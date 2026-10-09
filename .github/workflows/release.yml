@@ -1,0 +1,92 @@
+name: Release
+
+# Tag pushes such as v0.1.0 publish a GitHub Release with the Linux packages.
+# The workflow can also be started by hand from an existing tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    name: Build and publish Linux packages
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config file curl wget \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev libssl-dev
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Debian package
+        run: npm run desktop:deb
+
+      - name: Assemble standalone archive
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          mkdir -p dist/release/stage
+          cp target/release/tomato-todo dist/release/stage/
+          cp scripts/install.py dist/release/stage/
+          cp README.md dist/release/stage/
+          tar -czf "dist/release/tomato-todo-${VERSION}-x86_64-linux.tar.gz" -C dist/release/stage .
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: 番茄 Todo ${{ env.RELEASE_TAG }}
+          fail_on_unmatched_files: true
+          files: |
+            target/release/bundle/deb/*.deb
+            dist/release/*.tar.gz
+          body: |
+            首个公开版本：Rust + Tauri 的 Linux 桌面番茄钟与任务工具。
+
+            ## 亮点
+
+            - 任务、项目、子任务、重复规则、搜索与筛选
+            - 番茄钟、统计与专注历史（Rust 状态机，重启后按实际截止时间恢复）
+            - 学习计划 JSON v1 导入/导出，按 ID 合并去重
+            - 完整备份导入/导出（SQLite + JSON）
+            - niri / Wayland 专注保护、应用白名单与定时锁机
+            - 系统托盘、登录自启动、明暗主题与本地声音
+
+            ## 下载
+
+            - `*.deb`：Debian / Ubuntu，需要 GTK 3 与 WebKitGTK 4.1。
+            - `*-x86_64-linux.tar.gz`：Arch 等发行版；解压后运行
+              `python3 install.py --binary ./tomato-todo --autostart`。
+
+            桌面环境支持范围见 [README](https://github.com/AntheaLaffy/tomato-todo#桌面环境适配)。

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Tomato Todo",
+  "version": "0.1.0",
+  "identifier": "studio.tomato.todo",
+  "build": {
+    "beforeDevCommand": "npm run dev:ui",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "enableGTKAppId": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "番茄 Todo",
+        "width": 1440,
+        "height": 940,
+        "minWidth": 980,
+        "minHeight": 700,
+        "center": true,
+        "visible": false,
+        "backgroundColor": "#faf8f4"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost 'self'; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "category": "Productivity",
+    "linux": {
+      "deb": {
+        "desktopTemplate": "tomato.desktop.hbs"
+      }
+    },
+    "shortDescription": "任务与番茄钟，一个安静的专注空间",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ]
+  }
+}

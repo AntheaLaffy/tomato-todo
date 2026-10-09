@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "tasks": [],
+  "projects": [],
+  "settings": {
+    "focusMinutes": 25,
+    "shortBreakMinutes": 5,
+    "longBreakMinutes": 15,
+    "longBreakEvery": 4,
+    "dailyGoal": 8,
+    "autoBreak": false,
+    "autoFocus": false,
+    "sound": true,
+    "notifications": true,
+    "alwaysOnTop": false,
+    "theme": "light",
+    "protection": {
+      "mode": "off",
+      "whitelist": [],
+      "strict": false
+    }
+  },
+  "timer": {
+    "mode": "focus",
+    "running": false,
+    "taskId": null,
+    "durationSecs": 1500,
+    "remainingSecs": 1500,
+    "deadline": null,
+    "startedAt": null,
+    "cycle": 0,
+    "completionSerial": 0,
+    "lastFinishedMode": null
+  },
+  "sessions": [],
+  "lock": {
+    "schedules": [
+      {
+        "id": "example-night-rest",
+        "name": "晚间休息",
+        "start": "23:00",
+        "end": "07:00",
+        "days": [1, 2, 3, 4, 5, 6, 7],
+        "enabled": false,
+        "strict": true
+      }
+    ],
+    "active": null,
+    "suppressedUntil": 0
+  }
+}

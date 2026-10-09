@@ -1,0 +1,7 @@
+/target
+/node_modules
+/dist
+/artifacts
+/src-tauri/gen
+*.sqlite3*
+.DS_Store

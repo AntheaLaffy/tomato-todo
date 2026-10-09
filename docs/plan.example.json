@@ -1,0 +1,25 @@
+{
+  "format": "tomato-todo-plan",
+  "version": 1,
+  "pomodoroMinutes": 25,
+  "projects": [
+    { "id": "example-self-study", "name": "自主学习", "color": "#849b7d" }
+  ],
+  "tasks": [
+    {
+      "id": "example-self-study-chapter-1",
+      "title": "完成一章练习并复盘",
+      "notes": "先独立练习，再核对答案和记录错因。日期可按自己的安排填写。",
+      "projectId": "example-self-study",
+      "dueDate": null,
+      "priority": 2,
+      "estimate": 2,
+      "tags": ["练习"],
+      "subtasks": [
+        { "id": "attempt", "title": "先独立完成练习" },
+        { "id": "review", "title": "记录错因并复述方法" }
+      ],
+      "repeat": "none"
+    }
+  ]
+}

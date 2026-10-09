@@ -1,0 +1,32 @@
+{
+  "name": "tomato-todo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:ui": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build --no-bundle",
+    "desktop:deb": "tauri build --bundles deb",
+    "test": "cargo test -p tomato-core -p tomato-todo && cargo build -p tomato-preview && npm run build && node --test tests/integration.mjs tests/install.mjs",
+    "test:native": "npm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/native.mjs",
+    "format": "cargo fmt --all && prettier --write src scripts tests package.json",
+    "format:check": "cargo fmt --all --check && prettier --check \"src/**/*.{ts,css}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" package.json",
+    "check": "tsc --noEmit && cargo clippy --workspace --all-targets -- -D warnings",
+    "desktop:install": "python3 scripts/install.py",
+    "test:install": "node --test tests/install.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "lucide": "^1.53.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@tauri-apps/cli": "^2.12.1",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4"
+  }
+}
