@@ -112,6 +112,11 @@ test(
       ).toBeVisible();
       await page.waitForTimeout(2100);
       await page.getByRole("button", { name: "暂停专注", exact: true }).click();
+      // Wait for the pause to round-trip before reading the clock; otherwise
+      // the countdown can tick once more after the immediate read.
+      await expect(
+        page.getByRole("button", { name: "继续计时", exact: true }),
+      ).toBeVisible();
       const paused = await page.locator(".clock").innerText();
       assert.notEqual(paused, "25:00");
       await page.waitForTimeout(1100);
