@@ -2,9 +2,9 @@
 mode: maintenance
 ignore: See Scope and Exclusions
 stats:
-  total_files: 43
-  total_lines: 10564
-  total_size_bytes: 345746
+  total_files: 44
+  total_lines: 10577
+  total_size_bytes: 346428
 generated_at: 2026-10-09
 ---
 
@@ -60,3 +60,4 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录未建立 Git 仓库
 | index.html | 界面 | 页面根节点与入口 |
 | .gitignore | 维护 | 生成产物、私人分析和数据库排除 |
 | LICENSE | 维护 | MIT 许可，对应 Cargo 工作区 license 字段 |
+| CHANGELOG.md | 维护 | 版本变更与下一版本待办（音效由 GPT Astra 排期） |
