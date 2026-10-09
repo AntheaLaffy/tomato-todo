@@ -144,6 +144,25 @@ test(
       await page.getByRole("button", { name: "专注保护", exact: true }).click();
       await expect(page.locator("[data-guard-mode=lock]")).toBeDisabled();
       await expect(page.locator("#guard-strict")).toBeDisabled();
+      await page
+        .locator("#project-guard-select")
+        .selectOption({ label: "个人成长" });
+      await page.locator("[data-enable-project-whitelist]").click();
+      await page
+        .locator("#project-whitelist-form [name=appId]")
+        .fill("org.mozilla.firefox");
+      await page
+        .locator("#project-whitelist-form")
+        .getByRole("button", { name: "添加", exact: true })
+        .click();
+      await expect
+        .poll(async () => {
+          const snapshot = await (await fetch(`${url}/api/snapshot`)).json();
+          return snapshot.data.projects.find(
+            (project) => project.name === "个人成长",
+          )?.appWhitelist;
+        })
+        .toContain("org.mozilla.firefox");
       await page.getByRole("button", { name: "定时锁机", exact: true }).click();
       await expect(
         page.getByRole("button", { name: "开始快速锁机" }),

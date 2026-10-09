@@ -14,11 +14,15 @@ pub struct PlanFile {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PlanProject {
     pub id: String,
     pub name: String,
     pub color: String,
+    /// `None` keeps the local list; `Some` replaces it on import, which lets an
+    /// agent regenerate one project's allow-list without touching the rest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_whitelist: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -96,6 +100,7 @@ impl PlanFile {
                     id: p.id.clone(),
                     name: p.name.clone(),
                     color: p.color.clone(),
+                    app_whitelist: p.app_whitelist.clone(),
                 })
                 .collect(),
             tasks: self.tasks.iter().map(|t| t.task(0, t.estimate)).collect(),
@@ -108,17 +113,22 @@ impl PlanFile {
         self.validate()?;
         // Validate a full candidate first, so even direct callers never receive a partial merge.
         let mut next = data.clone();
-        let project_ids: HashSet<_> = data.projects.iter().map(|p| &p.id).collect();
-        next.projects.extend(
-            self.projects
-                .iter()
-                .filter(|p| !project_ids.contains(&p.id))
-                .map(|p| Project {
-                    id: p.id.clone(),
-                    name: p.name.clone(),
-                    color: p.color.clone(),
-                }),
-        );
+        for plan_project in &self.projects {
+            if let Some(existing) = next.projects.iter_mut().find(|p| p.id == plan_project.id) {
+                // Project config is regenerated, not progress, so a provided list
+                // wins over the local one; an omitted field keeps the local list.
+                if let Some(whitelist) = &plan_project.app_whitelist {
+                    existing.app_whitelist = Some(whitelist.clone());
+                }
+            } else {
+                next.projects.push(Project {
+                    id: plan_project.id.clone(),
+                    name: plan_project.name.clone(),
+                    color: plan_project.color.clone(),
+                    app_whitelist: plan_project.app_whitelist.clone(),
+                });
+            }
+        }
         let task_ids: HashSet<_> = data.tasks.iter().map(|t| &t.id).collect();
         for task in self.tasks.iter().filter(|t| !task_ids.contains(&t.id)) {
             let estimate =
@@ -176,6 +186,7 @@ impl AppData {
                     id: p.id.clone(),
                     name: p.name.clone(),
                     color: p.color.clone(),
+                    app_whitelist: p.app_whitelist.clone(),
                 })
                 .collect(),
             tasks,

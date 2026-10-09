@@ -33,6 +33,10 @@ pub struct Project {
     pub id: String,
     pub name: String,
     pub color: String,
+    /// When `Some`, this project's own list replaces the global whitelist during
+    /// a whitelist focus session; `None` keeps using the global list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_whitelist: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -96,6 +100,15 @@ pub struct TaskDraft {
 }
 fn default_estimate() -> u32 {
     1
+}
+
+/// App IDs must be short, non-blank and free of control characters, matching the
+/// global whitelist rule so project lists cannot smuggle in unenforceable values.
+fn valid_app_ids(list: &[String]) -> bool {
+    list.len() <= 100
+        && list
+            .iter()
+            .all(|a| !a.trim().is_empty() && a.len() <= 200 && !a.chars().any(char::is_control))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -234,16 +247,19 @@ impl Default for AppData {
                     id: id(),
                     name: "工作".into(),
                     color: "#df7561".into(),
+                    app_whitelist: None,
                 },
                 Project {
                     id: id(),
                     name: "学习".into(),
                     color: "#849b7d".into(),
+                    app_whitelist: None,
                 },
                 Project {
                     id: id(),
                     name: "生活".into(),
                     color: "#d5a553".into(),
+                    app_whitelist: None,
                 },
             ],
             settings: Settings::default(),
@@ -281,6 +297,10 @@ pub enum Action {
         id: Option<String>,
         name: String,
         color: String,
+    },
+    SetProjectWhitelist {
+        id: String,
+        whitelist: Option<Vec<String>>,
     },
     DeleteProject {
         id: String,
@@ -352,6 +372,21 @@ impl AppData {
             || (self.timer.running
                 && self.timer.mode == Mode::Focus
                 && self.settings.protection.mode != GuardMode::Off)
+    }
+    /// Permitted app IDs for a whitelist-mode focus session. A project that has
+    /// its own list replaces the global one; otherwise the global list applies.
+    pub fn effective_whitelist(&self) -> Vec<String> {
+        let project = self
+            .timer
+            .task_id
+            .as_ref()
+            .and_then(|id| self.tasks.iter().find(|t| &t.id == id))
+            .and_then(|t| t.project_id.as_ref())
+            .and_then(|id| self.projects.iter().find(|p| &p.id == id));
+        match project.and_then(|p| p.app_whitelist.as_ref()) {
+            Some(list) => list.clone(),
+            None => self.settings.protection.whitelist.clone(),
+        }
     }
     pub fn strict_protected(&self) -> bool {
         self.lock.active.as_ref().is_some_and(|a| a.strict)
@@ -632,8 +667,17 @@ impl AppData {
                         id: id(),
                         name: name.trim().into(),
                         color,
+                        app_whitelist: None,
                     });
                 }
+            }
+            Action::SetProjectWhitelist { id: pid, whitelist } => {
+                let p = self
+                    .projects
+                    .iter_mut()
+                    .find(|p| p.id == pid)
+                    .ok_or("项目不存在")?;
+                p.app_whitelist = whitelist;
             }
             Action::DeleteProject { id } => {
                 self.projects.retain(|p| p.id != id);
@@ -777,13 +821,7 @@ impl AppData {
             ["light", "dark", "system"].contains(&s.theme.as_str()),
             "无效的主题",
         )?;
-        ensure(
-            s.protection.whitelist.len() <= 100
-                && s.protection.whitelist.iter().all(|a| {
-                    !a.trim().is_empty() && a.len() <= 200 && !a.chars().any(char::is_control)
-                }),
-            "无效的应用白名单",
-        )?;
+        ensure(valid_app_ids(&s.protection.whitelist), "无效的应用白名单")?;
         let mut ids = HashSet::new();
         for p in &self.projects {
             ensure(!p.id.is_empty() && ids.insert(&p.id), "项目 ID 重复或为空")?;
@@ -796,6 +834,10 @@ impl AppData {
                     && p.color.starts_with('#')
                     && p.color[1..].bytes().all(|b| b.is_ascii_hexdigit()),
                 "无效的项目颜色",
+            )?;
+            ensure(
+                p.app_whitelist.as_ref().is_none_or(|l| valid_app_ids(l)),
+                "无效的项目应用白名单",
             )?;
         }
         let projects = ids;

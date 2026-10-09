@@ -190,7 +190,9 @@ fn main() {
                             ..Default::default()
                         }
                     } else {
-                        s.data.settings.protection.clone()
+                        let mut protection = s.data.settings.protection.clone();
+                        protection.whitelist = s.data.effective_whitelist();
+                        protection
                     };
                     match guard::enforce(&protection, std::process::id()) {
                         Ok(true) => {

@@ -3,7 +3,12 @@
   "version": 1,
   "pomodoroMinutes": 25,
   "projects": [
-    { "id": "example-self-study", "name": "自主学习", "color": "#849b7d" }
+    {
+      "id": "example-self-study",
+      "name": "自主学习",
+      "color": "#849b7d",
+      "appWhitelist": ["org.mozilla.firefox", "example.dictionary"]
+    }
   ],
   "tasks": [
     {

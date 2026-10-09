@@ -355,6 +355,158 @@ fn plan_defaults_and_protection_match_task_contract() {
     assert!(e.data.tasks.is_empty());
 }
 
+fn project_whitelist(e: &mut Engine, id: &str) -> Option<Vec<String>> {
+    e.snapshot(1000)
+        .unwrap()
+        .data
+        .projects
+        .iter()
+        .find(|p| p.id == id)
+        .unwrap()
+        .app_whitelist
+        .clone()
+}
+
+#[test]
+fn plan_project_whitelist_is_added_then_overwritten_by_import() {
+    let mut e = engine();
+    let create: plan::PlanFile = serde_json::from_str(
+        r##"{"format":"tomato-todo-plan","version":1,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d","appWhitelist":["org.mozilla.firefox"]}],"tasks":[{"id":"t1","title":"词汇","projectId":"english"}]}"##,
+    )
+    .unwrap();
+    e.dispatch(Action::ImportPlan { plan: create }, 1000)
+        .unwrap();
+    assert_eq!(
+        project_whitelist(&mut e, "english"),
+        Some(vec!["org.mozilla.firefox".to_string()])
+    );
+
+    // A regenerated file replaces the list, which is the agent round-trip.
+    let update: plan::PlanFile = serde_json::from_str(
+        r##"{"format":"tomato-todo-plan","version":1,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d","appWhitelist":["org.mozilla.firefox","mdict"]}],"tasks":[]}"##,
+    )
+    .unwrap();
+    e.dispatch(Action::ImportPlan { plan: update }, 1010)
+        .unwrap();
+    assert_eq!(
+        project_whitelist(&mut e, "english"),
+        Some(vec!["org.mozilla.firefox".to_string(), "mdict".to_string()])
+    );
+
+    // Omitting the field keeps the local list instead of clearing it.
+    let keep: plan::PlanFile = serde_json::from_str(
+        r##"{"format":"tomato-todo-plan","version":1,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d"}],"tasks":[]}"##,
+    )
+    .unwrap();
+    e.dispatch(Action::ImportPlan { plan: keep }, 1020).unwrap();
+    assert_eq!(
+        project_whitelist(&mut e, "english"),
+        Some(vec!["org.mozilla.firefox".to_string(), "mdict".to_string()])
+    );
+}
+
+#[test]
+fn effective_whitelist_prefers_project_list_over_global() {
+    let mut e = engine();
+    let mut settings = Settings::default();
+    settings.protection.whitelist = vec!["global.app".into()];
+    e.dispatch(Action::SaveSettings { settings }, 1000).unwrap();
+    let project = e
+        .dispatch(
+            Action::SaveProject {
+                id: None,
+                name: "英语".into(),
+                color: "#849b7d".into(),
+            },
+            1000,
+        )
+        .unwrap()
+        .data
+        .projects
+        .last()
+        .unwrap()
+        .id
+        .clone();
+    let task = e
+        .dispatch(
+            Action::SaveTask {
+                task: TaskDraft {
+                    project_id: Some(project.clone()),
+                    ..draft()
+                },
+            },
+            1000,
+        )
+        .unwrap()
+        .data
+        .tasks
+        .last()
+        .unwrap()
+        .id
+        .clone();
+    // Before selecting a task only the global list applies.
+    assert_eq!(
+        e.snapshot(1000).unwrap().data.effective_whitelist(),
+        vec!["global.app".to_string()]
+    );
+    e.dispatch(Action::SelectTask { id: Some(task) }, 1000)
+        .unwrap();
+    // Without a dedicated list the global list still applies.
+    assert_eq!(
+        e.snapshot(1000).unwrap().data.effective_whitelist(),
+        vec!["global.app".to_string()]
+    );
+    // A dedicated list replaces the global one, so a project-only app is
+    // allowed and the broader global list no longer is.
+    e.dispatch(
+        Action::SetProjectWhitelist {
+            id: project.clone(),
+            whitelist: Some(vec!["dict".into()]),
+        },
+        1000,
+    )
+    .unwrap();
+    assert_eq!(
+        e.snapshot(1000).unwrap().data.effective_whitelist(),
+        vec!["dict".to_string()]
+    );
+    // Disabling falls back to the global list.
+    e.dispatch(
+        Action::SetProjectWhitelist {
+            id: project.clone(),
+            whitelist: None,
+        },
+        1000,
+    )
+    .unwrap();
+    assert_eq!(
+        e.snapshot(1000).unwrap().data.effective_whitelist(),
+        vec!["global.app".to_string()]
+    );
+    // A blank project app ID is rejected without clobbering the stored list.
+    assert!(e
+        .dispatch(
+            Action::SetProjectWhitelist {
+                id: project.clone(),
+                whitelist: Some(vec!["  ".into()]),
+            },
+            1000,
+        )
+        .is_err());
+    e.dispatch(
+        Action::SetProjectWhitelist {
+            id: project,
+            whitelist: Some(vec!["dict".into()]),
+        },
+        1000,
+    )
+    .unwrap();
+    assert_eq!(
+        e.snapshot(1000).unwrap().data.effective_whitelist(),
+        vec!["dict".to_string()]
+    );
+}
+
 #[test]
 fn protection_rejects_mutations_until_emergency_or_completion() {
     let mut e = engine();

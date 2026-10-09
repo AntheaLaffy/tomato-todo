@@ -1,7 +1,14 @@
 {
   "version": 1,
   "tasks": [],
-  "projects": [],
+  "projects": [
+    {
+      "id": "example-study",
+      "name": "自主学习",
+      "color": "#849b7d",
+      "appWhitelist": ["org.mozilla.firefox"]
+    }
+  ],
   "settings": {
     "focusMinutes": 25,
     "shortBreakMinutes": 5,

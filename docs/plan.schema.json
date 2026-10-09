@@ -50,6 +50,16 @@
         "color": {
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "appWhitelist": {
+          "type": "array",
+          "maxItems": 100,
+          "description": "应用 ID 精确匹配；提供即启用该项目专属白名单并覆盖旧值，省略则不改动本机列表。",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
         }
       }
     },

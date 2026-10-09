@@ -158,6 +158,7 @@ let search = "";
 let immersive = false;
 let noiseKind = "off";
 let guardInfo: GuardInfo | null = null;
+let guardProjectId: string | null = null;
 let nativeStatus: DesktopStatus | null = null;
 let pending = false;
 let serial = -1;
@@ -538,6 +539,17 @@ function desktopSettingsCard() {
 function guardPage() {
   const p = state.data.settings.protection;
   if (!guardInfo) void refreshGuard();
+  const selectedProject =
+    state.data.projects.find((x) => x.id === guardProjectId) ??
+    state.data.projects[0];
+  const selectedList = selectedProject?.appWhitelist ?? [];
+  const availableApps = [
+    ...new Map(
+      (guardInfo?.windows || [])
+        .filter((w) => w.app_id)
+        .map((w) => [w.app_id!, w]),
+    ).values(),
+  ];
   return `${heading("让分心，暂时留在外面。", "为重要的事，留出一段有边界的时间。", "A QUIETER SPACE FOR YOUR MIND", false)}
   <div class="guard-intro"><div class="guard-emblem">${icon("shield-check")}</div><div><h2>专注保护</h2><p>只在专注计时期间生效，休息时自动解除。保护中无法暂停、修改设置或关闭应用；开启严格模式后，必须等到计时结束。</p></div><span class="badge ${guardInfo?.available ? "success" : ""}">${escape(guardInfo?.backend || "正在检测桌面…")}</span></div>
   <section class="card guard-card"><div class="card-heading"><h2>选择你的专注方式</h2></div><div class="guard-modes">${[
@@ -563,6 +575,35 @@ function guardPage() {
       "",
     )}</div><div class="guard-capability ${guardInfo?.available ? "available" : ""}">${icon(guardInfo?.available ? "check-circle-2" : "alert-circle")}<span>${escape(guardInfo?.message || "正在检查窗口控制接口…")}</span></div></section>
   <section class="card guard-card"><label class="setting-row"><span><strong>严格模式 · 不允许临时退出</strong><small>用于界面锁定和应用白名单。开启后，计时中不能暂停、提前结束或关闭保护；结束时自动解除。</small></span><input id="guard-strict" class="switch" type="checkbox" ${p.strict ? "checked" : ""} ${!guardInfo?.available ? "disabled" : ""}></label><p class="subtle small">请在开始前确认所需应用已加入白名单。未开启严格模式时，仍可通过确认文字提前结束。</p></section><section class="card whitelist-card"><div class="card-heading"><div><h2>允许使用的应用 <span class="count-label">${p.whitelist.length}</span></h2><p class="subtle small">以应用 ID 精确匹配。番茄 Todo 始终允许使用。</p></div><button class="button secondary small-button" data-action="refresh-apps">${icon("refresh-cw")} 刷新应用</button></div><div class="whitelist-tags">${p.whitelist.map((app) => `<span class="app-tag">${icon("monitor")} ${escape(app)}<button class="icon-btn tiny" data-remove-app="${escape(app)}" aria-label="移除 ${escape(app)}">${icon("x")}</button></span>`).join("") || '<p class="subtle small">还没有添加应用。先打开需要使用的软件，再从下方添加。</p>'}</div><div class="available-apps">${[...new Map((guardInfo?.windows || []).filter((w) => w.app_id).map((w) => [w.app_id!, w])).values()].map((w) => `<button class="available-app" data-add-app="${escape(w.app_id)}" ${p.whitelist.includes(w.app_id!) ? "disabled" : ""}>${icon("monitor")}<span><strong>${escape(w.app_id)}</strong><small>${escape(w.title)}</small></span>${icon(p.whitelist.includes(w.app_id!) ? "check" : "plus")}</button>`).join("")}</div><form id="whitelist-form" class="manual-app"><input name="appId" maxlength="200" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form></section>
+  <section class="card whitelist-card"><div class="card-heading"><div><h2>按项目白名单</h2><p class="subtle small">给某一类任务一套更贴合的放行清单；没启用专属清单的项目沿用上面的通用白名单。批量维护时导出计划，让 AI 修改项目的 appWhitelist 再导入覆盖。</p></div><select id="project-guard-select" aria-label="选择项目">${
+    state.data.projects
+      .map(
+        (x) =>
+          `<option value="${escape(x.id)}" ${x.id === selectedProject?.id ? "selected" : ""}>${escape(x.name)}</option>`,
+      )
+      .join("") || '<option value="">暂无项目</option>'
+  }</select></div>${
+    selectedProject
+      ? selectedProject.appWhitelist
+        ? `<div class="button-row"><span class="badge success">${icon("shield-check")} 专属白名单 · ${selectedList.length} 个应用</span><button type="button" class="text-button" data-guard-project="${escape(selectedProject.id)}" data-disable-project-whitelist="true">改用通用白名单</button></div><div class="whitelist-tags">${
+            selectedList
+              .map(
+                (app) =>
+                  `<span class="app-tag">${icon("monitor")} ${escape(app)}<button class="icon-btn tiny" data-guard-project="${escape(selectedProject.id)}" data-remove-project-app="${escape(app)}" aria-label="移除 ${escape(app)}">${icon("x")}</button></span>`,
+              )
+              .join("") ||
+            '<p class="subtle small">专属清单是空的，专注这个项目时只允许番茄 Todo。</p>'
+          }</div><div class="available-apps">${availableApps
+            .map(
+              (w) =>
+                `<button class="available-app" data-guard-project="${escape(selectedProject.id)}" data-add-project-app="${escape(w.app_id)}" ${selectedList.includes(w.app_id!) ? "disabled" : ""}>${icon("monitor")}<span><strong>${escape(w.app_id)}</strong><small>${escape(w.title)}</small></span>${icon(selectedList.includes(w.app_id!) ? "check" : "plus")}</button>`,
+            )
+            .join(
+              "",
+            )}</div><form id="project-whitelist-form" class="manual-app"><input type="hidden" name="projectId" value="${escape(selectedProject.id)}"><input name="appId" maxlength="200" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="项目应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form>`
+        : `<div class="button-row"><span class="badge">${icon("shield-check")} 使用通用白名单 · ${p.whitelist.length} 个应用</span><button type="button" class="button secondary small-button" data-guard-project="${escape(selectedProject.id)}" data-enable-project-whitelist="true">${icon("plus")} 启用专属白名单</button></div><p class="subtle small">启用后，专注这个项目的任务时只用专属清单，不再套用通用白名单。</p>`
+      : '<p class="subtle small">还没有项目。</p>'
+  }</section>
   <div class="guard-explanation">${icon("circle-help")}<p>白名单限制的是整个应用，不区分浏览器网站。此功能使用 niri 的窗口接口，每 0.6 秒检查一次并拉回未允许的窗口；不会结束其他软件。系统快捷键、桌面概览、多个显示器和主动终止进程不属于这项自律保护的管控范围。</p></div>`;
 }
 async function refreshGuard() {
@@ -1033,6 +1074,22 @@ function bindForms() {
       const f = new FormData(e.target as HTMLFormElement);
       await addWhitelist(String(f.get("appId")).trim());
     });
+  document
+    .querySelector<HTMLSelectElement>("#project-guard-select")
+    ?.addEventListener("change", (e) => {
+      guardProjectId = (e.target as HTMLSelectElement).value;
+      render();
+    });
+  document
+    .querySelector<HTMLFormElement>("#project-whitelist-form")
+    ?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target as HTMLFormElement);
+      await addProjectWhitelist(
+        String(f.get("projectId")),
+        String(f.get("appId")).trim(),
+      );
+    });
 }
 function updateTaskResults() {
   let tasks = state.data.tasks.filter(
@@ -1063,6 +1120,30 @@ async function addWhitelist(app: string) {
       },
       "已加入白名单",
     );
+}
+async function saveProjectWhitelist(
+  id: string,
+  whitelist: string[] | null,
+  message?: string,
+) {
+  await act({ type: "setProjectWhitelist", id, whitelist }, message);
+}
+async function addProjectWhitelist(id: string, app: string) {
+  const project = state.data.projects.find((p) => p.id === id);
+  if (!project || !app || project.appWhitelist?.includes(app)) return;
+  await saveProjectWhitelist(
+    id,
+    [...(project.appWhitelist ?? []), app],
+    "已加入项目白名单",
+  );
+}
+async function removeProjectWhitelist(id: string, app: string) {
+  const project = state.data.projects.find((p) => p.id === id);
+  if (!project?.appWhitelist) return;
+  await saveProjectWhitelist(
+    id,
+    project.appWhitelist.filter((a) => a !== app),
+  );
 }
 async function toggleTimer() {
   if (
@@ -1118,9 +1199,12 @@ async function importPlan() {
     }
     const existing = new Set(state.data.tasks.map((t) => t.id));
     const added = plan.tasks.filter((t) => !existing.has(t.id)).length;
+    const whitelisted = plan.projects.filter((p) =>
+      Array.isArray(p.appWhitelist),
+    ).length;
     confirmDialog(
       "合并学习计划？",
-      `文件含 ${plan.tasks.length} 个任务，预计新增 ${added} 个。同 ID 的已有任务和进度保留；新任务从未完成开始。预计番茄数按当前 ${state.data.settings.focusMinutes} 分钟向上折算，设置和专注记录保留。`,
+      `文件含 ${plan.tasks.length} 个任务，预计新增 ${added} 个。同 ID 的已有任务和进度保留；新任务从未完成开始。预计番茄数按当前 ${state.data.settings.focusMinutes} 分钟向上折算，设置和专注记录保留。${whitelisted ? `文件里 ${whitelisted} 个项目的应用白名单会覆盖本机同名项目。` : ""}`,
       "导入计划",
       async () => {
         await act({ type: "importPlan", plan }, "学习计划已合并");
@@ -1247,6 +1331,22 @@ document.addEventListener("click", async (e) => {
   }
   if (d.addApp) {
     await addWhitelist(d.addApp);
+    return;
+  }
+  if (d.addProjectApp && d.guardProject) {
+    await addProjectWhitelist(d.guardProject, d.addProjectApp);
+    return;
+  }
+  if (d.removeProjectApp && d.guardProject) {
+    await removeProjectWhitelist(d.guardProject, d.removeProjectApp);
+    return;
+  }
+  if (d.enableProjectWhitelist && d.guardProject) {
+    await saveProjectWhitelist(d.guardProject, [], "已启用专属白名单");
+    return;
+  }
+  if (d.disableProjectWhitelist && d.guardProject) {
+    await saveProjectWhitelist(d.guardProject, null, "已改用通用白名单");
     return;
   }
   if (d.removeApp) {

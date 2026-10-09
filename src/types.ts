@@ -4,6 +4,13 @@ export interface Project {
   id: string;
   name: string;
   color: string;
+  appWhitelist: string[] | null;
+}
+export interface PlanProject {
+  id: string;
+  name: string;
+  color: string;
+  appWhitelist?: string[];
 }
 export interface Subtask {
   id: string;
@@ -94,7 +101,7 @@ export interface PlanFile {
   format: "tomato-todo-plan";
   version: 1;
   pomodoroMinutes: number;
-  projects: Project[];
+  projects: PlanProject[];
   tasks: {
     id: string;
     title: string;

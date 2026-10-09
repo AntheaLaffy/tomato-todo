@@ -3,8 +3,8 @@ mode: maintenance
 ignore: See Scope and Exclusions
 stats:
   total_files: 43
-  total_lines: 10182
-  total_size_bytes: 328055
+  total_lines: 10564
+  total_size_bytes: 345746
 generated_at: 2026-10-09
 ---
 
