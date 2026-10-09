@@ -2,9 +2,9 @@
 mode: maintenance
 ignore: See Scope and Exclusions
 stats:
-  total_files: 40
-  total_lines: 9966
-  total_size_bytes: 319407
+  total_files: 43
+  total_lines: 10182
+  total_size_bytes: 328055
 generated_at: 2026-10-09
 ---
 
@@ -31,6 +31,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录未建立 Git 仓库
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、src-tauri/src/main.rs | tests/native.mjs、src 的 guardPage |
 | 启动/打包/测试 | 构建 | README.md、package.json | src-tauri/tauri.conf.json、scripts/ |
 | 安装/自启动/托盘/快捷栏 | 桌面 | src-tauri/src/desktop.rs、scripts/install.py | src/api.ts、src 的桌面设置、tests/native.mjs、tests/install.mjs |
+| 配置 CI/CD、发布版本 | 构建 | .github/CODEMAP.md | package.json、src-tauri/tauri.conf.json、README.md |
 | 维护项目结构 | 维护 | AGENTS.md、各级 CODEMAP.md | 实际新增/删除的文件 |
 
 ## 子目录
@@ -41,6 +42,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录未建立 Git 仓库
 | src-tauri/ | 桌面 | core、Tauri | 原生 IPC、窗口、通知与打包 |
 | src/ | 界面 | Tauri API、Lucide | TypeScript 与 CSS 界面 |
 | scripts/ | 构建 | Cargo、npm、Python | 开发服务与 Linux 用户安装 |
+| .github/ | 构建 | GitHub Actions、Ubuntu 22.04 | CI 与标签发布工作流 |
 | tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
 | docs/ | 文件契约 | Rust core | 学习计划 v1 标准、Schema 与通用示例 |
 | public/ | 资源 | Vite | Internals not indexed：本地图标、字体及字体许可证 |
@@ -57,3 +59,4 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录未建立 Git 仓库
 | vite.config.ts | 构建 | UI 构建与 /api 预览代理 |
 | index.html | 界面 | 页面根节点与入口 |
 | .gitignore | 维护 | 生成产物、私人分析和数据库排除 |
+| LICENSE | 维护 | MIT 许可，对应 Cargo 工作区 license 字段 |
