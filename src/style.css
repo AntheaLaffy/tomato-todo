@@ -1383,8 +1383,8 @@ main {
 }
 .week-chart {
   display: flex;
-  padding: 10px 23px 20px 20px;
-  height: 157px;
+  padding: 22px 23px 20px 20px;
+  height: 167px;
 }
 .chart-axis {
   display: flex;
@@ -1450,16 +1450,13 @@ main {
   color: var(--accent);
 }
 .bar-value {
-  display: none;
+  display: block;
   color: var(--secondary);
   font-size: 10px;
   position: absolute;
-  top: -14px;
+  top: -15px;
   white-space: nowrap;
   z-index: 2;
-}
-.chart-column:hover .bar-value {
-  display: block;
 }
 .bar-value small {
   font-size: 8px;
