@@ -106,6 +106,21 @@ pub fn enforce(protection: &Protection, own_pid: u32) -> AppResult<bool> {
     }
     Ok(false)
 }
+/// Ask niri to focus our own window. A plain focus request can be ignored under
+/// niri, while the IPC action is honoured; this is what pulls the user back after
+/// a reminder or a finished focus/break.
+pub fn focus_own(own_pid: u32) -> AppResult<()> {
+    let windows = windows()?;
+    let own = windows
+        .iter()
+        .find(|w| w.pid == Some(own_pid))
+        .ok_or("未找到番茄 Todo 的窗口")?;
+    if own.is_focused {
+        return Ok(());
+    }
+    request(json!({"Action": {"FocusWindow": {"id": own.id}}}))?;
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

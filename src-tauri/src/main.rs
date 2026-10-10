@@ -8,6 +8,19 @@ use tauri_plugin_notification::NotificationExt;
 use tomato_core::{guard, now, Action, AppResult, Engine, GuardMode, Mode, Snapshot};
 
 type Shared = Arc<Mutex<Engine>>;
+/// Show the window and ask niri to focus it. `set_focus` alone is a request the
+/// compositor may ignore, so retry the IPC focus briefly while the window maps.
+fn refocus(handle: &tauri::AppHandle) {
+    desktop::show(handle);
+    std::thread::spawn(|| {
+        for _ in 0..8 {
+            if guard::focus_own(std::process::id()).is_ok() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(120));
+        }
+    });
+}
 #[tauri::command]
 fn snapshot(engine: State<Shared>) -> AppResult<Snapshot> {
     engine.lock().map_err(|e| e.to_string())?.snapshot(now())
@@ -174,7 +187,7 @@ fn main() {
                     .map(|t| format!("{}/{:?}/{:?}", t.id, t.due_date, t.reminder_time));
                 if pending != reminded {
                     if let Some(t) = s.data.pending_reminder() {
-                        desktop::show(&handle);
+                        refocus(&handle);
                         if s.data.settings.notifications {
                             let _ = handle
                                 .notification()
@@ -230,7 +243,7 @@ fn main() {
                     serial = s.data.timer.completion_serial;
                     // A finished focus or break is exactly when the next decision is
                     // made, so bring the window back instead of only notifying.
-                    desktop::show(&handle);
+                    refocus(&handle);
                     let body = if s.data.timer.last_finished_mode == Some(Mode::Focus) {
                         "又完成了一个番茄。起身活动一下，休息也很重要。"
                     } else {
