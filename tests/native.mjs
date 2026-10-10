@@ -105,6 +105,14 @@ function trayClick(label) {
 }
 const click = (selector) =>
   js(`document.querySelector(${JSON.stringify(selector)}).click()`);
+async function trustedClick(selector) {
+  const element = await wd("/element", {
+    using: "css selector",
+    value: selector,
+  });
+  const id = element["element-6066-11e4-a52e-4f735466cecf"];
+  await wd(`/element/${id}/click`, {});
+}
 const waitSelector = (selector) =>
   until(
     () => js(`return !!document.querySelector(${JSON.stringify(selector)})`),
@@ -286,8 +294,28 @@ try {
     "Whitelist not selected",
   );
   await click("[data-page=focus]");
-  await click("[data-action=toggle-timer]");
+  await js(`
+    window.audioNotes = 0;
+    const create = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function (...args) {
+      window.audioNotes++;
+      window.audioState = this.state;
+      return create.apply(this, args);
+    };
+  `);
+  await trustedClick("[data-action=toggle-timer]");
   await waitSelector(".protected-clock");
+  await until(
+    () => js("return window.audioNotes === 2"),
+    "WebKit must play one focus-start cue",
+  );
+  assert.equal(await js("return window.audioState"), "running");
+  await pause(1100);
+  assert.equal(
+    await js("return window.audioNotes"),
+    2,
+    "Polling must not replay the start cue",
+  );
   await niri({ Action: { FocusWindow: { id: allowed.id } } });
   await pause(1400);
   assert.equal(
@@ -379,6 +407,8 @@ try {
   // Exercise reminder focus only in this private nested desktop.
   assert.equal((await invoke("hide_to_tray")).error, undefined);
   const reminderToday = (await invoke("snapshot")).value.today;
+  const reminderNow = new Date();
+  const reminderTime = `${String(reminderNow.getHours()).padStart(2, "0")}:${String(reminderNow.getMinutes()).padStart(2, "0")}`;
   const reminderResult = await invoke("dispatch", {
     action: {
       type: "saveTask",
@@ -387,7 +417,7 @@ try {
         title: "隔离桌面时间提醒",
         projectId: null,
         dueDate: reminderToday,
-        reminderTime: "00:00",
+        reminderTime,
         focusMinutes: 40,
       },
     },

@@ -3,6 +3,33 @@ use super::*;
 fn example_plan() -> plan::PlanFile {
     serde_json::from_str(include_str!("../../../docs/plan.example.json")).unwrap()
 }
+
+#[test]
+fn sound_volume_defaults_for_old_backups_and_round_trips_with_range_validation() {
+    let mut old = serde_json::to_value(AppData::default()).unwrap();
+    old["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("soundVolume");
+    let data: AppData = serde_json::from_value(old).unwrap();
+    assert_eq!(data.settings.sound_volume, 40);
+    let mut e = engine();
+    for level in [0, 65, 100] {
+        let settings = Settings {
+            sound_volume: level,
+            ..Settings::default()
+        };
+        e.dispatch(Action::SaveSettings { settings }, 1000).unwrap();
+        let exported: AppData = serde_json::from_str(&e.export(1000).unwrap()).unwrap();
+        assert_eq!(exported.settings.sound_volume, level);
+    }
+    let settings = Settings {
+        sound_volume: 101,
+        ..Settings::default()
+    };
+    assert!(e.dispatch(Action::SaveSettings { settings }, 1000).is_err());
+    assert_eq!(e.snapshot(1000).unwrap().data.settings.sound_volume, 100);
+}
 #[test]
 fn documented_backup_example_loads_and_round_trips_new_lock_fields() {
     let data: AppData =

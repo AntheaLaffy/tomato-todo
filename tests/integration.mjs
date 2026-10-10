@@ -45,6 +45,14 @@ test(
       });
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
+      await page.addInitScript(() => {
+        window.audioNotes = 0;
+        const create = AudioContext.prototype.createOscillator;
+        AudioContext.prototype.createOscillator = function (...args) {
+          window.audioNotes++;
+          return create.apply(this, args);
+        };
+      });
       await page.goto(url);
       await expect(
         page.getByRole("heading", { name: "今天，也要慢慢向前。" }),
@@ -100,6 +108,7 @@ test(
       // Completion changes only this instance. A manual template prints a finite
       // batch explicitly; automatic templates extend their rolling horizon.
       const afterCompletion = await (await fetch(`${url}/api/snapshot`)).json();
+      await expect.poll(() => page.evaluate(() => window.audioNotes)).toBe(2);
       assert.equal(afterCompletion.data.tasks.length, 1);
       const tomorrow = new Date(`${afterCompletion.today}T12:00:00Z`);
       tomorrow.setUTCDate(tomorrow.getUTCDate() + 7);
@@ -183,11 +192,35 @@ test(
       await expect(page.locator(".clock")).toHaveText("25:00");
       await page.getByRole("button", { name: "偏好设置", exact: true }).click();
       await page.locator("[name=focusMinutes]").fill("30");
+      await expect(page.locator("[name=soundVolume]")).toHaveValue("40");
+      await page.locator("[name=soundVolume]").fill("23");
+      await expect(page.locator("#sound-preview option")).toHaveCount(11);
+      await page.locator("#sound-preview").selectOption("reminder");
+      const notesBeforePreview = await page.evaluate(() => window.audioNotes);
+      await page.getByRole("button", { name: "试听音效", exact: true }).click();
+      await expect
+        .poll(() => page.evaluate(() => window.audioNotes))
+        .toBe(notesBeforePreview + 2);
+      await page.locator("[name=sound]").uncheck();
       await page.getByRole("button", { name: "保存设置", exact: true }).click();
       await expect(page.locator("#settings-status")).toHaveText(
         "更改后记得保存",
       );
       await page.reload();
+      await expect(page.locator(".clock")).toHaveText("30:00");
+      assert.equal(await page.evaluate(() => window.audioNotes), 0);
+      await page.getByRole("button", { name: "开始专注", exact: true }).click();
+      await expect(
+        page.getByRole("button", { name: "暂停专注", exact: true }),
+      ).toBeVisible();
+      assert.equal(await page.evaluate(() => window.audioNotes), 0);
+      await page.waitForTimeout(1100);
+      await page.getByRole("button", { name: "暂停专注", exact: true }).click();
+      await expect(
+        page.getByRole("button", { name: "继续计时", exact: true }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "重置计时", exact: true }).click();
+      await page.locator("#confirm-button").click();
       await expect(page.locator(".clock")).toHaveText("30:00");
       await page
         .getByRole("button", { name: "切换明暗主题", exact: true })
@@ -197,7 +230,7 @@ test(
         .getByRole("button", { name: "切换明暗主题", exact: true })
         .click();
       await page.getByRole("button", { name: "数据统计", exact: true }).click();
-      await expect(page.locator(".history-row")).toHaveCount(1);
+      await expect(page.locator(".history-row")).toHaveCount(2);
       await page.getByRole("button", { name: "专注保护", exact: true }).click();
       await expect(page.locator("[data-guard-mode=lock]")).toBeDisabled();
       await expect(page.locator("#guard-strict")).toBeDisabled();
@@ -244,6 +277,8 @@ test(
       await download.saveAs(backupPath);
       const backup = JSON.parse(await readFile(backupPath, "utf8"));
       assert.equal(backup.settings.focusMinutes, 30);
+      assert.equal(backup.settings.soundVolume, 23);
+      assert.equal(backup.settings.sound, false);
       assert.equal(backup.tasks.length, 2);
       const planDownloadEvent = page.waitForEvent("download");
       await page.getByRole("button", { name: "导出计划", exact: true }).click();

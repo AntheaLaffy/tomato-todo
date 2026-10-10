@@ -13,6 +13,6 @@ generated_at: 2026-10-10
 | PLAN_FORMAT.md | 文件契约 | v4 主线配置、模板/规则/印刷/实例、滚动预印/手动批次、报废/待补、旧 v1/v2 转换、按 ID 更新配置与 `replace` 整份同步 |
 | plan.schema.json | 文件契约 | JSON Schema 2020-12 结构、时间字段与单项范围校验 |
 | plan.example.json | 示例 | 通用可导入计划，不作为默认种子 |
-| BACKUP_FORMAT.md | 文件契约 | 完整备份 v3、节点裁定、配对、信号、ID 历史及严格模式/定时锁机字段和恢复时停用规则 |
+| BACKUP_FORMAT.md | 文件契约 | 完整备份 v3、节点裁定、配对、信号、ID 历史、音效开关/音量及严格模式/定时锁机字段和恢复时停用规则 |
 | backup.schema.json | 文件契约 | 完整备份与旧文件缺省兼容的 JSON Schema |
 | backup.example.json | 示例 | 无私人数据、包含静态模板与停用锁机规则的备份示例 |

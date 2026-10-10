@@ -229,6 +229,8 @@ pub struct Settings {
     pub auto_break: bool,
     pub auto_focus: bool,
     pub sound: bool,
+    #[serde(default = "default_sound_volume")]
+    pub sound_volume: u8,
     pub notifications: bool,
     pub always_on_top: bool,
     pub theme: String,
@@ -253,6 +255,9 @@ pub enum GuardMode {
     Lock,
     Whitelist,
 }
+fn default_sound_volume() -> u8 {
+    40
+}
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -264,6 +269,7 @@ impl Default for Settings {
             auto_break: false,
             auto_focus: false,
             sound: true,
+            sound_volume: default_sound_volume(),
             notifications: true,
             always_on_top: false,
             theme: "light".into(),
@@ -1418,6 +1424,7 @@ impl AppData {
             "数据超出数量限制",
         )?;
         let s = &self.settings;
+        ensure(s.sound_volume <= 100, "音效音量需为 0–100")?;
         ensure(
             (1..=180).contains(&s.focus_minutes)
                 && (1..=60).contains(&s.short_break_minutes)

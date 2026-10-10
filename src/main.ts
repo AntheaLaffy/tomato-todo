@@ -69,7 +69,15 @@ import {
   readImport,
   readPlan,
 } from "./api";
-import { chime, setNoise, setNoiseVolume, unlockAudio } from "./audio";
+import {
+  playSound,
+  stopSound,
+  setNoise,
+  setNoiseVolume,
+  unlockAudio,
+} from "./audio";
+import type { SoundCue } from "./audio";
+import { pendingTaskReminder, soundForTransition } from "./sound-events";
 import type {
   AppData,
   DesktopStatus,
@@ -177,6 +185,7 @@ let guardInfo: GuardInfo | null = null;
 let nativeStatus: DesktopStatus | null = null;
 let pending = false;
 let serial = -1;
+let snapshotRevision = 0;
 let disconnected = false;
 let settingsDirty = false;
 let blockedCount = 0;
@@ -289,7 +298,7 @@ async function act(
   if (pending) return false;
   pending = true;
   try {
-    accept(await dispatch(action));
+    accept(await dispatch(action), action);
     if (message) toast(message);
     return true;
   } catch (e) {
@@ -299,16 +308,20 @@ async function act(
     pending = false;
   }
 }
-function accept(next: Snapshot) {
+function accept(next: Snapshot, action?: Record<string, unknown>) {
+  snapshotRevision++;
+  const cue = soundForTransition(state, next, action);
   const wasProtected = state ? protectedNow() : false;
   const changed =
     !state ||
     JSON.stringify(state.data) !== JSON.stringify(next.data) ||
     state.today !== next.today;
   state = next;
+  if (!state.data.settings.sound || state.data.settings.soundVolume === 0)
+    stopSound();
+  else if (cue) playSound(cue, state.data.settings.soundVolume);
   if (!wasProtected && protectedNow()) closeModal();
   if (serial !== -1 && state.data.timer.completionSerial > serial) {
-    if (state.data.settings.sound) chime();
     toast(
       state.data.timer.lastFinishedMode === "focus"
         ? "完成一个番茄，辛苦了！起来休息一下吧。"
@@ -432,21 +445,7 @@ function metric(
   return `<div class="metric"><span class="metric-icon ${color}">${icon(iconName)}</span><div><p>${label}</p><div class="metric-value">${value}<small>${unit}</small></div></div><span class="metric-detail">${detail}</span></div>`;
 }
 function pendingReminder() {
-  if (
-    !state ||
-    state.data.timer.running ||
-    state.data.timer.startedAt !== null ||
-    state.data.timer.remainingSecs !== state.data.timer.durationSecs ||
-    state.data.lock.active
-  )
-    return undefined;
-  return state.data.tasks
-    .filter((t) => !t.completed && t.reminderPending)
-    .sort((a, b) =>
-      `${a.dueDate} ${a.reminderTime} ${a.id}`.localeCompare(
-        `${b.dueDate} ${b.reminderTime} ${b.id}`,
-      ),
-    )[0];
+  return state ? pendingTaskReminder(state) : undefined;
 }
 function reminderBanner() {
   const t = pendingReminder();
@@ -468,7 +467,7 @@ function focusPage() {
   return `${heading("今天，也要慢慢向前。", `${weekday} <span class="dot-separator">·</span> 专注当下，让每一小步都有回响。`)}
     <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办，按自己的节奏来`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
     <div class="focus-grid"><section class="card focus-card"><div class="card-heading"><h2>${icon("timer")} 我的番茄钟</h2><button class="icon-btn" data-action="immersive" aria-label="进入沉浸模式">${icon("maximize-2")}</button></div>${timerContent()}
-    <div class="sound-bar"><button class="sound-button ${noiseKind !== "off" ? "on" : ""}" data-action="sound">${icon("headphones")}<span>${noiseKind === "off" ? "来一点背景音？" : noiseKind === "rain" ? "雨声 · 正在播放" : "棕噪音 · 正在播放"}</span>${icon("chevron-right")}</button><button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}完成提示音">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
+    <div class="sound-bar"><button class="sound-button ${noiseKind !== "off" ? "on" : ""}" data-action="sound">${icon("headphones")}<span>${noiseKind === "off" ? "来一点背景音？" : noiseKind === "rain" ? "雨声 · 正在播放" : "棕噪音 · 正在播放"}</span>${icon("chevron-right")}</button><button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
     <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayTasks.length}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayTasks.length}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small">一步一步，来就好</span></div>
     <div class="today-list">${taskList(filter === "completed" ? state.data.tasks.filter((t) => t.completed && t.completedAt && new Date(t.completedAt * 1000).toLocaleDateString("sv-SE") === state.today) : regularTasks, true)}${filter !== "completed" && catchUpTasks.length ? `<h3 class="group-title">待补队列<span>${catchUpTasks.length}</span></h3>${taskList(catchUpTasks, true)}` : ""}</div>
     <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的小目标 <kbd>N</kbd></button><div class="list-footnote">${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
@@ -952,9 +951,25 @@ function settingNumber(
 function settingSwitch(name: keyof Settings, label: string, hint: string) {
   return `<label class="setting-row"><span><strong>${label}</strong><small>${hint}</small></span><input class="switch" name="${name}" type="checkbox" ${state.data.settings[name] ? "checked" : ""}></label>`;
 }
+function soundPreviewControls() {
+  const options: [SoundCue, string][] = [
+    ["start", "开始专注"],
+    ["resume", "继续计时"],
+    ["pause", "暂停计时"],
+    ["stop", "提前结束"],
+    ["focusEnd", "专注完成"],
+    ["breakStart", "进入休息"],
+    ["breakEnd", "休息结束"],
+    ["taskComplete", "任务完成"],
+    ["reminder", "到点提醒"],
+    ["lockStart", "开始锁机"],
+    ["lockEnd", "锁机结束"],
+  ];
+  return `<label class="setting-row"><span><strong>试听类型</strong><small>使用当前填写的音量，试听后记得保存</small></span><select id="sound-preview" aria-label="试听类型">${options.map(([cue, label]) => `<option value="${cue}" ${cue === "focusEnd" ? "selected" : ""}>${label}</option>`).join("")}</select></label><button type="button" class="text-button" data-action="test-sound">${icon("volume-2")} 试听音效</button>`;
+}
 function settingsPage() {
   const s = state.data.settings;
-  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>外观主题</strong><small>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "完成提示音", "阶段结束时，播放轻柔提示音")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}<button type="button" class="text-button" data-action="test-sound">${icon("volume-2")} 试听完成提示音</button></section>${desktopSettingsCard()}<section class="card settings-card data-settings"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务与步骤，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用下方备份。</div></section><section class="card settings-card data-settings"><h2>${icon("download")} 数据与备份</h2><p>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note">${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section><section class="settings-tip">${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div></div><div class="settings-save"><span id="settings-status">更改后记得保存</span><button type="submit" class="button primary">${icon("check")} 保存设置</button></div></form>`;
+  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>外观主题</strong><small>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务与步骤，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用下方备份。</div></section><section class="card settings-card data-settings"><h2>${icon("download")} 数据与备份</h2><p>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note">${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section><section class="settings-tip">${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div></div><div class="settings-save"><span id="settings-status">更改后记得保存</span><button type="submit" class="button primary">${icon("check")} 保存设置</button></div></form>`;
 }
 function desktopSettingsCard() {
   if (!desktop || !nativeStatus) return "";
@@ -2211,6 +2226,7 @@ function bindForms() {
         "longBreakMinutes",
         "longBreakEvery",
         "dailyGoal",
+        "soundVolume",
       ] as const)
         settings[key] = Number(f.get(key));
       for (const key of [
@@ -2811,7 +2827,10 @@ document.addEventListener("click", async (e) => {
       });
       break;
     case "test-sound":
-      chime();
+      playSound(
+        $<HTMLSelectElement>("#sound-preview").value as SoundCue,
+        Number($<HTMLInputElement>('[name="soundVolume"]').value),
+      );
       break;
     case "example":
       await act(
@@ -3037,6 +3056,11 @@ document.addEventListener("drop", (e) => {
 });
 document.addEventListener("dragend", () => dragProject(null));
 
+// Unlock on a user gesture before asynchronous actions return. Unsupported or
+// blocked audio remains optional; never replay missed cues after activation.
+document.addEventListener("pointerdown", unlockAudio, { capture: true });
+document.addEventListener("keydown", unlockAudio, { capture: true });
+
 async function boot() {
   try {
     if (desktop) nativeStatus = await getDesktopStatus();
@@ -3064,7 +3088,11 @@ async function boot() {
   setInterval(async () => {
     if (pending) return;
     try {
+      const revision = snapshotRevision;
       const next = await getSnapshot();
+      // An action may finish while a poll is in flight. Ignore its stale reply
+      // so the UI and sound transitions cannot roll back and replay.
+      if (pending || revision !== snapshotRevision) return;
       disconnected = false;
       accept(next);
       const el = document.getElementById("connection");

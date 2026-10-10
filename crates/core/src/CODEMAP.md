@@ -12,6 +12,7 @@ generated_at: 2026-10-10
 | 模板、自动预印与手动整批印刷 | 业务核心 | templates.rs 的 Printing/print_template/materialize_templates | template_tests.rs、src/main.ts 的 templateDialog/printDialog、plan.rs |
 | 主线信号与实例配对 | 业务核心 | nodes.rs；功能索引见 nodes.rs.analysis.md | node_tests.rs、lib.rs、reminders.rs、src/main.ts、docs/NODE_DESIGN.md |
 | ID 全局唯一及历史保留 | 持久化 | identities.rs 的 reconcile/validate、Engine | node_tests.rs、备份 v3、计划导入/任务恢复 |
+| 音效音量与旧备份兼容 | 契约 | lib.rs 的 Settings/default_sound_volume/validate | tests.rs、src/types.ts、src/sound-events.ts、docs/BACKUP_FORMAT.md 与 Schema |
 | 修改任务/重复规则 | 业务核心 | lib.rs 的 AppData::apply | tests.rs、src/types.ts |
 | 目标容器与待补 | 业务核心 | nodes.rs 的 bind_nodes/tick_nodes、lib.rs 的 Goal | src/main.ts 的 goalDialog/taskList、docs/BACKUP_FORMAT.md |
 | 过期习惯与缺勤统计 | 业务核心 | lib.rs 的 TaskKind/is_habit 与 stats/DayStat.missed、reminders.rs 的 tick_reminders | src/main.ts 的 isHabit/isCatchUp、docs/BACKUP_FORMAT.md |
@@ -32,8 +33,8 @@ generated_at: 2026-10-10
 | AppData / Action | nodes.rs | 主线 | 时间配对、完成条件、不可逆裁定、局域阻断、信号防重/追溯、冻结配置 |
 | identities.rs | 标识符 | 跨实体类型唯一、删除与历史引用永久保留、原任务恢复校验、导入历史合并 |
 | node_tests.rs | 验证 | 主线配对/信号/阻断/检查/裁定/删除/重启/备份/历史 ID 与专注收尾；见 node_tests.rs.analysis.md |
-| lib.rs | L:318 / L:400 |
-| Engine | lib.rs | L:1578 |
+| Settings / AppData / Action | lib.rs | L:223 / L:343 / L:425 |
+| Engine | lib.rs | L:1779 |
 | guard | guard.rs | L:1 |
 
 ## 文件

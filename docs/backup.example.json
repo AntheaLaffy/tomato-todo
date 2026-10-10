@@ -27,7 +27,8 @@
       "mode": "off",
       "whitelist": [],
       "strict": false
-    }
+    },
+    "soundVolume": 40
   },
   "timer": {
     "mode": "focus",

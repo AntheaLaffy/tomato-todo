@@ -198,6 +198,7 @@ export interface Settings {
   autoBreak: boolean;
   autoFocus: boolean;
   sound: boolean;
+  soundVolume: number;
   notifications: boolean;
   alwaysOnTop: boolean;
   theme: "light" | "dark" | "system";

@@ -29,6 +29,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 模板、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 templateDialog/printDialog | crates/core/src/plan.rs、src/types.ts、docs/CODEMAP.md |
 | 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
 | 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
+| 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、src-tauri/src/main.rs | tests/native.mjs、src 的 guardPage |
 | 启动/打包/测试 | 构建 | README.md、package.json | src-tauri/tauri.conf.json、scripts/ |
@@ -62,4 +63,4 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | index.html | 界面 | 页面根节点与入口 |
 | .gitignore | 维护 | 生成产物、私人分析和数据库排除 |
 | LICENSE | 维护 | MIT 许可，对应 Cargo 工作区 license 字段 |
-| CHANGELOG.md | 维护 | 版本变更与下一版本待办（音效由 GPT Astra 排期） |
+| CHANGELOG.md | 维护 | 版本变更与下一版本待办与关键节点音效记录 |

@@ -11,7 +11,7 @@
     "desktop": "tauri dev",
     "desktop:build": "tauri build --no-bundle",
     "desktop:deb": "tauri build --bundles deb",
-    "test": "cargo test -p tomato-core -p tomato-todo && cargo build -p tomato-preview && pnpm run build && node --test tests/integration.mjs tests/install.mjs",
+    "test": "cargo test -p tomato-core -p tomato-todo && cargo build -p tomato-preview && pnpm run build && node --test tests/audio.mjs tests/integration.mjs tests/install.mjs",
     "test:native": "pnpm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/native.mjs",
     "format": "cargo fmt --all && prettier --write src scripts tests package.json",
     "format:check": "cargo fmt --all --check && prettier --check \"src/**/*.{ts,css}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" package.json",
