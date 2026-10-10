@@ -4063,7 +4063,7 @@ dependencies = [
 
 [[package]]
 name = "tomato-core"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -4075,7 +4075,7 @@ dependencies = [
 
 [[package]]
 name = "tomato-preview"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "axum",
  "serde_json",
@@ -4086,7 +4086,7 @@ dependencies = [
 
 [[package]]
 name = "tomato-todo"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "gio",
  "libloading",
