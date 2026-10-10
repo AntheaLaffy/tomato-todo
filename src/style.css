@@ -4304,3 +4304,52 @@ body.ponder-open #toast {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* 助手计划清单：多步任务的进度。 */
+.agent-plan {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.agent-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.agent-plan-head span {
+  margin-right: auto;
+}
+.agent-plan ol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-plan li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--secondary);
+}
+.agent-plan li i {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+.agent-plan li.completed {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.agent-plan li.in_progress {
+  color: var(--text);
+}
+.agent-plan li.in_progress i {
+  color: var(--accent);
+}

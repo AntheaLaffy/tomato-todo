@@ -60,6 +60,24 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             &["questions"],
             false,
         ));
+        list.push(tool(
+            "update_plan",
+            "更新任务计划：一串步骤，每步 pending / in_progress / completed，至多一个 in_progress。用于需要多步完成的事（核对数据、生成审阅文件等），让用户看到进度；简单任务不要用。步骤用中文短句。",
+            json!({
+                "explanation":{"type":"string","maxLength":200,"description":"可选，说明本次更新"},
+                "plan":{"type":"array","minItems":1,"maxItems":12,"items":{
+                    "type":"object",
+                    "properties":{
+                        "step":{"type":"string","maxLength":120,"description":"步骤文字"},
+                        "status":{"type":"string","enum":["pending","in_progress","completed"]}
+                    },
+                    "required":["step","status"],
+                    "additionalProperties":false
+                }}
+            }),
+            &["plan"],
+            false,
+        ));
     }
     if !agent {
         list.push(tool("create_task","按用户明确要求创建任务。不要臆测可用时间或估时。",json!({"title":{"type":"string"},"notes":{"type":"string"},"projectId":{"type":["string","null"]},"goalId":{"type":["string","null"]},"dueDate":{"type":["string","null"]},"reminderTime":{"type":["string","null"]},"focusMinutes":{"type":["integer","null"]},"estimate":{"type":"integer","minimum":1},"priority":{"type":"integer","minimum":0,"maximum":3},"tags":{"type":"array","items":{"type":"string"}}}),&["title"],false));

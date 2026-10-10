@@ -59,7 +59,9 @@ export async function createStudySession({
       (await import(new URL("./extensions/tool-search/index.js",import.meta.resolve("@earendil-works/pi-coding-agent")))).createToolSearchExtension(),
       (pi)=>{pi.on("before_provider_request",(event)=>model.provider==="openai-codex"?withHostedSearch(event.payload,command.preferences?.webSearch??"cached"):undefined);},
     ],
-    systemPrompt: await readFile(join(root, "system-prompt.md"), "utf8"),
+    systemPrompt:
+      (await readFile(join(root, "system-prompt.md"), "utf8")) +
+      `\n当前编程权限：${command.preferences?.codingAccess === "full" ? "完整访问（以你的用户身份运行，可改工作区之外的文件）" : "仅工作区（写只落 coding/ 与 tools/）"}。\n`,
   });
   await loader.reload();
   const allowed = new Set([
@@ -75,7 +77,7 @@ export async function createStudySession({
     "patch_file",
     "review_file",
     "list_files",
-    "stage_file","web_search","web_fetch","request_user_input",
+    "stage_file","web_search","web_fetch","request_user_input","update_plan",
     "dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision",
   ]);
   if(command.automatic)for(const name of ["dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision"])allowed.delete(name);

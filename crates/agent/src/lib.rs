@@ -39,6 +39,7 @@ struct Live {
     reviewed: std::collections::HashMap<String, String>,
     job_id: String,
     questions: Value,
+    plan: Value,
 }
 struct Inner {
     store: Store,
@@ -260,6 +261,8 @@ impl Agent {
                 }
                 inner.store.session_file = None;
                 inner.store.messages.clear();
+                inner.live.questions = Value::Null;
+                inner.live.plan = Value::Null;
                 inner.store.save(&self.dir)?;
                 drop(inner);
                 self.status()
@@ -420,7 +423,7 @@ impl Agent {
     pub fn status(&self) -> AppResult<Value> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -587,6 +590,34 @@ impl Agent {
                 inner.store.memories.push(memory.clone());
                 inner.store.save(&self.dir)?;
                 Ok(json!(memory))
+            }
+            "clear_plan" => {
+                self.inner.lock().map_err(|e| e.to_string())?.live.plan = Value::Null;
+                Ok(json!({"cleared":true}))
+            }
+            "update_plan" => {
+                let plan = args["plan"].as_array().cloned().unwrap_or_default();
+                let mut running = 0;
+                for item in &plan {
+                    if item["step"]
+                        .as_str()
+                        .map(str::trim)
+                        .unwrap_or("")
+                        .is_empty()
+                    {
+                        return Err("计划步骤不能为空".into());
+                    }
+                    match item["status"].as_str().unwrap_or("") {
+                        "pending" | "completed" => {}
+                        "in_progress" => running += 1,
+                        _ => return Err("步骤状态需为 pending/in_progress/completed".into()),
+                    }
+                }
+                if running > 1 {
+                    return Err("至多一个步骤处于进行中".into());
+                }
+                self.inner.lock().map_err(|e| e.to_string())?.live.plan = json!(plan);
+                Ok(json!({"updated":true}))
             }
             "request_user_input" => {
                 let questions = args["questions"].as_array().cloned().unwrap_or_default();

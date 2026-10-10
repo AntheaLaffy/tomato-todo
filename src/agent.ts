@@ -72,6 +72,7 @@ export type AgentStatus = {
     question: string;
     options: { label: string; description: string }[];
   }[];
+  plan: { step: string; status: string }[];
   dataDir: string;
   mcpConfig: unknown;
 };
@@ -151,6 +152,7 @@ export function agentPage(): string {
     <section class="card agent-conversation">
       <div id="agent-run-status" role="status"></div>
       <div id="agent-messages" class="agent-messages" aria-live="polite"></div>
+      <div id="agent-plan"></div>
       <div id="agent-questions"></div>
       <form id="agent-chat">
         <textarea id="agent-text" name="text" rows="3" maxlength="32000" placeholder="问点什么，或贴一段最近的安排">${esc(draft)}</textarea>
@@ -198,6 +200,18 @@ function renderChat() {
           : ""),
   );
   if (messagesEl && nearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+  const plan = status.plan ?? [];
+  replace(
+    "agent-plan",
+    plan.length
+      ? `<div class="agent-plan"><div class="agent-plan-head"><span>计划</span><button class="icon-btn tiny" type="button" data-agent="clear-plan" aria-label="清除计划">✕</button></div><ol>${plan
+          .map(
+            (item) =>
+              `<li class="${esc(item.status)}"><i>${item.status === "completed" ? "✓" : item.status === "in_progress" ? "▶" : "○"}</i>${esc(item.step)}</li>`,
+          )
+          .join("")}</ol></div>`
+      : "",
+  );
   replace(
     "agent-questions",
     (status.questions ?? [])
@@ -541,6 +555,9 @@ async function action(button: HTMLButtonElement) {
     case "answer":
       if (button.dataset.text)
         await call({ op: "send", text: button.dataset.text });
+      break;
+    case "clear-plan":
+      await call({ op: "clear_plan" });
       break;
     case "delete-memory":
       await call({ op: "memory_delete", id: button.dataset.id });
