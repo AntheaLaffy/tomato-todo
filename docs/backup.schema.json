@@ -13,6 +13,13 @@
       },
       "maxItems": 500
     },
+    "goals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/goal"
+      },
+      "maxItems": 500
+    },
     "tasks": {
       "type": "array",
       "items": {
@@ -46,6 +53,23 @@
     "sessions"
   ],
   "$defs": {
+    "goal": {
+      "type": "object",
+      "required": ["id", "name", "target", "unit"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "target": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000000 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 10 },
+        "measure": { "enum": ["count", "time"], "default": "count" },
+        "dueDate": {
+          "anyOf": [
+            { "type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
     "project": {
       "type": "object",
       "required": [
@@ -110,6 +134,17 @@
           "description": "Rust additionally limits UTF-8 bytes to 50000."
         },
         "projectId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "goalId": {
           "anyOf": [
             {
               "type": "string",

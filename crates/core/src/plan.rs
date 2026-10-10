@@ -66,6 +66,7 @@ impl PlanTask {
             title: self.title.clone(),
             notes: self.notes.clone(),
             project_id: self.project_id.clone(),
+            goal_id: None,
             due_date: self.due_date.clone(),
             reminder_time: self.reminder_time.clone(),
             focus_minutes: self.focus_minutes,

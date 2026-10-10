@@ -22,6 +22,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
 | 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/main.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md |
+| 目标容器与过期补做 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Goal/goal_progress、src/main.ts 的 goalDialog | src/types.ts、docs/BACKUP_FORMAT.md |
 | 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
 | 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |

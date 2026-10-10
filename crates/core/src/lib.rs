@@ -40,6 +40,28 @@ pub struct Project {
     pub app_whitelist: Option<Vec<String>>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GoalMeasure {
+    #[default]
+    Count,
+    Time,
+}
+
+/// A long-lived objective that groups tasks and absorbs the work they miss.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Goal {
+    pub id: String,
+    pub name: String,
+    pub target: f64,
+    pub unit: String,
+    #[serde(default)]
+    pub measure: GoalMeasure,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Subtask {
@@ -55,6 +77,8 @@ pub struct Task {
     pub title: String,
     pub notes: String,
     pub project_id: Option<String>,
+    #[serde(default)]
+    pub goal_id: Option<String>,
     pub due_date: Option<String>,
     #[serde(default)]
     pub reminder_time: Option<String>,
@@ -95,6 +119,8 @@ pub struct TaskDraft {
     #[serde(default)]
     pub notes: String,
     pub project_id: Option<String>,
+    #[serde(default)]
+    pub goal_id: Option<String>,
     pub due_date: Option<String>,
     #[serde(default)]
     pub reminder_time: Option<String>,
@@ -244,6 +270,8 @@ pub struct AppData {
     pub version: u32,
     pub tasks: Vec<Task>,
     pub projects: Vec<Project>,
+    #[serde(default)]
+    pub goals: Vec<Goal>,
     pub settings: Settings,
     pub timer: Timer,
     pub sessions: Vec<Session>,
@@ -275,6 +303,7 @@ impl Default for AppData {
                     app_whitelist: None,
                 },
             ],
+            goals: vec![],
             settings: Settings::default(),
             timer: Timer::default(),
             sessions: vec![],
@@ -319,6 +348,19 @@ pub enum Action {
         whitelist: Option<Vec<String>>,
     },
     DeleteProject {
+        id: String,
+    },
+    SaveGoal {
+        id: Option<String>,
+        name: String,
+        target: f64,
+        unit: String,
+        #[serde(default)]
+        measure: GoalMeasure,
+        #[serde(default)]
+        due_date: Option<String>,
+    },
+    DeleteGoal {
         id: String,
     },
     SelectTask {
@@ -402,6 +444,35 @@ impl AppData {
         match project.and_then(|p| p.app_whitelist.as_ref()) {
             Some(list) => list.clone(),
             None => self.settings.protection.whitelist.clone(),
+        }
+    }
+    /// Accumulated progress toward a goal: completed tasks for count goals, or
+    /// focused hours for time goals.
+    pub fn goal_progress(&self, goal_id: &str) -> f64 {
+        let Some(goal) = self.goals.iter().find(|g| g.id == goal_id) else {
+            return 0.0;
+        };
+        match goal.measure {
+            GoalMeasure::Count => self
+                .tasks
+                .iter()
+                .filter(|t| t.goal_id.as_deref() == Some(goal_id) && t.completed)
+                .count() as f64,
+            GoalMeasure::Time => {
+                let ids: HashSet<&String> = self
+                    .tasks
+                    .iter()
+                    .filter(|t| t.goal_id.as_deref() == Some(goal_id))
+                    .map(|t| &t.id)
+                    .collect();
+                let seconds: u64 = self
+                    .sessions
+                    .iter()
+                    .filter(|s| s.task_id.as_ref().is_some_and(|id| ids.contains(id)))
+                    .map(|s| u64::from(s.duration_secs))
+                    .sum();
+                seconds as f64 / 3600.0
+            }
         }
     }
     pub fn strict_protected(&self) -> bool {
@@ -609,6 +680,7 @@ impl AppData {
                     title: d.title.trim().into(),
                     notes: d.notes,
                     project_id: d.project_id,
+                    goal_id: d.goal_id,
                     reminder_fired: old.is_some_and(|t| {
                         t.due_date == d.due_date
                             && t.reminder_time == d.reminder_time
@@ -755,6 +827,44 @@ impl AppData {
                     }
                 }
             }
+            Action::SaveGoal {
+                id: gid,
+                name,
+                target,
+                unit,
+                measure,
+                due_date,
+            } => {
+                if let Some(gid) = gid {
+                    let g = self
+                        .goals
+                        .iter_mut()
+                        .find(|g| g.id == gid)
+                        .ok_or("目标不存在")?;
+                    g.name = name.trim().into();
+                    g.target = target;
+                    g.unit = unit.trim().into();
+                    g.measure = measure;
+                    g.due_date = due_date;
+                } else {
+                    self.goals.push(Goal {
+                        id: id(),
+                        name: name.trim().into(),
+                        target,
+                        unit: unit.trim().into(),
+                        measure,
+                        due_date,
+                    });
+                }
+            }
+            Action::DeleteGoal { id } => {
+                self.goals.retain(|g| g.id != id);
+                for task in &mut self.tasks {
+                    if task.goal_id.as_ref() == Some(&id) {
+                        task.goal_id = None;
+                    }
+                }
+            }
             Action::SelectTask { id } => {
                 if id
                     .as_ref()
@@ -844,6 +954,7 @@ impl AppData {
                         title: title.into(),
                         notes: notes.into(),
                         project_id: self.projects.get(index).map(|p| p.id.clone()),
+                        goal_id: None,
                         due_date: Some(today.clone()),
                         reminder_time: None,
                         focus_minutes: None,
@@ -913,6 +1024,32 @@ impl AppData {
                 "无效的项目应用白名单",
             )?;
         }
+        let mut goal_ids = HashSet::new();
+        ensure(self.goals.len() <= 500, "目标数量超出限制")?;
+        for g in &self.goals {
+            ensure(
+                !g.id.is_empty() && goal_ids.insert(&g.id),
+                "目标 ID 重复或为空",
+            )?;
+            ensure(
+                !g.name.trim().is_empty() && g.name.chars().count() <= 40,
+                "目标名称需为 1–40 个字符",
+            )?;
+            ensure(
+                g.target.is_finite() && g.target > 0.0 && g.target <= 1_000_000.0,
+                "目标量需为正数",
+            )?;
+            ensure(
+                !g.unit.trim().is_empty() && g.unit.chars().count() <= 10,
+                "目标单位需为 1–10 个字符",
+            )?;
+            ensure(
+                g.due_date.as_ref().is_none_or(|d| {
+                    d.len() == 10 && NaiveDate::parse_from_str(d, "%Y-%m-%d").is_ok()
+                }),
+                "无效的目标日期",
+            )?;
+        }
         let projects = ids;
         let mut tasks = HashSet::new();
         for t in &self.tasks {
@@ -938,6 +1075,10 @@ impl AppData {
             ensure(
                 t.project_id.as_ref().is_none_or(|p| projects.contains(p)),
                 "任务引用了不存在的项目",
+            )?;
+            ensure(
+                t.goal_id.as_ref().is_none_or(|g| goal_ids.contains(g)),
+                "任务引用了不存在的目标",
             )?;
             ensure(
                 t.due_date.as_ref().is_none_or(|d| {

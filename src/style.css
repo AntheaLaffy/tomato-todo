@@ -301,6 +301,22 @@ input[type="color"] {
   border-radius: 3px;
   margin: 0 5px;
 }
+.goal-section {
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+.goal-section:last-child {
+  border-bottom-color: transparent;
+}
+.goal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.goal-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
 .sidebar-bottom {
   margin-top: auto;
   padding-top: 18px;
@@ -964,6 +980,32 @@ main {
 }
 .task-row.selected .task-title {
   color: var(--accent-hover);
+}
+.task-row.catch-up {
+  border-left: 3px solid var(--accent);
+}
+.catch-up-chip {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  vertical-align: middle;
+}
+.goal-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+.goal-figure b {
+  font-size: 26px;
+}
+.goal-figure span {
+  color: var(--muted);
+  font-size: 12px;
 }
 .task-checkbox {
   width: 17px;

@@ -508,6 +508,104 @@ fn effective_whitelist_prefers_project_list_over_global() {
 }
 
 #[test]
+fn goals_group_tasks_and_track_count_progress() {
+    let mut e = engine();
+    let s = e
+        .dispatch(
+            Action::SaveGoal {
+                id: None,
+                name: "OpenCamp".into(),
+                target: 3.0,
+                unit: "节".into(),
+                measure: GoalMeasure::Count,
+                due_date: None,
+            },
+            1000,
+        )
+        .unwrap();
+    let goal = s.data.goals[0].id.clone();
+    let mut d1 = draft();
+    d1.goal_id = Some(goal.clone());
+    d1.due_date = Some("2026-10-09".into());
+    let s = e.dispatch(Action::SaveTask { task: d1 }, 1000).unwrap();
+    let task = s.data.tasks[0].id.clone();
+    let mut d2 = draft();
+    d2.goal_id = Some(goal.clone());
+    e.dispatch(Action::SaveTask { task: d2 }, 1000).unwrap();
+    assert_eq!(e.snapshot(1000).unwrap().data.goal_progress(&goal), 0.0);
+    e.dispatch(Action::ToggleTask { id: task }, 1000).unwrap();
+    assert_eq!(e.snapshot(1000).unwrap().data.goal_progress(&goal), 1.0);
+    e.dispatch(Action::DeleteGoal { id: goal }, 1000).unwrap();
+    let s = e.snapshot(1000).unwrap();
+    assert!(s.data.goals.is_empty());
+    assert!(s.data.tasks.iter().all(|t| t.goal_id.is_none()));
+}
+
+#[test]
+fn time_goal_accumulates_focused_hours() {
+    let mut e = engine();
+    let s = e
+        .dispatch(
+            Action::SaveGoal {
+                id: None,
+                name: "OpenCamp".into(),
+                target: 30.0,
+                unit: "小时".into(),
+                measure: GoalMeasure::Time,
+                due_date: None,
+            },
+            1000,
+        )
+        .unwrap();
+    let goal = s.data.goals[0].id.clone();
+    let mut d = draft();
+    d.goal_id = Some(goal.clone());
+    d.focus_minutes = Some(30);
+    let s = e.dispatch(Action::SaveTask { task: d }, 1000).unwrap();
+    let task = s.data.tasks[0].id.clone();
+    e.dispatch(Action::SelectTask { id: Some(task) }, 1000)
+        .unwrap();
+    e.dispatch(Action::StartTimer, 1000).unwrap();
+    e.dispatch(Action::ResetTimer, 1000 + 3600).unwrap();
+    let progress = e.snapshot(1000 + 3600).unwrap().data.goal_progress(&goal);
+    assert!((progress - 0.5).abs() < 1e-9);
+}
+
+#[test]
+fn goal_validation_rejects_bad_fields() {
+    for (target, unit) in [(0.0, "节"), (-1.0, "节"), (10.0, "  ")] {
+        let mut e = engine();
+        assert!(e
+            .dispatch(
+                Action::SaveGoal {
+                    id: None,
+                    name: "目标".into(),
+                    target,
+                    unit: unit.into(),
+                    measure: GoalMeasure::Count,
+                    due_date: None,
+                },
+                1000,
+            )
+            .is_err());
+    }
+    let mut e = engine();
+    assert!(e
+        .dispatch(
+            Action::SaveGoal {
+                id: None,
+                name: "坏日期".into(),
+                target: 1.0,
+                unit: "节".into(),
+                measure: GoalMeasure::Count,
+                due_date: Some("2026-02-30".into()),
+            },
+            1000,
+        )
+        .is_err());
+}
+
+#[test]
 fn protection_rejects_mutations_until_emergency_or_completion() {
     let mut e = engine();
     let settings = Settings {
@@ -628,6 +726,7 @@ fn draft() -> TaskDraft {
         title: "测试任务".into(),
         notes: "".into(),
         project_id: None,
+        goal_id: None,
         due_date: None,
         reminder_time: None,
         focus_minutes: None,
@@ -865,6 +964,78 @@ fn reminder_persists_reschedule_rearms_and_old_days_expire() {
         .data
         .pending_reminder()
         .is_none());
+}
+
+#[test]
+fn reminder_expires_after_its_planned_block() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    d.focus_minutes = Some(25);
+    d.estimate = 1;
+    e.dispatch(Action::SaveTask { task: d }, friday(8, 50))
+        .unwrap();
+    // 1 session, 25 min: valid until 09:25.
+    assert!(e
+        .snapshot(friday(9, 20))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_some());
+    let late = e.snapshot(friday(9, 26)).unwrap().data;
+    assert!(!late.tasks[0].reminder_pending);
+    assert!(late.pending_reminder().is_none());
+}
+
+#[test]
+fn reminder_window_covers_multi_pomodoro_breaks_and_old_slots_stay_void() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    d.focus_minutes = Some(25);
+    d.estimate = 3;
+    e.dispatch(Action::SaveTask { task: d }, friday(8, 50))
+        .unwrap();
+    // 3 * 25 + 2 short breaks (5) = 85 min: valid until 10:25.
+    assert!(e
+        .snapshot(friday(10, 20))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_some());
+    assert!(e
+        .snapshot(friday(10, 26))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_none());
+    // A slot that was already over before the app opened never fires.
+    let mut late = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    d.focus_minutes = Some(25);
+    d.estimate = 1;
+    late.dispatch(Action::SaveTask { task: d }, friday(8, 0))
+        .unwrap();
+    let s = late.snapshot(friday(12, 0)).unwrap().data;
+    assert!(!s.tasks[0].reminder_pending);
+    assert!(s.pending_reminder().is_none());
+}
+
+#[test]
+fn single_session_length_is_independent_of_the_date() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = None;
+    d.focus_minutes = Some(40);
+    let s = e.dispatch(Action::SaveTask { task: d }, 1000).unwrap();
+    let id = s.data.tasks[0].id.clone();
+    e.dispatch(Action::SelectTask { id: Some(id) }, 1000)
+        .unwrap();
+    assert_eq!(e.snapshot(1000).unwrap().data.timer.duration_secs, 40 * 60);
 }
 
 #[test]

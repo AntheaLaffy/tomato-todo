@@ -6,6 +6,14 @@ export interface Project {
   color: string;
   appWhitelist: string[] | null;
 }
+export interface Goal {
+  id: string;
+  name: string;
+  target: number;
+  unit: string;
+  measure: "count" | "time";
+  dueDate: string | null;
+}
 export interface PlanProject {
   id: string;
   name: string;
@@ -22,6 +30,7 @@ export interface Task {
   title: string;
   notes: string;
   projectId: string | null;
+  goalId: string | null;
   dueDate: string | null;
   reminderTime: string | null;
   focusMinutes: number | null;
@@ -96,6 +105,7 @@ export interface AppData {
   version: number;
   tasks: Task[];
   projects: Project[];
+  goals: Goal[];
   settings: Settings;
   timer: Timer;
   sessions: Session[];

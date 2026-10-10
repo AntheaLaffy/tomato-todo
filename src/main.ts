@@ -73,6 +73,7 @@ import type {
   AppData,
   DesktopStatus,
   GuardInfo,
+  Goal,
   Mode,
   Project,
   Settings,
@@ -159,7 +160,6 @@ let search = "";
 let immersive = false;
 let noiseKind = "off";
 let guardInfo: GuardInfo | null = null;
-let guardProjectId: string | null = null;
 let nativeStatus: DesktopStatus | null = null;
 let pending = false;
 let serial = -1;
@@ -172,7 +172,7 @@ let toastTimer: ReturnType<typeof setTimeout>;
 const labels: Record<string, string> = {
   focus: "今日专注",
   tasks: "全部任务",
-  planned: "计划",
+  goals: "目标",
   stats: "数据统计",
   guard: "专注保护",
   lock: "定时锁机",
@@ -194,6 +194,23 @@ const strictNow = () =>
     : protectedNow() && state.data.settings.protection.strict;
 const projectOf = (task: Task) =>
   state.data.projects.find((p) => p.id === task.projectId);
+const goalProgress = (g: Goal) => {
+  if (g.measure === "time") {
+    const ids = new Set(
+      state.data.tasks.filter((t) => t.goalId === g.id).map((t) => t.id),
+    );
+    const seconds = state.data.sessions
+      .filter((s) => s.taskId && ids.has(s.taskId))
+      .reduce((sum, s) => sum + s.durationSecs, 0);
+    return seconds / 3600;
+  }
+  return state.data.tasks.filter((t) => t.goalId === g.id && t.completed)
+    .length;
+};
+const progressLabel = (g: Goal) => {
+  const done = goalProgress(g);
+  return `${g.measure === "time" ? done.toFixed(1) : done}/${g.target}`;
+};
 const completedPomodoros = (task: Task) =>
   state.data.sessions.filter((s) => s.taskId === task.id && s.completed).length;
 const time = (seconds: number) =>
@@ -337,7 +354,7 @@ function render() {
     <nav aria-label="主导航">${[
       ["focus", "sun"],
       ["tasks", "inbox"],
-      ["planned", "calendar-days"],
+      ["goals", "target"],
       ["stats", "chart-no-axes-combined"],
       ["guard", "shield-check"],
       ["lock", "moon"],
@@ -353,7 +370,7 @@ function render() {
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.2</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar"><div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
-  <main>${reminderBanner()}${page === "focus" ? focusPage() : page === "stats" ? statsPage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  <main>${reminderBanner()}${page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
   bindForms();
   icons();
   updateClock();
@@ -445,8 +462,13 @@ function taskList(tasks: Task[], compact = false) {
     .map((task) => {
       const p = projectOf(task),
         done = completedPomodoros(task),
-        selected = task.id === state.data.timer.taskId;
-      return `<article data-task-id="${escape(task.id)}" class="task-row ${task.reminderPending ? "reminded" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}"><button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}">${task.completed ? icon("check") : ""}</button><button class="task-body" data-edit-task="${task.id}"><span class="task-title">${escape(task.title)}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.repeat !== "none" ? `<span>${icon("refresh-cw")}${{ daily: "每天", weekdays: "工作日", weekly: "每周" }[task.repeat]}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${!task.completed ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button></div></article>`;
+        selected = task.id === state.data.timer.taskId,
+        catchUp =
+          !!task.goalId &&
+          !!task.dueDate &&
+          task.dueDate < state.today &&
+          !task.completed;
+      return `<article data-task-id="${escape(task.id)}" class="task-row ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}"><button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}">${task.completed ? icon("check") : ""}</button><button class="task-body" data-edit-task="${task.id}"><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.repeat !== "none" ? `<span>${icon("refresh-cw")}${{ daily: "每天", weekdays: "工作日", weekly: "每周" }[task.repeat]}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${!task.completed ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button></div></article>`;
     })
     .join("");
 }
@@ -470,7 +492,8 @@ function tasksPage() {
     );
   if (priority !== "all")
     tasks = tasks.filter((t) => t.priority === Number(priority));
-  return `${heading(escape(project?.name || (page === "planned" ? "给未来，留一点方向。" : "把想做的事，慢慢完成。")), `还有 ${count} 件事等着你。清空头脑，让清单帮你记住。`, page === "planned" ? "MAKE ROOM FOR WHAT MATTERS" : "SMALL STEPS, REAL PROGRESS")}
+  return `${heading(escape(project?.name || "把想做的事，慢慢完成。"), `还有 ${count} 件事等着你。清空头脑，让清单帮你记住。`, "SMALL STEPS, REAL PROGRESS")}
+  ${project ? projectWhitelistCard(project) : ""}
   <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs">${[
     ["active", "待完成"],
     ["completed", "已完成"],
@@ -494,23 +517,25 @@ function tasksPage() {
     )
     .join(
       "",
-    )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${project ? `<button class="icon-btn" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>` : ""}</div></div><div id="tasks-results">${page === "planned" ? groupedTasks(tasks) : taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>`;
+    )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${project ? `<button class="icon-btn" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>` : ""}</div></div><div id="tasks-results">${taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>`;
 }
-function groupedTasks(tasks: Task[]) {
-  if (!tasks.length) return taskList([]);
-  const groups: [string, Task[]][] = [
-    ["已逾期", tasks.filter((t) => t.dueDate && t.dueDate < state.today)],
-    ["今天", tasks.filter((t) => t.dueDate === state.today)],
-    ["即将到来", tasks.filter((t) => t.dueDate && t.dueDate > state.today)],
-    ["还未安排", tasks.filter((t) => !t.dueDate)],
-  ];
-  return groups
-    .filter(([, ts]) => ts.length)
-    .map(
-      ([label, ts]) =>
-        `<h3 class="group-title">${label}<span>${ts.length}</span></h3>${taskList(ts)}`,
-    )
-    .join("");
+function goalsPage() {
+  const goals = state.data.goals;
+  return `${heading("目标", "把长期的事，放在一起慢慢推进。", "LONG GAMES, SMALL STEPS", false)}
+  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs"><button class="active">全部目标 <span>${goals.length}</span></button></div><div class="toolbar-controls"><button class="button secondary small-button" data-action="new-goal">${icon("plus")} 新建目标</button></div></div>
+  ${
+    goals.length
+      ? goals
+          .map((g) => {
+            const remaining = state.data.tasks.filter(
+              (t) => t.goalId === g.id && !t.completed,
+            );
+            return `<section class="goal-section"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${g.id}" aria-label="编辑目标">${icon("pencil")}</button></div><div class="goal-figure"><b>${progressLabel(g)}</b><span>${escape(g.unit)}${g.dueDate ? ` · 截止 ${dateLabel(g.dueDate)}` : ""}</span></div><div class="progress-track"><i style="width:${Math.min(100, (goalProgress(g) / g.target) * 100)}%"></i></div><h4 class="group-title">待完成<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : '<p class="subtle small">这个目标暂时没有待完成的任务。</p>'}</section>`;
+          })
+          .join("")
+      : `<div class="empty-state"><div class="empty-illustration">${icon("target")}</div><h3>还没有目标</h3><p>把需要长期积累的事建成目标，把听课、作业等任务挂到它下面。</p><button class="text-button" data-action="new-goal">新建目标 →</button></div>`
+  }
+  </section>`;
 }
 function weekChart(large: boolean) {
   const days = state.stats.days.slice(-7),
@@ -584,20 +609,49 @@ function desktopSettingsCard() {
     `<label class="setting-row"><span><strong>${label}</strong><small>${hint}</small></span><input class="switch" name="${name}" type="checkbox" ${nativeStatus![name] ? "checked" : ""}></label>`;
   return `<section class="card settings-card"><h2>${icon("monitor")} 桌面集成</h2>${toggle("autostart", "登录后自动启动", "后台启动到托盘，点击图标打开窗口")}${toggle("closeToTray", "关闭窗口后留在托盘", "继续计时和提醒；从托盘菜单可以完全退出")}<p class="subtle small">${nativeStatus.trayAvailable ? "托盘已连接。收起窗口后，专注仍会继续。" : "当前未检测到托盘，关闭时会正常退出，后台启动时会显示窗口。"}</p><div class="button-row"><button type="button" class="button secondary" data-action="hide-tray" ${nativeStatus.trayAvailable ? "" : "disabled"}>${icon("minimize-2")} 收起到托盘</button><button type="button" class="text-button" data-action="quit-app">退出应用</button></div></section>`;
 }
-function guardPage() {
-  const p = state.data.settings.protection;
+function projectWhitelistCard(project: Project) {
   if (!guardInfo) void refreshGuard();
-  const selectedProject =
-    state.data.projects.find((x) => x.id === guardProjectId) ??
-    state.data.projects[0];
-  const selectedList = selectedProject?.appWhitelist ?? [];
-  const availableApps = [
+  const list = project.appWhitelist ?? [];
+  const available = [
     ...new Map(
       (guardInfo?.windows || [])
         .filter((w) => w.app_id)
         .map((w) => [w.app_id!, w]),
     ).values(),
   ];
+  const global = state.data.settings.protection.whitelist.length;
+  return `<section class="card whitelist-card"><div class="card-heading"><div><h2>应用白名单</h2><p class="subtle small">${
+    project.appWhitelist
+      ? "已启用专属白名单：专注这个项目的任务时只用这份清单，不再套用通用白名单。导出计划可让 AI 批量修改 appWhitelist 再导入。"
+      : `未启用：专注这个项目的任务时沿用通用白名单（当前 ${global} 个应用）。`
+  }</p></div>${
+    project.appWhitelist
+      ? `<button type="button" class="text-button" data-guard-project="${escape(project.id)}" data-disable-project-whitelist="true">改用通用白名单</button>`
+      : `<button type="button" class="button secondary small-button" data-guard-project="${escape(project.id)}" data-enable-project-whitelist="true">${icon("plus")} 启用专属白名单</button>`
+  }</div>${
+    project.appWhitelist
+      ? `<div class="whitelist-tags">${
+          list
+            .map(
+              (app) =>
+                `<span class="app-tag">${icon("monitor")} ${escape(app)}<button class="icon-btn tiny" data-guard-project="${escape(project.id)}" data-remove-project-app="${escape(app)}" aria-label="移除 ${escape(app)}">${icon("x")}</button></span>`,
+            )
+            .join("") ||
+          '<p class="subtle small">专属清单是空的，专注这个项目时只允许番茄 Todo。</p>'
+        }</div><div class="available-apps">${available
+          .map(
+            (w) =>
+              `<button class="available-app" data-guard-project="${escape(project.id)}" data-add-project-app="${escape(w.app_id)}" ${list.includes(w.app_id!) ? "disabled" : ""}>${icon("monitor")}<span><strong>${escape(w.app_id)}</strong><small>${escape(w.title)}</small></span>${icon(list.includes(w.app_id!) ? "check" : "plus")}</button>`,
+          )
+          .join(
+            "",
+          )}</div><form id="project-whitelist-form" class="manual-app"><input type="hidden" name="projectId" value="${escape(project.id)}"><input name="appId" maxlength="200" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="项目应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form>`
+      : ""
+  }</section>`;
+}
+function guardPage() {
+  const p = state.data.settings.protection;
+  if (!guardInfo) void refreshGuard();
   return `${heading("让分心，暂时留在外面。", "为重要的事，留出一段有边界的时间。", "A QUIETER SPACE FOR YOUR MIND", false)}
   <div class="guard-intro"><div class="guard-emblem">${icon("shield-check")}</div><div><h2>专注保护</h2><p>只在专注计时期间生效，休息时自动解除。保护中无法暂停、修改设置或关闭应用；开启严格模式后，必须等到计时结束。</p></div><span class="badge ${guardInfo?.available ? "success" : ""}">${escape(guardInfo?.backend || "正在检测桌面…")}</span></div>
   <section class="card guard-card"><div class="card-heading"><h2>选择你的专注方式</h2></div><div class="guard-modes">${[
@@ -623,41 +677,13 @@ function guardPage() {
       "",
     )}</div><div class="guard-capability ${guardInfo?.available ? "available" : ""}">${icon(guardInfo?.available ? "check-circle-2" : "alert-circle")}<span>${escape(guardInfo?.message || "正在检查窗口控制接口…")}</span></div></section>
   <section class="card guard-card"><label class="setting-row"><span><strong>严格模式 · 不允许临时退出</strong><small>用于界面锁定和应用白名单。开启后，计时中不能暂停、提前结束或关闭保护；结束时自动解除。</small></span><input id="guard-strict" class="switch" type="checkbox" ${p.strict ? "checked" : ""} ${!guardInfo?.available ? "disabled" : ""}></label><p class="subtle small">请在开始前确认所需应用已加入白名单。未开启严格模式时，仍可通过确认文字提前结束。</p></section><section class="card whitelist-card"><div class="card-heading"><div><h2>允许使用的应用 <span class="count-label">${p.whitelist.length}</span></h2><p class="subtle small">以应用 ID 精确匹配。番茄 Todo 始终允许使用。</p></div><button class="button secondary small-button" data-action="refresh-apps">${icon("refresh-cw")} 刷新应用</button></div><div class="whitelist-tags">${p.whitelist.map((app) => `<span class="app-tag">${icon("monitor")} ${escape(app)}<button class="icon-btn tiny" data-remove-app="${escape(app)}" aria-label="移除 ${escape(app)}">${icon("x")}</button></span>`).join("") || '<p class="subtle small">还没有添加应用。先打开需要使用的软件，再从下方添加。</p>'}</div><div class="available-apps">${[...new Map((guardInfo?.windows || []).filter((w) => w.app_id).map((w) => [w.app_id!, w])).values()].map((w) => `<button class="available-app" data-add-app="${escape(w.app_id)}" ${p.whitelist.includes(w.app_id!) ? "disabled" : ""}>${icon("monitor")}<span><strong>${escape(w.app_id)}</strong><small>${escape(w.title)}</small></span>${icon(p.whitelist.includes(w.app_id!) ? "check" : "plus")}</button>`).join("")}</div><form id="whitelist-form" class="manual-app"><input name="appId" maxlength="200" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form></section>
-  <section class="card whitelist-card"><div class="card-heading"><div><h2>按项目白名单</h2><p class="subtle small">给某一类任务一套更贴合的放行清单；没启用专属清单的项目沿用上面的通用白名单。批量维护时导出计划，让 AI 修改项目的 appWhitelist 再导入覆盖。</p></div><select id="project-guard-select" aria-label="选择项目">${
-    state.data.projects
-      .map(
-        (x) =>
-          `<option value="${escape(x.id)}" ${x.id === selectedProject?.id ? "selected" : ""}>${escape(x.name)}</option>`,
-      )
-      .join("") || '<option value="">暂无项目</option>'
-  }</select></div>${
-    selectedProject
-      ? selectedProject.appWhitelist
-        ? `<div class="button-row"><span class="badge success">${icon("shield-check")} 专属白名单 · ${selectedList.length} 个应用</span><button type="button" class="text-button" data-guard-project="${escape(selectedProject.id)}" data-disable-project-whitelist="true">改用通用白名单</button></div><div class="whitelist-tags">${
-            selectedList
-              .map(
-                (app) =>
-                  `<span class="app-tag">${icon("monitor")} ${escape(app)}<button class="icon-btn tiny" data-guard-project="${escape(selectedProject.id)}" data-remove-project-app="${escape(app)}" aria-label="移除 ${escape(app)}">${icon("x")}</button></span>`,
-              )
-              .join("") ||
-            '<p class="subtle small">专属清单是空的，专注这个项目时只允许番茄 Todo。</p>'
-          }</div><div class="available-apps">${availableApps
-            .map(
-              (w) =>
-                `<button class="available-app" data-guard-project="${escape(selectedProject.id)}" data-add-project-app="${escape(w.app_id)}" ${selectedList.includes(w.app_id!) ? "disabled" : ""}>${icon("monitor")}<span><strong>${escape(w.app_id)}</strong><small>${escape(w.title)}</small></span>${icon(selectedList.includes(w.app_id!) ? "check" : "plus")}</button>`,
-            )
-            .join(
-              "",
-            )}</div><form id="project-whitelist-form" class="manual-app"><input type="hidden" name="projectId" value="${escape(selectedProject.id)}"><input name="appId" maxlength="200" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="项目应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form>`
-        : `<div class="button-row"><span class="badge">${icon("shield-check")} 使用通用白名单 · ${p.whitelist.length} 个应用</span><button type="button" class="button secondary small-button" data-guard-project="${escape(selectedProject.id)}" data-enable-project-whitelist="true">${icon("plus")} 启用专属白名单</button></div><p class="subtle small">启用后，专注这个项目的任务时只用专属清单，不再套用通用白名单。</p>`
-      : '<p class="subtle small">还没有项目。</p>'
-  }</section>
   <div class="guard-explanation">${icon("circle-help")}<p>白名单限制的是整个应用，不区分浏览器网站。此功能使用 niri 的窗口接口，每 0.6 秒检查一次并拉回未允许的窗口；不会结束其他软件。系统快捷键、桌面概览、多个显示器和主动终止进程不属于这项自律保护的管控范围。</p></div>`;
 }
 async function refreshGuard() {
   try {
     guardInfo = await getGuard();
-    if (page === "guard" || page === "lock") render();
+    if (page === "guard" || page === "lock" || page.startsWith("project:"))
+      render();
   } catch (e) {
     toast(String(e));
   }
@@ -791,7 +817,7 @@ function taskDialog(id?: string) {
     task?.projectId || (page.startsWith("project:") ? page.slice(8) : "");
   const subs = task?.subtasks.map((s) => ({ ...s })) || [];
   modal(
-    `${modalHeader(task ? "编辑任务" : "种下一个小目标", "把事情写下来，就已经开始了。")}<form id="task-form"><label class="form-field"><span>任务名称</span><input name="title" placeholder="你想完成什么？" maxlength="200" required autofocus value="${escape(task?.title)}"></label><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">收件箱 · 不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>提醒时间 <small>可选，到点唤出任务</small></span><input name="reminderTime" type="time" value="${escape(task?.reminderTime)}"></label><label class="form-field"><span>单次专注时长 <small>可选，留空跟随全局设置</small></span><input name="focusMinutes" type="number" min="1" max="180" placeholder="${state.data.settings.focusMinutes} 分钟" value="${task?.focusMinutes || ""}"></label><label class="form-field"><span>优先级</span><select name="priority">${[
+    `${modalHeader(task ? "编辑任务" : "种下一个小目标", "把事情写下来，就已经开始了。")}<form id="task-form"><label class="form-field"><span>任务名称</span><input name="title" placeholder="你想完成什么？" maxlength="200" required autofocus value="${escape(task?.title)}"></label><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">收件箱 · 不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>所属目标</span><select name="goalId"><option value="">不属于目标</option>${state.data.goals.map((g) => `<option value="${g.id}" ${task?.goalId === g.id ? "selected" : ""}>${escape(g.name)}</option>`).join("")}</select></label><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>提醒时间 <small>可选，到点唤出任务</small></span><input name="reminderTime" type="time" value="${escape(task?.reminderTime)}"></label><label class="form-field"><span>单次专注时长 <small>可选，留空跟随全局设置</small></span><input name="focusMinutes" type="number" min="1" max="180" placeholder="${state.data.settings.focusMinutes} 分钟" value="${task?.focusMinutes || ""}"></label><label class="form-field"><span>优先级</span><select name="priority">${[
       [0, "无优先级"],
       [1, "低优先级"],
       [2, "中优先级"],
@@ -872,6 +898,7 @@ function taskDialog(id?: string) {
           title: f.get("title"),
           notes: f.get("notes"),
           projectId: f.get("projectId") || null,
+          goalId: f.get("goalId") || null,
           dueDate: f.get("dueDate") || null,
           reminderTime: f.get("reminderTime") || null,
           focusMinutes: f.get("focusMinutes")
@@ -923,6 +950,43 @@ function projectDialog(id?: string) {
         async () => {
           page = "tasks";
           await act({ type: "deleteProject", id: p.id }, "项目已删除");
+        },
+        true,
+      );
+}
+function goalDialog(id?: string) {
+  const g = state.data.goals.find((g) => g.id === id);
+  modal(
+    `${modalHeader(g ? "编辑目标" : "新建目标", "给长期的事，一个能积累的位置。")}<form id="goal-form"><label class="form-field"><span>目标名称</span><input name="name" maxlength="40" required autofocus value="${escape(g?.name)}" placeholder="例如：OpenCamp 学习"></label><div class="form-grid"><label class="form-field"><span>计量方式</span><select name="measure"><option value="count" ${g?.measure !== "time" ? "selected" : ""}>按数量</option><option value="time" ${g?.measure === "time" ? "selected" : ""}>按时长</option></select></label><label class="form-field"><span>目标量</span><input name="target" type="number" min="0.1" step="0.1" required value="${g?.target ?? 1}"></label><label class="form-field"><span>单位</span><input name="unit" maxlength="10" required value="${escape(g?.unit)}" placeholder="节 / 小时 / 次"></label><label class="form-field"><span>截止日期 <small>可选</small></span><input name="dueDate" type="date" value="${g?.dueDate || ""}"></label></div><div class="modal-actions">${g ? `<button type="button" class="text-button danger-text" id="delete-goal">删除目标</button>` : "<span></span>"}<button type="submit" class="button primary">保存目标</button></div></form>`,
+  );
+  $("#goal-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    if (
+      await act(
+        {
+          type: "saveGoal",
+          id: g?.id || null,
+          name: f.get("name"),
+          target: Number(f.get("target")),
+          unit: f.get("unit"),
+          measure: f.get("measure"),
+          dueDate: f.get("dueDate") || null,
+        },
+        "目标已保存",
+      )
+    )
+      closeModal();
+  };
+  if (g)
+    $("#delete-goal").onclick = () =>
+      confirmDialog(
+        "删除这个目标？",
+        "目标下的任务会保留，但不再计入目标。",
+        "删除目标",
+        async () => {
+          page = "tasks";
+          await act({ type: "deleteGoal", id: g.id }, "目标已删除");
         },
         true,
       );
@@ -1127,12 +1191,6 @@ function bindForms() {
       await addWhitelist(String(f.get("appId")).trim());
     });
   document
-    .querySelector<HTMLSelectElement>("#project-guard-select")
-    ?.addEventListener("change", (e) => {
-      guardProjectId = (e.target as HTMLSelectElement).value;
-      render();
-    });
-  document
     .querySelector<HTMLFormElement>("#project-whitelist-form")
     ?.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1154,8 +1212,7 @@ function updateTaskResults() {
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
-  $("#tasks-results").innerHTML =
-    page === "planned" ? groupedTasks(tasks) : taskList(tasks);
+  $("#tasks-results").innerHTML = taskList(tasks);
   icons();
 }
 async function addWhitelist(app: string) {
@@ -1342,6 +1399,10 @@ document.addEventListener("click", async (e) => {
     projectDialog(d.editProject);
     return;
   }
+  if (d.editGoal) {
+    goalDialog(d.editGoal);
+    return;
+  }
   if (d.guardMode) {
     await act(
       {
@@ -1455,6 +1516,9 @@ document.addEventListener("click", async (e) => {
       break;
     case "new-project":
       projectDialog();
+      break;
+    case "new-goal":
+      goalDialog();
       break;
     case "close-modal":
       closeModal();

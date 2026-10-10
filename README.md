@@ -68,7 +68,8 @@ python3 scripts/install.py --autostart --pin-dms
 ## 已实现
 
 - 任务与项目：增删改、完成与撤销、优先级、截止日期、标签、备注、子任务、每日/工作日/每周重复；搜索、筛选和排序。
-- 可选时间安排：任务可填写提醒时刻、单次专注时长和重复周期；灵活任务留空即可。到点唤出窗口、高亮任务，一键开始；正在计时、暂停计时或锁机时延后。程序需保持运行，电脑休眠时不唤醒；当天迟到补提醒，跨日不补。
+- 目标：把长期的事（如 OpenCamp 课程）建成目标，把听课、作业等任务挂到同一目标下；目标按「数量」或「时长」累计进度，漏做的目标任务会作为「待补」出现在今日专注，直到补完。
+- 可选时间安排：任务可填写提醒时刻、单次专注时长和重复周期；灵活任务留空即可。到点唤出窗口、高亮任务，一键开始；正在计时、暂停计时或锁机时延后。提醒只在计划块内有效（番茄数 × 单次时长，加上番茄之间的休息），超过仍未开始即作废，当天不再提醒；跨日不补。程序需保持运行，电脑休眠时不唤醒。
 - 番茄钟：自定义专注/短休息/长休息，暂停、继续、跳过、重置、任务关联、循环与自动衔接。计时由 Rust 管理，重启后按实际截止时间恢复，不把应用关闭期间虚构成连续完成的番茄。
 - 统计：当天专注时间、完成番茄、连续天数、近七天趋势、项目时间分布与专注历史；提前结束也保留实际用时，但不计为完成番茄。
 - 专注体验：沉浸计时、合成雨声与棕噪声、音量、结束铃声、系统通知、置顶、明暗/跟随系统主题、键盘快捷键。
@@ -88,27 +89,27 @@ python3 scripts/install.py --autostart --pin-dms
 
 ## 开发与验证
 
-需要 Rust stable、Node.js 22.12+、系统 GTK 3 / WebKitGTK 4.1 开发库、C 编译工具链和 pkg-config。
+需要 Rust stable、Node.js 22.12+、pnpm、系统 GTK 3 / WebKitGTK 4.1 开发库、C 编译工具链和 pkg-config。
 
 ```sh
-npm ci
-npm run desktop        # Tauri 桌面开发
-npm run dev            # Rust 服务 + Vite 浏览器预览
-npm run check          # TypeScript + Rust Clippy
-npm run format:check   # rustfmt + Prettier 格式检查
-npm test               # Rust 单元测试 + 构建 + 浏览器端到端测试
-npm run desktop:deb    # 构建生产安装包
+pnpm install
+pnpm run desktop        # Tauri 桌面开发
+pnpm run dev            # Rust 服务 + Vite 浏览器预览
+pnpm run check          # TypeScript + Rust Clippy
+pnpm run format:check   # rustfmt + Prettier 格式检查
+pnpm test               # Rust 单元测试 + 构建 + 浏览器端到端测试
+pnpm run desktop:deb    # 构建生产安装包
 ```
 
 浏览器预览访问 `http://127.0.0.1:1420`，Rust 服务仅监听 `127.0.0.1:4319`。端到端测试使用独立临时数据库、4321 端口和 Chromium；可用 `CHROMIUM_PATH` 指定浏览器可执行文件。
 
-原生保护测试：`npm run test:native`，需要 niri、Xvfb、tauri-driver、WebKitWebDriver、Python GObject/GTK。测试创建独立的嵌套桌面，验证白名单放行、非白名单回焦、拒绝关闭与暂停、全屏锁定和紧急恢复，不在用户当前桌面测试阻拦。
+原生保护测试：`pnpm run test:native`，需要 niri、Xvfb、tauri-driver、WebKitWebDriver、Python GObject/GTK。测试创建独立的嵌套桌面，验证白名单放行、非白名单回焦、拒绝关闭与暂停、全屏锁定和紧急恢复，不在用户当前桌面测试阻拦。
 
-此测试入口构建内置界面的独立测试程序，无需另起 Vite；同时使用私有 D-Bus、临时 XDG 配置和 StatusNotifier 测试宿主，验证真实托盘菜单、隐藏后的计时、自启动开关、单实例恢复与无托盘时的回退。安装脚本验证：`npm run test:install`，使用临时用户目录检查配置保留、图标/启动项及重复安装。
+此测试入口构建内置界面的独立测试程序，无需另起 Vite；同时使用私有 D-Bus、临时 XDG 配置和 StatusNotifier 测试宿主，验证真实托盘菜单、隐藏后的计时、自启动开关、单实例恢复与无托盘时的回退。安装脚本验证：`pnpm run test:install`，使用临时用户目录检查配置保留、图标/启动项及重复安装。
 
 验证入口覆盖 Rust 状态机、计划往返导入、旧备份兼容、严格执行、跨午夜锁机，以及真实浏览器和独立嵌套 niri 桌面。生产程序加载内置界面，无需 Vite 服务。
 
-持续集成在 Ubuntu 22.04 上运行 `npm run check`、`npm run format:check` 与 `npm test`；推送 `v*` 标签时由 [Release 工作流](.github/workflows/release.yml) 构建 `.deb` 与独立压缩包并发布到 Releases。
+持续集成在 Ubuntu 22.04 上运行 `pnpm run check`、`pnpm run format:check` 与 `pnpm test`；推送 `v*` 标签时由 [Release 工作流](.github/workflows/release.yml) 构建 `.deb` 与独立压缩包并发布到 Releases。
 
 ## 数据与实现
 

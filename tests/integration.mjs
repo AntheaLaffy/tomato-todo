@@ -106,6 +106,17 @@ test(
       await expect(
         page.locator(".project-nav").filter({ hasText: "个人成长" }),
       ).toBeVisible();
+      await page.locator("[data-page=goals]").first().click();
+      await page.getByRole("button", { name: "新建目标", exact: true }).click();
+      await page.locator("#goal-form [name=name]").fill("OpenCamp");
+      await page.locator("#goal-form [name=target]").fill("3");
+      await page.locator("#goal-form [name=unit]").fill("节");
+      await page.getByRole("button", { name: "保存目标", exact: true }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(
+        page.locator(".goal-section").filter({ hasText: "OpenCamp" }),
+      ).toBeVisible();
+      await page.locator("[data-page=focus]").first().click();
       await page.getByRole("button", { name: "开始专注", exact: true }).click();
       await expect(
         page.getByRole("button", { name: "暂停专注", exact: true }),
@@ -144,9 +155,11 @@ test(
       await page.getByRole("button", { name: "专注保护", exact: true }).click();
       await expect(page.locator("[data-guard-mode=lock]")).toBeDisabled();
       await expect(page.locator("#guard-strict")).toBeDisabled();
+      // The per-project whitelist lives on the project page, not the guard page.
       await page
-        .locator("#project-guard-select")
-        .selectOption({ label: "个人成长" });
+        .locator(".project-nav")
+        .filter({ hasText: "个人成长" })
+        .click();
       await page.locator("[data-enable-project-whitelist]").click();
       await page
         .locator("#project-whitelist-form [name=appId]")
@@ -271,7 +284,12 @@ test(
         .click();
       await page.locator("[name=title]").fill("时间明确的测试任务");
       await page.locator("[name=focusMinutes]").fill("40");
-      await page.locator("[name=reminderTime]").fill("00:00");
+      // Due now, so it is inside its planned block instead of long expired.
+      const now = new Date();
+      const reminderAt = `${String(now.getHours()).padStart(2, "0")}:${String(
+        now.getMinutes(),
+      ).padStart(2, "0")}`;
+      await page.locator("[name=reminderTime]").fill(reminderAt);
       await page.getByRole("button", { name: "创建任务", exact: true }).click();
       const reminder = page.getByRole("region", { name: "任务时间提醒" });
       await expect(reminder).toContainText("时间明确的测试任务");

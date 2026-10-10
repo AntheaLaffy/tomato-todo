@@ -1,6 +1,6 @@
 //! Persist delivery state so polling and restarts cannot repeatedly steal focus.
 use crate::{date_at, AppData, AppResult, Task};
-use chrono::{Local, TimeZone};
+use chrono::{Local, TimeZone, Timelike};
 
 pub fn validate(task: &Task) -> AppResult<()> {
     if task.focus_minutes.is_some_and(|m| !(1..=180).contains(&m)) {
@@ -22,6 +22,34 @@ pub fn validate(task: &Task) -> AppResult<()> {
     }
     Ok(())
 }
+fn minutes_of(time: &str) -> Option<i64> {
+    let bytes = time.as_bytes();
+    if bytes.len() != 5 || bytes[2] != b':' {
+        return None;
+    }
+    Some(i64::from(
+        time[..2].parse::<u32>().ok()? * 60 + time[3..].parse::<u32>().ok()?,
+    ))
+}
+
+/// Length of the scheduled block: every focus session plus the breaks between
+/// them, so a multi-pomodoro task stays valid across its rest gaps.
+fn window_minutes(task: &Task, settings: &crate::Settings) -> i64 {
+    let focus = i64::from(task.focus_minutes.unwrap_or(settings.focus_minutes));
+    let sessions = i64::from(task.estimate.max(1));
+    let every = i64::from(settings.long_break_every.max(1));
+    let breaks: i64 = (1..sessions)
+        .map(|i| {
+            if i % every == 0 {
+                i64::from(settings.long_break_minutes)
+            } else {
+                i64::from(settings.short_break_minutes)
+            }
+        })
+        .sum();
+    sessions * focus + breaks
+}
+
 impl AppData {
     pub fn reminder_idle(&self) -> bool {
         !self.timer.running
@@ -40,22 +68,35 @@ impl AppData {
     }
     pub(crate) fn tick_reminders(&mut self, at: i64) -> bool {
         let date = date_at(at);
-        let time = Local
-            .timestamp_opt(at, 0)
-            .single()
-            .unwrap()
-            .format("%H:%M")
-            .to_string();
+        let now = Local.timestamp_opt(at, 0).single().unwrap();
+        let now_minutes = i64::from(now.hour() * 60 + now.minute());
+        let settings = &self.settings;
         let mut changed = false;
         for t in &mut self.tasks {
-            if (t.completed || t.due_date.as_deref() != Some(&date)) && t.reminder_pending {
+            let today = t.due_date.as_deref() == Some(&date);
+            // Past its whole planned block, an unstarted reminder is void: it
+            // no longer fires or pulls the window back today.
+            let expired = today
+                && t.reminder_time
+                    .as_deref()
+                    .and_then(minutes_of)
+                    .is_some_and(|start| now_minutes > start + window_minutes(t, settings));
+            if (t.completed || !today || expired) && t.reminder_pending {
                 t.reminder_pending = false;
+                changed = true;
+            }
+            if expired && !t.reminder_fired {
+                t.reminder_fired = true;
                 changed = true;
             }
             if !t.completed
                 && !t.reminder_fired
-                && t.due_date.as_deref() == Some(&date)
-                && t.reminder_time.as_ref().is_some_and(|r| r <= &time)
+                && today
+                && !expired
+                && t.reminder_time
+                    .as_deref()
+                    .and_then(minutes_of)
+                    .is_some_and(|start| start <= now_minutes)
             {
                 t.reminder_fired = true;
                 t.reminder_pending = true;
