@@ -189,6 +189,7 @@ const labels: Record<string, string> = {
   templates: "印刷模板",
   goals: "目标·习惯·愿景",
   stats: "数据统计",
+  schedule: "本周日程",
   guard: "专注保护",
   lock: "定时锁机",
   settings: "偏好设置",
@@ -392,6 +393,7 @@ function render() {
       ["tasks", "inbox"],
       ["goals", "target"],
       ["stats", "chart-no-axes-combined"],
+      ["schedule", "calendar-days"],
       ["guard", "shield-check"],
       ["lock", "moon"],
     ]
@@ -406,7 +408,7 @@ function render() {
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.5.0</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar"><div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
-  <main>${reminderBanner()}${page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  <main>${reminderBanner()}${page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
   bindForms();
   icons();
   updateClock();
@@ -525,6 +527,74 @@ function taskList(tasks: Task[], compact = false) {
       return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}" ${isVoid(task) ? "disabled" : ""}>${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${goalOf(task) ? `<span>${icon("target")}${escape(goalOf(task)!.name)}${nodeOf(task) ? ` · ${escape(nodeOf(task)!.spec.name)}` : ""}${isVoid(task) ? " · 已报废" : ""}</span>` : ""}${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed && !isVoid(task) ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
     })
     .join("");
+}
+let weekOffset = 0;
+const isoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function schedulePage() {
+  const base = new Date(`${state.today}T12:00:00`);
+  const monday = new Date(base);
+  monday.setDate(base.getDate() - ((base.getDay() + 6) % 7) + weekOffset * 7);
+  const weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+  const start = 7 * 60;
+  const end = 23 * 60;
+  const span = end - start;
+  const toMin = (time: string | null | undefined) =>
+    time ? Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5)) : start;
+  const focus = state.data.settings.focusMinutes;
+  const brk = state.data.settings.shortBreakMinutes;
+  const lists = days.map((d) =>
+    state.data.tasks
+      .filter((t) => t.dueDate === isoDate(d))
+      .sort((a, b) => toMin(a.reminderTime) - toMin(b.reminderTime)),
+  );
+  const total = lists.reduce(
+    (n, ts) => n + ts.reduce((m, t) => m + t.estimate, 0),
+    0,
+  );
+  const range = `${isoDate(days[0]).slice(5).replace("-", "/")}–${isoDate(days[6]).slice(5).replace("-", "/")}`;
+  const hours = Array.from({ length: span / 60 + 1 }, (_, i) => start / 60 + i);
+  const pct = (min: number) => ((min - start) / span) * 100;
+  return `${heading("这一周的日程", "横轴星期、纵轴时间，方块就是任务。", "WEEK AT A GLANCE", false)}
+  <div class="week-nav"><button class="text-button" data-week-prev>${icon("arrow-left")} 上一周</button><span>${range} · 共 ${total} 番茄</span>${weekOffset === 0 ? "" : '<button class="text-button" data-week-now>回到本周</button>'}<button class="text-button" data-week-next>下一周 ${icon("arrow-right")}</button></div>
+  <section class="calendar">
+    <div class="calendar-head"><span class="calendar-gutter"></span>${days
+      .map((d, i) => {
+        const est = lists[i].reduce((m, t) => m + t.estimate, 0);
+        return `<div class="calendar-day ${isoDate(d) === state.today ? "today" : ""}"><b>${weekdays[i]}</b><small>${isoDate(d).slice(5).replace("-", "/")}</small>${est ? `<em>${est} 番茄</em>` : ""}</div>`;
+      })
+      .join("")}</div>
+    <div class="calendar-body">
+      <div class="calendar-gutter">${hours.map((h) => `<span style="top:${pct(h * 60)}%">${String(h).padStart(2, "0")}:00</span>`).join("")}</div>
+      ${days
+        .map(
+          (_, i) =>
+            `<div class="calendar-col">${hours.map((h) => `<i class="hour-line" style="top:${pct(h * 60)}%"></i>`).join("")}${lists[
+              i
+            ]
+              .map((t) => {
+                const top = Math.max(0, pct(toMin(t.reminderTime)));
+                const minutes = Math.max(
+                  30,
+                  t.estimate * focus + Math.max(0, t.estimate - 1) * brk,
+                );
+                const height = Math.max(
+                  3,
+                  Math.min(100 - top, (minutes / span) * 100),
+                );
+                const p = projectOf(t);
+                return `<button class="calendar-block ${t.completed ? "done" : ""}" style="top:${top}%;height:${height}%;border-left-color:${escape(p?.color || "#c9c4ba")}" data-edit-task="${escape(t.id)}"><b>${escape(t.reminderTime || "")}</b><span>${escape(t.title)}</span></button>`;
+              })
+              .join("")}</div>`,
+        )
+        .join("")}
+    </div>
+  </section>`;
 }
 function tasksPage() {
   const project = page.startsWith("project:")
@@ -2426,6 +2496,21 @@ document.addEventListener("click", async (e) => {
   }
   if (d.goalsTab) {
     goalsTab = d.goalsTab;
+    render();
+    return;
+  }
+  if (d.weekPrev !== undefined) {
+    weekOffset -= 1;
+    render();
+    return;
+  }
+  if (d.weekNext !== undefined) {
+    weekOffset += 1;
+    render();
+    return;
+  }
+  if (d.weekNow !== undefined) {
+    weekOffset = 0;
     render();
     return;
   }

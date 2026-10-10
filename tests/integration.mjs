@@ -431,6 +431,16 @@ test(
               .length,
         )
         .toBe(beforeDelete - 1);
+      // The weekly schedule shows seven days and can move between weeks.
+      await page.locator("[data-page=schedule]").first().click();
+      await expect(page.locator(".calendar-day")).toHaveCount(7);
+      await page.locator("[data-week-next]").click();
+      await expect(page.locator("[data-week-now]")).toHaveCount(1);
+      await page.locator("[data-week-now]").click();
+      await page.screenshot({
+        path: join(dir, "schedule.png"),
+        fullPage: true,
+      });
       assert.deepEqual(errors, []);
     } finally {
       await browser?.close();
