@@ -190,4 +190,5 @@ Rust 负责状态机、任务规则、数据校验、SQLite、统计和桌面保
 以下是方向，**尚未实现**，欢迎一起补齐：
 
 - **内嵌智能体**：启动时静默检查一轮数据异常，只在发现异常时唤醒智能体，主动追问并归因（计划是否合理、是力不从心还是太轻松、长期搁置的兴趣项等）；无异常则保持静默、不消耗 token。（数据异常的建模由 GPT Astra 操刀，尚未开工。）
+- **智能体运行与打包**：计划以 [Pi（pi-mono）](https://github.com/badlogic/pi-mono) 承载智能体，接入 DeepSeek API 和 Codex 的 ChatGPT 账号登录路径，将所需运行框架与客户端随桌面应用打包。服务分别由用户配置 API Key 或登录账号；当前只记录方向，暂不实现。接入依据见 [DeepSeek 的 Pi 集成说明](https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono/) 与 [OpenAI 的账号登录文档](https://learn.chatgpt.com/docs/auth)。
 - **Agent Skills 与 MCP**：把学习计划维护流程整理成可复用的技能，并提供 MCP 接口，让智能体能读取任务、统计与安排并协助调整学习环境。列入未来计划，当前版本暂不实现。
