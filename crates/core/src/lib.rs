@@ -84,6 +84,10 @@ pub struct Habit {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_minutes: Option<u32>,
     pub slots: Vec<HabitSlot>,
+    /// Date of the most recent daily materialization, so deleting that day's
+    /// occurrence does not bring it back on the next tick.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_generated: Option<String>,
 }
 
 /// A motivational marker: a name plus some prose that can belong to a project, a
@@ -126,6 +130,10 @@ pub struct Task {
     pub reminder_time: Option<String>,
     #[serde(default)]
     pub focus_minutes: Option<u32>,
+    /// Static grace window (minutes) a plain task may still be repaired after its
+    /// planned block; 0 means it is spent as soon as the block ends.
+    #[serde(default)]
+    pub scrap_minutes: u32,
     pub priority: u8,
     pub estimate: u32,
     #[serde(default)]
@@ -181,6 +189,8 @@ pub struct TaskDraft {
     pub reminder_time: Option<String>,
     #[serde(default)]
     pub focus_minutes: Option<u32>,
+    #[serde(default)]
+    pub scrap_minutes: u32,
     #[serde(default)]
     pub priority: u8,
     #[serde(default = "default_estimate")]
@@ -373,6 +383,15 @@ impl Default for AppData {
     }
 }
 
+/// What a task is being detached from (the task itself stays).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DetachTarget {
+    Project,
+    Goal,
+    Habit,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(
     tag = "type",
@@ -410,6 +429,13 @@ pub enum Action {
     },
     DeleteProject {
         id: String,
+    },
+    ReorderProjects {
+        ids: Vec<String>,
+    },
+    DetachTasks {
+        ids: Vec<String>,
+        target: DetachTarget,
     },
     SaveGoal {
         id: Option<String>,
@@ -786,6 +812,7 @@ impl AppData {
                             && t.reminder_time == d.reminder_time
                             && t.reminder_expired
                     }),
+                    scrap_minutes: d.scrap_minutes,
                     focus_minutes: d.focus_minutes,
                     reminder_time: d.reminder_time,
                     due_date: d.due_date,
@@ -923,6 +950,31 @@ impl AppData {
                 }
                 self.visions.retain(|a| a.project_id.as_ref() != Some(&id));
             }
+            Action::ReorderProjects { ids } => {
+                // Only accept a permutation of the current projects.
+                if ids.len() != self.projects.len()
+                    || !ids
+                        .iter()
+                        .all(|id| self.projects.iter().any(|p| &p.id == id))
+                {
+                    return Err("项目排序列表与现有项目不一致".into());
+                }
+                self.projects = ids
+                    .iter()
+                    .filter_map(|id| self.projects.iter().find(|p| &p.id == id).cloned())
+                    .collect();
+            }
+            Action::DetachTasks { ids, target } => {
+                for t in self.tasks.iter_mut() {
+                    if ids.contains(&t.id) {
+                        match target {
+                            DetachTarget::Project => t.project_id = None,
+                            DetachTarget::Goal => t.goal_id = None,
+                            DetachTarget::Habit => t.habit_id = None,
+                        }
+                    }
+                }
+            }
             Action::SaveGoal {
                 id: gid,
                 name,
@@ -986,6 +1038,7 @@ impl AppData {
                         project_id,
                         focus_minutes,
                         slots,
+                        last_generated: None,
                     });
                 }
             }
@@ -1123,6 +1176,7 @@ impl AppData {
                         reminder_fired: false,
                         reminder_pending: false,
                         reminder_expired: false,
+                        scrap_minutes: 0,
                         priority,
                         estimate,
                         completed: false,
@@ -1273,6 +1327,7 @@ impl AppData {
                 t.priority <= 3 && (1..=99).contains(&t.estimate),
                 "无效的优先级或预计番茄数",
             )?;
+            ensure(t.scrap_minutes <= 10_080, "重修窗口超出范围")?;
             ensure(
                 t.project_id.as_ref().is_none_or(|p| projects.contains(p)),
                 "任务引用了不存在的项目",

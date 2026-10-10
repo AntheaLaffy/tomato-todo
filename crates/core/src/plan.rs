@@ -74,6 +74,7 @@ impl PlanTask {
             reminder_fired: false,
             reminder_pending: false,
             reminder_expired: false,
+            scrap_minutes: 0,
             priority: self.priority,
             estimate,
             completed: false,

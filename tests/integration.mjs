@@ -346,6 +346,41 @@ test(
       await expect(
         page.locator(".vision-card").filter({ hasText: "考上北大" }),
       ).toBeVisible();
+      // Batch delete tasks through selection mode.
+      await page.locator("[data-page=tasks]").first().click();
+      // Right-click a project for its context menu, and confirm batch selection
+      // also exists on the flat project page.
+      await page
+        .locator(".project-nav")
+        .filter({ hasText: "个人成长" })
+        .click({ button: "right" });
+      await expect(page.locator(".context-menu")).toBeVisible();
+      await page.locator("[data-page=tasks]").first().click();
+      await expect(page.locator(".context-menu")).toHaveCount(0);
+      await page
+        .locator(".project-nav")
+        .filter({ hasText: "个人成长" })
+        .click();
+      await expect(page.locator("[data-select-mode=on]")).toBeVisible();
+      await page.locator("[data-page=tasks]").first().click();
+      const beforeDelete = (await (await fetch(`${url}/api/snapshot`)).json())
+        .data.tasks.length;
+      await page.locator("[data-select-mode=on]").click();
+      // Pick a plain task: a habit occurrence would just be materialized again.
+      await page
+        .locator(".task-row")
+        .filter({ hasText: "时间明确的测试任务" })
+        .locator(".task-checkbox.pick")
+        .click();
+      await page.locator("[data-delete-selected]").click();
+      await page.locator("#confirm-button").click();
+      await expect
+        .poll(
+          async () =>
+            (await (await fetch(`${url}/api/snapshot`)).json()).data.tasks
+              .length,
+        )
+        .toBe(beforeDelete - 1);
       assert.deepEqual(errors, []);
     } finally {
       await browser?.close();

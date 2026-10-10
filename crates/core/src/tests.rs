@@ -872,6 +872,126 @@ fn visions_attach_to_a_project_or_goal_or_stand_alone() {
 }
 
 #[test]
+fn deleting_a_habit_occurrence_does_not_regenerate_it() {
+    let mut e = engine();
+    e.dispatch(
+        Action::SaveHabit {
+            id: None,
+            name: "午饭".into(),
+            project_id: None,
+            focus_minutes: None,
+            slots: vec![HabitSlot {
+                days: vec![1, 2, 3, 4, 5, 6, 7],
+                time: "12:00".into(),
+            }],
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    let s = e.snapshot(friday(8, 0)).unwrap();
+    let habit = s.data.habits[0].id.clone();
+    let task = s
+        .data
+        .tasks
+        .iter()
+        .find(|t| t.habit_id.as_deref() == Some(habit.as_str()))
+        .unwrap()
+        .id
+        .clone();
+    e.dispatch(Action::DeleteTask { id: task }, friday(8, 1))
+        .unwrap();
+    let s = e.snapshot(friday(8, 2)).unwrap();
+    assert!(s
+        .data
+        .tasks
+        .iter()
+        .all(|t| t.habit_id.as_deref() != Some(habit.as_str())));
+}
+
+#[test]
+fn tasks_detach_without_being_deleted() {
+    let mut e = engine();
+    let project = e.snapshot(1000).unwrap().data.projects[0].id.clone();
+    let mut d = draft();
+    d.project_id = Some(project);
+    let s = e.dispatch(Action::SaveTask { task: d }, 1000).unwrap();
+    let id = s.data.tasks[0].id.clone();
+    e.dispatch(
+        Action::DetachTasks {
+            ids: vec![id.clone()],
+            target: DetachTarget::Project,
+        },
+        1000,
+    )
+    .unwrap();
+    let s = e.snapshot(1000).unwrap();
+    assert_eq!(s.data.tasks.len(), 1);
+    assert!(s.data.tasks[0].project_id.is_none());
+}
+
+#[test]
+fn plain_tasks_get_a_static_repair_window() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    d.focus_minutes = Some(25);
+    d.estimate = 1; // planned block ends 09:25
+    d.scrap_minutes = 120; // repairable until 11:25
+    e.dispatch(Action::SaveTask { task: d }, friday(8, 0))
+        .unwrap();
+    assert!(!e.snapshot(friday(10, 0)).unwrap().data.tasks[0].reminder_expired);
+    assert!(e.snapshot(friday(11, 30)).unwrap().data.tasks[0].reminder_expired);
+}
+
+#[test]
+fn projects_reorder_only_as_a_permutation() {
+    let mut e = engine();
+    let ids: Vec<String> = e
+        .snapshot(1000)
+        .unwrap()
+        .data
+        .projects
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
+    let mut reversed = ids.clone();
+    reversed.reverse();
+    let s = e
+        .dispatch(
+            Action::ReorderProjects {
+                ids: reversed.clone(),
+            },
+            1000,
+        )
+        .unwrap();
+    assert_eq!(
+        s.data
+            .projects
+            .iter()
+            .map(|p| p.id.clone())
+            .collect::<Vec<_>>(),
+        reversed
+    );
+    assert!(e
+        .dispatch(
+            Action::ReorderProjects {
+                ids: vec!["missing".into()]
+            },
+            1000
+        )
+        .is_err());
+    assert!(e
+        .dispatch(
+            Action::ReorderProjects {
+                ids: vec![ids[0].clone()]
+            },
+            1000
+        )
+        .is_err());
+}
+
+#[test]
 fn protection_rejects_mutations_until_emergency_or_completion() {
     let mut e = engine();
     let settings = Settings {
@@ -996,6 +1116,7 @@ fn draft() -> TaskDraft {
         due_date: None,
         reminder_time: None,
         focus_minutes: None,
+        scrap_minutes: 0,
         priority: 2,
         estimate: 2,
         tags: vec![],

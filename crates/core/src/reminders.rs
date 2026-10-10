@@ -80,7 +80,10 @@ impl AppData {
             // block is over today; from then on it neither fires nor rolls over.
             let expired = match start {
                 Some(s) if !t.completed => {
-                    past || (today && now_minutes > s + window_minutes(t, settings))
+                    // A plain task may be repaired for its static grace window
+                    // after the planned block; habits carry 0 and are spent then.
+                    let spent_at = s + window_minutes(t, settings) + i64::from(t.scrap_minutes);
+                    past || (today && now_minutes > spent_at)
                 }
                 _ => false,
             };

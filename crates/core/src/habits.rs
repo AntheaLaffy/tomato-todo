@@ -55,10 +55,17 @@ impl AppData {
             .weekday()
             .number_from_monday() as u8;
         let mut added = Vec::new();
-        for habit in &self.habits {
+        let mut handled = Vec::new();
+        for (index, habit) in self.habits.iter().enumerate() {
+            // Once today is materialized it stays that way, so a deleted
+            // occurrence is not silently recreated on the next tick.
+            if habit.last_generated.as_deref() == Some(date.as_str()) {
+                continue;
+            }
             let Some(slot) = habit.slots.iter().find(|s| s.days.contains(&weekday)) else {
                 continue;
             };
+            handled.push(index);
             let exists = self.tasks.iter().any(|t| {
                 t.habit_id.as_deref() == Some(habit.id.as_str())
                     && t.due_date.as_deref() == Some(date.as_str())
@@ -81,6 +88,7 @@ impl AppData {
                 reminder_fired: false,
                 reminder_pending: false,
                 reminder_expired: false,
+                scrap_minutes: 0,
                 completed: false,
                 completed_at: None,
                 created_at: at,
@@ -90,8 +98,11 @@ impl AppData {
                 next_task_id: None,
             });
         }
-        let changed = !added.is_empty();
+        let changed = !added.is_empty() || !handled.is_empty();
         self.tasks.extend(added);
+        for index in handled {
+            self.habits[index].last_generated = Some(date.clone());
+        }
         changed
     }
 }

@@ -14,6 +14,8 @@ generated_at: 2026-10-10
 | 过期习惯与缺勤统计 | 业务核心 | reminders.rs 的 tick_reminders、lib.rs 的 stats/DayStat.missed | src/main.ts 的 isExpiredHabit、docs/BACKUP_FORMAT.md |
 | 习惯时段与当天生成 | 业务核心 | habits.rs、lib.rs 的 materialize_habits | src/main.ts 的 habitDialog/habitsTab、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 | lib.rs 的 Vision/SaveVision | src/main.ts 的 visionDialog/visionsTab、docs/BACKUP_FORMAT.md |
+| 项目排序 | 业务核心 | lib.rs 的 Action::ReorderProjects | src/main.ts 的侧栏拖拽/sortProjects |
+| 批量删除/移出 | 业务核心 | lib.rs 的 Action::DetachTasks/DetachTarget | src/main.ts 的 selectControls/detachSelected |
 | 计划合并/导出与文件校验 | 文件契约 | plan.rs | docs/CODEMAP.md、tests.rs、桌面/预览与 TypeScript 消费方 |
 | 修复倒计时与统计 | 业务核心 | lib.rs 的 tick/stats/Engine | tests.rs、桌面后台线程 |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
@@ -23,8 +25,8 @@ generated_at: 2026-10-10
 
 | Symbol | Source | Line |
 | --- | --- | --- |
-| AppData / Action | lib.rs | L:324 / L:382 |
-| Engine | lib.rs | L:1412 |
+| AppData / Action | lib.rs | L:328 / L:395 |
+| Engine | lib.rs | L:1458 |
 | guard | guard.rs | L:1 |
 
 ## 文件

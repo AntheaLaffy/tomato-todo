@@ -52,6 +52,7 @@ import {
   Flag,
   Link2,
   RefreshCw,
+  ArrowUpDown,
 } from "lucide";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -136,6 +137,7 @@ const iconSet = {
   Flag,
   Link2,
   RefreshCw,
+  ArrowUpDown,
 };
 const $ = <T extends Element = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -155,6 +157,10 @@ const logo = `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M
 let state: Snapshot;
 let page = "focus";
 let goalsTab = "goals";
+let selectMode = false;
+const selectedTaskIds = new Set<string>();
+let visibleTaskIds: string[] = [];
+let dragProjectId: string | null = null;
 let filter = "active";
 let reminderSeen = "";
 let priority = "all";
@@ -211,6 +217,7 @@ const daysLabel = (days: number[]) => {
   if (sorted.join() === "6,7") return "周末";
   return "周" + sorted.map(dayLabel).join("");
 };
+
 const isTimed = (task: Task) => !!task.reminderTime;
 const goalProgress = (g: Goal) => {
   if (g.measure === "time") {
@@ -365,6 +372,8 @@ function navigate(next: string) {
   search = "";
   filter = "active";
   priority = "all";
+  selectMode = false;
+  selectedTaskIds.clear();
   settingsDirty = false;
   render();
   if (desktop && next === "settings") {
@@ -399,8 +408,8 @@ function render() {
           `<button class="nav-item ${page === id ? "active" : ""}" data-page="${id}">${icon(ic)}<span>${labels[id]}</span>${id === "tasks" ? `<b>${d.tasks.filter((t) => !t.completed).length}</b>` : id === "focus" ? '<span class="nav-dot"></span>' : ""}</button>`,
       )
       .join("")}</nav>
-    <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
-    <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${d.tasks.filter((t) => t.projectId === p.id && !t.completed).length}</b></button>`).join("")}</nav>
+    <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
+    <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${d.tasks.filter((t) => t.projectId === p.id && !t.completed).length}</b></button>`).join("")}</nav>
     <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("sprout").replace("sprout", "leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.4.0</span></div></div>
   </aside>
@@ -494,18 +503,20 @@ function taskList(tasks: Task[], compact = false) {
   );
   if (!items.length)
     return `<div class="empty-state"><div class="empty-illustration">${icon(filter === "completed" ? "check-check" : "leaf")}</div><h3>${search ? "没有找到匹配的任务" : filter === "completed" ? "每一次完成，都值得被记录" : "给今天，一个小小的开始"}</h3><p>${search ? "试试其他关键词，或新建一个任务。" : filter === "completed" ? "完成的任务会出现在这里。" : "写下想做的事，把第一步留给现在。"}</p>${!state.data.tasks.length ? '<button class="text-button" data-action="example">还没想好？体验示例任务 →</button>' : ""}</div>`;
+  visibleTaskIds = items.map((t) => t.id);
   return items
     .map((task) => {
       const p = projectOf(task),
         done = completedPomodoros(task),
         selected = task.id === state.data.timer.taskId,
+        picked = selectMode && selectedTaskIds.has(task.id),
         catchUp =
           !!task.goalId &&
           !!task.dueDate &&
           task.dueDate < state.today &&
           !task.completed &&
           !isVoid(task);
-      return `<article data-task-id="${escape(task.id)}" class="task-row ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}"><button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}">${task.completed ? icon("check") : ""}</button><button class="task-body" data-edit-task="${task.id}"><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.repeat !== "none" ? `<span>${icon("refresh-cw")}${{ daily: "每天", weekdays: "工作日", weekly: "每周" }[task.repeat]}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${!task.completed ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button></div></article>`;
+      return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}">${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.repeat !== "none" ? `<span>${icon("refresh-cw")}${{ daily: "每天", weekdays: "工作日", weekly: "每周" }[task.repeat]}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
     })
     .join("");
 }
@@ -529,7 +540,10 @@ function tasksPage() {
     );
   if (priority !== "all")
     tasks = tasks.filter((t) => t.priority === Number(priority));
-  return `${heading(escape(project?.name || "把想做的事，慢慢完成。"), `还有 ${count} 件事等着你。清空头脑，让清单帮你记住。`, "SMALL STEPS, REAL PROGRESS")}
+  const title = project
+    ? `${escape(project.name)} <button class="icon-btn title-edit" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>`
+    : "把想做的事，慢慢完成。";
+  return `${heading(title, `还有 ${count} 件事等着你。清空头脑，让清单帮你记住。`, "SMALL STEPS, REAL PROGRESS")}
   ${project ? projectWhitelistCard(project) + projectVisionCard(project) : ""}
   <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs">${[
     ["active", "待完成"],
@@ -554,7 +568,7 @@ function tasksPage() {
     )
     .join(
       "",
-    )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${project ? `<button class="icon-btn" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>` : ""}</div></div><div id="tasks-results">${taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>`;
+    )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${selectControls()}</div></div><div id="tasks-results">${taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>`;
 }
 function goalsPage() {
   const goals = state.data.goals;
@@ -616,10 +630,12 @@ function habitsTab(habits: Task[]) {
       : []),
   ].join("");
 }
+function habitSlotHtml(days: number[], time: string) {
+  return `<div class="habit-slot" data-slot><div class="slot-days">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label><input type="checkbox" value="${d}" ${days.includes(d) ? "checked" : ""}>${dayLabel(d)}</label>`).join("")}</div><input type="time" value="${escape(time)}" aria-label="时段"><button type="button" class="icon-btn tiny" data-remove-slot aria-label="移除时段">${icon("x")}</button></div>`;
+}
 function habitDialog(id?: string) {
   const h = state.data.habits.find((h) => h.id === id);
-  const slotRow = (days: number[], time: string) =>
-    `<div class="habit-slot" data-slot><div class="slot-days">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label><input type="checkbox" value="${d}" ${days.includes(d) ? "checked" : ""}>${dayLabel(d)}</label>`).join("")}</div><input type="time" value="${escape(time)}" aria-label="时段"><button type="button" class="icon-btn tiny" data-remove-slot aria-label="移除时段">${icon("x")}</button></div>`;
+  const slotRow = habitSlotHtml;
   const slots = h?.slots.length ? h.slots : [{ days: [], time: "" }];
   modal(
     `${modalHeader(h ? "编辑习惯" : "新建习惯", "同一个习惯，可以每天不同时间。")}<form id="habit-form"><label class="form-field"><span>习惯名称</span><input name="name" maxlength="40" required autofocus value="${escape(h?.name)}" placeholder="例如：午饭"></label><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${h?.projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>单次时长 <small>可选</small></span><input name="focusMinutes" type="number" min="1" max="180" value="${h?.focusMinutes ?? ""}" placeholder="${state.data.settings.focusMinutes} 分钟"></label></div><div class="form-field"><span>每周时段</span><div id="habit-slots">${slots.map((s) => slotRow(s.days, s.time)).join("")}</div><button type="button" class="text-button" id="add-slot">${icon("plus")} 添加时段</button></div><div class="modal-actions">${h ? `<button type="button" class="text-button danger-text" id="delete-habit">删除习惯</button>` : "<span></span>"}<button type="submit" class="button primary">保存习惯</button></div></form>`,
@@ -1061,7 +1077,7 @@ function taskDialog(id?: string) {
     task?.projectId || (page.startsWith("project:") ? page.slice(8) : "");
   const subs = task?.subtasks.map((s) => ({ ...s })) || [];
   modal(
-    `${modalHeader(task ? "编辑任务" : "种下一个小目标", "把事情写下来，就已经开始了。")}<form id="task-form"><label class="form-field"><span>任务名称</span><input name="title" placeholder="你想完成什么？" maxlength="200" required autofocus value="${escape(task?.title)}"></label><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">收件箱 · 不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>所属目标</span><select name="goalId"><option value="">不属于目标</option>${state.data.goals.map((g) => `<option value="${g.id}" ${task?.goalId === g.id ? "selected" : ""}>${escape(g.name)}</option>`).join("")}</select></label><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>提醒时间 <small>可选，到点唤出任务</small></span><input name="reminderTime" type="time" value="${escape(task?.reminderTime)}"></label><label class="form-field"><span>单次专注时长 <small>可选，留空跟随全局设置</small></span><input name="focusMinutes" type="number" min="1" max="180" placeholder="${state.data.settings.focusMinutes} 分钟" value="${task?.focusMinutes || ""}"></label><label class="form-field"><span>优先级</span><select name="priority">${[
+    `${modalHeader(task ? "编辑任务" : "种下一个小目标", "把事情写下来，就已经开始了。")}<form id="task-form"><label class="form-field"><span>任务名称</span><input name="title" placeholder="你想完成什么？" maxlength="200" required autofocus value="${escape(task?.title)}"></label><label class="form-field"><span>类型 <small>按条件自动识别，也可手动指定</small></span><select name="taskType" id="task-type"><option value="focus">普通任务</option><option value="goal">目标</option><option value="habit">习惯</option></select></label><p id="task-type-hint" class="type-hint"></p><div id="new-habit-inline" class="inline-create" hidden><span class="subtle small">习惯按不同星期可有不同时间，为它加上时段：</span><div id="task-habit-slots">${habitSlotHtml([], "")}</div><button type="button" id="add-task-slot" class="text-button">${icon("plus")} 添加时段</button><button type="button" id="create-habit" class="button secondary small-button">创建习惯组</button></div><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">收件箱 · 不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>所属目标</span><select name="goalId"><option value="">不属于目标</option>${state.data.goals.map((g) => `<option value="${g.id}" ${task?.goalId === g.id ? "selected" : ""}>${escape(g.name)}</option>`).join("")}<option value="__new__">＋ 新建目标…</option></select></label><div id="new-goal-inline" class="inline-create" hidden><input name="newGoalName" maxlength="40" placeholder="目标名称"><input name="newGoalTarget" type="number" min="0.1" step="0.1" value="1" placeholder="目标量" aria-label="目标量"><input name="newGoalUnit" maxlength="10" placeholder="单位（节/小时）" aria-label="单位"><button type="button" id="create-goal" class="button secondary small-button">创建并选用</button></div><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>提醒时间 <small>可选，到点唤出任务</small></span><input name="reminderTime" type="time" value="${escape(task?.reminderTime)}"></label><label class="form-field"><span>单次专注时长 <small>可选，留空跟随全局设置</small></span><input name="focusMinutes" type="number" min="1" max="180" placeholder="${state.data.settings.focusMinutes} 分钟" value="${task?.focusMinutes || ""}"></label><label class="form-field"><span>优先级</span><select name="priority">${[
       [0, "无优先级"],
       [1, "低优先级"],
       [2, "中优先级"],
@@ -1130,25 +1146,144 @@ function taskDialog(id?: string) {
     }
   });
   drawSubs();
-  // Goal work must be one-off, so a goal disables the repeat selector.
+  // Type is derived from the fields until the user picks one; after that we only
+  // validate and give feedback instead of switching it around.
+  const form = document.querySelector<HTMLFormElement>("#task-form")!;
+  const typeSelect = document.querySelector<HTMLSelectElement>("#task-type")!;
+  const hint = document.querySelector<HTMLElement>("#task-type-hint")!;
+  const value = (name: string) =>
+    (form.querySelector(`[name=${name}]`) as HTMLInputElement | null)?.value ??
+    "";
+  let typeOverridden = false;
+  const derivedType = () => {
+    if (value("goalId")) return "goal";
+    if (value("reminderTime") && value("repeat") !== "none") return "habit";
+    return "focus";
+  };
+  const typeErrors = (type: string) => {
+    const goalId = value("goalId"),
+      reminder = value("reminderTime"),
+      repeat = value("repeat"),
+      errors: string[] = [];
+    if (type === "goal") {
+      if (!goalId) errors.push("目标任务要选择所属目标");
+      if (!reminder) errors.push("目标任务要有精确时间");
+      if (repeat !== "none") errors.push("目标任务不能重复，请改用习惯");
+    } else if (type === "habit") {
+      if (!reminder) errors.push("习惯要有精确时间");
+      if (repeat === "none") errors.push("习惯要设置重复周期");
+      if (goalId) errors.push("习惯不能属于目标");
+    } else {
+      if (goalId) errors.push("普通任务不能属于目标");
+      if (reminder && repeat !== "none")
+        errors.push("有提醒和重复，应归为习惯");
+    }
+    return errors;
+  };
+  const typeLabels: Record<string, string> = {
+    focus: "普通任务",
+    goal: "目标",
+    habit: "习惯",
+  };
+  const habitInline = document.querySelector<HTMLElement>("#new-habit-inline")!;
+  const goalInline = document.querySelector<HTMLElement>("#new-goal-inline")!;
   const goalSelect = document.querySelector<HTMLSelectElement>(
     "#task-form [name=goalId]",
-  );
-  const repeatSelect = document.querySelector<HTMLSelectElement>(
-    "#task-form [name=repeat]",
-  );
-  const syncRepeat = () => {
-    if (!goalSelect || !repeatSelect) return;
-    if (goalSelect.value) {
-      repeatSelect.value = "none";
-      repeatSelect.disabled = true;
-    } else repeatSelect.disabled = false;
+  )!;
+  const syncType = () => {
+    if (!typeOverridden) typeSelect.value = derivedType();
+    const type = typeSelect.value;
+    const errors = typeErrors(type);
+    hint.className = `type-hint ${errors.length ? "error" : ""}`;
+    hint.textContent = errors.length
+      ? errors[0]
+      : typeOverridden
+        ? `已手动指定为「${typeLabels[type]}」，按该类型校验`
+        : `自动识别为「${typeLabels[type]}」`;
+    habitInline.hidden = type !== "habit";
   };
-  goalSelect?.addEventListener("change", syncRepeat);
-  syncRepeat();
+  form.addEventListener("input", syncType);
+  form.addEventListener("change", syncType);
+  typeSelect.addEventListener("change", () => {
+    typeOverridden = true;
+    syncType();
+  });
+  goalSelect.addEventListener("change", () => {
+    goalInline.hidden = goalSelect.value !== "__new__";
+    if (goalSelect.value === "__new__") goalSelect.value = "";
+    syncType();
+  });
+  $("#create-goal").addEventListener("click", async () => {
+    const name = value("newGoalName").trim();
+    if (!name) return toast("先给目标起个名字");
+    await act(
+      {
+        type: "saveGoal",
+        id: null,
+        name,
+        target: Number(value("newGoalTarget")) || 1,
+        unit: value("newGoalUnit").trim() || "次",
+        measure: "count",
+        dueDate: null,
+      },
+      "目标已创建",
+    );
+    const created = state.data.goals[state.data.goals.length - 1];
+    if (created) goalSelect.value = created.id;
+    goalInline.hidden = true;
+    syncType();
+  });
+  $("#add-task-slot").addEventListener("click", () =>
+    $("#task-habit-slots").insertAdjacentHTML(
+      "beforeend",
+      habitSlotHtml([], ""),
+    ),
+  );
+  $("#new-habit-inline").addEventListener("click", (e) => {
+    const btn = (e.target as Element).closest("[data-remove-slot]");
+    if (
+      btn &&
+      document.querySelectorAll("#task-habit-slots [data-slot]").length > 1
+    )
+      (btn as HTMLElement).closest("[data-slot]")?.remove();
+  });
+  $("#create-habit").addEventListener("click", async () => {
+    const title = value("title").trim();
+    if (!title) return toast("先给习惯起个名字");
+    const slots = [
+      ...document.querySelectorAll<HTMLElement>(
+        "#task-habit-slots [data-slot]",
+      ),
+    ].map((row) => ({
+      days: [...row.querySelectorAll<HTMLInputElement>("input:checked")].map(
+        (c) => Number(c.value),
+      ),
+      time: row.querySelector<HTMLInputElement>("input[type=time]")!.value,
+    }));
+    await act(
+      {
+        type: "saveHabit",
+        id: null,
+        name: title,
+        projectId: value("projectId") || null,
+        focusMinutes: value("focusMinutes")
+          ? Number(value("focusMinutes"))
+          : null,
+        slots,
+      },
+      "习惯组已创建",
+    );
+    closeModal();
+  });
+  syncType();
   $("#task-form").onsubmit = async (e) => {
     e.preventDefault();
     addSub();
+    if (typeErrors(typeSelect.value).length) {
+      syncType();
+      hint.scrollIntoView({ block: "center" });
+      return;
+    }
     const f = new FormData(e.target as HTMLFormElement);
     const ok = await act(
       {
@@ -1587,6 +1722,37 @@ document.addEventListener("click", async (e) => {
   const el = (e.target as Element).closest<HTMLElement>("button");
   if (!el || el.hasAttribute("disabled")) return;
   const d = el.dataset;
+  if (d.selectMode) {
+    selectMode = d.selectMode === "on";
+    selectedTaskIds.clear();
+    render();
+    return;
+  }
+  if (d.selectTask) {
+    if (selectedTaskIds.has(d.selectTask)) selectedTaskIds.delete(d.selectTask);
+    else selectedTaskIds.add(d.selectTask);
+    render();
+    return;
+  }
+  if (d.selectAll) {
+    selectedTaskIds.clear();
+    visibleTaskIds.forEach((id) => selectedTaskIds.add(id));
+    render();
+    return;
+  }
+  if (d.deleteSelected !== undefined) {
+    await deleteSelectedTasks();
+    return;
+  }
+  if (d.detachSelected !== undefined) {
+    const r = el.getBoundingClientRect();
+    showContextMenu(r.left, r.bottom + 4, [
+      ["移出所属项目", () => void detachSelected("project")],
+      ["移出所属目标", () => void detachSelected("goal")],
+      ["移出所属习惯", () => void detachSelected("habit")],
+    ]);
+    return;
+  }
   if (d.startReminder) {
     if (await act({ type: "startReminder", id: d.startReminder }))
       navigate("focus");
@@ -1794,6 +1960,14 @@ document.addEventListener("click", async (e) => {
     case "new-project":
       projectDialog();
       break;
+    case "sort-projects": {
+      const r = el.getBoundingClientRect();
+      showContextMenu(r.left, r.bottom + 4, [
+        ["按名称", () => void sortProjects("name")],
+        ["按未完成数", () => void sortProjects("count")],
+      ]);
+      break;
+    }
     case "new-goal":
       goalDialog();
       break;
@@ -1958,6 +2132,131 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     applyTheme();
   }
 });
+function confirmDeleteProject(id: string) {
+  const target = state.data.projects.find((p) => p.id === id);
+  if (!target) return;
+  confirmDialog(
+    "删除这个项目？",
+    "项目中的任务会移到收件箱，专属白名单与愿景会一并删除，专注记录保留。",
+    "删除项目",
+    async () => {
+      page = "tasks";
+      await act({ type: "deleteProject", id: target.id }, "项目已删除");
+    },
+    true,
+  );
+}
+function hideContextMenu() {
+  document.querySelector("#context-menu")?.remove();
+}
+function showContextMenu(x: number, y: number, items: [string, () => void][]) {
+  hideContextMenu();
+  const menu = document.createElement("div");
+  menu.id = "context-menu";
+  menu.className = "context-menu";
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  items.forEach(([label, run]) => {
+    const item = document.createElement("button");
+    item.textContent = label;
+    item.addEventListener("click", () => {
+      hideContextMenu();
+      run();
+    });
+    menu.appendChild(item);
+  });
+  document.body.appendChild(menu);
+}
+document.addEventListener("contextmenu", (e) => {
+  hideContextMenu();
+  const el = (e.target as Element).closest<HTMLElement>("[data-project-menu]");
+  if (!el) return;
+  e.preventDefault();
+  const id = el.dataset.projectMenu!;
+  showContextMenu(e.clientX, e.clientY, [
+    ["重命名 / 编辑", () => projectDialog(id)],
+    ["删除项目", () => confirmDeleteProject(id)],
+  ]);
+});
+document.addEventListener("click", () => hideContextMenu());
+
+function selectControls() {
+  return selectMode
+    ? `<button class="button secondary small-button" data-select-all="on">全选</button><button class="button secondary small-button" data-detach-selected="on" ${selectedTaskIds.size ? "" : "disabled"}>移出（${selectedTaskIds.size}）</button><button class="button danger small-button" data-delete-selected ${selectedTaskIds.size ? "" : "disabled"}>删除所选（${selectedTaskIds.size}）</button><button class="text-button" data-select-mode="off">退出选择</button>`
+    : `<button class="button secondary small-button" data-select-mode="on">${icon("check-check")} 选择</button>`;
+}
+async function detachSelected(target: "project" | "goal" | "habit") {
+  const ids = [...selectedTaskIds];
+  if (!ids.length) return;
+  selectedTaskIds.clear();
+  render();
+  await act(
+    { type: "detachTasks", ids, target },
+    `已移出 ${ids.length} 个任务`,
+  );
+}
+async function deleteSelectedTasks() {
+  const ids = [...selectedTaskIds];
+  if (!ids.length) return;
+  const snapshots = ids
+    .map((id) => state.data.tasks.find((t) => t.id === id))
+    .filter((t): t is Task => !!t);
+  confirmDialog(
+    `删除选中的 ${ids.length} 个任务？`,
+    "任务会被移除，已有专注记录会保留。",
+    "删除所选",
+    async () => {
+      for (const id of ids) await act({ type: "deleteTask", id });
+      selectedTaskIds.clear();
+      selectMode = false;
+      render();
+      toast(`已删除 ${ids.length} 个任务`, async () => {
+        for (const task of snapshots) await act({ type: "restoreTask", task });
+      });
+    },
+    true,
+  );
+}
+function dragProject(id: string | null) {
+  dragProjectId = id;
+}
+async function sortProjects(by: "name" | "count") {
+  const ids = [...state.data.projects]
+    .sort((a, b) =>
+      by === "name"
+        ? a.name.localeCompare(b.name, "zh")
+        : state.data.tasks.filter((t) => t.projectId === b.id && !t.completed)
+            .length -
+          state.data.tasks.filter((t) => t.projectId === a.id && !t.completed)
+            .length,
+    )
+    .map((p) => p.id);
+  await act({ type: "reorderProjects", ids }, "项目顺序已更新");
+}
+document.addEventListener("dragstart", (e) => {
+  const el = (e.target as Element).closest<HTMLElement>("[data-project-menu]");
+  if (el) dragProject(el.dataset.projectMenu!);
+});
+document.addEventListener("dragover", (e) => {
+  if (dragProjectId && (e.target as Element).closest("[data-project-menu]"))
+    e.preventDefault();
+});
+document.addEventListener("drop", (e) => {
+  const el = (e.target as Element).closest<HTMLElement>("[data-project-menu]");
+  if (!el || !dragProjectId) return;
+  e.preventDefault();
+  const target = el.dataset.projectMenu!;
+  const dragged = dragProjectId;
+  dragProject(null);
+  if (target === dragged) return;
+  const ids = state.data.projects
+    .map((p) => p.id)
+    .filter((id) => id !== dragged);
+  ids.splice(ids.indexOf(target), 0, dragged);
+  void act({ type: "reorderProjects", ids }, "项目顺序已更新");
+});
+document.addEventListener("dragend", () => dragProject(null));
+
 async function boot() {
   try {
     if (desktop) nativeStatus = await getDesktopStatus();
