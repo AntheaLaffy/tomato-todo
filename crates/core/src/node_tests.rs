@@ -682,3 +682,35 @@ fn failed_mainline_records_the_failure_and_voids_its_pairings_together() {
     assert_eq!(day.goal_voided, 2);
     assert_eq!(day.goal_success, 0);
 }
+
+#[test]
+fn plan_import_merges_mainline_nodes_without_losing_decisions() {
+    let mut e = Engine::open(":memory:").unwrap();
+    let mut ns = vec![spec("a", 8), spec("b", 9)];
+    ns[0].signal = Some(signal(SignalKind::Failure, Direction::Tail, "10:00"));
+    save(&mut e, None, ns);
+    let gid = e.data.goals[0].id.clone();
+    task(&mut e, &gid, "08:30");
+    e.snapshot(at(10, 1)).unwrap();
+    let mut plan = e.snapshot(at(10, 2)).unwrap().data.export_plan();
+    // The file renames the line and appends a node.
+    let goal = plan.goals.iter_mut().find(|g| g.id == gid).unwrap();
+    goal.name = "改名后".into();
+    goal.nodes.push(NodeSpec {
+        id: "c".into(),
+        name: "新阶段".into(),
+        start: "2026-10-12T10:00".into(),
+        end: "2026-10-12T11:00".into(),
+        required_tasks: 1,
+        confirmation_required: false,
+        signal: None,
+        block_success: BlockRule::Never,
+        block_failure: BlockRule::Never,
+    });
+    e.dispatch(Action::ImportPlan { plan }, at(10, 3)).unwrap();
+    let g = e.data.goals.iter().find(|g| g.id == gid).unwrap();
+    assert_eq!(g.name, "改名后");
+    assert!(g.nodes.iter().any(|n| n.spec.id == "c"));
+    // The node that already failed keeps its verdict.
+    assert_eq!(verdict(&e, 0), Some(Verdict::Failure));
+}

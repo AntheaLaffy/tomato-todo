@@ -406,6 +406,60 @@ fn plan_project_whitelist_is_added_then_overwritten_by_import() {
 }
 
 #[test]
+fn plan_import_updates_configuration_while_keeping_progress() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-12".into());
+    d.subtasks = vec![Subtask {
+        id: "s1".into(),
+        title: "第一步".into(),
+        done: false,
+    }];
+    let s = e
+        .dispatch(Action::SaveTask { task: d }, friday(8, 0))
+        .unwrap();
+    let id = s.data.tasks[0].id.clone();
+    e.dispatch(
+        Action::ToggleSubtask {
+            task_id: id.clone(),
+            subtask_id: "s1".into(),
+        },
+        friday(9, 0),
+    )
+    .unwrap();
+    let mut plan = e.snapshot(friday(9, 1)).unwrap().data.export_plan();
+    // Editing the file must now change the plan, not be silently ignored.
+    plan.tasks[0].title = "改过的标题".into();
+    plan.tasks[0].due_date = Some("2026-10-20".into());
+    plan.tasks[0].goal_id = Some("g1".into());
+    plan.goals.push(plan::PlanGoal {
+        id: "g1".into(),
+        name: "新主线".into(),
+        nodes: vec![crate::nodes::NodeSpec {
+            id: "n1".into(),
+            name: "阶段".into(),
+            start: "2026-10-20T00:00".into(),
+            end: "2026-10-21T00:00".into(),
+            required_tasks: 1,
+            confirmation_required: false,
+            signal: None,
+            block_success: crate::nodes::BlockRule::Never,
+            block_failure: crate::nodes::BlockRule::Never,
+        }],
+    });
+    let s = e
+        .dispatch(Action::ImportPlan { plan }, friday(10, 0))
+        .unwrap();
+    let t = s.data.tasks.iter().find(|t| t.id == id).unwrap();
+    assert_eq!(t.title, "改过的标题");
+    assert_eq!(t.due_date.as_deref(), Some("2026-10-20"));
+    assert_eq!(t.goal_id.as_deref(), Some("g1"));
+    assert_eq!(t.node_id.as_deref(), Some("n1"));
+    // Progress and steps survive the update.
+    assert!(t.subtasks[0].done);
+}
+
+#[test]
 fn effective_whitelist_prefers_project_list_over_global() {
     let mut e = engine();
     let mut settings = Settings::default();

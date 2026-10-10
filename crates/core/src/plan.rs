@@ -5,7 +5,7 @@ use crate::{
 };
 use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -140,6 +140,30 @@ impl PlanTask {
                 .collect(),
         }
     }
+
+    /// Configuration comes from the file; progress and history stay local. The
+    /// reminder state and pairing survive only while the slot itself is unchanged.
+    fn merge(&self, old: &Task, at: i64, estimate: u32) -> Task {
+        let mut task = self.task(at, estimate);
+        task.created_at = old.created_at;
+        task.completed = old.completed;
+        task.completed_at = old.completed_at;
+        if old.goal_id == self.goal_id
+            && old.due_date == self.due_date
+            && old.reminder_time == self.reminder_time
+        {
+            task.reminder_fired = old.reminder_fired;
+            task.reminder_pending = old.reminder_pending;
+            task.reminder_expired = old.reminder_expired;
+            task.node_id = old.node_id.clone();
+        }
+        for sub in &mut task.subtasks {
+            if let Some(prev) = old.subtasks.iter().find(|s| s.id == sub.id) {
+                sub.done = prev.done;
+            }
+        }
+        task
+    }
 }
 
 impl PlanFile {
@@ -206,8 +230,10 @@ impl PlanFile {
         let mut next = data.clone();
         for plan_project in &self.projects {
             if let Some(existing) = next.projects.iter_mut().find(|p| p.id == plan_project.id) {
-                // Project config is regenerated, not progress, so a provided list
-                // wins over the local one; an omitted field keeps the local list.
+                // Project config is regenerated, not progress, so the file wins; an
+                // omitted allow-list keeps the local one.
+                existing.name = plan_project.name.clone();
+                existing.color = plan_project.color.clone();
                 if let Some(whitelist) = &plan_project.app_whitelist {
                     existing.app_whitelist = Some(whitelist.clone());
                 }
@@ -221,24 +247,54 @@ impl PlanFile {
             }
         }
         for goal in &self.goals {
-            if !next.goals.iter().any(|g| g.id == goal.id) {
-                next.goals.push(goal.goal());
+            let incoming = goal.goal();
+            if let Some(existing) = next.goals.iter_mut().find(|g| g.id == incoming.id) {
+                existing.name = incoming.name;
+                // Merge nodes by id: update undecided specs, add new ones, and keep
+                // any node the file no longer lists so its history is not erased.
+                let mut merged: Vec<crate::nodes::Node> = Vec::new();
+                for spec in &incoming.nodes {
+                    if let Some(old) = existing.nodes.iter().find(|n| n.spec.id == spec.spec.id) {
+                        let mut kept = old.clone();
+                        if kept.result.is_some() || kept.emitted {
+                            kept.spec.name = spec.spec.name.clone();
+                        } else {
+                            kept.spec = spec.spec.clone();
+                        }
+                        merged.push(kept);
+                    } else {
+                        merged.push(spec.clone());
+                    }
+                }
+                for old in &existing.nodes {
+                    if !incoming.nodes.iter().any(|s| s.spec.id == old.spec.id) {
+                        merged.push(old.clone());
+                    }
+                }
+                merged.sort_by(|a, b| a.spec.start.cmp(&b.spec.start));
+                existing.nodes = merged;
+            } else {
+                next.goals.push(incoming);
             }
         }
         for habit in &self.habits {
-            if !next.habits.iter().any(|h| h.id == habit.id) {
+            if let Some(existing) = next.habits.iter_mut().find(|h| h.id == habit.id) {
+                existing.name = habit.name.clone();
+            } else {
                 next.habits.push(habit.clone());
             }
         }
-        for template in &self.templates {
-            if !next.templates.iter().any(|t| t.id == template.id) {
-                let mut template = template.clone();
-                template.shape.estimate = converted_estimate(
-                    template.shape.estimate,
-                    template.shape.focus_minutes,
-                    self.pomodoro_minutes,
-                    data.settings.focus_minutes,
-                )?;
+        for plan_template in &self.templates {
+            let mut template = plan_template.clone();
+            template.shape.estimate = converted_estimate(
+                template.shape.estimate,
+                template.shape.focus_minutes,
+                self.pomodoro_minutes,
+                data.settings.focus_minutes,
+            )?;
+            if let Some(existing) = next.templates.iter_mut().find(|t| t.id == template.id) {
+                *existing = template;
+            } else {
                 next.templates.push(template);
             }
         }
@@ -251,19 +307,36 @@ impl PlanFile {
                 next.prints.push(print.clone());
             }
         }
-        let task_ids: HashSet<_> = data.tasks.iter().map(|t| &t.id).collect();
-        for task in self.tasks.iter().filter(|t| !task_ids.contains(&t.id)) {
-            let estimate = if task.focus_minutes.is_some() {
-                task.estimate
-            } else {
-                (task.estimate * self.pomodoro_minutes).div_ceil(data.settings.focus_minutes)
+        // Existing instances take the file's configuration while keeping progress.
+        // An instance whose verdict is already fixed is history, so it is left alone.
+        let incoming: HashMap<&str, &PlanTask> =
+            self.tasks.iter().map(|t| (t.id.as_str(), t)).collect();
+        let mut released: Vec<String> = Vec::new();
+        for task in &mut next.tasks {
+            let Some(plan) = incoming.get(task.id.as_str()) else {
+                continue;
             };
-            if estimate > 99 {
-                return Err(format!(
-                    "任务“{}”换算后超过 99 个番茄，请先拆分任务",
-                    task.title
-                ));
+            if task
+                .node_id
+                .as_ref()
+                .is_some_and(|id| node_is_decided(&next.goals, id))
+            {
+                continue;
             }
+            let estimate = plan_estimate(plan, self.pomodoro_minutes, data.settings.focus_minutes)?;
+            let old = task.clone();
+            let merged = plan.merge(&old, at, estimate);
+            if old.goal_id != merged.goal_id
+                || old.due_date != merged.due_date
+                || old.reminder_time != merged.reminder_time
+            {
+                released.push(old.id.clone());
+            }
+            *task = merged;
+        }
+        let local_ids: HashSet<String> = next.tasks.iter().map(|t| t.id.clone()).collect();
+        for task in self.tasks.iter().filter(|t| !local_ids.contains(&t.id)) {
+            let estimate = plan_estimate(task, self.pomodoro_minutes, data.settings.focus_minutes)?;
             let mut instance = task.task(at, estimate);
             if self.version < 3 {
                 let template = task.legacy_template(at, estimate);
@@ -287,6 +360,8 @@ impl PlanFile {
             }
             next.tasks.push(instance);
         }
+        next.node_bindings
+            .retain(|b| !released.contains(&b.task_id));
         next.validate()?;
         *data = next;
         Ok(())
@@ -365,6 +440,29 @@ impl AppData {
             tasks,
         }
     }
+}
+
+fn plan_estimate(task: &PlanTask, pomodoro: u32, focus: u32) -> AppResult<u32> {
+    let estimate = if task.focus_minutes.is_some() {
+        task.estimate
+    } else {
+        (task.estimate * pomodoro).div_ceil(focus)
+    };
+    if estimate > 99 {
+        return Err(format!(
+            "任务“{}”换算后超过 99 个番茄，请先拆分任务",
+            task.title
+        ));
+    }
+    Ok(estimate)
+}
+
+fn node_is_decided(goals: &[Goal], node_id: &str) -> bool {
+    goals.iter().any(|g| {
+        g.nodes
+            .iter()
+            .any(|n| n.spec.id == node_id && n.result.is_some())
+    })
 }
 
 fn converted_estimate(
