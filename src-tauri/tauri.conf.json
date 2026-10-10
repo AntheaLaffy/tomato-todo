@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "番茄 Todo",
+        "title": "\u756a\u8304 Todo",
         "width": 1440,
         "height": 940,
         "minWidth": 980,
@@ -30,20 +30,25 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb"],
+    "targets": [
+      "deb"
+    ],
     "category": "Productivity",
     "linux": {
       "deb": {
         "desktopTemplate": "tomato.desktop.hbs"
       }
     },
-    "shortDescription": "任务与番茄钟，一个安静的专注空间",
+    "shortDescription": "\u4efb\u52a1\u4e0e\u756a\u8304\u949f\uff0c\u4e00\u4e2a\u5b89\u9759\u7684\u4e13\u6ce8\u7a7a\u95f4",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico",
       "icons/icon.icns"
-    ]
+    ],
+    "resources": {
+      "../agent/bundle/": "agent/"
+    }
   }
 }

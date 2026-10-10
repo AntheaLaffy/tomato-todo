@@ -63,6 +63,8 @@ jobs:
           cp target/release/tomato-todo dist/release/stage/
           cp scripts/install.py dist/release/stage/
           cp README.md dist/release/stage/
+          cp -a agent/bundle dist/release/stage/agent
+          cp -a src-tauri/icons dist/release/stage/icons
           tar -czf "dist/release/tomato-todo-${VERSION}-x86_64-linux.tar.gz" -C dist/release/stage .
 
       - name: Publish GitHub Release

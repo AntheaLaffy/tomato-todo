@@ -1,6 +1,6 @@
 ---
 source: style.css
-lines: 3412
+lines: 3465
 generated_at: 2026-10-10
 ---
 
@@ -42,3 +42,5 @@ generated_at: 2026-10-10
 主线节点、编辑表单、结果颜色、信号追溯与小屏日期输入：L:3141 起。`#goal-form .modal-actions` 固定保存操作区。
 
 偏好页 .settings-grid 使用 align-items: start，两列各自按卡片内容高度排列，避免左列被整列拉伸。
+
+锁机明日日程：`.tomorrow-entry` / `.tomorrow-agenda` / `.agenda-notes` / `.agenda-steps` / `.modal.sleep-preview`（L:3414 起），两列时间与内容、备注保留换行、长文本折行，休息锁机弹窗使用低亮度深色。

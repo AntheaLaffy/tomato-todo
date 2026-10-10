@@ -10,7 +10,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 
 | Path / pattern | Treatment | Reason |
 | --- | --- | --- |
-| target/、node_modules/、dist/、src-tauri/gen/ | Excluded | 构建、依赖与生成的 ACL schema |
+| target/、node_modules/、dist/、src-tauri/gen/、agent/node_modules/、agent/bundle/ | Excluded | 构建、依赖、生成的 ACL schema 与随包运行产物 |
 | artifacts/、*.sqlite3* | Excluded | 测试截图、私人课表分析与本地数据库 |
 | Cargo.lock、package-lock.json | Excluded | 依赖锁文件保留，但无需逐项导航 |
 | public/、src-tauri/icons/ | Boundary only | 静态二进制资源，引用由配置与视图管理 |
@@ -30,6 +30,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
 | 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
 | 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
+| 学习助手、异常诊断与联网 | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、src-tauri/src/main.rs | tests/native.mjs、src 的 guardPage |
 | 启动/打包/测试 | 构建 | README.md、package.json | src-tauri/tauri.conf.json、scripts/ |
@@ -42,6 +43,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | Dir | Domain | Depends On | Purpose |
 | --- | --- | --- | --- |
 | crates/ | 业务核心 | Rust 依赖 | 领域模型与本地预览服务 |
+| agent/ | 智能体运行时 | Pi SDK、Node | 随包的 Pi 会话、工具集、技能、MCP 与联网实现 |
 | src-tauri/ | 桌面 | core、Tauri | 原生 IPC、窗口、通知与打包 |
 | src/ | 界面 | Tauri API、Lucide | TypeScript 与 CSS 界面 |
 | scripts/ | 构建 | Cargo、npm、Python | 开发服务与 Linux 用户安装 |

@@ -34,6 +34,11 @@ export const saveDesktopSettings = (autostart: boolean, closeToTray: boolean) =>
   invoke<DesktopStatus>("save_desktop_settings", { autostart, closeToTray });
 export const hideToTray = () => invoke<void>("hide_to_tray");
 export const quitApp = () => invoke<void>("quit_app");
+export const agentCall = <T>(requestBody: Record<string, unknown>) =>
+  desktop
+    ? invoke<T>("agent_call", { request: requestBody })
+    : request<T>("agent", requestBody);
+export const openAgentLogin = () => invoke<void>("agent_open_login");
 export async function exportData(data: AppData): Promise<boolean> {
   if (desktop) return invoke<boolean>("export_data");
   return downloadJson(data, "tomato-todo-backup.json");
@@ -42,7 +47,7 @@ export async function exportPlan(): Promise<boolean> {
   if (desktop) return invoke<boolean>("export_data", { plan: true });
   return downloadJson(await request<PlanFile>("plan"), "tomato-todo-plan.json");
 }
-function downloadJson(data: unknown, filename: string): boolean {
+export function downloadJson(data: unknown, filename: string): boolean {
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
   );

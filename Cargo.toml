@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/preview", "src-tauri"]
+members = ["crates/core", "crates/agent", "crates/preview", "src-tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -9,8 +9,14 @@ license = "MIT"
 
 [profile.dev]
 debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false
 
 [profile.release]
+incremental = false
 strip = true
 lto = "thin"
 codegen-units = 1

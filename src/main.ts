@@ -1,4 +1,5 @@
 import "./style.css";
+import { agentPage, mountAgent, setupAgent } from "./agent";
 import {
   createIcons,
   Sun,
@@ -190,6 +191,37 @@ let disconnected = false;
 let settingsDirty = false;
 let settingsRevision = 0;
 let settingsSave: Promise<boolean> | null = null;
+let agentWakePending = false;
+let revealingAgent = false;
+let agentWakeBlockedSettingsRevision: number | null = null;
+async function revealAgent() {
+  if (
+    !agentWakePending ||
+    revealingAgent ||
+    !state ||
+    state.data.timer.running ||
+    state.data.timer.startedAt ||
+    protectedNow() ||
+    $("#modal-root").innerHTML
+  )
+    return;
+  if (
+    page === "settings" &&
+    settingsDirty &&
+    agentWakeBlockedSettingsRevision === settingsRevision
+  )
+    return;
+  revealingAgent = true;
+  try {
+    immersive = false;
+    await navigate("agent");
+    if (page === "agent") agentWakePending = false;
+    else if (page === "settings" && settingsDirty)
+      agentWakeBlockedSettingsRevision = settingsRevision;
+  } finally {
+    revealingAgent = false;
+  }
+}
 let blockedCount = 0;
 let lastFocus: HTMLElement | null = null;
 let undo: (() => Promise<void>) | null = null;
@@ -204,6 +236,7 @@ const labels: Record<string, string> = {
   guard: "专注保护",
   lock: "定时锁机",
   settings: "偏好设置",
+  agent: "学习助手",
 };
 const modeLabels: Record<Mode, string> = {
   focus: "专注",
@@ -403,6 +436,7 @@ function render() {
       ["goals", "target"],
       ["stats", "chart-no-axes-combined"],
       ["schedule", "calendar-days"],
+      ["agent", "sparkles"],
       ["guard", "shield-check"],
       ["lock", "moon"],
     ]
@@ -417,8 +451,9 @@ function render() {
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.6.1</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar"><div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
-  <main>${reminderBanner()}${page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  <main>${reminderBanner()}${page === "agent" ? agentPage() : page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
   bindForms();
+  if (page === "agent") mountAgent();
   icons();
   updateClock();
 }
@@ -1187,6 +1222,42 @@ function lockDialog(id?: string) {
     await saveLockSchedule(schedule);
   });
 }
+function tomorrowScheduleDialog() {
+  const date = new Date(`${state.today}T12:00:00`);
+  date.setDate(date.getDate() + 1);
+  const tomorrow = isoDate(date);
+  const tasks = state.data.tasks
+    .filter((task) => task.dueDate === tomorrow && !isVoid(task))
+    .sort(
+      (a, b) =>
+        (a.reminderTime || "99:99").localeCompare(b.reminderTime || "99:99") ||
+        a.createdAt - b.createdAt,
+    );
+  const label = date.toLocaleDateString("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  });
+  modal(
+    `${modalHeader("明天的日程", `${label} · ${tasks.length} 项安排`)}
+    <div class="tomorrow-schedule">
+      <p class="subtle small">看看明天要做什么，准备好需要带的资料。</p>
+      ${
+        tasks.length
+          ? `<ol class="tomorrow-agenda">${tasks
+              .map((task) => {
+                const project = projectOf(task);
+                return `<li><time>${escape(task.reminderTime || "时间未定")}</time><div><h3>${escape(task.title)}${task.completed ? ' <span class="subtle small">已完成</span>' : ""}</h3>${project ? `<p class="subtle small">${escape(project.name)}</p>` : ""}${task.notes ? `<p class="agenda-notes">${escape(task.notes)}</p>` : ""}${task.subtasks.length ? `<ul class="agenda-steps">${task.subtasks.map((step) => `<li>${escape(step.title)}</li>`).join("")}</ul>` : ""}</div></li>`;
+              })
+              .join("")}</ol>`
+          : '<p class="small-empty">明天暂无已安排的任务，安心休息吧。</p>'
+      }
+    </div><div class="modal-actions"><button class="button secondary" data-action="close-modal">返回锁机页面</button></div>`,
+    true,
+  );
+  if (state.data.lock.active)
+    document.querySelector(".modal")?.classList.add("sleep-preview");
+}
 function renderImmersive() {
   const locked = protectedNow(),
     p = state.data.settings.protection,
@@ -1195,7 +1266,7 @@ function renderImmersive() {
     ? Math.max(0, rest.endsAt - state.serverTime)
     : state.remainingSecs;
   $("#app").innerHTML =
-    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow">${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
+    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow">${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div><button class="text-button tomorrow-entry" data-action="tomorrow-schedule">${icon("calendar-days")} 查看明天日程</button>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
   icons();
   updateClock();
 }
@@ -2812,6 +2883,9 @@ document.addEventListener("click", async (e) => {
     case "new-habit":
       templateDialog(undefined, true);
       break;
+    case "tomorrow-schedule":
+      tomorrowScheduleDialog();
+      break;
     case "close-modal":
       closeModal();
       break;
@@ -3122,6 +3196,10 @@ async function boot() {
     return;
   }
   if (desktop) {
+    await listen("agent-wake", () => {
+      agentWakePending = true;
+      void revealAgent();
+    });
     await listen("distraction-blocked", () => {
       blockedCount++;
       const el = document.getElementById("blocked-count");
@@ -3135,6 +3213,15 @@ async function boot() {
     );
     await listen<string>("desktop-error", (e) => toast(e.payload));
   }
+  setupAgent({
+    active: () => page === "agent",
+    wake: () => {
+      agentWakePending = true;
+      void revealAgent();
+    },
+    toast,
+    accept: (snapshot) => accept(snapshot, { type: "import" }),
+  });
   setInterval(async () => {
     if (pending) return;
     try {
@@ -3145,6 +3232,7 @@ async function boot() {
       if (pending || revision !== snapshotRevision) return;
       disconnected = false;
       accept(next);
+      void revealAgent();
       const el = document.getElementById("connection");
       if (el) el.textContent = "所有更改已保存到本机";
     } catch {

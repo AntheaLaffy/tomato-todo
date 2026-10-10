@@ -2,6 +2,8 @@
 /node_modules
 /dist
 /artifacts
+/agent/node_modules
+/agent/bundle
 /src-tauri/gen
 *.sqlite3*
 .DS_Store

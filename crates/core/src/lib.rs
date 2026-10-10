@@ -7,6 +7,7 @@ use std::{
     path::Path,
 };
 use uuid::Uuid;
+pub mod diagnostics;
 pub mod guard;
 pub mod habits;
 pub mod identities;
@@ -1821,7 +1822,9 @@ impl Engine {
         self.conn.execute("INSERT INTO app_state (id,data) VALUES (1,?1) ON CONFLICT(id) DO UPDATE SET data=excluded.data", params![raw]).map_err(|e| format!("保存失败：{e}"))?;
         Ok(())
     }
-    pub fn dispatch(&mut self, action: Action, at: i64) -> AppResult<Snapshot> {
+    /// Validate an action with the same identity/history rules as dispatch, without
+    /// persisting it. Used to review agent-generated files before applying them.
+    pub fn preview_action(&self, action: Action, at: i64) -> AppResult<AppData> {
         let restore_id = match &action {
             Action::RestoreTask { task } => {
                 let record = self
@@ -1841,6 +1844,10 @@ impl Engine {
         next.apply(action, at)?;
         identities::reconcile(&self.data, &mut next, restore_id.as_deref())?;
         next.validate()?;
+        Ok(next)
+    }
+    pub fn dispatch(&mut self, action: Action, at: i64) -> AppResult<Snapshot> {
+        let next = self.preview_action(action, at)?;
         self.persist(&next)?;
         self.data = next;
         self.snapshot(at)

@@ -27,11 +27,23 @@ fn snapshot(engine: State<Shared>) -> AppResult<Snapshot> {
 }
 #[tauri::command]
 fn dispatch(action: Action, app: tauri::AppHandle, engine: State<Shared>) -> AppResult<Snapshot> {
-    apply_action(&app, &engine, action)
+    apply_action(&app, &engine, action, None)
 }
-fn apply_action(app: &tauri::AppHandle, engine: &Shared, action: Action) -> AppResult<Snapshot> {
+fn apply_action(
+    app: &tauri::AppHandle,
+    engine: &Shared,
+    action: Action,
+    expected: Option<String>,
+) -> AppResult<Snapshot> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     let current = engine.snapshot(now())?;
+    if let Some(expected) = expected {
+        if !current.data.reminder_idle()
+            || tomato_agent::files::fingerprint(&current.data)? != expected
+        {
+            return Err("数据已变化或计时已启动，请重新审阅".into());
+        }
+    }
     let mut proposed = current.data.clone();
     proposed.apply(
         serde_json::from_value(serde_json::to_value(&action).map_err(|e| e.to_string())?)
@@ -51,6 +63,25 @@ fn apply_action(app: &tauri::AppHandle, engine: &Shared, action: Action) -> AppR
         let _ = window.set_always_on_top(result.data.settings.always_on_top);
     }
     Ok(result)
+}
+#[tauri::command]
+fn agent_call(
+    request: serde_json::Value,
+    service: State<Arc<tomato_agent::Agent>>,
+) -> AppResult<serde_json::Value> {
+    service.request(request)
+}
+#[tauri::command]
+fn agent_open_login(service: State<Arc<tomato_agent::Agent>>) -> AppResult<()> {
+    let status = service.status()?;
+    let url = status["authEvent"]["url"]
+        .as_str()
+        .ok_or("当前没有登录链接")?;
+    if !url.starts_with("https://auth.openai.com/") {
+        return Err("登录链接不是官方认证域名".into());
+    }
+    gio::AppInfo::launch_default_for_uri(url, None::<&gio::AppLaunchContext>)
+        .map_err(|e| e.to_string())
 }
 #[tauri::command]
 fn guard_info() -> guard::GuardInfo {
@@ -140,6 +171,7 @@ async fn read_import(
 }
 
 fn main() {
+    tomato_agent::mcp_entry();
     // niri reports the native Wayland window's PID; Xwayland can report the
     // satellite's PID instead, preventing protection from finding this window.
     if std::env::var_os("NIRI_SOCKET").is_some() && std::env::var_os("WAYLAND_DISPLAY").is_some() {
@@ -162,6 +194,10 @@ fn main() {
             let path = std::env::var_os("TOMATO_DATA_PATH")
                 .map(std::path::PathBuf::from)
                 .unwrap_or(app.path().app_data_dir()?.join("tomato.sqlite3"));
+            let agent_dir = path
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .join("agent");
             let mut engine = Engine::open(path).map_err(std::io::Error::other)?;
             let initial = engine.snapshot(now()).map_err(std::io::Error::other)?;
             if let Some(window) = app.get_webview_window("main") {
@@ -169,6 +205,27 @@ fn main() {
             }
             let engine = Arc::new(Mutex::new(engine));
             app.manage(engine.clone());
+            let action_engine = engine.clone();
+            let action_handle = app.handle().clone();
+            let wake_handle = app.handle().clone();
+            let resources = tomato_agent::resources(
+                &std::env::current_exe()?,
+                Some(&app.path().resource_dir()?),
+            );
+            let service = tomato_agent::Agent::open(
+                engine.clone(),
+                agent_dir,
+                resources,
+                Arc::new(move |action, expected| {
+                    apply_action(&action_handle, &action_engine, action, expected)
+                }),
+                Arc::new(move || {
+                    refocus(&wake_handle);
+                    let _ = wake_handle.emit("agent-wake", ());
+                }),
+            )
+            .map_err(std::io::Error::other)?;
+            app.manage(service.clone());
             desktop::setup(app.handle(), background).map_err(std::io::Error::other)?;
             let handle = app.handle().clone();
             let mut serial = initial.data.timer.completion_serial;
@@ -181,6 +238,7 @@ fn main() {
                 let Some(s) = snapshot else {
                     continue;
                 };
+                let _ = service.observe(&s);
                 let pending = s
                     .data
                     .pending_reminder()
@@ -284,6 +342,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             snapshot,
             dispatch,
+            agent_call,
+            agent_open_login,
             guard_info,
             export_data,
             read_import,
@@ -296,6 +356,11 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("无法启动番茄 Todo")
         .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                if let Some(service) = app.try_state::<Arc<tomato_agent::Agent>>() {
+                    service.shutdown();
+                }
+            }
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 if desktop::protected(app) {
                     api.prevent_exit();

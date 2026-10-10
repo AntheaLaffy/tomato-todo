@@ -1,7 +1,7 @@
 ---
 source: main.ts
-lines: 3157
-generated_at: 2026-10-11
+lines: 3196
+generated_at: 2026-10-10
 ---
 
 ## 功能索引
@@ -12,12 +12,12 @@ generated_at: 2026-10-11
 | 分发、快照、导航与提醒                              | 296–450   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 今日待办、本周日程日历、待补队列与静态实例列表      | 451–593   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 任务、目标、习惯模板、愿景与统计设置                | 594–1096  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 保护、定时锁机、沉浸与刷新                          | 1097–1222 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1223–1884 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 容器、搜索与设置操作                                | 1885–2410 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 文件导入、模板动作与页面事件                        | 2411–2989 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 右键菜单、批量删除/移出、拖拽与快捷键               | 2990–3108 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动与轮询                                          | 3109–3157 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 保护、定时锁机、沉浸与刷新                          | 1097–1258 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1259–1920 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 容器、搜索与设置操作                                | 1921–2446 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 文件导入、模板动作与页面事件                        | 2447–3028 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 右键菜单、批量删除/移出、拖拽与快捷键               | 3029–3147 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 启动与轮询                                          | 3148–3196 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 
 ## Symbols
 
@@ -37,22 +37,22 @@ generated_at: 2026-10-11
 | goalStatsCard        | function | 852  |
 | crossSectionCard     | function | 872  |
 | statsPage            | function | 890  |
-| projectWhitelistCard | function | 1057  |
+| projectWhitelistCard | function | 1057 |
 | guardPage            | function | 1097 |
-| templatesCard        | function | 1274 |
-| datesForPrinting     | function | 1285 |
-| printDialog          | function | 1313 |
-| templateDialog       | function | 1369 |
-| taskDialog           | function | 1763 |
-| goalDialog           | function | 1960 |
-| importPlan           | function | 2428 |
-| selectControls       | function | 3032 |
-| detachSelected       | function | 3037 |
-| deleteSelectedTasks  | function | 3047 |
-| sortProjects         | function | 3072 |
-| savePreferences | function | 954 |
-| settingsPage | function | 1043 |
-| boot                 | function | 3114 |
+| templatesCard        | function | 1310 |
+| datesForPrinting     | function | 1321 |
+| printDialog          | function | 1349 |
+| templateDialog       | function | 1405 |
+| taskDialog           | function | 1799 |
+| goalDialog           | function | 1996 |
+| importPlan           | function | 2464 |
+| selectControls       | function | 3071 |
+| detachSelected       | function | 3076 |
+| deleteSelectedTasks  | function | 3086 |
+| sortProjects         | function | 3111 |
+| savePreferences      | function | 954  |
+| settingsPage         | function | 1043 |
+| boot                 | function | 3153 |
 
 模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通/目标待补呈现。
 
@@ -69,3 +69,5 @@ generated_at: 2026-10-11
 侧栏排序：sort-projects 使用 showContextMenu；外部点击在捕获阶段关闭旧菜单，避免打开菜单的同次点击在冒泡阶段将其关闭。排序持久化仍使用 reorderProjects；项目右键菜单共享关闭逻辑。
 
 偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/备份。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。
+
+锁机日程：tomorrowScheduleDialog（L:1190）按 state.today 的本地日期取次日，时间排序、无时间排末尾，排除已报废实例。展示任务/项目/备注/步骤，无修改和计时入口；renderImmersive 在保护期间提供入口，严格模式可用，休息锁机使用深色弹窗。

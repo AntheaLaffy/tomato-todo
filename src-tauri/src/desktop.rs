@@ -243,6 +243,7 @@ fn menu_action(app: &tauri::AppHandle, id: &str) -> AppResult<()> {
                 } else {
                     Action::StartTimer
                 },
+                None,
             )?;
             Ok(())
         }

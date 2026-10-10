@@ -621,7 +621,105 @@ test(
         path: join(dir, "schedule.png"),
         fullPage: true,
       });
+      // Render a synthetic lock snapshot in Chromium only. No native protection
+      // is enabled, and the real backend stays untouched during read-only viewing.
+      const preview = await (await fetch(`${url}/api/snapshot`)).json();
+      preview.data.timer.running = false;
+      const baseTask = preview.data.tasks[0];
+      const requests = [];
+      page.on("request", (request) => {
+        // /api/agent is background status polling, not a user action.
+        if (
+          request.method() === "POST" &&
+          request.url().endsWith("/api/action")
+        )
+          requests.push(request.url());
+      });
+      await page.route("**/api/snapshot", (route) =>
+        route.fulfill({ json: preview }),
+      );
+      for (const [today, tomorrow, strict, width] of [
+        ["2028-12-31", "2029-01-01", true, 1280],
+        ["2028-02-28", "2028-02-29", false, 360],
+      ]) {
+        preview.today = today;
+        preview.data.lock.active = {
+          name: "测试休息",
+          strict,
+          endsAt: preview.serverTime + 3600,
+        };
+        const task = (id, title, time, dueDate = tomorrow) => ({
+          ...baseTask,
+          id,
+          title,
+          dueDate,
+          reminderTime: time,
+          goalId: null,
+          nodeId: null,
+          projectId: null,
+          reminderPending: false,
+          reminderExpired: false,
+          completed: false,
+          notes: "带教材 <讲义>\n和笔记本",
+          subtasks: [{ title: "准备练习册", done: false }],
+        });
+        preview.data.tasks = [
+          task("later", "下午阅读", "14:30"),
+          task("untimed", "整理资料", null),
+          task("earlier", "上午练习", "08:00"),
+          task("today", "今天的任务", "09:00", today),
+        ];
+        await page.setViewportSize({ width, height: 900 });
+        await page.reload();
+        await expect(page.locator(".sleep-space")).toBeVisible();
+        await expect(page.locator("[data-action=emergency]")).toHaveCount(
+          strict ? 0 : 1,
+        );
+        await page.getByRole("button", { name: "查看明天日程" }).click();
+        const dialog = page.getByRole("dialog");
+        await expect(dialog).toContainText("3 项安排");
+        await expect(dialog.locator(".tomorrow-agenda h3")).toHaveText([
+          "上午练习",
+          "下午阅读",
+          "整理资料",
+        ]);
+        await expect(dialog).toContainText("带教材 <讲义>");
+        await expect(dialog).toContainText("准备练习册");
+        await expect(dialog).toContainText("时间未定");
+        await expect(dialog).not.toContainText("今天的任务");
+        await expect(
+          dialog.locator("input,textarea,[data-edit-task],[data-focus-task]"),
+        ).toHaveCount(0);
+        assert.ok(
+          await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth),
+        );
+        await page.screenshot({
+          path: join(dir, `lock-tomorrow-${width}.png`),
+          fullPage: true,
+          animations: "disabled",
+        });
+        await page.keyboard.press("Escape");
+        await expect(dialog).toHaveCount(0);
+        await expect(
+          page.locator(".sleep-space .protected-clock"),
+        ).toBeVisible();
+        await page.getByRole("button", { name: "查看明天日程" }).click();
+        await page.getByRole("button", { name: "返回锁机页面" }).click();
+        await expect(dialog).toHaveCount(0);
+      }
+      preview.data.tasks = [];
+      await page.reload();
+      await page.getByRole("button", { name: "查看明天日程" }).click();
+      await expect(page.getByRole("dialog")).toContainText(
+        "明天暂无已安排的任务",
+      );
+      assert.deepEqual(
+        requests,
+        [],
+        "Viewing tomorrow must not dispatch any actions",
+      );
       assert.deepEqual(errors, []);
+      console.log(`schedule artifacts: ${dir}`);
     } finally {
       await browser?.close();
       server.kill("SIGTERM");

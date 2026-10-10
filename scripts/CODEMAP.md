@@ -7,7 +7,8 @@ generated_at: 2026-10-09
 
 ## 文件
 
-| File | Domain | Function |
-| --- | --- | --- |
-| dev.mjs | 构建 | 启动 Rust 预览服务及 Vite 并处理退出 |
-| install.py | 安装 | 安装二进制、图标、菜单/自启动入口；备份并更新 DMS 快捷栏 |
+| File            | Domain | Function                                                                       |
+| --------------- | ------ | ------------------------------------------------------------------------------ |
+| dev.mjs         | 构建   | 启动 Rust 预览服务及 Vite 并处理退出                                           |
+| install.py      | 安装   | 安装二进制、图标、菜单/自启动入口；备份并更新 DMS 快捷栏                       |
+| build-agent.mjs | 构建   | 打包固定版本 Pi SDK、校验并内置 Node 运行时，生成 agent/bundle（不含私人数据） |

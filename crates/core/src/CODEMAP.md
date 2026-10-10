@@ -25,6 +25,7 @@ generated_at: 2026-10-10
 | 主线统计与纵切面 | 业务核心 | lib.rs 的 stats/GoalStat/NodeStat/DayStat | node_tests.rs、src/main.ts 的 statsPage/goalStatsCard/crossSectionCard |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
 | 扩展桌面白名单 | 桌面保护 | guard.rs | src-tauri/src/main.rs、tests/native.mjs |
+| 学习助手的异常诊断 | 诊断 | diagnostics.rs 的 diagnose/Anomaly | crates/agent 的唤醒排队、tests.rs、docs/AGENT.md |
 
 ## 主要接口
 
@@ -45,6 +46,7 @@ generated_at: 2026-10-10
 | plan.rs | 文件契约 | v1/v2 转换与 v4 主线配置 DTO、导出未完成任务、按 ID 更新配置与保留进度、`replace` 整份同步、稳定 ID 去重、番茄时长换算 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
 | guard.rs | 桌面保护 | niri IPC 能力检测、精确应用匹配和回焦 |
+| diagnostics.rs | 诊断 | 本地异常检测（时段重叠、计划超量/过少、习惯缺勤、主线停滞、深夜记录、投入下降）与证据字段，供学习助手唤醒 |
 | tests.rs | 验证 | 状态、持久化、保护与计划往返/失败原子性回归测试 |
 | reminders.rs | 时间安排 | 日期/时间与单次时长校验、当天待处理队列、计时/锁机延后、跨日清理 |
 | templates.rs | 模板/印刷 | 形状与日程/周期分时校验、按日期防重、0–90 天滚动整周期预印、临时/手动批量、逾期/报废过滤、显式形状同步 |

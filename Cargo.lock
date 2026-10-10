@@ -4062,6 +4062,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tomato-agent"
+version = "0.6.1"
+dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tomato-core",
+ "uuid",
+]
+
+[[package]]
 name = "tomato-core"
 version = "0.6.1"
 dependencies = [
@@ -4080,6 +4096,7 @@ dependencies = [
  "axum",
  "serde_json",
  "tokio",
+ "tomato-agent",
  "tomato-core",
  "tower-http",
 ]
@@ -4097,6 +4114,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
+ "tomato-agent",
  "tomato-core",
 ]
 

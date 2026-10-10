@@ -48,6 +48,10 @@ def install(args):
     config = xdg("XDG_CONFIG_HOME", ".config")
     state = xdg("XDG_STATE_HOME", ".local/state")
     source = Path(args.binary).resolve()
+    agent_source = Path(args.agent_bundle).resolve() if args.agent_bundle else ROOT / "agent/bundle"
+    if not agent_source.is_dir() and (source.parent / "agent").is_dir():
+        agent_source = source.parent / "agent"
+    agent_target = home / ".local/lib/tomato-todo/agent"
     binary = home / ".local/lib/tomato-todo/tomato-todo"
     launcher = home / ".local/bin/tomato-todo"
     entry = data / "applications" / (DESKTOP_ID + ".desktop")
@@ -90,6 +94,7 @@ def install(args):
         if changed:
             patches.append((settings_path, settings))
     plan = {"binary": str(binary), "launcher": str(launcher), "application": str(entry),
+            "agent": str(agent_target) if agent_source.is_dir() else None,
             "autostart": str(autostart) if args.autostart else None,
             "dmsChanges": [str(path) for path, _ in patches]}
     if args.dry_run:
@@ -102,6 +107,21 @@ def install(args):
         for path, _ in patches:
             shutil.copy2(path, backup / path.name)
     atomic_write(binary, source.read_bytes(), 0o755)
+    if agent_source.is_dir():
+        # Resources contain only the pinned runtime, dependencies and public skills.
+        # Replace the tree instead of merging so retired skills do not linger.
+        staging = agent_target.with_name("agent.installing")
+        if staging.exists():
+            shutil.rmtree(staging)
+        shutil.copytree(agent_source, staging)
+        previous = agent_target.with_name("agent.previous")
+        if previous.exists():
+            shutil.rmtree(previous)
+        if agent_target.exists():
+            agent_target.rename(previous)
+        staging.rename(agent_target)
+        if previous.exists():
+            shutil.rmtree(previous)
     launcher.parent.mkdir(parents=True, exist_ok=True)
     if not launcher.is_symlink():
         launcher.symlink_to(binary)
@@ -112,7 +132,8 @@ def install(args):
     atomic_write(entry, desktop.encode())
     for size, filename in ((32, "32x32.png"), (128, "128x128.png"), (256, "128x128@2x.png")):
         icon = data / "icons/hicolor" / f"{size}x{size}" / "apps/tomato-todo.png"
-        atomic_write(icon, (ROOT / "src-tauri/icons" / filename).read_bytes())
+        icon_root = ROOT / "src-tauri/icons" if (ROOT / "src-tauri/icons").is_dir() else source.parent / "icons"
+        atomic_write(icon, (icon_root / filename).read_bytes())
     if args.autostart:
         startup = ("[Desktop Entry]\nType=Application\nName=番茄 Todo\n"
                    f"Exec={quote_exec(binary)} --background\nIcon=tomato-todo\nTerminal=false\n"
@@ -130,6 +151,7 @@ def install(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", default=str(ROOT / "target/release/tomato-todo"))
+    parser.add_argument("--agent-bundle", help="Packaged Pi and Node resources")
     parser.add_argument("--home", help="Isolated home directory for tests")
     parser.add_argument("--autostart", action="store_true")
     parser.add_argument("--pin-dms", action="store_true")
