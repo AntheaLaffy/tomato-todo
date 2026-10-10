@@ -504,7 +504,7 @@ export const PONDER_TARGETS: PonderTarget[] = [
     id: "agent-web",
     title: "联网搜索",
     category: "智能体",
-    selectors: ["#agent-config-form"],
+    selectors: ['#agent-config-form label:has(input[name="exaKey"])'],
     sections: [
       {
         text: "搜索默认用免 Key 的 Exa；填自己的 Exa API Key 可以提升额度。Codex 后端使用账号服务端搜索。",
@@ -515,6 +515,93 @@ export const PONDER_TARGETS: PonderTarget[] = [
       },
     ],
     related: ["agent", "agent-review"],
+  },
+  {
+    id: "agent-setup",
+    title: "连接与设置",
+    category: "智能体",
+    selectors: ["#agent-config-form"],
+    sections: [
+      {
+        text: "先选后端并填好连接信息，再勾选「启用」。启用后助手才能应答；「异常时自动唤醒」允许它在空闲时主动分析。",
+      },
+      {
+        heading: "两种后端",
+        text: "DeepSeek 用自己的 API Key，按用量付费；Codex 用「登录 Codex」走 ChatGPT 账号登录，用订阅额度。模型可以留空用默认。",
+      },
+    ],
+    related: ["agent-backend", "agent-login", "agent-wake", "agent-key"],
+  },
+  {
+    id: "agent-backend",
+    title: "后端与模型",
+    category: "智能体",
+    selectors: [
+      '#agent-config-form label:has(select[name="provider"])',
+      '#agent-config-form label:has(input[name="model"])',
+    ],
+    sections: [
+      {
+        text: "DeepSeek 适合已有 API Key 的人；Codex 适合已有 ChatGPT Plus/Pro 订阅的人。切换后端后要重新保存。",
+      },
+      {
+        heading: "模型",
+        text: "留空使用后端默认模型；需要省 token 或要视觉能力时，再从下拉里指定。",
+      },
+    ],
+    related: ["agent-setup", "agent-key", "agent-login"],
+  },
+  {
+    id: "agent-key",
+    title: "API Key",
+    category: "智能体",
+    selectors: ['#agent-config-form label:has(input[name="apiKey"])'],
+    sections: [
+      {
+        text: "DeepSeek 的 Key 只保存在本机 agent/auth.json（权限 600），不会出现在状态接口、日志或任务备份里。",
+      },
+      {
+        heading: "Exa 是另一回事",
+        text: "Exa Key 是可选的：不填也能用免 Key 的搜索额度，填了只是额度更大。",
+      },
+    ],
+    related: ["agent-setup", "agent-web", "agent-backend"],
+  },
+  {
+    id: "agent-wake",
+    title: "自动唤醒",
+    category: "智能体",
+    selectors: [
+      '#agent-config-form label:has(input[name="maxAutoWakesPerDay"])',
+      '#agent-config-form label:has(input[name="cooldownHours"])',
+      '#agent-config-form label:has(input[name="quietStart"])',
+    ],
+    sections: [
+      {
+        text: "本地检测异常信号，只在启用、已连接且处于空闲时才唤醒助手；受每日上限、同一异常冷却与安静时段约束。",
+      },
+      {
+        heading: "只分析，不改数据",
+        text: "自动唤醒只分析、追问并生成待审阅文件；应用修改始终需要你点击。正在计时或锁机时先排队。",
+      },
+    ],
+    related: ["agent-setup", "agent", "agent-review"],
+  },
+  {
+    id: "agent-login",
+    title: "登录 Codex",
+    category: "智能体",
+    selectors: ["#agent-auth", '[data-agent="login"]'],
+    sections: [
+      {
+        text: "点「登录 Codex」会在系统浏览器打开官方登录页，完成后自动回来；登录凭据独立保存在本机。",
+      },
+      {
+        heading: "登录页没自动完成",
+        text: "如果 1455 端口被其它工具占用，页面会给出粘贴框，把浏览器回调链接或授权码贴进去也可继续。",
+      },
+    ],
+    related: ["agent-setup", "agent-backend"],
   },
   {
     id: "mcp",

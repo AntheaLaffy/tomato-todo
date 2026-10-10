@@ -1418,6 +1418,23 @@ test(
       await expect(page.locator("#ponder-title")).toHaveText("待补队列");
       await page.keyboard.press("Escape");
       await expect(page.locator("#ponder-layer")).toBeHidden();
+      // The same hint teaches each assistant setting in place, so a new user can
+      // learn what a field means without leaving the form.
+      await page.locator('[data-page="agent"]').click();
+      await page.locator('[data-agent="settings"]').click();
+      await page
+        .locator('#agent-config-form label:has(input[name="apiKey"])')
+        .hover();
+      await expect(page.locator("#ponder-hint")).toContainText("API Key", {
+        timeout: 4000,
+      });
+      await page.keyboard.down("g");
+      await expect(page.locator("#ponder-title")).toHaveText("API Key", {
+        timeout: 4000,
+      });
+      await page.keyboard.up("g");
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#ponder-layer")).toBeHidden();
       assert.deepEqual(errors, []);
       console.log(`ponder artifacts: ${dir}`);
     } finally {

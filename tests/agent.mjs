@@ -361,16 +361,20 @@ test(
       await page.goto(url);
       await page.locator('[data-page="agent"]').click();
       await expect(page.locator("h1")).toContainText("学习助手");
+      // Memory and files live in on-demand sheets, not on the conversation page.
+      await page.locator('[data-agent="memory"]').click();
       await page
         .locator("#agent-memory-text")
         .fill("合成测试：每天可用60分钟，愿景是持续掌握。");
       await page.locator("#agent-memory-add button").click();
       await expect(page.locator("#agent-memories")).toContainText("已确认");
+      await page.locator('[data-agent="close-sheet"]').click();
       await page.locator("#agent-text").fill("草稿不会被轮询覆盖");
       await delay(3000);
       await expect(page.locator("#agent-text")).toHaveValue(
         "草稿不会被轮询覆盖",
       );
+      await page.locator('[data-agent="plans"]').click();
       await page
         .locator('[data-agent="review"][data-name="review.json"]')
         .click();

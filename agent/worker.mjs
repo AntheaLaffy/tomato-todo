@@ -169,12 +169,21 @@ async function authentication(command) {
         notify: (event) => emit({ type: "auth_event", event }),
         prompt: (prompt) => {
           if (command.op === "api_key") return Promise.resolve(command.key);
+          // The app runs on a desktop with a browser, so default the Codex login
+          // method to browser instead of making the user answer a bare select.
+          if (prompt.type === "select") {
+            const browser =
+              prompt.options?.find((option) => option.id === "browser") ??
+              prompt.options?.[0];
+            return Promise.resolve(browser?.id ?? "browser");
+          }
           emit({
             type: "auth_event",
             event: {
               type: "prompt",
               message: prompt.message,
               promptType: prompt.type,
+              placeholder: prompt.placeholder,
             },
           });
           return new Promise((resolve, reject) => {
