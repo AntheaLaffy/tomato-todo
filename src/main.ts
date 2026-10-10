@@ -208,10 +208,9 @@ const strictNow = () =>
     : protectedNow() && state.data.settings.protection.strict;
 const projectOf = (task: Task) =>
   state.data.projects.find((p) => p.id === task.projectId);
-// Categories are derived, not stored: a goal task accumulates, any other timed
-// task is a routine (a spent one does not roll over), the rest is flexible.
-const isHabit = (task: Task) =>
-  !!task.reminderTime && !task.goalId && (!!task.habitId || task.recurring);
+// Jurisdiction is defined once in the Rust core; read its frozen kind instead of
+// re-deriving the category here.
+const isHabit = (task: Task) => state.taskKinds[task.id] === "habit";
 const dayLabel = (d: number) => "一二三四五六日"[d - 1] ?? "?";
 const daysLabel = (days: number[]) => {
   const sorted = [...days].sort((a, b) => a - b);

@@ -138,13 +138,32 @@ pub struct Task {
     pub tags: Vec<String>,
     pub subtasks: Vec<Subtask>,
 }
+/// Which jurisdiction an instance is counted under. The category is derived from
+/// the instance's own fields — never stored as user data, never edited — so history
+/// keeps its category even after its template or container is gone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TaskKind {
+    Ordinary,
+    Habit,
+    Goal,
+}
+
 impl Task {
+    /// The single definition of a task's jurisdiction, read off the frozen fields.
+    pub fn kind(&self) -> TaskKind {
+        if self.goal_id.is_some() {
+            TaskKind::Goal
+        } else if self.reminder_time.is_some() && (self.habit_id.is_some() || self.recurring) {
+            TaskKind::Habit
+        } else {
+            TaskKind::Ordinary
+        }
+    }
     /// Repetition is what makes a miss a habit miss. A one-off timed item is an
     /// appointment: it is spent when its time passes, but it is not a lapse.
     pub fn is_habit(&self) -> bool {
-        self.reminder_time.is_some()
-            && self.goal_id.is_none()
-            && (self.habit_id.is_some() || self.recurring)
+        self.kind() == TaskKind::Habit
     }
 }
 
@@ -555,6 +574,9 @@ pub struct Stats {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub node_progress: Vec<nodes::NodeProgress>,
+    /// Frozen jurisdiction per instance so consumers read one definition instead of
+    /// re-deriving it.
+    pub task_kinds: HashMap<String, TaskKind>,
     pub data: AppData,
     pub stats: Stats,
     pub remaining_secs: u32,
@@ -953,8 +975,9 @@ impl AppData {
                     .as_ref()
                     .is_some_and(|id| !self.habits.iter().any(|h| &h.id == id))
                 {
+                    // Losing the container only removes governance; the frozen
+                    // origin stays so history keeps its category.
                     task.habit_id = None;
-                    task.recurring = false;
                 }
                 self.tasks.push(task);
             }
@@ -1044,10 +1067,7 @@ impl AppData {
                                 t.goal_id = None;
                                 t.node_id = None;
                             }
-                            DetachTarget::Habit => {
-                                t.habit_id = None;
-                                t.recurring = false;
-                            }
+                            DetachTarget::Habit => t.habit_id = None,
                         }
                     }
                 }
@@ -1152,11 +1172,11 @@ impl AppData {
                     self.delete_template(&tid);
                 }
                 self.habits.retain(|h| h.id != id);
-                // Existing occurrences keep running as ordinary timed tasks.
+                // Existing occurrences keep their frozen origin: detaching only
+                // removes the group, so past misses stay misses for the statistics.
                 for task in &mut self.tasks {
                     if task.habit_id.as_ref() == Some(&id) {
                         task.habit_id = None;
-                        task.recurring = false;
                     }
                 }
             }
@@ -1654,6 +1674,12 @@ impl Engine {
         }
         Ok(Snapshot {
             node_progress: self.data.all_node_progress(),
+            task_kinds: self
+                .data
+                .tasks
+                .iter()
+                .map(|t| (t.id.clone(), t.kind()))
+                .collect(),
             remaining_secs: self.data.timer.remaining(at),
             stats: self.data.stats(at),
             data: self.data.clone(),

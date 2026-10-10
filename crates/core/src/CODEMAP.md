@@ -14,7 +14,7 @@ generated_at: 2026-10-10
 | ID 全局唯一及历史保留 | 持久化 | identities.rs 的 reconcile/validate、Engine | node_tests.rs、备份 v3、计划导入/任务恢复 |
 | 修改任务/重复规则 | 业务核心 | lib.rs 的 AppData::apply | tests.rs、src/types.ts |
 | 目标容器与待补 | 业务核心 | nodes.rs 的 bind_nodes/tick_nodes、lib.rs 的 Goal | src/main.ts 的 goalDialog/taskList、docs/BACKUP_FORMAT.md |
-| 过期习惯与缺勤统计 | 业务核心 | reminders.rs 的 tick_reminders、lib.rs 的 stats/DayStat.missed | src/main.ts 的 isExpiredHabit、docs/BACKUP_FORMAT.md |
+| 过期习惯与缺勤统计 | 业务核心 | lib.rs 的 TaskKind/is_habit 与 stats/DayStat.missed、reminders.rs 的 tick_reminders | src/main.ts 的 isHabit/isCatchUp、docs/BACKUP_FORMAT.md |
 | 习惯分组与周期印刷 | 业务核心 | templates.rs 的 materialize_templates | src/main.ts 的 templateDialog/habitsTab、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 | lib.rs 的 Vision/SaveVision | src/main.ts 的 visionDialog/visionsTab、docs/BACKUP_FORMAT.md |
 | 项目排序 | 业务核心 | lib.rs 的 Action::ReorderProjects | src/main.ts 的侧栏拖拽/sortProjects |
@@ -39,7 +39,7 @@ generated_at: 2026-10-10
 
 | File | Domain | Function |
 | --- | --- | --- |
-| lib.rs | 业务核心 | 备份 v3 数据模型、Action、计时、静态实例、无自定义单位的目标、习惯、愿景、统计、Engine 持久化 |
+| lib.rs | 业务核心 | 备份 v3 数据模型、Action、计时、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计、Engine 持久化 |
 | plan.rs | 文件契约 | v1/v2 转换与 v4 主线配置 DTO、导出未完成任务、原子合并、稳定 ID 去重、番茄时长换算 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
 | guard.rs | 桌面保护 | niri IPC 能力检测、精确应用匹配和回焦 |

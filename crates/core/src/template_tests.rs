@@ -355,8 +355,43 @@ fn habits_skip_spent_slots_never_make_up_and_count_existing_misses() {
         )
         .unwrap();
     assert_eq!(s.data.tasks.len(), 1);
-    assert!(!s.data.tasks[0].is_habit());
+    assert_eq!(s.data.tasks[0].habit_id, None);
+    // Deleting the group removes governance, not the frozen origin: the missed
+    // occurrence stays a habit miss in the statistics.
+    assert!(s.data.tasks[0].recurring);
+    assert!(s.data.tasks[0].is_habit());
+    assert_eq!(
+        s.task_kinds.get(&s.data.tasks[0].id),
+        Some(&TaskKind::Habit)
+    );
+    assert_eq!(s.stats.days.last().unwrap().missed, 1);
     assert!(s.data.templates.is_empty());
+}
+#[test]
+fn detaching_a_habit_keeps_the_frozen_jurisdiction_for_statistics() {
+    let mut e = engine();
+    let mut t = template();
+    weekly(&mut t);
+    let s = save(&mut e, t, vec![Some("2026-10-12".into())], at(12, 9, 30));
+    let id = s.data.tasks[0].id.clone();
+    let s = e.snapshot(at(12, 15, 25)).unwrap();
+    assert_eq!(s.stats.days.last().unwrap().missed, 1);
+    assert_eq!(s.task_kinds.get(&id), Some(&TaskKind::Habit));
+    // Detaching clears the container reference only; the category used by the
+    // statistics must not move with it.
+    let s = e
+        .dispatch(
+            Action::DetachTasks {
+                ids: vec![id.clone()],
+                target: DetachTarget::Habit,
+            },
+            at(12, 15, 26),
+        )
+        .unwrap();
+    assert_eq!(s.data.tasks[0].habit_id, None);
+    assert!(s.data.tasks[0].recurring);
+    assert_eq!(s.task_kinds.get(&id), Some(&TaskKind::Habit));
+    assert_eq!(s.stats.days.last().unwrap().missed, 1);
 }
 #[test]
 fn v3_plan_and_backup_keep_the_ledger_and_do_not_reset_progress() {
@@ -632,9 +667,12 @@ fn multiple_shapes_share_a_habit_group_without_splitting_one_shape_per_time() {
         .dispatch(Action::DeleteHabit { id: group }, at(12, 8, 1))
         .unwrap();
     assert!(s.data.habits.is_empty() && s.data.templates.is_empty());
+    // The group is gone, but the occurrences keep the origin they were printed
+    // with, so their habit history is not rewritten.
     assert!(s
         .data
         .tasks
         .iter()
-        .all(|t| t.habit_id.is_none() && t.template_id.is_none() && !t.recurring));
+        .all(|t| t.habit_id.is_none() && t.template_id.is_none() && t.recurring));
+    assert!(s.task_kinds.values().all(|kind| *kind == TaskKind::Habit));
 }

@@ -28,7 +28,7 @@
 
 ## 任务与历史
 
-任务包含计划 v4 的实例字段，另有 `completed`、`completedAt`（Unix 秒/null）、`createdAt`（Unix 秒）、子任务 `done` 与提醒送达状态。`completed` 必须与 `completedAt` 是否存在一致。实例的日期、完成、步骤进度与专注历史均属于实例；`templateId` 只指向来源，修改模板不会改历史。`recurring` 是生成时冻结的重复属性，不能从当前模板反向计算。实例不保存 `repeat/nextTaskId`。
+任务包含计划 v4 的实例字段，另有 `completed`、`completedAt`（Unix 秒/null）、`createdAt`（Unix 秒）、子任务 `done` 与提醒送达状态。`completed` 必须与 `completedAt` 是否存在一致。实例的日期、完成、步骤进度与专注历史均属于实例；`templateId` 只指向来源，修改模板不会改历史。`recurring` 是生成时冻结的重复属性，不能从当前模板反向计算。从习惯组移出或删除习惯组只清 `habitId`，不改写 `recurring`，因此历史缺勤与管辖分类不会随容器变化。实例不保存 `repeat/nextTaskId`。
 
 `goalId/habitId` 引用所属管辖组；目标实例按组 ID 与执行时间配对节点，可重复，提醒时刻可选。`nodeId` 保存配对；节点裁定后所有配对实例报废，包括已完成记录。普通定时实例的 `scrapMinutes` 默认 0，单位分钟，从计划块结束起算，仅当天有效；仍可重修的普通/目标实例进入待补队列。习惯不重修，只对已经生成而漏做的实例记缺勤。普通/习惯已过静态窗口的候选不再印刷；主线不控制模板印刷，后来配对到已裁定节点的实例立即报废。
 

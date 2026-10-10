@@ -267,8 +267,10 @@ export interface PlanFile {
     repeat?: "none" | "daily" | "weekdays" | "weekly";
   }[];
 }
+export type TaskKind = "ordinary" | "habit" | "goal";
 export interface Snapshot {
   nodeProgress: NodeProgress[];
+  taskKinds: Record<string, TaskKind>;
   data: AppData;
   stats: {
     todaySeconds: number;

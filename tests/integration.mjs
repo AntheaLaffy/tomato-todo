@@ -597,6 +597,11 @@ test(
       );
       const weekday = new Date(`${snapshot.today}T12:00:00Z`).getUTCDay() || 7;
       assert.equal(upcoming.length, (14 - weekday) * 2);
+      const habitInstanceIds = new Set(
+        snapshot.data.tasks
+          .filter((t) => t.templateId === automatic.id)
+          .map((t) => t.id),
+      );
       await page.locator("[data-page=tasks]").first().click();
       await page.screenshot({
         path: join(dir, "templates-list.png"),
@@ -626,8 +631,17 @@ test(
         .toBe(0);
       snapshot = await (await fetch(`${url}/api/snapshot`)).json();
       assert.ok(snapshot.data.tasks.length >= 17);
+      assert.ok(snapshot.data.tasks.every((t) => t.habitId === null));
+      // Deleting the group only detaches it; the printed occurrences keep the
+      // origin they were printed with so statistics do not lose the habit history.
+      const detachedHabits = snapshot.data.tasks.filter((t) =>
+        habitInstanceIds.has(t.id),
+      );
+      assert.ok(detachedHabits.length > 0);
       assert.ok(
-        snapshot.data.tasks.every((t) => t.habitId === null && !t.recurring),
+        detachedHabits.every(
+          (t) => t.recurring === true && snapshot.taskKinds[t.id] === "habit",
+        ),
       );
       await page.locator("[data-page=focus]").first().click();
       await page.locator("[data-action=new-task]").first().click();
