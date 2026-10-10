@@ -4353,3 +4353,24 @@ body.ponder-open #toast {
 .agent-plan li.in_progress i {
   color: var(--accent);
 }
+
+/* 对话卡底部：后端/模型选择 + 用量 + 操作。 */
+.agent-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.agent-model select {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--secondary);
+  font-size: 12px;
+}
+.agent-model select:focus {
+  border-color: var(--accent);
+  outline: none;
+}

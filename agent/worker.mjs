@@ -65,34 +65,39 @@ async function usageJson(url, headers) {
 // Provider-side quota is not part of the Pi SDK: DeepSeek exposes a balance
 // endpoint, and the ChatGPT subscription exposes rate-limit windows through the
 // same backend Codex CLI reads. Both are best-effort; an error is reported as-is.
-async function usageReport() {
+async function usageReport(provider) {
   const report = {};
-  const deepseek = await credentials.read("deepseek");
-  if (deepseek?.key) {
-    try {
-      const data = await usageJson("https://api.deepseek.com/user/balance", {
-        authorization: `Bearer ${deepseek.key}`,
-      });
-      report.deepseek = {
-        available: data.is_available === true,
-        balances: data.balance_infos ?? [],
-      };
-    } catch (error) {
-      report.deepseek = { error: String(error.message) };
+  // Only the backend the user selected: querying the other one wastes a request
+  // and shows numbers for a model that is not in use.
+  if (provider === "deepseek") {
+    const deepseek = await credentials.read("deepseek");
+    if (deepseek?.key) {
+      try {
+        const data = await usageJson("https://api.deepseek.com/user/balance", {
+          authorization: `Bearer ${deepseek.key}`,
+        });
+        report.deepseek = {
+          available: data.is_available === true,
+          balances: data.balance_infos ?? [],
+        };
+      } catch (error) {
+        report.deepseek = { error: String(error.message) };
+      }
     }
-  }
-  const codex = await credentials.read("openai-codex");
-  if (codex?.access) {
-    try {
-      report.codex = await usageJson(
-        "https://chatgpt.com/backend-api/wham/usage",
-        {
-          authorization: `Bearer ${codex.access}`,
-          "chatgpt-account-id": codex.accountId ?? "",
-        },
-      );
-    } catch (error) {
-      report.codex = { error: String(error.message) };
+  } else if (provider === "openai-codex") {
+    const codex = await credentials.read("openai-codex");
+    if (codex?.access) {
+      try {
+        report.codex = await usageJson(
+          "https://chatgpt.com/backend-api/wham/usage",
+          {
+            authorization: `Bearer ${codex.access}`,
+            "chatgpt-account-id": codex.accountId ?? "",
+          },
+        );
+      } catch (error) {
+        report.codex = { error: String(error.message) };
+      }
     }
   }
   return report;
@@ -252,7 +257,7 @@ async function authentication(command) {
   authAbort = undefined;
 }
 async function handle(command) {
-  if(command.op==="usage") {try{emit({type:"network_result",id:command.id,result:await usageReport()});}catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
+  if(command.op==="usage") {try{emit({type:"network_result",id:command.id,result:await usageReport(command.provider)});}catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
   if(command.op==="network") {try{const result=await networkTool(command.name,command.arguments,{runtime:await initialized,credentials,preferences:command.preferences},AbortSignal.timeout(20000));emit({type:"network_result",id:command.id,result});}catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
   if (command.op === "tool_result") {
     const request = pending.get(command.id);

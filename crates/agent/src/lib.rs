@@ -125,15 +125,25 @@ impl Agent {
             "status" => self.status(),
             "usage" => {
                 let id = uuid::Uuid::new_v4().to_string();
+                let provider = self
+                    .inner
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .store
+                    .preferences
+                    .provider
+                    .clone();
                 let (tx, rx) = std::sync::mpsc::channel();
                 self.network_pending
                     .lock()
                     .map_err(|e| e.to_string())?
                     .insert(id.clone(), tx);
-                let result = self.send(json!({"op":"usage","id":id})).and_then(|_| {
-                    rx.recv_timeout(std::time::Duration::from_secs(20))
-                        .map_err(|_| "获取用量超时".to_string())?
-                });
+                let result = self
+                    .send(json!({"op":"usage","id":id,"provider":provider}))
+                    .and_then(|_| {
+                        rx.recv_timeout(std::time::Duration::from_secs(20))
+                            .map_err(|_| "获取用量超时".to_string())?
+                    });
                 self.network_pending
                     .lock()
                     .map_err(|e| e.to_string())?
@@ -298,7 +308,7 @@ impl Agent {
                 return Err("当前分析尚未结束".into());
             }
             let p = inner.store.preferences.clone();
-            if !p.enabled {
+            if automatic && !p.enabled {
                 return Err("请先在连接配置中启用学习助手".into());
             }
             if inner.live.auth[&p.provider]["configured"] != true {

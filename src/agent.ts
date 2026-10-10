@@ -156,7 +156,7 @@ export function agentPage(): string {
       <div id="agent-questions"></div>
       <form id="agent-chat">
         <textarea id="agent-text" name="text" rows="3" maxlength="32000" placeholder="问点什么，或贴一段最近的安排">${esc(draft)}</textarea>
-        <div class="agent-actions"><span class="agent-usage" id="agent-usage">${usageHtml()}</span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
+        <div class="agent-actions"><span class="agent-status"><span class="agent-model" id="agent-model">${modelSelectHtml()}</span><span class="agent-usage" id="agent-usage">${usageHtml()}</span></span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
       </form>
     </section>
     <div id="agent-sheet" class="agent-sheet" hidden></div>
@@ -226,12 +226,14 @@ function renderChat() {
       )
       .join(""),
   );
+  const modelBox = document.getElementById("agent-model");
+  if (modelBox && !modelBox.contains(document.activeElement))
+    replace("agent-model", modelSelectHtml());
   document
     .querySelector<HTMLButtonElement>("#agent-chat button[type=submit]")
     ?.toggleAttribute(
       "disabled",
       status.busy ||
-        !status.preferences.enabled ||
         !status.providers?.[status.preferences.provider]?.configured,
     );
 }
@@ -298,6 +300,38 @@ function redactedUsage() {
   if (copy?.codex) delete copy.codex.email;
   return copy;
 }
+function modelSelectHtml() {
+  const s = status;
+  if (!s?.providers) return "";
+  const providers: [string, string][] = [
+    ["deepseek", "DeepSeek"],
+    ["openai-codex", "Codex"],
+  ];
+  const current = `${s.preferences.provider}|${s.preferences.model ?? ""}`;
+  const groups = providers
+    .map(([id, label]) => {
+      const provider = s.providers?.[id];
+      if (!provider) return "";
+      const options = [
+        `<option value="${id}|" ${current === `${id}|` ? "selected" : ""}>${label} · 默认模型</option>`,
+        ...provider.models.map(
+          (m) =>
+            `<option value="${id}|${esc(m.id)}" ${current === `${id}|${m.id}` ? "selected" : ""}>${esc(m.name)}</option>`,
+        ),
+      ];
+      if (
+        id === s.preferences.provider &&
+        s.preferences.model &&
+        !provider.models.some((m) => m.id === s.preferences.model)
+      )
+        options.push(
+          `<option value="${id}|${esc(s.preferences.model)}" selected>${esc(s.preferences.model)}</option>`,
+        );
+      return `<optgroup label="${label}">${options.join("")}</optgroup>`;
+    })
+    .join("");
+  return `<select id="agent-model-select" aria-label="后端与模型">${groups}</select>`;
+}
 function renderUsage() {
   const element = document.getElementById("agent-usage");
   if (element) element.innerHTML = usageHtml();
@@ -329,8 +363,6 @@ function sheetHtml(): string {
   const body = () => {
     if (currentSheet === "settings")
       return `<form id="agent-config-form"><div class="agent-form-grid">
-        <label>后端<select name="provider"><option value="deepseek" ${field("provider", p.provider) === "deepseek" ? "selected" : ""}>DeepSeek · API</option><option value="openai-codex" ${field("provider", p.provider) === "openai-codex" ? "selected" : ""}>Codex · 账号</option></select></label>
-        <label>模型<input name="model" list="agent-models" value="${esc(field("model", p.model))}" placeholder="留空用默认"><datalist id="agent-models"></datalist></label>
         <label>DeepSeek API Key<input name="apiKey" type="password" autocomplete="off" placeholder="留空保留" value="${esc(field("apiKey", ""))}"></label>
         <label>Exa API Key（可选）<input name="exaKey" type="password" autocomplete="off" placeholder="留空用免费额度" value="${esc(field("exaKey", ""))}"></label>
         <label>每日可用分钟<input name="dailyCapacityMinutes" type="number" min="15" max="1440" value="${esc(field("dailyCapacityMinutes", p.dailyCapacityMinutes?.toString() ?? ""))}"></label>
@@ -450,6 +482,19 @@ export function mountAgent() {
         input.type === "checkbox" ? input.checked : input.value;
     }
   });
+  panel.addEventListener("change", (event) => {
+    const select = event.target as HTMLSelectElement;
+    if (select.id !== "agent-model-select" || !status) return;
+    const [provider, model] = select.value.split("|");
+    void call({
+      op: "configure",
+      preferences: { ...status.preferences, provider, model },
+      apiKey: "",
+      exaKey: "",
+    })
+      .then(() => loadUsage())
+      .catch((error) => hooks.toast(String(error)));
+  });
   panel.addEventListener("submit", (event) => {
     event.preventDefault();
     void submit(event.target as HTMLFormElement).catch((error) =>
@@ -482,8 +527,8 @@ async function submit(form: HTMLFormElement) {
     const preferences: Preferences = {
       enabled: data.has("enabled"),
       automatic: data.has("automatic"),
-      provider: String(data.get("provider")),
-      model: String(data.get("model")).trim(),
+      provider: status?.preferences.provider ?? "deepseek",
+      model: status?.preferences.model ?? "",
       dailyCapacityMinutes: data.get("dailyCapacityMinutes")
         ? Number(data.get("dailyCapacityMinutes"))
         : null,
