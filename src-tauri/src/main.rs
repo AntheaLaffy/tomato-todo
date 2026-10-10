@@ -228,6 +228,9 @@ fn main() {
                 }
                 if s.data.timer.completion_serial != serial {
                     serial = s.data.timer.completion_serial;
+                    // A finished focus or break is exactly when the next decision is
+                    // made, so bring the window back instead of only notifying.
+                    desktop::show(&handle);
                     let body = if s.data.timer.last_finished_mode == Some(Mode::Focus) {
                         "又完成了一个番茄。起身活动一下，休息也很重要。"
                     } else {
