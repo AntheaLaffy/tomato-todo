@@ -491,7 +491,7 @@ impl Agent {
             inner.live.wake_serial += 1;
             inner.store.save(&self.dir)?;
             inner.live.busy = true;
-            format!("本地异常检测唤醒。先核实证据和用户背景，读取对应技能与已确认记忆，提出最少必要的问题。仅分析、提问和生成待审阅文件，不应用修改。证据：{}",serde_json::to_string(&eligible).map_err(|e|e.to_string())?)
+            format!("本地检测到一个学习安排信号。看一眼当前数据和已确认背景，用一两句话说你注意到了什么、想问什么，不要罗列清单。仅分析、提问和生成待审阅文件，不应用修改。信号：{}",serde_json::to_string(&eligible).map_err(|e|e.to_string())?)
         };
         (self.wake)();
         self.prompt(prompt, true, vec![])
