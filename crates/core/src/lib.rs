@@ -558,7 +558,59 @@ pub struct DayStat {
     pub pomodoros: u32,
     /// Routines (timed, no goal) whose day passed without being completed.
     pub missed: u32,
+    /// Instances of any kind completed that day.
+    pub completed: u32,
+    /// Plain timed instances spent that day without being completed.
+    pub voided: u32,
+    /// Mainline nodes that became success / failure that day.
+    pub goal_success: u32,
+    pub goal_failure: u32,
+    /// Instances voided because their node was decided that day.
+    pub goal_voided: u32,
 }
+
+/// Whole-line outcome. Every node has to pass for the line to succeed, so success
+/// is expected and a failure is the event worth studying.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LineOutcome {
+    Empty,
+    Pending,
+    Success,
+    Failure,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeStat {
+    pub id: String,
+    pub name: String,
+    pub start: String,
+    pub end: String,
+    pub verdict: Option<nodes::Verdict>,
+    pub decided_at: Option<i64>,
+    pub paired: usize,
+    pub completed: usize,
+    pub node_completed: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalStat {
+    pub id: String,
+    pub name: String,
+    pub outcome: LineOutcome,
+    /// Execution window covered by the nodes.
+    pub start: Option<String>,
+    pub end: Option<String>,
+    /// When the line's outcome became final: the failure if it failed, otherwise
+    /// the last success that carried every node.
+    pub decided_at: Option<i64>,
+    pub paired: usize,
+    pub completed: usize,
+    pub nodes: Vec<NodeStat>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Stats {
@@ -568,6 +620,9 @@ pub struct Stats {
     pub total_seconds: u64,
     pub total_pomodoros: usize,
     pub streak: u32,
+    /// Per-mainline outcome and node timing, so success/failure stops being a
+    /// per-instance question and becomes a property of the whole line.
+    pub goals: Vec<GoalStat>,
     pub days: Vec<DayStat>,
 }
 #[derive(Debug, Serialize)]
@@ -1539,28 +1594,146 @@ impl AppData {
             entry.0 += session.duration_secs as u64;
             entry.1 += u32::from(session.completed);
         }
-        let mut missed_by_day: HashMap<&str, u32> = HashMap::new();
+        // One pass over the instances fills the daily cross-section: what finished,
+        // what lapsed on time, and how the mainlines around it resolved.
+        let mut completed_by_day: HashMap<String, u32> = HashMap::new();
+        let mut voided_by_day: HashMap<String, u32> = HashMap::new();
+        let mut missed_by_day: HashMap<String, u32> = HashMap::new();
         for t in &self.tasks {
-            if t.reminder_expired && t.is_habit() {
-                if let Some(date) = t.due_date.as_deref() {
-                    *missed_by_day.entry(date).or_default() += 1;
+            if let Some(ts) = t.completed_at {
+                *completed_by_day.entry(date_at(ts)).or_default() += 1;
+            }
+            if t.reminder_expired && !t.completed {
+                if let Some(date) = &t.due_date {
+                    match t.kind() {
+                        TaskKind::Habit => *missed_by_day.entry(date.clone()).or_default() += 1,
+                        TaskKind::Ordinary => *voided_by_day.entry(date.clone()).or_default() += 1,
+                        TaskKind::Goal => {}
+                    }
                 }
             }
         }
+        let mut goal_success_by_day: HashMap<String, u32> = HashMap::new();
+        let mut goal_failure_by_day: HashMap<String, u32> = HashMap::new();
+        let mut goal_voided_by_day: HashMap<String, u32> = HashMap::new();
+        for goal in &self.goals {
+            for node in &goal.nodes {
+                let Some(result) = &node.result else {
+                    continue;
+                };
+                let date = date_at(result.at);
+                match result.verdict {
+                    nodes::Verdict::Success => {
+                        *goal_success_by_day.entry(date.clone()).or_default() += 1
+                    }
+                    nodes::Verdict::Failure => {
+                        *goal_failure_by_day.entry(date.clone()).or_default() += 1
+                    }
+                }
+                let paired = self
+                    .node_bindings
+                    .iter()
+                    .filter(|b| b.goal_id == goal.id && b.node_id == node.spec.id)
+                    .count() as u32;
+                *goal_voided_by_day.entry(date).or_default() += paired;
+            }
+        }
+        let count =
+            |map: &HashMap<String, u32>, date: &str| map.get(date).copied().unwrap_or_default();
         let days: Vec<DayStat> = (0..28)
             .rev()
             .map(|n| {
                 let date = current.checked_sub_days(Days::new(n)).unwrap().to_string();
                 let (seconds, pomodoros) = by_day.get(&date).copied().unwrap_or_default();
-                let missed = missed_by_day
-                    .get(date.as_str())
-                    .copied()
-                    .unwrap_or_default();
                 DayStat {
-                    date,
                     seconds,
                     pomodoros,
-                    missed,
+                    missed: count(&missed_by_day, &date),
+                    completed: count(&completed_by_day, &date),
+                    voided: count(&voided_by_day, &date),
+                    goal_success: count(&goal_success_by_day, &date),
+                    goal_failure: count(&goal_failure_by_day, &date),
+                    goal_voided: count(&goal_voided_by_day, &date),
+                    date,
+                }
+            })
+            .collect();
+        let goals: Vec<GoalStat> = self
+            .goals
+            .iter()
+            .map(|goal| {
+                let mut start: Option<String> = None;
+                let mut end: Option<String> = None;
+                let mut all_success = !goal.nodes.is_empty();
+                let mut failure_at: Option<i64> = None;
+                let mut success_at: Option<i64> = None;
+                let mut paired = 0usize;
+                let mut completed = 0usize;
+                let mut node_stats = Vec::with_capacity(goal.nodes.len());
+                for node in &goal.nodes {
+                    let spec_start = node.spec.start.clone();
+                    let spec_end = node.spec.end.clone();
+                    start = Some(match start {
+                        Some(s) => s.min(spec_start),
+                        None => spec_start,
+                    });
+                    end = Some(match end {
+                        Some(e) => e.max(spec_end),
+                        None => spec_end,
+                    });
+                    let progress = self.node_progress(&goal.id, node);
+                    paired += progress.paired_count;
+                    completed += progress.completed_count;
+                    match &node.result {
+                        Some(result) => match result.verdict {
+                            nodes::Verdict::Success => {
+                                success_at =
+                                    Some(success_at.map_or(result.at, |d| d.max(result.at)));
+                            }
+                            nodes::Verdict::Failure => {
+                                all_success = false;
+                                failure_at =
+                                    Some(failure_at.map_or(result.at, |d| d.min(result.at)));
+                            }
+                        },
+                        None => all_success = false,
+                    }
+                    node_stats.push(NodeStat {
+                        id: node.spec.id.clone(),
+                        name: node.spec.name.clone(),
+                        start: node.spec.start.clone(),
+                        end: node.spec.end.clone(),
+                        verdict: node.result.as_ref().map(|r| r.verdict),
+                        decided_at: node.result.as_ref().map(|r| r.at),
+                        paired: progress.paired_count,
+                        completed: progress.completed_count,
+                        node_completed: progress.completed,
+                    });
+                }
+                let outcome = if goal.nodes.is_empty() {
+                    LineOutcome::Empty
+                } else if failure_at.is_some() {
+                    LineOutcome::Failure
+                } else if all_success {
+                    LineOutcome::Success
+                } else {
+                    LineOutcome::Pending
+                };
+                let decided_at = match outcome {
+                    LineOutcome::Failure => failure_at,
+                    LineOutcome::Success => success_at,
+                    _ => None,
+                };
+                GoalStat {
+                    id: goal.id.clone(),
+                    name: goal.name.clone(),
+                    outcome,
+                    start,
+                    end,
+                    decided_at,
+                    paired,
+                    completed,
+                    nodes: node_stats,
                 }
             })
             .collect();
@@ -1590,6 +1763,7 @@ impl AppData {
             total_seconds: self.sessions.iter().map(|s| s.duration_secs as u64).sum(),
             total_pomodoros: self.sessions.iter().filter(|s| s.completed).count(),
             streak,
+            goals,
             days,
         }
     }

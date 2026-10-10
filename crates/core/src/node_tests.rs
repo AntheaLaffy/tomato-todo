@@ -629,3 +629,56 @@ fn restoring_a_backup_cannot_rewrite_signal_evidence_or_closed_completion_facts(
         .is_err());
     assert_eq!(e.export(at(10, 0)).unwrap(), before);
 }
+
+#[test]
+fn mainline_statistics_report_the_whole_line_and_each_node_timing() {
+    let mut e = Engine::open(":memory:").unwrap();
+    let mut ns = vec![spec("a", 8), spec("b", 9)];
+    ns[1].signal = Some(signal(SignalKind::Check, Direction::Head, "12:00"));
+    save(&mut e, None, ns);
+    let gid = e.data.goals[0].id.clone();
+    let a = task(&mut e, &gid, "08:30");
+    let b = task(&mut e, &gid, "09:30");
+    // Paired work alone does not settle a line: an unfinished node keeps it open.
+    let s = e.snapshot(at(10, 0)).unwrap();
+    assert_eq!(s.stats.goals[0].outcome, LineOutcome::Pending);
+    assert_eq!(s.stats.goals[0].nodes[0].paired, 1);
+    assert_eq!(s.stats.goals[0].start.as_deref(), Some("2026-10-12T08:00"));
+    assert_eq!(s.stats.goals[0].end.as_deref(), Some("2026-10-12T10:00"));
+    e.dispatch(Action::ToggleTask { id: a }, at(10, 1)).unwrap();
+    e.dispatch(Action::ToggleTask { id: b }, at(10, 2)).unwrap();
+    let s = e.snapshot(at(12, 1)).unwrap();
+    assert_eq!(s.stats.goals[0].outcome, LineOutcome::Success);
+    assert_eq!(s.stats.goals[0].decided_at, Some(at(12, 1)));
+    assert!(s.stats.goals[0]
+        .nodes
+        .iter()
+        .all(|n| n.verdict == Some(Verdict::Success) && n.node_completed));
+    // The daily cross-section counts the two nodes decided today.
+    assert_eq!(s.stats.days.last().unwrap().goal_success, 2);
+    assert_eq!(s.stats.days.last().unwrap().goal_failure, 0);
+}
+
+#[test]
+fn failed_mainline_records_the_failure_and_voids_its_pairings_together() {
+    let mut e = Engine::open(":memory:").unwrap();
+    let mut ns = vec![spec("a", 8), spec("b", 9)];
+    ns[0].signal = Some(signal(SignalKind::Failure, Direction::Tail, "10:00"));
+    save(&mut e, None, ns);
+    let gid = e.data.goals[0].id.clone();
+    task(&mut e, &gid, "08:30");
+    task(&mut e, &gid, "09:30");
+    let s = e.snapshot(at(10, 1)).unwrap();
+    assert_eq!(s.stats.goals[0].outcome, LineOutcome::Failure);
+    assert_eq!(s.stats.goals[0].decided_at, Some(at(10, 1)));
+    assert!(s.stats.goals[0]
+        .nodes
+        .iter()
+        .all(|n| n.verdict == Some(Verdict::Failure)));
+    // The cross-section pins the whole line's failure to the instant it happened,
+    // together with the instances it voided.
+    let day = s.stats.days.last().unwrap();
+    assert_eq!(day.goal_failure, 2);
+    assert_eq!(day.goal_voided, 2);
+    assert_eq!(day.goal_success, 0);
+}

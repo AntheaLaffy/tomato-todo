@@ -58,6 +58,29 @@ export interface NodeProgress {
   allTasksCompleted: boolean;
   completed: boolean;
 }
+export type LineOutcome = "empty" | "pending" | "success" | "failure";
+export interface NodeStat {
+  id: string;
+  name: string;
+  start: string;
+  end: string;
+  verdict: Verdict | null;
+  decidedAt: number | null;
+  paired: number;
+  completed: number;
+  nodeCompleted: boolean;
+}
+export interface GoalStat {
+  id: string;
+  name: string;
+  outcome: LineOutcome;
+  start: string | null;
+  end: string | null;
+  decidedAt: number | null;
+  paired: number;
+  completed: number;
+  nodes: NodeStat[];
+}
 export interface SignalEvent {
   id: string;
   goalId: string;
@@ -279,11 +302,17 @@ export interface Snapshot {
     totalSeconds: number;
     totalPomodoros: number;
     streak: number;
+    goals: GoalStat[];
     days: {
       date: string;
       seconds: number;
       pomodoros: number;
       missed: number;
+      completed: number;
+      voided: number;
+      goalSuccess: number;
+      goalFailure: number;
+      goalVoided: number;
     }[];
   };
   remainingSecs: number;

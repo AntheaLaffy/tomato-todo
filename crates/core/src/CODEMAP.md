@@ -21,6 +21,7 @@ generated_at: 2026-10-10
 | 批量删除/移出 | 业务核心 | lib.rs 的 Action::DetachTasks/DetachTarget | src/main.ts 的 selectControls/detachSelected |
 | 计划合并/导出与文件校验 | 文件契约 | plan.rs | docs/CODEMAP.md、tests.rs、桌面/预览与 TypeScript 消费方 |
 | 修复倒计时与统计 | 业务核心 | lib.rs 的 tick/stats/Engine | tests.rs、桌面后台线程 |
+| 主线统计与纵切面 | 业务核心 | lib.rs 的 stats/GoalStat/NodeStat/DayStat | node_tests.rs、src/main.ts 的 statsPage/goalStatsCard/crossSectionCard |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
 | 扩展桌面白名单 | 桌面保护 | guard.rs | src-tauri/src/main.rs、tests/native.mjs |
 
@@ -39,7 +40,7 @@ generated_at: 2026-10-10
 
 | File | Domain | Function |
 | --- | --- | --- |
-| lib.rs | 业务核心 | 备份 v3 数据模型、Action、计时、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计、Engine 持久化 |
+| lib.rs | 业务核心 | 备份 v3 数据模型、Action、计时、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（整条主线成败与逐日纵切面）、Engine 持久化 |
 | plan.rs | 文件契约 | v1/v2 转换与 v4 主线配置 DTO、导出未完成任务、原子合并、稳定 ID 去重、番茄时长换算 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
 | guard.rs | 桌面保护 | niri IPC 能力检测、精确应用匹配和回焦 |

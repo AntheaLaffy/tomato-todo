@@ -87,6 +87,7 @@ import type {
   Task,
   Template,
   LockSchedule,
+  LineOutcome,
 } from "./types";
 
 const iconSet = {
@@ -766,6 +767,61 @@ function weekChart(large: boolean) {
     max = Math.max(60 * 60, ...days.map((d) => d.seconds));
   return `<div class="week-chart ${large ? "large" : ""}"><div class="chart-axis"><span>${Math.ceil(max / 60)} 分</span><span>${Math.ceil(max / 120)} 分</span><span>0</span></div><div class="chart-plot"><div class="grid-lines"><i></i><i></i><i></i></div>${days.map((d, i) => `<div class="chart-column"><span class="bar-value">${Math.floor(d.seconds / 60)}<small> 分</small></span><div class="bar-slot"><div class="chart-bar ${i === 6 ? "today" : ""}" style="height:${Math.max(2, (d.seconds / max) * 100)}%" title="${d.date}：${duration(d.seconds)}"></div></div><span class="bar-label ${i === 6 ? "today" : ""}">${i === 6 ? "今天" : new Date(`${d.date}T12:00:00`).toLocaleDateString("zh-CN", { weekday: "short" })}</span></div>`).join("")}</div></div>`;
 }
+const lineOutcomeLabel: Record<LineOutcome, string> = {
+  empty: "尚未设置节点",
+  pending: "进行中",
+  success: "全线成功",
+  failure: "主线失败",
+};
+const stamp = (ts: number | null) =>
+  ts === null
+    ? ""
+    : new Date(ts * 1000).toLocaleString("zh-CN", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+const spanLabel = (start: string, end: string) =>
+  `${start.slice(5, 16).replace("T", " ")}\u2013${end.slice(11, 16)}`;
+function goalStatsCard() {
+  const goals = state.stats.goals;
+  return `<section class="card mainline-card"><div class="card-heading"><h2>主线</h2><span class="subtle small">整条线通过才算成功，失败与未完成更值得回看</span></div>${
+    goals.length
+      ? goals
+          .map((g) => {
+            const when = g.decidedAt
+              ? `${stamp(g.decidedAt)} ${g.outcome === "failure" ? "裁定失败" : "全线成功"}`
+              : "尚未裁定";
+            return `<div class="mainline-stat ${g.outcome}"><div class="mainline-stat-head"><b>${escape(g.name)}</b><span class="badge ${g.outcome}">${lineOutcomeLabel[g.outcome]}</span></div><p class="subtle small">${g.nodes.length} 个节点 · 配对 ${g.paired} · 完成 ${g.completed} · ${when}</p><div class="mainline-nodes">${g.nodes
+              .map(
+                (n) =>
+                  `<div class="mainline-node-stat ${n.verdict ?? "pending"}"><span>${escape(n.name)}</span><small>${escape(spanLabel(n.start, n.end))}</small><em class="badge ${n.verdict ?? "pending"}">${n.verdict === "success" ? "成功" : n.verdict === "failure" ? "失败" : n.nodeCompleted ? "已完成" : "未完成"}</em><small>${n.completed}/${n.paired}</small></div>`,
+              )
+              .join("")}</div></div>`;
+          })
+          .join("")
+      : '<div class="small-empty">还没有目标组。主线失败往往比成功更值得回看。</div>'
+  }</section>`;
+}
+function crossSectionCard() {
+  const days = state.stats.days
+    .slice(-14)
+    .filter(
+      (d) =>
+        d.goalFailure || d.goalSuccess || d.goalVoided || d.voided || d.missed,
+    );
+  return `<section class="card cross-section"><div class="card-heading"><h2>纵切面</h2><span class="subtle small">同一天的成败并排看，才看得见相互影响</span></div>${
+    days.length
+      ? `<div class="cross-table"><div class="cross-head"><span>日期</span><span>完成</span><span>缺勤</span><span>作废</span><span>主线成功</span><span>主线失败</span><span>主线报废</span></div>${days
+          .map(
+            (d) =>
+              `<div class="cross-row ${d.goalFailure ? "has-failure" : ""}"><span>${d.date.slice(5).replace("-", "/")}</span><span>${d.completed || "·"}</span><span>${d.missed || "·"}</span><span>${d.voided || "·"}</span><span>${d.goalSuccess || "·"}</span><span>${d.goalFailure ? `<b>${d.goalFailure}</b>` : "·"}</span><span>${d.goalVoided || "·"}</span></div>`,
+          )
+          .join("")}</div>`
+      : '<div class="small-empty">最近两周还没有可纵向对比的成败记录。</div>'
+  }</section>`;
+}
 function statsPage() {
   const s = state.stats,
     sessions = [...state.data.sessions].reverse();
@@ -794,7 +850,7 @@ function statsPage() {
           )
           .join("")
       : '<div class="small-empty">完成第一段专注，<br>看看时间去了哪里。</div>'
-  }</section></div>
+  }</section></div>${goalStatsCard()}${crossSectionCard()}
   <section class="card history-card"><div class="card-heading"><h2>专注足迹 <span class="count-label">${sessions.length}</span></h2><span class="subtle small">包含提前结束的实际专注时间</span></div>${
     sessions.length
       ? `<div class="history-table"><div class="history-head"><span>任务 / 项目</span><span>日期</span><span>专注时长</span><span>状态</span></div>${sessions

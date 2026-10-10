@@ -1050,6 +1050,22 @@ test(
         snapshot.data.tasks.find((t) => t.title === "检查任务").completed,
         true,
       );
+      // The statistics judge the whole line and align it with other tasks by day.
+      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
+      assert.equal(
+        snapshot.stats.goals.find((g) => g.id === group.id).outcome,
+        "failure",
+      );
+      assert.equal(
+        snapshot.stats.goals.find((g) => g.id === checkGroup.id).outcome,
+        "success",
+      );
+      assert.ok(snapshot.stats.days.some((d) => d.goalFailure > 0));
+      await page.locator("[data-page=stats]").first().click();
+      const mainline = page.locator(".mainline-card");
+      await expect(mainline).toContainText("主线失败");
+      await expect(mainline).toContainText("全线成功");
+      await expect(page.locator(".cross-row.has-failure")).not.toHaveCount(0);
       assert.deepEqual(errors, []);
       console.log(`node artifacts: ${dir}`);
     } finally {
