@@ -2977,7 +2977,15 @@ document.addEventListener("contextmenu", (e) => {
     ["删除项目", () => confirmDeleteProject(id)],
   ]);
 });
-document.addEventListener("click", () => hideContextMenu());
+// Dismiss before the delegated opener runs, so its opening click cannot close
+// the menu it just created. Menu items handle their own dismissal.
+document.addEventListener(
+  "click",
+  (e) => {
+    if (!(e.target as Element).closest("#context-menu")) hideContextMenu();
+  },
+  { capture: true },
+);
 
 function selectControls() {
   return selectMode

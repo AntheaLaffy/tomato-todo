@@ -24,6 +24,7 @@ generated_at: 2026-10-10
 | 数据统计与纵切面                 | 界面      | main.ts 的 statsPage/goalStatsCard/crossSectionCard、types.ts 的 GoalStat/NodeStat/LineOutcome                     | crates/core/src/lib.rs 的 stats/GoalStat/NodeStat/DayStat、docs/BACKUP_FORMAT.md                                      |
 | 本周日程表                       | 界面      | main.ts 的 schedulePage/weekOffset、style.css 的 schedule-grid                                                     | types.ts 的 Task（dueDate/reminderTime）、main.ts.analysis.md                                                         |
 | 关键节点音效与音量 | 声音/契约 | audio.ts、sound-events.ts、main.ts 的 accept/soundPreviewControls | types.ts、Rust Settings、备份契约、tests/audio.mjs |
+| 侧栏项目排序与右键菜单 | 界面 | main.ts 的 showContextMenu/hideContextMenu/sortProjects 与捕获阶段的外部点击关闭 | tests/integration.mjs 的打开/排序/保存/关闭回归 |
 
 ## 文件
 

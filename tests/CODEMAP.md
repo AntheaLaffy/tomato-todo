@@ -10,6 +10,7 @@ generated_at: 2026-10-10
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
 | 验证前端业务 | 验证 | integration.mjs | package.json |
+| 验证侧栏排序菜单 | 验证 | integration.mjs 的项目排序 | src/main.ts 的菜单捕获阶段关闭与 sortProjects |
 | 验证音效与静音 | 验证 | audio.mjs、integration.mjs | src/audio.ts、src/sound-events.ts、native.mjs |
 | 验证白名单与全屏 | 验证 | native.mjs | fixtures/guard_window.py、crates/core/src/guard.rs |
 | 验证桌面集成 | 验证 | native.mjs、install.mjs | fixtures/tray_bus.py、src-tauri/src/desktop.rs、scripts/install.py |

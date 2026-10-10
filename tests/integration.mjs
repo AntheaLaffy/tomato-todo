@@ -433,6 +433,52 @@ test(
       ).toBeVisible();
       // Batch delete tasks through selection mode.
       await page.locator("[data-page=tasks]").first().click();
+      // The opening click must not also trigger the outside-click dismissor.
+      const projectsBeforeSort = (
+        await (await fetch(`${url}/api/snapshot`)).json()
+      ).data;
+      const names = (projects) => projects.map((p) => p.name);
+      const sidebarNames = () =>
+        page.locator(".project-nav > span:not(.project-dot)").allTextContents();
+      await page.getByRole("button", { name: "项目排序", exact: true }).click();
+      await expect(page.locator("#context-menu")).toBeVisible();
+      await page.waitForTimeout(1100);
+      await expect(page.locator("#context-menu")).toBeVisible();
+      await page
+        .locator("#context-menu")
+        .getByRole("button", { name: "按名称", exact: true })
+        .click();
+      await expect(page.locator("#context-menu")).toHaveCount(0);
+      await expect
+        .poll(sidebarNames)
+        .toEqual(
+          names(
+            [...projectsBeforeSort.projects].sort((a, b) =>
+              a.name.localeCompare(b.name, "zh"),
+            ),
+          ),
+        );
+      const nameSorted = (await (await fetch(`${url}/api/snapshot`)).json())
+        .data;
+      const count = (id) =>
+        nameSorted.tasks.filter((t) => t.projectId === id && !t.completed)
+          .length;
+      await page.getByRole("button", { name: "项目排序", exact: true }).click();
+      await expect(page.locator("#context-menu")).toBeVisible();
+      await page
+        .locator("#context-menu")
+        .getByRole("button", { name: "按未完成数", exact: true })
+        .click();
+      const countSortedNames = names(
+        [...nameSorted.projects].sort((a, b) => count(b.id) - count(a.id)),
+      );
+      await expect.poll(sidebarNames).toEqual(countSortedNames);
+      await page.reload();
+      await expect.poll(sidebarNames).toEqual(countSortedNames);
+      await page.getByRole("button", { name: "项目排序", exact: true }).click();
+      await expect(page.locator("#context-menu")).toBeVisible();
+      await page.locator("[data-page=tasks]").first().click();
+      await expect(page.locator("#context-menu")).toHaveCount(0);
       // Right-click a project for its context menu, and confirm batch selection
       // also exists on the flat project page.
       await page
