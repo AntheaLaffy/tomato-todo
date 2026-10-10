@@ -75,7 +75,7 @@ export async function createStudySession({
     "patch_file",
     "review_file",
     "list_files",
-    "stage_file","web_search","web_fetch",
+    "stage_file","web_search","web_fetch","request_user_input",
     "dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision",
   ]);
   if(command.automatic)for(const name of ["dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision"])allowed.delete(name);

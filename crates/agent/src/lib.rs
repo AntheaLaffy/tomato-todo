@@ -38,6 +38,7 @@ struct Live {
     last_scan: i64,
     reviewed: std::collections::HashMap<String, String>,
     job_id: String,
+    questions: Value,
 }
 struct Inner {
     store: Store,
@@ -302,6 +303,7 @@ impl Agent {
             }
             inner.live.busy = true;
             inner.live.authentication = false;
+            inner.live.questions = Value::Null;
             inner.live.text.clear();
             inner.live.error = None;
             inner.live.automatic = automatic;
@@ -418,7 +420,7 @@ impl Agent {
     pub fn status(&self) -> AppResult<Value> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -585,6 +587,30 @@ impl Agent {
                 inner.store.memories.push(memory.clone());
                 inner.store.save(&self.dir)?;
                 Ok(json!(memory))
+            }
+            "request_user_input" => {
+                let questions = args["questions"].as_array().cloned().unwrap_or_default();
+                if questions.is_empty() || questions.len() > 3 {
+                    return Err("请提供 1–3 个问题".into());
+                }
+                for question in &questions {
+                    if question["question"]
+                        .as_str()
+                        .map(str::trim)
+                        .unwrap_or("")
+                        .is_empty()
+                    {
+                        return Err("问题不能为空".into());
+                    }
+                    let options = question["options"].as_array().map(Vec::len).unwrap_or(0);
+                    if !(2..=3).contains(&options) {
+                        return Err("每个问题提供 2–3 个选项".into());
+                    }
+                }
+                self.inner.lock().map_err(|e| e.to_string())?.live.questions = json!(questions);
+                Ok(
+                    json!({"shown":true,"note":"问题已展示，用户会作为下一条消息作答；先简短说明你会怎么用这些答案。"}),
+                )
             }
             "read_skill" => {
                 let name = nonempty_text(args, "name", 60)?;

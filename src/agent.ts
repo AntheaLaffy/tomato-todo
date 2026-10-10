@@ -66,6 +66,12 @@ export type AgentStatus = {
     evidence: unknown;
   }[];
   files: { name: string; bytes: number; reviewable: boolean }[];
+  questions: {
+    id: string;
+    header: string;
+    question: string;
+    options: { label: string; description: string }[];
+  }[];
   dataDir: string;
   mcpConfig: unknown;
 };
@@ -145,6 +151,7 @@ export function agentPage(): string {
     <section class="card agent-conversation">
       <div id="agent-run-status" role="status"></div>
       <div id="agent-messages" class="agent-messages" aria-live="polite"></div>
+      <div id="agent-questions"></div>
       <form id="agent-chat">
         <textarea id="agent-text" name="text" rows="3" maxlength="32000" placeholder="问点什么，或贴一段最近的安排">${esc(draft)}</textarea>
         <div class="agent-actions"><span class="agent-usage" id="agent-usage">${usageHtml()}</span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
@@ -191,6 +198,20 @@ function renderChat() {
           : ""),
   );
   if (messagesEl && nearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+  replace(
+    "agent-questions",
+    (status.questions ?? [])
+      .map(
+        (question) =>
+          `<div class="agent-question"><div class="agent-question-head">${esc(question.header)}</div><p>${esc(question.question)}</p><div class="agent-question-options">${question.options
+            .map(
+              (option) =>
+                `<button class="agent-option" type="button" data-agent="answer" data-text="${esc(`${question.header}：${option.label}`)}"><b>${esc(option.label)}</b><small>${esc(option.description)}</small></button>`,
+            )
+            .join("")}</div></div>`,
+      )
+      .join(""),
+  );
   document
     .querySelector<HTMLButtonElement>("#agent-chat button[type=submit]")
     ?.toggleAttribute(
@@ -516,6 +537,10 @@ async function action(button: HTMLButtonElement) {
     case "refresh-usage":
       usage = null;
       void loadUsage();
+      break;
+    case "answer":
+      if (button.dataset.text)
+        await call({ op: "send", text: button.dataset.text });
       break;
     case "delete-memory":
       await call({ op: "memory_delete", id: button.dataset.id });

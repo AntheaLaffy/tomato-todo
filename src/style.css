@@ -4259,3 +4259,48 @@ body.ponder-open #toast {
   background: var(--surface);
   box-shadow: var(--shadow);
 }
+
+/* 助手提问卡片：带选项的问题，点一下就是回答。 */
+.agent-question {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.agent-question-head {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+.agent-question p {
+  margin: 4px 0 10px;
+}
+.agent-question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.agent-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+}
+.agent-option:hover {
+  border-color: var(--accent);
+}
+.agent-option b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.agent-option small {
+  color: var(--muted);
+  font-size: 12px;
+}

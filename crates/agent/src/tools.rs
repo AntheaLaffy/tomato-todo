@@ -28,6 +28,39 @@ pub fn definitions(agent: bool) -> Vec<Value> {
         tool("list_files","列出私有工作区中的可审阅文件。",json!({}),&[],true),
         tool("stage_file","把 coding/ 中脚本生成的候选 JSON 挂接到原导出文件的来源，再审阅。保留真实来源指纹，尚不修改软件。",json!({"name":name,"source":{"type":"string","description":"coding/ 内的 .json 文件名"},"originName":{"type":"string","description":"原导出文件名"}}),&["name","source","originName"],false),
     ];
+    if agent {
+        list.push(tool(
+            "request_user_input",
+            "需要用户做决定时，给出 1–3 个带选项的问题。每个问题 2–3 个互斥选项，推荐项放第一个并在标签后加「（推荐）」；不要写「其他」，界面会自动加自由输入。仅在缺少必要信息、偏好或确认时使用。",
+            json!({"questions":{
+                "type":"array","minItems":1,"maxItems":3,
+                "items":{
+                    "type":"object",
+                    "properties":{
+                        "id":{"type":"string","description":"snake_case 标识"},
+                        "header":{"type":"string","maxLength":12,"description":"短标题"},
+                        "question":{"type":"string","maxLength":200,"description":"一句话问题"},
+                        "options":{
+                            "type":"array","minItems":2,"maxItems":3,
+                            "items":{
+                                "type":"object",
+                                "properties":{
+                                    "label":{"type":"string","maxLength":40,"description":"选项名"},
+                                    "description":{"type":"string","maxLength":160,"description":"一句话说明影响或代价"}
+                                },
+                                "required":["label","description"],
+                                "additionalProperties":false
+                            }
+                        }
+                    },
+                    "required":["id","header","question","options"],
+                    "additionalProperties":false
+                }
+            }}),
+            &["questions"],
+            false,
+        ));
+    }
     if !agent {
         list.push(tool("create_task","按用户明确要求创建任务。不要臆测可用时间或估时。",json!({"title":{"type":"string"},"notes":{"type":"string"},"projectId":{"type":["string","null"]},"goalId":{"type":["string","null"]},"dueDate":{"type":["string","null"]},"reminderTime":{"type":["string","null"]},"focusMinutes":{"type":["integer","null"]},"estimate":{"type":"integer","minimum":1},"priority":{"type":"integer","minimum":0,"maximum":3},"tags":{"type":"array","items":{"type":"string"}}}),&["title"],false));
         list.push(tool("update_task","按稳定 ID 仅修改指定字段，保留其他配置与完成历史；结构调整使用文件流程。",json!({"id":{"type":"string"},"changes":{"type":"object","properties":{"title":{"type":"string"},"notes":{"type":"string"},"projectId":{"type":["string","null"]},"dueDate":{"type":["string","null"]},"reminderTime":{"type":["string","null"]},"focusMinutes":{"type":["integer","null"]},"estimate":{"type":"integer"},"priority":{"type":"integer"},"tags":{"type":"array","items":{"type":"string"}},"scrapMinutes":{"type":"integer"}},"additionalProperties":false}}),&["id","changes"],false));
