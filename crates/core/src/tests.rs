@@ -322,7 +322,7 @@ fn plan_validation_and_conversion_fail_atomically() {
     plan.tasks[0].due_date = Some("2026-02-30".into());
     cases.push(plan);
     let mut plan = example_plan();
-    plan.version = 3;
+    plan.version = 99;
     cases.push(plan);
     let mut plan = example_plan();
     plan.pomodoro_minutes = 0;
@@ -508,109 +508,6 @@ fn effective_whitelist_prefers_project_list_over_global() {
 }
 
 #[test]
-fn goals_group_tasks_and_track_count_progress() {
-    let mut e = engine();
-    let s = e
-        .dispatch(
-            Action::SaveGoal {
-                id: None,
-                name: "OpenCamp".into(),
-                target: 3.0,
-                unit: "节".into(),
-                measure: GoalMeasure::Count,
-                due_date: None,
-            },
-            1000,
-        )
-        .unwrap();
-    let goal = s.data.goals[0].id.clone();
-    let mut d1 = draft();
-    d1.goal_id = Some(goal.clone());
-    d1.reminder_time = Some("09:00".into());
-    d1.due_date = Some("2026-10-09".into());
-    let s = e.dispatch(Action::SaveTask { task: d1 }, 1000).unwrap();
-    let task = s.data.tasks[0].id.clone();
-    let mut d2 = draft();
-    d2.goal_id = Some(goal.clone());
-    d2.reminder_time = Some("09:00".into());
-    d2.due_date = Some("2026-10-09".into());
-    e.dispatch(Action::SaveTask { task: d2 }, 1000).unwrap();
-    assert_eq!(e.snapshot(1000).unwrap().data.goal_progress(&goal), 0.0);
-    e.dispatch(Action::ToggleTask { id: task }, 1000).unwrap();
-    assert_eq!(e.snapshot(1000).unwrap().data.goal_progress(&goal), 1.0);
-    e.dispatch(Action::DeleteGoal { id: goal }, 1000).unwrap();
-    let s = e.snapshot(1000).unwrap();
-    assert!(s.data.goals.is_empty());
-    assert!(s.data.tasks.iter().all(|t| t.goal_id.is_none()));
-}
-
-#[test]
-fn time_goal_accumulates_focused_hours() {
-    let mut e = engine();
-    let s = e
-        .dispatch(
-            Action::SaveGoal {
-                id: None,
-                name: "OpenCamp".into(),
-                target: 30.0,
-                unit: "小时".into(),
-                measure: GoalMeasure::Time,
-                due_date: None,
-            },
-            1000,
-        )
-        .unwrap();
-    let goal = s.data.goals[0].id.clone();
-    let mut d = draft();
-    d.goal_id = Some(goal.clone());
-    d.reminder_time = Some("09:00".into());
-    d.due_date = Some("2026-10-09".into());
-    d.focus_minutes = Some(30);
-    let s = e.dispatch(Action::SaveTask { task: d }, 1000).unwrap();
-    let task = s.data.tasks[0].id.clone();
-    e.dispatch(Action::SelectTask { id: Some(task) }, 1000)
-        .unwrap();
-    e.dispatch(Action::StartTimer, 1000).unwrap();
-    e.dispatch(Action::ResetTimer, 1000 + 3600).unwrap();
-    let progress = e.snapshot(1000 + 3600).unwrap().data.goal_progress(&goal);
-    assert!((progress - 0.5).abs() < 1e-9);
-}
-
-#[test]
-fn goal_validation_rejects_bad_fields() {
-    for (target, unit) in [(0.0, "节"), (-1.0, "节"), (10.0, "  ")] {
-        let mut e = engine();
-        assert!(e
-            .dispatch(
-                Action::SaveGoal {
-                    id: None,
-                    name: "目标".into(),
-                    target,
-                    unit: unit.into(),
-                    measure: GoalMeasure::Count,
-                    due_date: None,
-                },
-                1000,
-            )
-            .is_err());
-    }
-    let mut e = engine();
-    assert!(e
-        .dispatch(
-            Action::SaveGoal {
-                id: None,
-                name: "坏日期".into(),
-                target: 1.0,
-                unit: "节".into(),
-                measure: GoalMeasure::Count,
-                due_date: Some("2026-02-30".into()),
-            },
-            1000,
-        )
-        .is_err());
-}
-
-#[test]
 fn expired_routines_count_as_misses_but_goal_work_does_not() {
     let mut e = engine();
     let mut routine = draft();
@@ -635,10 +532,8 @@ fn expired_routines_count_as_misses_but_goal_work_does_not() {
             Action::SaveGoal {
                 id: None,
                 name: "OpenCamp".into(),
-                target: 1.0,
-                unit: "节".into(),
-                measure: GoalMeasure::Count,
-                due_date: None,
+
+                nodes: vec![],
             },
             friday(8, 0),
         )
@@ -653,7 +548,12 @@ fn expired_routines_count_as_misses_but_goal_work_does_not() {
     e.dispatch(Action::SaveTask { task: goal_task }, friday(8, 0))
         .unwrap();
     let s = e.snapshot(friday(16, 0)).unwrap();
-    assert!(s.data.tasks.iter().all(|t| t.reminder_expired));
+    assert!(s
+        .data
+        .tasks
+        .iter()
+        .filter(|t| t.due_date.as_deref() == Some("2026-10-09"))
+        .all(|t| t.reminder_expired));
     let day = s
         .stats
         .days
@@ -694,7 +594,14 @@ fn habits_materialize_today_once_and_detach_on_delete() {
         .iter()
         .filter(|t| t.habit_id.as_deref() == Some(habit.as_str()))
         .collect();
-    assert_eq!(todays.len(), 1);
+    assert_eq!(todays.len(), 3);
+    assert_eq!(
+        todays
+            .iter()
+            .map(|t| t.due_date.as_deref().unwrap())
+            .collect::<HashSet<_>>(),
+        HashSet::from(["2026-10-09", "2026-10-10", "2026-10-11"])
+    );
     assert_eq!(todays[0].reminder_time.as_deref(), Some("12:00"));
     assert_eq!(todays[0].due_date.as_deref(), Some("2026-10-09"));
     // Ticking again must not duplicate the occurrence.
@@ -705,7 +612,7 @@ fn habits_materialize_today_once_and_detach_on_delete() {
             .iter()
             .filter(|t| t.habit_id.as_deref() == Some(habit.as_str()))
             .count(),
-        1
+        3
     );
     // Deleting the habit leaves the occurrence as an ordinary timed task.
     e.dispatch(Action::DeleteHabit { id: habit }, friday(8, 2))
@@ -720,14 +627,14 @@ fn habits_materialize_today_once_and_detach_on_delete() {
 }
 
 #[test]
-fn habit_validation_rejects_overlapping_days_and_bad_times() {
+fn habit_validation_rejects_duplicate_slots_and_bad_times() {
     let mut e = engine();
     let slot = |days: Vec<u8>, time: &str| HabitSlot {
         days,
         time: time.into(),
     };
     for slots in [
-        vec![slot(vec![1, 2], "12:00"), slot(vec![2, 3], "12:30")],
+        vec![slot(vec![1, 2], "12:00"), slot(vec![2, 3], "12:00")],
         vec![slot(vec![], "12:00")],
         vec![slot(vec![1], "25:00")],
         vec![],
@@ -745,48 +652,6 @@ fn habit_validation_rejects_overlapping_days_and_bad_times() {
             )
             .is_err());
     }
-}
-
-#[test]
-fn goal_work_may_not_repeat() {
-    let mut e = engine();
-    let s = e
-        .dispatch(
-            Action::SaveGoal {
-                id: None,
-                name: "OpenCamp".into(),
-                target: 1.0,
-                unit: "节".into(),
-                measure: GoalMeasure::Count,
-                due_date: None,
-            },
-            friday(8, 0),
-        )
-        .unwrap();
-    let goal = s.data.goals[0].id.clone();
-    let mut task = draft();
-    task.goal_id = Some(goal.clone());
-    task.repeat = Repeat::Daily;
-    assert!(e
-        .dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
-        .is_err());
-    // A timed, one-off goal task is fine.
-    task.repeat = Repeat::None;
-    task.reminder_time = Some("09:00".into());
-    task.due_date = Some("2026-10-09".into());
-    e.dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
-        .unwrap();
-    // Timed is necessary: a goal task without a time is rejected.
-    task.reminder_time = None;
-    assert!(e
-        .dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
-        .is_err());
-    // A repeating task outside any goal is fine (it is a habit only if timed).
-    let mut habit = draft();
-    habit.repeat = Repeat::Daily;
-    habit.due_date = Some("2026-10-09".into());
-    e.dispatch(Action::SaveTask { task: habit }, friday(8, 0))
-        .unwrap();
 }
 
 #[test]
@@ -820,10 +685,8 @@ fn visions_attach_to_a_project_or_goal_or_stand_alone() {
             Action::SaveGoal {
                 id: None,
                 name: "OpenCamp".into(),
-                target: 1.0,
-                unit: "节".into(),
-                measure: GoalMeasure::Count,
-                due_date: Some("2026-12-31".into()),
+
+                nodes: vec![],
             },
             1000,
         )
@@ -905,7 +768,8 @@ fn deleting_a_habit_occurrence_does_not_regenerate_it() {
         .data
         .tasks
         .iter()
-        .all(|t| t.habit_id.as_deref() != Some(habit.as_str())));
+        .all(|t| t.habit_id.as_deref() != Some(habit.as_str())
+            || t.due_date.as_deref() != Some("2026-10-09")));
 }
 
 #[test]
@@ -1042,12 +906,30 @@ fn recurring_weekday_task_skips_weekend_and_does_not_duplicate() {
     let s = e
         .dispatch(Action::ToggleTask { id: id.clone() }, at)
         .unwrap();
-    assert_eq!(s.data.tasks[1].due_date.as_deref(), Some("2026-10-12"));
-    assert!(!s.data.tasks[1].subtasks[0].done);
+    assert_eq!(s.data.tasks.len(), 5); // The whole workweek was printed at creation.
+    assert_eq!(
+        s.data
+            .tasks
+            .iter()
+            .map(|t| t.due_date.as_deref().unwrap())
+            .collect::<HashSet<_>>(),
+        HashSet::from([
+            "2026-10-05",
+            "2026-10-06",
+            "2026-10-07",
+            "2026-10-08",
+            "2026-10-09"
+        ])
+    );
     e.dispatch(Action::ToggleTask { id: id.clone() }, at)
         .unwrap();
     e.dispatch(Action::ToggleTask { id }, at).unwrap();
-    assert_eq!(e.data.tasks.len(), 2);
+    assert_eq!(e.data.tasks.len(), 5);
+    assert_eq!(e.snapshot(at + 86400).unwrap().data.tasks.len(), 5); // Saturday
+    let monday = e.snapshot(at + 3 * 86400).unwrap();
+    assert_eq!(monday.data.tasks.len(), 10);
+    assert_eq!(monday.data.tasks[5].due_date.as_deref(), Some("2026-10-12"));
+    assert!(!monday.data.tasks[5].subtasks[0].done);
 }
 
 #[test]
@@ -1218,6 +1100,7 @@ fn task_edit_completion_delete_and_restore() {
     )
     .unwrap();
     assert!(e.data.tasks[0].completed);
+    let task = e.data.tasks[0].clone();
     e.dispatch(
         Action::DeleteTask {
             id: task.id.clone(),
@@ -1485,6 +1368,8 @@ fn custom_duration_and_repeat_keep_schedule_without_changing_global_settings() {
     assert_eq!(s.data.settings.focus_minutes, 25);
     e.dispatch(Action::ResetTimer, friday(9, 1)).unwrap();
     let s = e.dispatch(Action::ToggleTask { id }, friday(9, 1)).unwrap();
+    assert_eq!(s.data.tasks.len(), 3);
+    let s = e.snapshot(friday(8, 0) + 86400).unwrap();
     let next = &s.data.tasks[1];
     assert_eq!(next.focus_minutes, Some(40));
     assert_eq!(next.reminder_time.as_deref(), Some("09:00"));
@@ -1504,7 +1389,7 @@ fn v2_plan_preserves_schedule_and_duration_old_backups_remain_flexible() {
         .dispatch(Action::SaveTask { task: d }, friday(8, 0))
         .unwrap();
     let mut plan = s.data.export_plan();
-    assert_eq!(plan.version, 2);
+    assert_eq!(plan.version, 4);
     let imported = engine()
         .dispatch(Action::ImportPlan { plan: plan.clone() }, friday(8, 0))
         .unwrap();

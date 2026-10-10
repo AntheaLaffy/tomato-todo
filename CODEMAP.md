@@ -22,9 +22,11 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
 | 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/main.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md |
-| 目标容器与过期补做 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Goal/goal_progress、src/main.ts 的 goalDialog | src/types.ts、docs/BACKUP_FORMAT.md |
-| 习惯时段与当天生成 | 业务核心 / 界面 | crates/core/src/habits.rs、src/main.ts 的 habitsTab | lib.rs 的 materialize_habits、src/types.ts、docs/BACKUP_FORMAT.md |
+| 目标容器与过期补做 | 业务核心 / 界面 | crates/core/src/nodes.rs 的配对/信号与 lib.rs 的 Goal、src/main.ts 的 goalDialog | src/types.ts、docs/BACKUP_FORMAT.md |
+| 主线节点、信号与永久 ID | 业务核心 / 界面 | crates/core/src/nodes.rs、identities.rs、src/main.ts 的 goalDialog | docs/NODE_DESIGN.md、node_tests.rs、plan.rs、src/types.ts 与文件契约 |
+| 习惯分组与周期印刷 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 habitsTab | templates.rs 的 materialize_templates、src/types.ts、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Vision、src/main.ts 的 visionsTab | src/types.ts、docs/BACKUP_FORMAT.md |
+| 模板、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 templateDialog/printDialog | crates/core/src/plan.rs、src/types.ts、docs/CODEMAP.md |
 | 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
 | 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
@@ -44,7 +46,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | scripts/ | 构建 | Cargo、npm、Python | 开发服务与 Linux 用户安装 |
 | .github/ | 构建 | GitHub Actions、Ubuntu 22.04 | CI 与标签发布工作流 |
 | tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
-| docs/ | 文件契约 | Rust core | 学习计划 v1 标准、Schema 与通用示例 |
+| docs/ | 文件契约 / 领域设计 | Rust core | 学习计划 v4 / 备份 v3 标准、Schema、通用示例及节点语义与实现记录 |
 | public/ | 资源 | Vite | Internals not indexed：本地图标、字体及字体许可证 |
 
 ## 文件

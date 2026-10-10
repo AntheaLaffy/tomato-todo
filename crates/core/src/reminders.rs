@@ -34,7 +34,7 @@ fn minutes_of(time: &str) -> Option<i64> {
 
 /// Length of the scheduled block: every focus session plus the breaks between
 /// them, so a multi-pomodoro task stays valid across its rest gaps.
-fn window_minutes(task: &Task, settings: &crate::Settings) -> i64 {
+pub fn window_minutes(task: &Task, settings: &crate::Settings) -> i64 {
     let focus = i64::from(task.focus_minutes.unwrap_or(settings.focus_minutes));
     let sessions = i64::from(task.estimate.max(1));
     let every = i64::from(settings.long_break_every.max(1));
@@ -70,6 +70,13 @@ impl AppData {
         let date = date_at(at);
         let now = Local.timestamp_opt(at, 0).single().unwrap();
         let now_minutes = i64::from(now.hour() * 60 + now.minute());
+        let now_seconds = now_minutes * 60 + i64::from(now.second());
+        let void_goal_tasks: std::collections::HashSet<_> = self
+            .tasks
+            .iter()
+            .filter(|t| t.goal_id.is_some() && self.task_is_void(t, at))
+            .map(|t| t.id.clone())
+            .collect();
         let settings = &self.settings;
         let mut changed = false;
         for t in &mut self.tasks {
@@ -78,15 +85,23 @@ impl AppData {
             let start = t.reminder_time.as_deref().and_then(minutes_of);
             // A timed task is spent once its day has passed, or once its planned
             // block is over today; from then on it neither fires nor rolls over.
-            let expired = match start {
-                Some(s) if !t.completed => {
-                    // A plain task may be repaired for its static grace window
-                    // after the planned block; habits carry 0 and are spent then.
-                    let spent_at = s + window_minutes(t, settings) + i64::from(t.scrap_minutes);
-                    past || (today && now_minutes > spent_at)
-                }
-                _ => false,
-            };
+            let expired = !t.completed
+                && (void_goal_tasks.contains(&t.id)
+                    || match start {
+                        Some(s) if !t.completed => {
+                            // A plain task may be repaired for its static grace window
+                            // after the planned block; habits carry 0 and are spent then.
+                            let spent_at = s
+                                + window_minutes(t, settings)
+                                + i64::from(if t.is_habit() || t.goal_id.is_some() {
+                                    0
+                                } else {
+                                    t.scrap_minutes
+                                });
+                            past || (today && now_seconds >= spent_at * 60)
+                        }
+                        _ => false,
+                    });
             if expired && !t.reminder_expired {
                 t.reminder_expired = true;
                 changed = true;

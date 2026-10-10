@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Tomato Todo Plan v1 / v2",
+  "title": "Tomato Todo Plan v1 / v2 / v4",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,7 +17,9 @@
     "version": {
       "enum": [
         1,
-        2
+        2,
+        3,
+        4
       ]
     },
     "pomodoroMinutes": {
@@ -37,6 +39,34 @@
       "maxItems": 50000,
       "items": {
         "$ref": "#/$defs/task"
+      }
+    },
+    "templates": {
+      "type": "array",
+      "maxItems": 5000,
+      "items": {
+        "$ref": "#/$defs/template"
+      }
+    },
+    "prints": {
+      "type": "array",
+      "maxItems": 200000,
+      "items": {
+        "$ref": "#/$defs/print"
+      }
+    },
+    "goals": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/goal"
+      }
+    },
+    "habits": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/habit"
       }
     }
   },
@@ -174,6 +204,37 @@
           "minimum": 1,
           "maximum": 180,
           "default": null
+        },
+        "templateId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "goalId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "habitId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "recurring": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10080,
+          "default": 0
         }
       },
       "allOf": [
@@ -220,6 +281,454 @@
           "pattern": "\\S"
         }
       }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "\\S"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 50000,
+          "description": "Rust additionally limits UTF-8 bytes to 50000."
+        },
+        "projectId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 0
+        },
+        "estimate": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99,
+          "default": 1
+        },
+        "tags": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "subtasks": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/templateSubtask"
+          }
+        },
+        "focusMinutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 180,
+          "default": null
+        },
+        "goalId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "habitId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "scrapMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10080,
+          "default": 0
+        }
+      }
+    },
+    "printing": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "once"
+            },
+            "date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "time": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+              "default": null
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "slots"
+          ],
+          "properties": {
+            "kind": {
+              "const": "calendar"
+            },
+            "slots": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 49,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dates"
+                ],
+                "properties": {
+                  "dates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 366,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                    }
+                  },
+                  "time": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "default": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "slots"
+          ],
+          "properties": {
+            "kind": {
+              "const": "weekly"
+            },
+            "slots": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 49,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "days"
+                ],
+                "properties": {
+                  "days": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 7,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 7
+                    }
+                  },
+                  "time": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "default": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "print": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "templateId"
+      ],
+      "properties": {
+        "templateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "habit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "nodes": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/nodeSpec"
+          },
+          "default": []
+        }
+      }
+    },
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "shape",
+        "printing"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shape": {
+          "$ref": "#/$defs/shape"
+        },
+        "printing": {
+          "$ref": "#/$defs/printing"
+        },
+        "automatic": {
+          "type": "boolean",
+          "default": false
+        },
+        "printAheadDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 90,
+          "default": 7
+        }
+      }
+    },
+    "templateSubtask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "nodeSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "direction",
+        "at"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "success",
+            "failure",
+            "check"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "head",
+            "tail"
+          ]
+        },
+        "at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "condition": {
+          "enum": [
+            "always",
+            "completed",
+            "incomplete"
+          ],
+          "default": "always"
+        }
+      }
+    },
+    "nodeSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "requiredTasks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50000,
+          "default": 1
+        },
+        "confirmationRequired": {
+          "type": "boolean",
+          "default": false
+        },
+        "signal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nodeSignal"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "blockSuccess": {
+          "enum": [
+            "never",
+            "always",
+            "unpaired",
+            "unfinishedTasks",
+            "incomplete",
+            "completed"
+          ],
+          "default": "never"
+        },
+        "blockFailure": {
+          "enum": [
+            "never",
+            "always",
+            "unpaired",
+            "unfinishedTasks",
+            "incomplete",
+            "completed"
+          ],
+          "default": "never"
+        }
+      }
     }
   },
   "allOf": [
@@ -244,6 +753,100 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "version": {
+            "enum": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "templates": {
+            "maxItems": 0
+          },
+          "prints": {
+            "maxItems": 0
+          },
+          "goals": {
+            "maxItems": 0
+          },
+          "habits": {
+            "maxItems": 0
+          },
+          "tasks": {
+            "items": {
+              "properties": {
+                "templateId": {
+                  "type": "null"
+                },
+                "goalId": {
+                  "type": "null"
+                },
+                "habitId": {
+                  "type": "null"
+                },
+                "recurring": {
+                  "const": false
+                },
+                "scrapMinutes": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "version": {
+            "enum": [
+              3,
+              4
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "properties": {
+                "repeat": {
+                  "const": "none"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "version": {
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "goals": {
+            "maxItems": 0
           }
         }
       }

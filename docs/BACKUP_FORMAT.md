@@ -1,33 +1,42 @@
-# 完整备份文件 v1
+# 完整备份文件 v3
 
 入口：**偏好设置 → 数据与备份 → 导出备份 / 导入备份**。文件采用 UTF-8 JSON，建议文件名 `tomato-todo-backup.json`，上限 20 MiB。备份覆盖项目、任务完成进度、计时状态、专注历史、设置和定时锁机规则。只交换待办安排时应使用 [学习计划文件](PLAN_FORMAT.md)，避免替换现有数据。
 
-机器定义见 [backup.schema.json](backup.schema.json)，通用示例见 [backup.example.json](backup.example.json)。Schema 校验结构，Rust 核心检查引用、日期、时间和跨字段约束。旧版备份缺少新增字段时按下表补默认值；`version` 仍为 `1`，不改变既有字段语义。
+机器定义见 [backup.schema.json](backup.schema.json)，通用示例见 [backup.example.json](backup.example.json)。Schema 校验结构，Rust 核心检查引用、日期、时间和跨字段约束。当前数据/备份版本为 `3`；模型采用破坏性升级，不自动迁移旧本机数据库或备份。旧学习计划 v1/v2 仍可转换导入。
 
 ## 顶层字段
 
-| 字段 | 内容 | 要求 |
-| --- | --- | --- |
-| `version` | 数据版本 | 固定 `1` |
-| `projects` | 项目数组 | 最多 500 项，`id/name/color/appWhitelist` 同计划格式；`appWhitelist` 可选；提供时专注该项目的任务用这份专属清单替代通用白名单 |
-| `goals` | 目标数组 | 最多 500 项；含 `name`、`target`(>0)、`unit`、`measure`(`count` 按已完成任务数 / `time` 按累计专注小时)，可选 `dueDate`；旧文件省略时为空 |
-| `habits` | 习惯数组 | 最多 500 项；含 `name`、`slots`(`days` 1—7 与 `time` HH:MM，同一个星期只能出现一次)，可选 `projectId`、`focusMinutes`；旧文件省略时为空 |
-| `visions` | 愿景数组 | 最多 500 项；含 `name`、可选 `notes`，可归 `projectId` 或 `goalId`（至多一个，都为 null 即顶层总愿景）；旧文件省略时为空 |
-| `tasks` | 全部任务，包括已完成任务 | 最多 50,000 项 |
-| `settings` | 番茄钟、主题与专注保护设置 | 必填 |
-| `timer` | 当前计时器 | 必填 |
-| `sessions` | 专注历史数组 | 最多 200,000 项 |
-| `lock` | 定时锁机规则和当前状态 | 旧文件省略时默认无规则、未锁机 |
+| 字段           | 内容                       | 要求                                                                                                                          |
+| -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `version`      | 数据版本                   | 固定 `3`                                                                                                                      |
+| `projects`     | 项目数组                   | 最多 500 项，`id/name/color/appWhitelist` 同计划格式；`appWhitelist` 可选；提供时专注该项目的任务用这份专属清单替代通用白名单 |
+| `goals`        | 主线任务组                 | 最多 500 项；`id/name/nodes`，每个节点含 `spec/confirmed/emitted/result`，没有统一产出单位                                    |
+| `nodeBindings` | 实例配对历史               | 最多 200000 项，`taskId/goalId/nodeId/completed/boundAt`；删除实例仍保留其完成事实                                            |
+| `signalEvents` | 信号及裁定依据             | 最多 200000 项，保留来源、方向、内容、接收顺序及阻断时的规则和完成情况                                                        |
+| `identities`   | 永久 ID 登记               | 最多 1000000 项；`id/kind/retired/restoreTask`；历史 ID 不能用于新实体                                                        |
+| `habits`       | 习惯组数组                 | 最多 500 项，只保存 `id/name`；形状和安排由模板管理                                                                           |
+| `templates`    | 模板与印刷规则             | 最多 5000 项，结构同计划 v4；不含完成和统计                                                                                   |
+| `prints`       | 已印日期记录               | 最多 200000 项，删除实例后仍保留，恢复后防止重新生成                                                                          |
+| `visions`      | 愿景数组                   | 最多 500 项；含 `name`、可选 `notes`，可归 `projectId` 或 `goalId`（至多一个，都为 null 即顶层总愿景）；旧文件省略时为空      |
+| `tasks`        | 全部任务，包括已完成任务   | 最多 50,000 项                                                                                                                |
+| `settings`     | 番茄钟、主题与专注保护设置 | 必填                                                                                                                          |
+| `timer`        | 当前计时器                 | 必填                                                                                                                          |
+| `sessions`     | 专注历史数组               | 最多 200,000 项                                                                                                               |
+| `lock`         | 定时锁机规则和当前状态     | 旧文件省略时默认无规则、未锁机                                                                                                |
 
 完整备份没有 `format: "tomato-todo-plan"` 标记。两个文件各有独立的导入入口，不能只改后缀互换。
 
 ## 任务与历史
 
-任务包含学习计划中的全部字段，另有 `completed`（布尔值）、`completedAt`（Unix 秒或 null）、`createdAt`（Unix 秒）、`nextTaskId`（下一次重复任务 ID 或 null）。子任务另有 `done` 布尔值。`completed` 必须与 `completedAt` 是否存在一致。完整备份中的 `notes`、`priority`、`estimate`、`tags`、`subtasks`、`completed`、`createdAt` 不能省略；`repeat` 默认为 `none`。
+任务包含计划 v4 的实例字段，另有 `completed`、`completedAt`（Unix 秒/null）、`createdAt`（Unix 秒）、子任务 `done` 与提醒送达状态。`completed` 必须与 `completedAt` 是否存在一致。实例的日期、完成、步骤进度与专注历史均属于实例；`templateId` 只指向来源，修改模板不会改历史。`recurring` 是生成时冻结的重复属性，不能从当前模板反向计算。实例不保存 `repeat/nextTaskId`。
 
-任务带可选的 `goalId`（所属目标）与 `habitId`（所属习惯）。属于目标的过期未完成任务会在今日专注里标为「待补」；习惯按 `slots` 的星期生成当天任务（`habitId` 指向习惯，`reminderTime` 取该时段）。旧备份缺少 `goals`、`habits`、`goalId` 或 `habitId` 时按空处理。
+`goalId/habitId` 引用所属管辖组；目标实例按组 ID 与执行时间配对节点，可重复，提醒时刻可选。`nodeId` 保存配对；节点裁定后所有配对实例报废，包括已完成记录。普通定时实例的 `scrapMinutes` 默认 0，单位分钟，从计划块结束起算，仅当天有效；仍可重修的普通/目标实例进入待补队列。习惯不重修，只对已经生成而漏做的实例记缺勤。普通/习惯已过静态窗口的候选不再印刷；主线不控制模板印刷，后来配对到已裁定节点的实例立即报废。
 
-提醒的送达状态 `reminderFired` / `reminderPending` / `reminderExpired` 属于本机执行记录：`reminderExpired` 表示该定时任务的当日已过或计划块已结束。无 `goalId` 的定时任务（养习惯）过期后不再进入今日待办，但会计入每日缺勤统计；旧备份缺这些字段时默认为 `false`。
+`reminderFired/reminderPending/reminderExpired` 保存本机提醒状态，缺省 false。目标的最终报废由配对节点的不可逆信号裁定决定，不能仅从 `reminderExpired` 推断。`templates` 和 `prints` 的完整规则见 [计划 v4](PLAN_FORMAT.md)。`automatic`、`printAheadDays` 和独立印刷记录随备份保存；恢复时保持模板自动预印设置，在后续轮询中只补齐未印且尚未报废的候选实例。
+
+节点 `spec` 的配置见 [主线设计](NODE_DESIGN.md) 与计划 v4。节点 `result` 为 null 或 `{ verdict: success|failure, at, signalId }`；必须对应真实信号记录。结果和配对属于运行状态，不以节点时间自动生成过期状态。信号记录的 `deliveries` 包含 `nodeId/blocked/blockRule/before/after/pairedCount/completedCount/completed`，可解释传播和裁定。
+
+备份保留全部配对、确认、裁定、已发标记和 ID 历史。本机导入时合并已有 ID 历史，不能删除或改写本机已有的节点裁定。恢复更旧的文件若会倒退裁定则整体拒绝；恢复原文件到新数据库可完整保留其历史。删除任务时保存原任务恢复内容，撤销只恢复同一实体，不能借原 ID 创建另一条任务。节点已有配对、信号或裁定时不能删除；已有裁定节点只能改名。开始新一轮应创建新的任务组和节点。
 
 `visions` 是纯标记：愿景不参与任务、进度与缺勤，删除所属项目或目标时其愿景一并删除。
 
@@ -45,11 +54,11 @@
 - `theme`：`light`、`dark`、`system`。
 - `protection`：见下表；旧文件可省略，默认关闭。
 
-| `protection` 字段 | 含义 | 旧文件默认值 |
-| --- | --- | --- |
-| `mode` | `off` 自由专注、`lock` 界面锁定、`whitelist` 应用白名单 | `off` |
-| `whitelist` | 应用 ID 字符串数组，精确匹配，最多 100 个 | `[]` |
-| `strict` | 界面锁定或白名单专注中禁止应用内提前退出、暂停和规则修改；到时解除 | `false` |
+| `protection` 字段 | 含义                                                               | 旧文件默认值 |
+| ----------------- | ------------------------------------------------------------------ | ------------ |
+| `mode`            | `off` 自由专注、`lock` 界面锁定、`whitelist` 应用白名单            | `off`        |
+| `whitelist`       | 应用 ID 字符串数组，精确匹配，最多 100 个                          | `[]`         |
+| `strict`          | 界面锁定或白名单专注中禁止应用内提前退出、暂停和规则修改；到时解除 | `false`      |
 
 白名单 ID 不能全为空白或含控制字符，每个不超过 200 个 UTF-8 字节。`strict` 在 `mode: off` 时不产生锁定；严格设置保留在备份中，但不会因为恢复文件而开始计时。窗口接口故障时会释放保护并报错；严格模式不承诺阻止系统快捷键或从系统外部结束进程。
 
@@ -79,14 +88,14 @@
 
 该对象对应顶层 `lock`。`schedules` 最多 20 项，各规则字段如下：
 
-| 字段 | 规则 |
-| --- | --- |
-| `id` | 非空且在规则中唯一 |
-| `name` | 1—40 个字符，不能全为空白 |
-| `start` / `end` | 本机当地时间 `HH:MM`，必须有效且不相同 |
-| `days` | 1—7 的不重复整数数组，至少一天；1 为周一，7 为周日 |
-| `enabled` | 是否启用 |
-| `strict` | 生效期间不允许从应用提前退出；省略为 false |
+| 字段            | 规则                                               |
+| --------------- | -------------------------------------------------- |
+| `id`            | 非空且在规则中唯一                                 |
+| `name`          | 1—40 个字符，不能全为空白                          |
+| `start` / `end` | 本机当地时间 `HH:MM`，必须有效且不相同             |
+| `days`          | 1—7 的不重复整数数组，至少一天；1 为周一，7 为周日 |
+| `enabled`       | 是否启用                                           |
+| `strict`        | 生效期间不允许从应用提前退出；省略为 false         |
 
 结束早于开始时跨午夜。星期归属**开始日期**，例如只选周五的 23:00—07:00，持续到周六早上。启用的规则不能重叠，跨周日/周一的重叠也会被拒绝。规则使用接收电脑的本地时区，不把导出机器的时区固定在文件内；夏令时重复的起点取较早时刻、终点取较晚时刻，不存在的本地时刻跳过当次。
 

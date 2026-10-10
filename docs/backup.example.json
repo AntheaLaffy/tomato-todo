@@ -1,12 +1,14 @@
 {
-  "version": 1,
+  "version": 3,
   "tasks": [],
   "projects": [
     {
       "id": "example-study",
       "name": "自主学习",
       "color": "#849b7d",
-      "appWhitelist": ["org.mozilla.firefox"]
+      "appWhitelist": [
+        "org.mozilla.firefox"
+      ]
     }
   ],
   "settings": {
@@ -47,12 +49,57 @@
         "name": "晚间休息",
         "start": "23:00",
         "end": "07:00",
-        "days": [1, 2, 3, 4, 5, 6, 7],
+        "days": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
         "enabled": false,
         "strict": true
       }
     ],
     "active": null,
     "suppressedUntil": 0
-  }
+  },
+  "templates": [
+    {
+      "id": "example-practice-template",
+      "shape": {
+        "title": "完成一章练习并复盘",
+        "notes": "先独立练习，再核对答案和记录错因。日期可按自己的安排填写。",
+        "projectId": "example-study",
+        "priority": 2,
+        "estimate": 2,
+        "tags": [
+          "练习"
+        ],
+        "subtasks": [
+          {
+            "id": "attempt",
+            "title": "先独立完成练习"
+          },
+          {
+            "id": "review",
+            "title": "记录错因并复述方法"
+          }
+        ],
+        "scrapMinutes": 30
+      },
+      "printing": {
+        "kind": "once",
+        "date": null,
+        "time": null
+      },
+      "automatic": false,
+      "printAheadDays": 7
+    }
+  ],
+  "prints": [],
+  "goals": [],
+  "habits": [],
+  "visions": []
 }

@@ -1,5 +1,5 @@
 //! Shared application engine. Both the desktop and preview call the same validated actions.
-use chrono::{Datelike, Days, Local, NaiveDate, TimeZone, Weekday};
+use chrono::{Days, Local, NaiveDate, TimeZone};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -9,9 +9,12 @@ use std::{
 use uuid::Uuid;
 pub mod guard;
 pub mod habits;
+pub mod identities;
 pub mod lock;
+pub mod nodes;
 pub mod plan;
 pub mod reminders;
+pub mod templates;
 
 pub type AppResult<T> = Result<T, String>;
 pub(crate) fn id() -> String {
@@ -41,26 +44,14 @@ pub struct Project {
     pub app_whitelist: Option<Vec<String>>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum GoalMeasure {
-    #[default]
-    Count,
-    Time,
-}
-
-/// A long-lived objective that groups tasks and absorbs the work they miss.
+/// A stable pairing identity and its independently edited mainline.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Goal {
     pub id: String,
     pub name: String,
-    pub target: f64,
-    pub unit: String,
     #[serde(default)]
-    pub measure: GoalMeasure,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub due_date: Option<String>,
+    pub nodes: Vec<nodes::Node>,
 }
 
 /// One "weekdays at a time" band of a routine.
@@ -72,22 +63,12 @@ pub struct HabitSlot {
     pub time: String,
 }
 
-/// A weekly routine that materializes one ordinary task per scheduled day, so a
-/// habit can run at different times on different days without manual bookkeeping.
+/// A habit jurisdiction groups printed instances; its shapes and times live in templates.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Habit {
     pub id: String,
     pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub focus_minutes: Option<u32>,
-    pub slots: Vec<HabitSlot>,
-    /// Date of the most recent daily materialization, so deleting that day's
-    /// occurrence does not bring it back on the next tick.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_generated: Option<String>,
 }
 
 /// A motivational marker: a name plus some prose that can belong to a project, a
@@ -118,6 +99,13 @@ pub struct Subtask {
 #[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: String,
+    #[serde(default)]
+    pub node_id: Option<String>,
+    #[serde(default)]
+    pub template_id: Option<String>,
+    /// Frozen printing provenance; editing a template cannot reclassify history.
+    #[serde(default)]
+    pub recurring: bool,
     pub title: String,
     pub notes: String,
     pub project_id: Option<String>,
@@ -149,10 +137,6 @@ pub struct Task {
     pub created_at: i64,
     pub tags: Vec<String>,
     pub subtasks: Vec<Subtask>,
-    #[serde(default)]
-    pub repeat: Repeat,
-    #[serde(default)]
-    pub next_task_id: Option<String>,
 }
 impl Task {
     /// Repetition is what makes a miss a habit miss. A one-off timed item is an
@@ -160,7 +144,7 @@ impl Task {
     pub fn is_habit(&self) -> bool {
         self.reminder_time.is_some()
             && self.goal_id.is_none()
-            && (self.habit_id.is_some() || self.repeat != Repeat::None)
+            && (self.habit_id.is_some() || self.recurring)
     }
 }
 
@@ -333,10 +317,20 @@ pub struct Session {
 #[serde(rename_all = "camelCase")]
 pub struct AppData {
     pub version: u32,
+    #[serde(default)]
+    pub identities: Vec<identities::Identity>,
     pub tasks: Vec<Task>,
+    #[serde(default)]
+    pub templates: Vec<templates::Template>,
+    #[serde(default)]
+    pub prints: Vec<templates::PrintRecord>,
     pub projects: Vec<Project>,
     #[serde(default)]
     pub goals: Vec<Goal>,
+    #[serde(default)]
+    pub node_bindings: Vec<nodes::Binding>,
+    #[serde(default)]
+    pub signal_events: Vec<nodes::SignalEvent>,
     #[serde(default)]
     pub habits: Vec<Habit>,
     #[serde(default)]
@@ -350,8 +344,11 @@ pub struct AppData {
 impl Default for AppData {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: 3,
+            identities: vec![],
             tasks: vec![],
+            templates: vec![],
+            prints: vec![],
             projects: vec![
                 Project {
                     id: id(),
@@ -373,6 +370,8 @@ impl Default for AppData {
                 },
             ],
             goals: vec![],
+            node_bindings: vec![],
+            signal_events: vec![],
             habits: vec![],
             visions: vec![],
             settings: Settings::default(),
@@ -399,6 +398,25 @@ pub enum DetachTarget {
     rename_all_fields = "camelCase"
 )]
 pub enum Action {
+    PrintInstances {
+        shape: templates::Shape,
+        printing: templates::Printing,
+    },
+    SaveTemplate {
+        template: templates::Template,
+        #[serde(default)]
+        print_dates: Vec<Option<String>>,
+    },
+    DeleteTemplate {
+        id: String,
+    },
+    PrintTemplate {
+        id: String,
+        dates: Vec<Option<String>>,
+    },
+    SyncTemplate {
+        id: String,
+    },
     StartReminder {
         id: String,
     },
@@ -440,15 +458,20 @@ pub enum Action {
     SaveGoal {
         id: Option<String>,
         name: String,
-        target: f64,
-        unit: String,
         #[serde(default)]
-        measure: GoalMeasure,
-        #[serde(default)]
-        due_date: Option<String>,
+        nodes: Vec<nodes::NodeSpec>,
+    },
+    ConfirmNode {
+        goal_id: String,
+        node_id: String,
+        confirmed: bool,
     },
     DeleteGoal {
         id: String,
+    },
+    SaveHabitGroup {
+        id: Option<String>,
+        name: String,
     },
     SaveHabit {
         id: Option<String>,
@@ -531,6 +554,7 @@ pub struct Stats {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub node_progress: Vec<nodes::NodeProgress>,
     pub data: AppData,
     pub stats: Stats,
     pub remaining_secs: u32,
@@ -560,34 +584,11 @@ impl AppData {
             None => self.settings.protection.whitelist.clone(),
         }
     }
-    /// Accumulated progress toward a goal: completed tasks for count goals, or
-    /// focused hours for time goals.
-    pub fn goal_progress(&self, goal_id: &str) -> f64 {
-        let Some(goal) = self.goals.iter().find(|g| g.id == goal_id) else {
-            return 0.0;
-        };
-        match goal.measure {
-            GoalMeasure::Count => self
-                .tasks
-                .iter()
-                .filter(|t| t.goal_id.as_deref() == Some(goal_id) && t.completed)
-                .count() as f64,
-            GoalMeasure::Time => {
-                let ids: HashSet<&String> = self
-                    .tasks
-                    .iter()
-                    .filter(|t| t.goal_id.as_deref() == Some(goal_id))
-                    .map(|t| &t.id)
-                    .collect();
-                let seconds: u64 = self
-                    .sessions
-                    .iter()
-                    .filter(|s| s.task_id.as_ref().is_some_and(|id| ids.contains(id)))
-                    .map(|s| u64::from(s.duration_secs))
-                    .sum();
-                seconds as f64 / 3600.0
-            }
+    pub fn task_is_void(&self, task: &Task, _at: i64) -> bool {
+        if task.goal_id.is_some() {
+            return self.task_node(task).is_some_and(|n| n.result.is_some());
         }
+        !task.completed && task.reminder_time.is_some() && task.reminder_expired
     }
     pub fn strict_protected(&self) -> bool {
         self.lock.active.as_ref().is_some_and(|a| a.strict)
@@ -663,9 +664,26 @@ impl AppData {
     }
     /// Advance at most one phase after downtime: never fabricate unattended focus sessions.
     pub fn tick(&mut self, at: i64) -> bool {
-        let materialized = self.materialize_habits(at);
-        let changed = self.tick_with_lock(at) || materialized;
-        self.tick_reminders(at) || changed
+        let materialized = self.materialize_templates(at);
+        let nodes_changed = self.tick_nodes(at);
+        let changed = self.tick_with_lock(at) || materialized || nodes_changed;
+        let closed_selection = self.timer.task_id.as_ref().is_some_and(|id| {
+            self.tasks
+                .iter()
+                .any(|t| &t.id == id && t.goal_id.is_some() && self.task_is_void(t, at))
+        });
+        if closed_selection {
+            if self.timer.mode == Mode::Focus {
+                if self.timer.running || self.timer.started_at.is_some() {
+                    self.record(at, false);
+                }
+                self.timer.task_id = None;
+                self.reset_to(Mode::Focus);
+            } else {
+                self.timer.task_id = None;
+            }
+        }
+        self.tick_reminders(at) || changed || closed_selection
     }
     fn tick_with_lock(&mut self, at: i64) -> bool {
         let previous = serde_json::to_value(&self.lock).ok();
@@ -740,6 +758,23 @@ impl AppData {
             return Err("专注保护中，结束前不能修改任务或计时；如有急事请使用紧急退出".into());
         }
         match action {
+            Action::PrintInstances { shape, printing } => {
+                self.print_instances(shape, printing, at)?
+            }
+            Action::SaveTemplate {
+                template,
+                print_dates,
+            } => {
+                let id = template.id.clone();
+                self.save_template(template)?;
+                self.validate()?;
+                if !print_dates.is_empty() {
+                    self.print_template(&id, &print_dates, at)?;
+                }
+            }
+            Action::DeleteTemplate { id } => self.delete_template(&id),
+            Action::PrintTemplate { id, dates } => self.print_template(&id, &dates, at)?,
+            Action::SyncTemplate { id } => self.sync_template(&id)?,
             Action::StartReminder { id } => {
                 if !self.reminder_idle() {
                     return Err("请先结束当前计时".into());
@@ -789,8 +824,14 @@ impl AppData {
                 if d.id.is_some() && existing.is_none() {
                     return Err("任务不存在，可能已经被删除".into());
                 }
+                if let Some(index) = existing {
+                    self.ensure_task_unsettled(&self.tasks[index].id)?;
+                }
                 let old = existing.map(|i| &self.tasks[i]);
                 let task = Task {
+                    node_id: old.and_then(|t| t.node_id.clone()),
+                    template_id: old.and_then(|t| t.template_id.clone()),
+                    recurring: old.is_some_and(|t| t.recurring),
                     id: d.id.unwrap_or_else(id),
                     title: d.title.trim().into(),
                     notes: d.notes,
@@ -828,15 +869,40 @@ impl AppData {
                         .filter(|t| !t.is_empty())
                         .collect(),
                     subtasks: d.subtasks,
-                    repeat: d.repeat,
-                    next_task_id: old.and_then(|t| t.next_task_id.clone()),
                 };
+                let mut task = task;
+                if old.is_some_and(|old| {
+                    old.goal_id != task.goal_id
+                        || old.due_date != task.due_date
+                        || old.reminder_time != task.reminder_time
+                }) {
+                    self.release_binding(&task.id);
+                    task.node_id = None;
+                }
+                if d.repeat != Repeat::None {
+                    let template = templates::from_task(&task, d.repeat, at);
+                    task.template_id = Some(template.id.clone());
+                    task.recurring = true;
+                    self.prints.push(templates::PrintRecord {
+                        template_id: template.id.clone(),
+                        date: task.due_date.clone(),
+                    });
+                    self.templates.push(template);
+                }
                 match existing {
                     Some(i) => self.tasks[i] = task,
                     None => self.tasks.push(task),
                 }
             }
             Action::ToggleTask { id: task_id } => {
+                self.ensure_task_unsettled(&task_id)?;
+                if self
+                    .tasks
+                    .iter()
+                    .any(|t| t.id == task_id && self.task_is_void(t, at))
+                {
+                    return Err("作废实例不能完成".into());
+                }
                 let t = self
                     .tasks
                     .iter_mut()
@@ -844,36 +910,6 @@ impl AppData {
                     .ok_or("任务不存在")?;
                 t.completed = !t.completed;
                 t.completed_at = if t.completed { Some(at) } else { None };
-                // Reopening the previous occurrence must not generate duplicate future tasks.
-                if t.completed && t.repeat != Repeat::None && t.next_task_id.is_none() {
-                    let today = date_at(at);
-                    let base = t.due_date.as_deref().unwrap_or(&today).max(&today);
-                    let base =
-                        NaiveDate::parse_from_str(base, "%Y-%m-%d").map_err(|e| e.to_string())?;
-                    let mut next = base
-                        .checked_add_days(Days::new(if t.repeat == Repeat::Weekly { 7 } else { 1 }))
-                        .ok_or("日期超出范围")?;
-                    if t.repeat == Repeat::Weekdays {
-                        while matches!(next.weekday(), Weekday::Sat | Weekday::Sun) {
-                            next = next.succ_opt().ok_or("日期超出范围")?;
-                        }
-                    }
-                    let mut upcoming = t.clone();
-                    upcoming.id = id();
-                    upcoming.completed = false;
-                    upcoming.completed_at = None;
-                    upcoming.created_at = at;
-                    upcoming.due_date = Some(next.to_string());
-                    upcoming.next_task_id = None;
-                    upcoming.reminder_fired = false;
-                    upcoming.reminder_pending = false;
-                    for sub in &mut upcoming.subtasks {
-                        sub.id = id();
-                        sub.done = false;
-                    }
-                    t.next_task_id = Some(upcoming.id.clone());
-                    self.tasks.push(upcoming);
-                }
             }
             Action::DeleteTask { id } => {
                 if !self.tasks.iter().any(|t| t.id == id) {
@@ -897,12 +933,36 @@ impl AppData {
                 {
                     task.project_id = None;
                 }
+                if task
+                    .template_id
+                    .as_ref()
+                    .is_some_and(|id| !self.templates.iter().any(|t| &t.id == id))
+                {
+                    task.template_id = None;
+                }
+                if task
+                    .goal_id
+                    .as_ref()
+                    .is_some_and(|id| !self.goals.iter().any(|g| &g.id == id))
+                {
+                    task.goal_id = None;
+                    task.node_id = None;
+                }
+                if task
+                    .habit_id
+                    .as_ref()
+                    .is_some_and(|id| !self.habits.iter().any(|h| &h.id == id))
+                {
+                    task.habit_id = None;
+                    task.recurring = false;
+                }
                 self.tasks.push(task);
             }
             Action::ToggleSubtask {
                 task_id,
                 subtask_id,
             } => {
+                self.ensure_task_unsettled(&task_id)?;
                 let sub = self
                     .tasks
                     .iter_mut()
@@ -948,6 +1008,11 @@ impl AppData {
                         task.project_id = None;
                     }
                 }
+                for template in &mut self.templates {
+                    if template.shape.project_id.as_ref() == Some(&id) {
+                        template.shape.project_id = None;
+                    }
+                }
                 self.visions.retain(|a| a.project_id.as_ref() != Some(&id));
             }
             Action::ReorderProjects { ids } => {
@@ -965,54 +1030,72 @@ impl AppData {
                     .collect();
             }
             Action::DetachTasks { ids, target } => {
+                if target == DetachTarget::Goal {
+                    for id in &ids {
+                        self.ensure_task_unsettled(id)?;
+                        self.release_binding(id);
+                    }
+                }
                 for t in self.tasks.iter_mut() {
                     if ids.contains(&t.id) {
                         match target {
                             DetachTarget::Project => t.project_id = None,
-                            DetachTarget::Goal => t.goal_id = None,
-                            DetachTarget::Habit => t.habit_id = None,
+                            DetachTarget::Goal => {
+                                t.goal_id = None;
+                                t.node_id = None;
+                            }
+                            DetachTarget::Habit => {
+                                t.habit_id = None;
+                                t.recurring = false;
+                            }
                         }
                     }
                 }
             }
-            Action::SaveGoal {
-                id: gid,
-                name,
-                target,
-                unit,
-                measure,
-                due_date,
-            } => {
-                if let Some(gid) = gid {
-                    let g = self
-                        .goals
-                        .iter_mut()
-                        .find(|g| g.id == gid)
-                        .ok_or("目标不存在")?;
-                    g.name = name.trim().into();
-                    g.target = target;
-                    g.unit = unit.trim().into();
-                    g.measure = measure;
-                    g.due_date = due_date;
-                } else {
-                    self.goals.push(Goal {
-                        id: id(),
-                        name: name.trim().into(),
-                        target,
-                        unit: unit.trim().into(),
-                        measure,
-                        due_date,
-                    });
-                }
-            }
+            Action::SaveGoal { id, name, nodes } => self.save_goal(id, name, nodes)?,
+            Action::ConfirmNode {
+                goal_id,
+                node_id,
+                confirmed,
+            } => self.confirm_node(&goal_id, &node_id, confirmed)?,
             Action::DeleteGoal { id } => {
+                if self
+                    .goals
+                    .iter()
+                    .any(|g| g.id == id && g.nodes.iter().any(|n| n.result.is_some() || n.emitted))
+                {
+                    return Err(
+                        "主线已有裁定或信号历史，不能删除；可创建新的任务组开始下一轮".into(),
+                    );
+                }
+                self.node_bindings.retain(|b| b.goal_id != id);
                 self.goals.retain(|g| g.id != id);
                 for task in &mut self.tasks {
                     if task.goal_id.as_ref() == Some(&id) {
                         task.goal_id = None;
+                        task.node_id = None;
+                    }
+                }
+                for template in &mut self.templates {
+                    if template.shape.goal_id.as_ref() == Some(&id) {
+                        template.shape.goal_id = None;
                     }
                 }
                 self.visions.retain(|a| a.goal_id.as_ref() != Some(&id));
+            }
+            Action::SaveHabitGroup { id: hid, name } => {
+                if let Some(hid) = hid {
+                    self.habits
+                        .iter_mut()
+                        .find(|h| h.id == hid)
+                        .ok_or("习惯组不存在")?
+                        .name = name.trim().into();
+                } else {
+                    self.habits.push(Habit {
+                        id: id(),
+                        name: name.trim().into(),
+                    });
+                }
             }
             Action::SaveHabit {
                 id: hid,
@@ -1021,33 +1104,59 @@ impl AppData {
                 focus_minutes,
                 slots,
             } => {
-                if let Some(hid) = hid {
-                    let h = self
-                        .habits
-                        .iter_mut()
-                        .find(|h| h.id == hid)
-                        .ok_or("习惯不存在")?;
-                    h.name = name.trim().into();
-                    h.project_id = project_id;
-                    h.focus_minutes = focus_minutes;
-                    h.slots = slots;
+                let hid = hid.unwrap_or_else(id);
+                if let Some(habit) = self.habits.iter_mut().find(|h| h.id == hid) {
+                    habit.name = name.trim().into();
                 } else {
                     self.habits.push(Habit {
-                        id: id(),
+                        id: hid.clone(),
                         name: name.trim().into(),
-                        project_id,
-                        focus_minutes,
-                        slots,
-                        last_generated: None,
                     });
                 }
+                self.save_template(templates::Template {
+                    id: format!("habit:{hid}"),
+                    automatic: true,
+                    print_ahead_days: 0,
+                    printing: templates::Printing::Weekly {
+                        slots: slots
+                            .into_iter()
+                            .map(|s| templates::PrintSlot {
+                                days: s.days,
+                                time: Some(s.time),
+                            })
+                            .collect(),
+                    },
+                    shape: templates::Shape {
+                        title: name.trim().into(),
+                        notes: String::new(),
+                        project_id,
+                        goal_id: None,
+                        habit_id: Some(hid),
+                        focus_minutes,
+                        scrap_minutes: 0,
+                        priority: 0,
+                        estimate: 1,
+                        tags: vec![],
+                        subtasks: vec![],
+                    },
+                })?;
             }
             Action::DeleteHabit { id } => {
+                let tids: Vec<_> = self
+                    .templates
+                    .iter()
+                    .filter(|t| t.shape.habit_id.as_ref() == Some(&id))
+                    .map(|t| t.id.clone())
+                    .collect();
+                for tid in tids {
+                    self.delete_template(&tid);
+                }
                 self.habits.retain(|h| h.id != id);
                 // Existing occurrences keep running as ordinary timed tasks.
                 for task in &mut self.tasks {
                     if task.habit_id.as_ref() == Some(&id) {
                         task.habit_id = None;
+                        task.recurring = false;
                     }
                 }
             }
@@ -1080,6 +1189,13 @@ impl AppData {
             }
             Action::DeleteVision { id } => self.visions.retain(|a| a.id != id),
             Action::SelectTask { id } => {
+                if self
+                    .tasks
+                    .iter()
+                    .any(|t| Some(&t.id) == id.as_ref() && self.task_is_void(t, at))
+                {
+                    return Err("作废实例不能专注".into());
+                }
                 if id
                     .as_ref()
                     .is_some_and(|id| !self.tasks.iter().any(|t| &t.id == id && !t.completed))
@@ -1092,7 +1208,16 @@ impl AppData {
                 self.timer.task_id = id;
                 self.reset_to(self.timer.mode);
             }
-            Action::StartTimer => self.start(at),
+            Action::StartTimer => {
+                if self
+                    .tasks
+                    .iter()
+                    .any(|t| Some(&t.id) == self.timer.task_id.as_ref() && self.task_is_void(t, at))
+                {
+                    return Err("作废实例不能开始专注".into());
+                }
+                self.start(at);
+            }
             Action::PauseTimer => {
                 self.timer.remaining_secs = self.timer.remaining(at);
                 self.timer.running = false;
@@ -1127,6 +1252,7 @@ impl AppData {
             Action::Import { data } => {
                 data.validate()?;
                 let mut data = *data;
+                self.protect_decisions(&data)?;
                 // Restoring a file must not silently arm a scheduled desktop lock.
                 data.lock.active = None;
                 data.lock.suppressed_until = 0;
@@ -1165,6 +1291,9 @@ impl AppData {
                 {
                     self.tasks.push(Task {
                         id: id(),
+                        template_id: None,
+                        node_id: None,
+                        recurring: false,
                         title: title.into(),
                         notes: notes.into(),
                         project_id: self.projects.get(index).map(|p| p.id.clone()),
@@ -1184,17 +1313,21 @@ impl AppData {
                         created_at: at + index as i64,
                         tags: vec!["示例".into()],
                         subtasks: vec![],
-                        repeat: Repeat::None,
-                        next_task_id: None,
                     });
                 }
             }
         }
+        self.bind_nodes(at);
+        self.validate()?;
+        self.tick_nodes(at);
         self.validate()
     }
 
     pub fn validate(&self) -> AppResult<()> {
         self.lock.validate()?;
+        templates::validate(self)?;
+        nodes::validate(self)?;
+        identities::validate(self)?;
         fn ensure(ok: bool, message: &str) -> AppResult<()> {
             if ok {
                 Ok(())
@@ -1202,7 +1335,7 @@ impl AppData {
                 Err(message.into())
             }
         }
-        ensure(self.version == 1, "不支持此数据版本")?;
+        ensure(self.version == 3, "不支持此数据版本")?;
         ensure(
             self.tasks.len() <= 50_000
                 && self.sessions.len() <= 200_000
@@ -1252,20 +1385,6 @@ impl AppData {
                 !g.name.trim().is_empty() && g.name.chars().count() <= 40,
                 "目标名称需为 1–40 个字符",
             )?;
-            ensure(
-                g.target.is_finite() && g.target > 0.0 && g.target <= 1_000_000.0,
-                "目标量需为正数",
-            )?;
-            ensure(
-                !g.unit.trim().is_empty() && g.unit.chars().count() <= 10,
-                "目标单位需为 1–10 个字符",
-            )?;
-            ensure(
-                g.due_date.as_ref().is_none_or(|d| {
-                    d.len() == 10 && NaiveDate::parse_from_str(d, "%Y-%m-%d").is_ok()
-                }),
-                "无效的目标日期",
-            )?;
         }
         let mut habit_ids = HashSet::new();
         ensure(self.habits.len() <= 500, "习惯数量超出限制")?;
@@ -1275,10 +1394,6 @@ impl AppData {
                 "习惯 ID 重复或为空",
             )?;
             habits::validate(h)?;
-            ensure(
-                h.project_id.as_ref().is_none_or(|p| ids.contains(p)),
-                "习惯引用了不存在的项目",
-            )?;
         }
         let mut vision_ids = HashSet::new();
         ensure(self.visions.len() <= 500, "愿景数量超出限制")?;
@@ -1340,17 +1455,13 @@ impl AppData {
                 t.habit_id.as_ref().is_none_or(|h| habit_ids.contains(h)),
                 "任务引用了不存在的习惯",
             )?;
-            // Repeating and rolling over must never combine: the pair would pile
-            // up every failed instance forever. Repetition belongs to habits,
-            // which expire instead of rolling over.
             ensure(
-                !(t.goal_id.is_some() && t.repeat != Repeat::None),
-                "目标管辖的任务不能重复；重复的例行事项请建成习惯",
+                !(t.goal_id.is_some() && t.habit_id.is_some()),
+                "目标与习惯组不能同时管辖实例",
             )?;
-            // Timed is a necessary condition for both jurisdictions.
             ensure(
-                !(t.goal_id.is_some() && t.reminder_time.is_none()),
-                "目标管辖的任务需要精确时间",
+                t.habit_id.is_none() || t.reminder_time.is_some(),
+                "习惯实例需要精确时间",
             )?;
             ensure(
                 t.due_date.as_ref().is_none_or(|d| {
@@ -1492,12 +1603,13 @@ impl Engine {
         let raw = conn.query_row("SELECT data FROM app_state WHERE id=1", [], |r| {
             r.get::<_, String>(0)
         });
-        let data = match raw {
+        let mut data = match raw {
             Ok(raw) => serde_json::from_str::<AppData>(&raw)
                 .map_err(|e| format!("数据读取失败，原文件已保留：{e}"))?,
             Err(rusqlite::Error::QueryReturnedNoRows) => AppData::default(),
             Err(e) => return Err(e.to_string()),
         };
+        identities::reconcile(&data.clone(), &mut data, None)?;
         data.validate()?;
         let engine = Self { conn, data };
         engine.persist(&engine.data)?;
@@ -1509,8 +1621,25 @@ impl Engine {
         Ok(())
     }
     pub fn dispatch(&mut self, action: Action, at: i64) -> AppResult<Snapshot> {
+        let restore_id = match &action {
+            Action::RestoreTask { task } => {
+                let record = self
+                    .data
+                    .identities
+                    .iter()
+                    .find(|r| r.id == task.id && r.retired && r.kind == "task")
+                    .ok_or("没有对应的原任务恢复记录")?;
+                if record.restore_task.as_ref() != serde_json::to_string(task).ok().as_ref() {
+                    return Err("恢复内容与原任务不一致，历史 ID 不能复用".into());
+                }
+                Some(task.id.clone())
+            }
+            _ => None,
+        };
         let mut next = self.data.clone();
         next.apply(action, at)?;
+        identities::reconcile(&self.data, &mut next, restore_id.as_deref())?;
+        next.validate()?;
         self.persist(&next)?;
         self.data = next;
         self.snapshot(at)
@@ -1518,11 +1647,13 @@ impl Engine {
     pub fn snapshot(&mut self, at: i64) -> AppResult<Snapshot> {
         let mut next = self.data.clone();
         if next.tick(at) {
+            identities::reconcile(&self.data, &mut next, None)?;
             next.validate()?;
             self.persist(&next)?;
             self.data = next;
         }
         Ok(Snapshot {
+            node_progress: self.data.all_node_progress(),
             remaining_secs: self.data.timer.remaining(at),
             stats: self.data.stats(at),
             data: self.data.clone(),
@@ -1538,3 +1669,9 @@ impl Engine {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod template_tests;
+
+#[cfg(test)]
+mod node_tests;

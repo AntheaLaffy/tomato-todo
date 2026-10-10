@@ -1,13 +1,16 @@
 {
   "format": "tomato-todo-plan",
-  "version": 1,
+  "version": 4,
   "pomodoroMinutes": 25,
   "projects": [
     {
       "id": "example-self-study",
       "name": "自主学习",
       "color": "#849b7d",
-      "appWhitelist": ["org.mozilla.firefox", "example.dictionary"]
+      "appWhitelist": [
+        "org.mozilla.firefox",
+        "example.dictionary"
+      ]
     }
   ],
   "tasks": [
@@ -19,12 +22,63 @@
       "dueDate": null,
       "priority": 2,
       "estimate": 2,
-      "tags": ["练习"],
-      "subtasks": [
-        { "id": "attempt", "title": "先独立完成练习" },
-        { "id": "review", "title": "记录错因并复述方法" }
+      "tags": [
+        "练习"
       ],
-      "repeat": "none"
+      "subtasks": [
+        {
+          "id": "attempt",
+          "title": "先独立完成练习"
+        },
+        {
+          "id": "review",
+          "title": "记录错因并复述方法"
+        }
+      ],
+      "templateId": "example-practice-template",
+      "scrapMinutes": 30,
+      "recurring": false
     }
-  ]
+  ],
+  "templates": [
+    {
+      "id": "example-practice-template",
+      "shape": {
+        "title": "完成一章练习并复盘",
+        "notes": "先独立练习，再核对答案和记录错因。日期可按自己的安排填写。",
+        "projectId": "example-self-study",
+        "priority": 2,
+        "estimate": 2,
+        "tags": [
+          "练习"
+        ],
+        "subtasks": [
+          {
+            "id": "attempt",
+            "title": "先独立完成练习"
+          },
+          {
+            "id": "review",
+            "title": "记录错因并复述方法"
+          }
+        ],
+        "scrapMinutes": 30
+      },
+      "printing": {
+        "kind": "once",
+        "date": null,
+        "time": null
+      },
+      "automatic": false,
+      "printAheadDays": 7
+    }
+  ],
+  "prints": [
+    {
+      "templateId": "example-practice-template",
+      "date": null
+    }
+  ],
+  "goals": [],
+  "habits": []
 }
