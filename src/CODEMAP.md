@@ -1,6 +1,6 @@
 ---
 mode: maintenance
-generated_at: 2026-10-09
+generated_at: 2026-10-10
 ---
 
 奶油白与番茄红的桌面界面；业务状态通过 Rust 命令更新。
@@ -10,6 +10,7 @@ generated_at: 2026-10-09
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
 | 调整页面布局 | 界面 | main.ts.analysis.md、style.css.analysis.md | — |
+| 任务到点提醒 | 界面 | main.ts 的 pendingReminder/reminderBanner/taskDialog | Rust reminders.rs、桌面轮询 |
 | 修改任务字段 | 契约 | types.ts、main.ts 的 taskDialog | crates/core/src/lib.rs |
 | 修改备份流程 | 桥接 | api.ts | main.ts 的 importBackup、Rust Import Action |
 | 修改计划文件流程 | 桥接 | api.ts、types.ts、main.ts 的 importPlan | crates/core/src/plan.rs、docs/CODEMAP.md、桌面/预览适配层 |

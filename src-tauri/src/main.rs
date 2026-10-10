@@ -159,6 +159,7 @@ fn main() {
             desktop::setup(app.handle(), background).map_err(std::io::Error::other)?;
             let handle = app.handle().clone();
             let mut serial = initial.data.timer.completion_serial;
+            let mut reminded: Option<String> = None;
             let mut locked = false;
             let mut was_protected = false;
             std::thread::spawn(move || loop {
@@ -167,6 +168,24 @@ fn main() {
                 let Some(s) = snapshot else {
                     continue;
                 };
+                let pending = s
+                    .data
+                    .pending_reminder()
+                    .map(|t| format!("{}/{:?}/{:?}", t.id, t.due_date, t.reminder_time));
+                if pending != reminded {
+                    if let Some(t) = s.data.pending_reminder() {
+                        desktop::show(&handle);
+                        if s.data.settings.notifications {
+                            let _ = handle
+                                .notification()
+                                .builder()
+                                .title("任务到时间了")
+                                .body(&t.title)
+                                .show();
+                        }
+                    }
+                    reminded = pending;
+                }
                 desktop::update_tray(&handle, &s);
                 let protect = s.data.protected();
                 let entering = protect && !was_protected;

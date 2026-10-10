@@ -23,6 +23,10 @@ export interface Task {
   notes: string;
   projectId: string | null;
   dueDate: string | null;
+  reminderTime: string | null;
+  focusMinutes: number | null;
+  reminderFired: boolean;
+  reminderPending: boolean;
   priority: number;
   estimate: number;
   completed: boolean;
@@ -99,7 +103,7 @@ export interface AppData {
 }
 export interface PlanFile {
   format: "tomato-todo-plan";
-  version: 1;
+  version: 1 | 2;
   pomodoroMinutes: number;
   projects: PlanProject[];
   tasks: {
@@ -108,6 +112,8 @@ export interface PlanFile {
     notes?: string;
     projectId?: string | null;
     dueDate?: string | null;
+    reminderTime?: string | null;
+    focusMinutes?: number | null;
     priority?: number;
     estimate?: number;
     tags?: string[];

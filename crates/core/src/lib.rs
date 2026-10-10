@@ -10,6 +10,7 @@ use uuid::Uuid;
 pub mod guard;
 pub mod lock;
 pub mod plan;
+pub mod reminders;
 
 pub type AppResult<T> = Result<T, String>;
 fn id() -> String {
@@ -55,8 +56,16 @@ pub struct Task {
     pub notes: String,
     pub project_id: Option<String>,
     pub due_date: Option<String>,
+    #[serde(default)]
+    pub reminder_time: Option<String>,
+    #[serde(default)]
+    pub focus_minutes: Option<u32>,
     pub priority: u8,
     pub estimate: u32,
+    #[serde(default)]
+    pub reminder_fired: bool,
+    #[serde(default)]
+    pub reminder_pending: bool,
     pub completed: bool,
     pub completed_at: Option<i64>,
     pub created_at: i64,
@@ -87,6 +96,10 @@ pub struct TaskDraft {
     pub notes: String,
     pub project_id: Option<String>,
     pub due_date: Option<String>,
+    #[serde(default)]
+    pub reminder_time: Option<String>,
+    #[serde(default)]
+    pub focus_minutes: Option<u32>,
     #[serde(default)]
     pub priority: u8,
     #[serde(default = "default_estimate")]
@@ -277,6 +290,9 @@ impl Default for AppData {
     rename_all_fields = "camelCase"
 )]
 pub enum Action {
+    StartReminder {
+        id: String,
+    },
     SaveTask {
         task: TaskDraft,
     },
@@ -397,7 +413,12 @@ impl AppData {
     }
     fn duration(&self, mode: Mode) -> u32 {
         60 * match mode {
-            Mode::Focus => self.settings.focus_minutes,
+            Mode::Focus => self
+                .tasks
+                .iter()
+                .find(|t| Some(&t.id) == self.timer.task_id.as_ref())
+                .and_then(|t| t.focus_minutes)
+                .unwrap_or(self.settings.focus_minutes),
             Mode::ShortBreak => self.settings.short_break_minutes,
             Mode::LongBreak => self.settings.long_break_minutes,
         }
@@ -411,6 +432,21 @@ impl AppData {
         self.timer.started_at = None;
     }
     fn start(&mut self, at: i64) {
+        if self.timer.mode == Mode::Focus {
+            if self.timer.started_at.is_none()
+                && !self.timer.running
+                && self.timer.remaining_secs == self.timer.duration_secs
+            {
+                self.reset_to(Mode::Focus);
+            }
+            if let Some(t) = self
+                .tasks
+                .iter_mut()
+                .find(|t| Some(&t.id) == self.timer.task_id.as_ref())
+            {
+                t.reminder_pending = false;
+            }
+        }
         if !self.timer.running {
             self.timer.started_at.get_or_insert(at);
             self.timer.deadline = Some(at + self.timer.remaining_secs as i64);
@@ -442,6 +478,10 @@ impl AppData {
     }
     /// Advance at most one phase after downtime: never fabricate unattended focus sessions.
     pub fn tick(&mut self, at: i64) -> bool {
+        let changed = self.tick_with_lock(at);
+        self.tick_reminders(at) || changed
+    }
+    fn tick_with_lock(&mut self, at: i64) -> bool {
         let previous = serde_json::to_value(&self.lock).ok();
         if self.lock.active.as_ref().is_some_and(|a| at >= a.ends_at) {
             self.lock.active = None;
@@ -514,6 +554,20 @@ impl AppData {
             return Err("专注保护中，结束前不能修改任务或计时；如有急事请使用紧急退出".into());
         }
         match action {
+            Action::StartReminder { id } => {
+                if !self.reminder_idle() {
+                    return Err("请先结束当前计时".into());
+                }
+                let t = self
+                    .tasks
+                    .iter_mut()
+                    .find(|t| t.id == id && !t.completed && t.reminder_pending)
+                    .ok_or("提醒已失效")?;
+                t.reminder_pending = false;
+                self.timer.task_id = Some(id);
+                self.reset_to(Mode::Focus);
+                self.start(at);
+            }
             Action::EmergencyUnlock => {
                 self.record(at, false);
                 self.reset_to(Mode::Focus);
@@ -555,6 +609,18 @@ impl AppData {
                     title: d.title.trim().into(),
                     notes: d.notes,
                     project_id: d.project_id,
+                    reminder_fired: old.is_some_and(|t| {
+                        t.due_date == d.due_date
+                            && t.reminder_time == d.reminder_time
+                            && t.reminder_fired
+                    }),
+                    reminder_pending: old.is_some_and(|t| {
+                        t.due_date == d.due_date
+                            && t.reminder_time == d.reminder_time
+                            && t.reminder_pending
+                    }),
+                    focus_minutes: d.focus_minutes,
+                    reminder_time: d.reminder_time,
                     due_date: d.due_date,
                     priority: d.priority,
                     estimate: d.estimate,
@@ -605,6 +671,8 @@ impl AppData {
                     upcoming.created_at = at;
                     upcoming.due_date = Some(next.to_string());
                     upcoming.next_task_id = None;
+                    upcoming.reminder_fired = false;
+                    upcoming.reminder_pending = false;
                     for sub in &mut upcoming.subtasks {
                         sub.id = id();
                         sub.done = false;
@@ -698,6 +766,7 @@ impl AppData {
                     return Err("请先结束当前计时，再切换专注任务".into());
                 }
                 self.timer.task_id = id;
+                self.reset_to(self.timer.mode);
             }
             Action::StartTimer => self.start(at),
             Action::PauseTimer => {
@@ -776,6 +845,10 @@ impl AppData {
                         notes: notes.into(),
                         project_id: self.projects.get(index).map(|p| p.id.clone()),
                         due_date: Some(today.clone()),
+                        reminder_time: None,
+                        focus_minutes: None,
+                        reminder_fired: false,
+                        reminder_pending: false,
                         priority,
                         estimate,
                         completed: false,
@@ -843,6 +916,7 @@ impl AppData {
         let projects = ids;
         let mut tasks = HashSet::new();
         for t in &self.tasks {
+            reminders::validate(t)?;
             ensure(
                 !t.id.is_empty() && tasks.insert(&t.id),
                 "任务 ID 重复或为空",

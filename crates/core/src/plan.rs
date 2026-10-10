@@ -36,6 +36,10 @@ pub struct PlanTask {
     pub project_id: Option<String>,
     #[serde(default)]
     pub due_date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reminder_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_minutes: Option<u32>,
     #[serde(default)]
     pub priority: u8,
     #[serde(default = "crate::default_estimate")]
@@ -63,6 +67,10 @@ impl PlanTask {
             notes: self.notes.clone(),
             project_id: self.project_id.clone(),
             due_date: self.due_date.clone(),
+            reminder_time: self.reminder_time.clone(),
+            focus_minutes: self.focus_minutes,
+            reminder_fired: false,
+            reminder_pending: false,
             priority: self.priority,
             estimate,
             completed: false,
@@ -86,7 +94,15 @@ impl PlanTask {
 
 impl PlanFile {
     pub fn validate(&self) -> AppResult<()> {
-        if self.format != "tomato-todo-plan" || self.version != 1 {
+        if self.version == 1
+            && self
+                .tasks
+                .iter()
+                .any(|t| t.focus_minutes.is_some() || t.reminder_time.is_some())
+        {
+            return Err("任务时间安排需要计划 v2".into());
+        }
+        if self.format != "tomato-todo-plan" || !matches!(self.version, 1 | 2) {
             return Err("不支持的计划格式或版本".into());
         }
         if !(1..=180).contains(&self.pomodoro_minutes) {
@@ -131,8 +147,11 @@ impl PlanFile {
         }
         let task_ids: HashSet<_> = data.tasks.iter().map(|t| &t.id).collect();
         for task in self.tasks.iter().filter(|t| !task_ids.contains(&t.id)) {
-            let estimate =
-                (task.estimate * self.pomodoro_minutes).div_ceil(data.settings.focus_minutes);
+            let estimate = if task.focus_minutes.is_some() {
+                task.estimate
+            } else {
+                (task.estimate * self.pomodoro_minutes).div_ceil(data.settings.focus_minutes)
+            };
             if estimate > 99 {
                 return Err(format!(
                     "任务“{}”换算后超过 99 个番茄，请先拆分任务",
@@ -159,6 +178,8 @@ impl AppData {
                 notes: t.notes.clone(),
                 project_id: t.project_id.clone(),
                 due_date: t.due_date.clone(),
+                reminder_time: t.reminder_time.clone(),
+                focus_minutes: t.focus_minutes,
                 priority: t.priority,
                 estimate: t.estimate,
                 tags: t.tags.clone(),
@@ -176,7 +197,7 @@ impl AppData {
         let used: HashSet<_> = tasks.iter().filter_map(|t| t.project_id.as_ref()).collect();
         PlanFile {
             format: "tomato-todo-plan".into(),
-            version: 1,
+            version: 2,
             pomodoro_minutes: self.settings.focus_minutes,
             projects: self
                 .projects

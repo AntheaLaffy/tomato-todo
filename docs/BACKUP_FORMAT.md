@@ -24,6 +24,8 @@
 
 历史记录包含 `id`、`taskId`（可空）、`taskTitle`、`projectName`、`startedAt`、`endedAt`、`durationSecs`（1—10800）、`completed`。开始和结束均为 Unix 秒，结束不能早于开始，ID 在历史中唯一。已删除任务可保留历史，故历史任务 ID 不强制要求仍在当前列表里。睡眠/小憩锁机不生成专注记录。
 
+任务可带 `reminderTime`（HH:MM/null，非空需要日期）、`focusMinutes`（1—180/null）、`reminderFired` 和 `reminderPending`（布尔值，缺省 false）。旧备份缺失时间字段时默认不提醒、使用全局时长；任务仍为统一类型。提醒状态随备份保存；当天未处理提醒在空闲后显示，过期提醒在下次轮询清除。
+
 ## 设置与严格模式
 
 `settings` 包含：

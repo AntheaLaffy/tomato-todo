@@ -1,6 +1,6 @@
 ---
 mode: maintenance
-generated_at: 2026-10-09
+generated_at: 2026-10-10
 ---
 
 真实后端、浏览器和隔离的原生桌面验证。
@@ -23,6 +23,6 @@ generated_at: 2026-10-09
 
 | File | Domain | Function |
 | --- | --- | --- |
-| integration.mjs | 验证 | 浏览器端到端覆盖、计划导出/文件导入/重复导入与截图 |
-| native.mjs | 验证 | 私有 D-Bus、托盘宿主、嵌套 niri + WebKitWebDriver 验证计划合并、严格到期、睡眠锁机与托盘定时唤回 |
+| integration.mjs | 验证 | 时间提醒、高亮、一键开始和浏览器端到端覆盖、计划导出/文件导入/重复导入与截图 |
+| native.mjs | 验证 | 私有 D-Bus、托盘宿主、嵌套 niri + WebKitWebDriver 验证计划合并、严格到期、睡眠锁机与托盘定时唤回与任务提醒 |
 | install.mjs | 验证 | 临时用户目录验证安装入口、DMS 配置保留及幂等性 |

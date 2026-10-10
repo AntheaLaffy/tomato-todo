@@ -37,11 +37,22 @@
       "$ref": "#/$defs/lock"
     }
   },
-  "required": ["version", "projects", "tasks", "settings", "timer", "sessions"],
+  "required": [
+    "version",
+    "projects",
+    "tasks",
+    "settings",
+    "timer",
+    "sessions"
+  ],
   "$defs": {
     "project": {
       "type": "object",
-      "required": ["id", "name", "color"],
+      "required": [
+        "id",
+        "name",
+        "color"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -149,7 +160,12 @@
           }
         },
         "repeat": {
-          "enum": ["none", "daily", "weekdays", "weekly"],
+          "enum": [
+            "none",
+            "daily",
+            "weekdays",
+            "weekly"
+          ],
           "default": "none"
         },
         "completed": {
@@ -181,12 +197,65 @@
               "type": "null"
             }
           ]
+        },
+        "reminderTime": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "default": null
+        },
+        "focusMinutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 180,
+          "default": null
+        },
+        "reminderFired": {
+          "type": "boolean",
+          "default": false
+        },
+        "reminderPending": {
+          "type": "boolean",
+          "default": false
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "reminderTime"
+            ],
+            "properties": {
+              "reminderTime": {
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "dueDate"
+            ],
+            "properties": {
+              "dueDate": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
     },
     "subtask": {
       "type": "object",
-      "required": ["id", "title", "done"],
+      "required": [
+        "id",
+        "title",
+        "done"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -247,7 +316,11 @@
           "type": "boolean"
         },
         "theme": {
-          "enum": ["light", "dark", "system"]
+          "enum": [
+            "light",
+            "dark",
+            "system"
+          ]
         },
         "protection": {
           "$ref": "#/$defs/protection"
@@ -271,7 +344,11 @@
       "type": "object",
       "properties": {
         "mode": {
-          "enum": ["off", "lock", "whitelist"]
+          "enum": [
+            "off",
+            "lock",
+            "whitelist"
+          ]
         },
         "whitelist": {
           "type": "array",
@@ -292,7 +369,11 @@
       "type": "object",
       "properties": {
         "mode": {
-          "enum": ["focus", "shortBreak", "longBreak"]
+          "enum": [
+            "focus",
+            "shortBreak",
+            "longBreak"
+          ]
         },
         "running": {
           "type": "boolean"
@@ -354,7 +435,11 @@
         "lastFinishedMode": {
           "anyOf": [
             {
-              "enum": ["focus", "shortBreak", "longBreak"]
+              "enum": [
+                "focus",
+                "shortBreak",
+                "longBreak"
+              ]
             },
             {
               "type": "null"
@@ -492,7 +577,14 @@
           "type": "boolean"
         }
       },
-      "required": ["id", "name", "start", "end", "days", "enabled"],
+      "required": [
+        "id",
+        "name",
+        "start",
+        "end",
+        "days",
+        "enabled"
+      ],
       "additionalProperties": false
     },
     "activeLock": {
@@ -518,7 +610,12 @@
           "type": "boolean"
         }
       },
-      "required": ["name", "startedAt", "endsAt", "strict"]
+      "required": [
+        "name",
+        "startedAt",
+        "endsAt",
+        "strict"
+      ]
     }
   }
 }

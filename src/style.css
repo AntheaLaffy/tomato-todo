@@ -2836,3 +2836,38 @@ main {
     grid-template-columns: 1fr;
   }
 }
+
+/* A reminder stays actionable without replacing an open editor. */
+.reminder-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 22px;
+  margin-bottom: 24px;
+  border: 2px solid var(--accent);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+}
+.reminder-banner h2 {
+  margin: 8px 0;
+}
+.reminder-banner p {
+  margin: 0;
+}
+.reminder-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.task-row.reminded {
+  box-shadow: inset 4px 0 var(--accent);
+  background: var(--accent-soft);
+}
+@media (max-width: 760px) {
+  .reminder-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

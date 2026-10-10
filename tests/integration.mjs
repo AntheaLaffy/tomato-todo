@@ -266,6 +266,34 @@ test(
         path: "artifacts/e2e-focus.png",
         fullPage: true,
       });
+      await page
+        .getByRole("button", { name: "新建任务 N", exact: true })
+        .click();
+      await page.locator("[name=title]").fill("时间明确的测试任务");
+      await page.locator("[name=focusMinutes]").fill("40");
+      await page.locator("[name=reminderTime]").fill("00:00");
+      await page.getByRole("button", { name: "创建任务", exact: true }).click();
+      const reminder = page.getByRole("region", { name: "任务时间提醒" });
+      await expect(reminder).toContainText("时间明确的测试任务");
+      await expect(reminder).toContainText("40 分钟专注");
+      await expect(page.locator(".task-row.reminded")).toHaveCount(1);
+      await page.screenshot({ path: "artifacts/reminder.png", fullPage: true });
+      await page.reload();
+      await expect(reminder).toBeVisible();
+      await page.getByRole("button", { name: "一键开始", exact: true }).click();
+      await expect(reminder).toHaveCount(0);
+      let reminderState = (await (await fetch(`${url}/api/snapshot`)).json())
+        .data;
+      assert.equal(reminderState.timer.running, true);
+      assert.equal(reminderState.timer.durationSecs, 2400);
+      assert.equal(reminderState.settings.focusMinutes, 30);
+      await fetch(`${url}/api/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "resetTimer" }),
+      });
+      await page.reload();
+      await expect(reminder).toHaveCount(0);
       assert.deepEqual(errors, []);
     } finally {
       await browser?.close();

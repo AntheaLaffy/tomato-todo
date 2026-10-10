@@ -376,6 +376,53 @@ try {
   await waitSelector("input[name=autostart]");
   await waitSelector("[data-action=export-plan]");
   await waitSelector("[data-action=import-plan]");
+  // Exercise reminder focus only in this private nested desktop.
+  assert.equal((await invoke("hide_to_tray")).error, undefined);
+  const reminderToday = (await invoke("snapshot")).value.today;
+  const reminderResult = await invoke("dispatch", {
+    action: {
+      type: "saveTask",
+      task: {
+        id: null,
+        title: "隔离桌面时间提醒",
+        projectId: null,
+        dueDate: reminderToday,
+        reminderTime: "00:00",
+        focusMinutes: 40,
+      },
+    },
+  });
+  assert.equal(reminderResult.error, undefined);
+  const reminderTask = reminderResult.value.data.tasks.find(
+    (t) => t.title === "隔离桌面时间提醒",
+  );
+  await until(
+    async () =>
+      (await invoke("plugin:window|is_visible", { label: "main" })).value ===
+      true,
+    "Reminder should reveal tray window",
+  );
+  await until(
+    async () =>
+      (await niri("FocusedWindow")).FocusedWindow?.app_id === "tomato-todo",
+    "Reminder should focus its window",
+  );
+  await waitSelector("[data-start-reminder]");
+  await writeFile(
+    "artifacts/native-reminder.png",
+    Buffer.from(await wd("/screenshot", null, "GET"), "base64"),
+  );
+  await click("[data-start-reminder]");
+  await until(
+    async () => (await invoke("snapshot")).value.data.timer.running,
+    "Reminder should start with one click",
+  );
+  assert.equal((await invoke("snapshot")).value.data.timer.durationSecs, 2400);
+  await invoke("dispatch", { action: { type: "resetTimer" } });
+  await invoke("dispatch", {
+    action: { type: "deleteTask", id: reminderTask.id },
+  });
+  await click("[data-page=settings]");
   const plan = JSON.parse(await readFile("docs/plan.example.json", "utf8"));
   const beforePlan = (await invoke("snapshot")).value.data;
   const importedPlan = await invoke("dispatch", {

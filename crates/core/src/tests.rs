@@ -322,7 +322,7 @@ fn plan_validation_and_conversion_fail_atomically() {
     plan.tasks[0].due_date = Some("2026-02-30".into());
     cases.push(plan);
     let mut plan = example_plan();
-    plan.version = 2;
+    plan.version = 3;
     cases.push(plan);
     let mut plan = example_plan();
     plan.pomodoro_minutes = 0;
@@ -629,6 +629,8 @@ fn draft() -> TaskDraft {
         notes: "".into(),
         project_id: None,
         due_date: None,
+        reminder_time: None,
+        focus_minutes: None,
         priority: 2,
         estimate: 2,
         tags: vec![],
@@ -785,4 +787,238 @@ fn deleting_project_preserves_tasks() {
         .unwrap();
     assert_eq!(e.data.tasks.len(), 1);
     assert!(e.data.tasks[0].project_id.is_none());
+}
+
+#[test]
+fn reminders_defer_during_focus_and_pause_then_start_atomically() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    let s = e
+        .dispatch(Action::SaveTask { task: d }, friday(8, 59))
+        .unwrap();
+    let id = s.data.tasks[0].id.clone();
+    assert!(!s.data.tasks[0].reminder_fired);
+    e.dispatch(Action::StartTimer, friday(8, 59)).unwrap();
+    let s = e.snapshot(friday(9, 0)).unwrap();
+    assert!(s.data.tasks[0].reminder_pending);
+    assert!(s.data.pending_reminder().is_none());
+    e.dispatch(Action::PauseTimer, friday(9, 0)).unwrap();
+    assert!(e
+        .dispatch(Action::StartReminder { id: id.clone() }, friday(9, 1))
+        .is_err());
+    let s = e.dispatch(Action::ResetTimer, friday(9, 1)).unwrap();
+    assert_eq!(s.data.pending_reminder().unwrap().id, id);
+    let s = e
+        .dispatch(Action::StartReminder { id: id.clone() }, friday(9, 1))
+        .unwrap();
+    assert!(s.data.timer.running);
+    assert_eq!(s.data.timer.task_id, Some(id));
+    assert!(!s.data.tasks[0].reminder_pending);
+}
+
+#[test]
+fn reminder_persists_reschedule_rearms_and_old_days_expire() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("reminders.sqlite3");
+    let mut e = Engine::open(&path).unwrap();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    let s = e
+        .dispatch(Action::SaveTask { task: d.clone() }, friday(9, 1))
+        .unwrap();
+    let id = s.data.tasks[0].id.clone();
+    assert!(s.data.pending_reminder().is_some());
+    // There is no dismiss action: an unhandled reminder stays pending, and
+    // that state survives a restart.
+    drop(e);
+    let mut e = Engine::open(&path).unwrap();
+    assert!(e
+        .snapshot(friday(9, 2))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_some());
+    // Rescheduling to a later time re-arms the reminder.
+    d.id = Some(id);
+    d.reminder_time = Some("10:00".into());
+    e.dispatch(Action::SaveTask { task: d }, friday(9, 2))
+        .unwrap();
+    assert!(e
+        .snapshot(friday(9, 30))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_none());
+    assert!(e
+        .snapshot(friday(10, 0))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_some());
+    // A new day clears yesterday's unhandled reminder.
+    assert!(e
+        .snapshot(friday(10, 0) + 86400)
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_none());
+}
+
+#[test]
+fn reminder_validation_and_lock_deferral() {
+    let mut e = engine();
+    for time in ["9:00", "24:00", "12:60", "早上", "aa:bb"] {
+        let mut d = draft();
+        d.due_date = Some("2026-10-09".into());
+        d.reminder_time = Some(time.into());
+        assert!(e
+            .dispatch(Action::SaveTask { task: d }, friday(8, 0))
+            .is_err());
+    }
+    let mut d = draft();
+    d.reminder_time = Some("09:00".into());
+    assert!(e
+        .dispatch(Action::SaveTask { task: d.clone() }, friday(8, 0))
+        .is_err());
+    d.due_date = Some("2026-10-09".into());
+    e.dispatch(Action::SaveTask { task: d }, friday(8, 59))
+        .unwrap();
+    e.dispatch(
+        Action::StartQuickLock {
+            minutes: 2,
+            strict: false,
+        },
+        friday(8, 59),
+    )
+    .unwrap();
+    assert!(e
+        .snapshot(friday(9, 0))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_none());
+    assert!(e
+        .snapshot(friday(9, 1))
+        .unwrap()
+        .data
+        .pending_reminder()
+        .is_some());
+}
+
+#[test]
+fn custom_duration_and_repeat_keep_schedule_without_changing_global_settings() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    d.focus_minutes = Some(40);
+    d.repeat = Repeat::Daily;
+    let s = e
+        .dispatch(Action::SaveTask { task: d }, friday(9, 0))
+        .unwrap();
+    let id = s.data.tasks[0].id.clone();
+    let s = e
+        .dispatch(Action::StartReminder { id: id.clone() }, friday(9, 0))
+        .unwrap();
+    assert_eq!(s.remaining_secs, 2400);
+    assert_eq!(s.data.settings.focus_minutes, 25);
+    e.dispatch(Action::ResetTimer, friday(9, 1)).unwrap();
+    let s = e.dispatch(Action::ToggleTask { id }, friday(9, 1)).unwrap();
+    let next = &s.data.tasks[1];
+    assert_eq!(next.focus_minutes, Some(40));
+    assert_eq!(next.reminder_time.as_deref(), Some("09:00"));
+    assert!(!next.reminder_fired);
+    assert!(!next.reminder_pending);
+    assert_eq!(next.due_date.as_deref(), Some("2026-10-10"));
+}
+
+#[test]
+fn v2_plan_preserves_schedule_and_duration_old_backups_remain_flexible() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    d.focus_minutes = Some(40);
+    let s = e
+        .dispatch(Action::SaveTask { task: d }, friday(8, 0))
+        .unwrap();
+    let mut plan = s.data.export_plan();
+    assert_eq!(plan.version, 2);
+    let imported = engine()
+        .dispatch(Action::ImportPlan { plan: plan.clone() }, friday(8, 0))
+        .unwrap();
+    let t = &imported.data.tasks[0];
+    assert_eq!(t.focus_minutes, Some(40));
+    assert_eq!(t.estimate, 2);
+    assert_eq!(t.reminder_time.as_deref(), Some("09:00"));
+    plan.version = 1;
+    assert!(plan.validate().is_err());
+    let mut json = serde_json::to_value(&s.data).unwrap();
+    let task = json["tasks"][0].as_object_mut().unwrap();
+    for key in [
+        "focusMinutes",
+        "reminderTime",
+        "reminderFired",
+        "reminderPending",
+    ] {
+        task.remove(key);
+    }
+    let old: AppData = serde_json::from_value(json).unwrap();
+    assert!(old.tasks[0].reminder_time.is_none());
+    assert!(old.tasks[0].focus_minutes.is_none());
+    old.validate().unwrap();
+}
+
+#[test]
+fn reminder_queue_and_completion_do_not_drop_other_tasks() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    e.dispatch(Action::SaveTask { task: d.clone() }, friday(8, 0))
+        .unwrap();
+    d.reminder_time = Some("09:01".into());
+    e.dispatch(Action::SaveTask { task: d }, friday(8, 0))
+        .unwrap();
+    let s = e.snapshot(friday(9, 2)).unwrap();
+    let id = s.data.pending_reminder().unwrap().id.clone();
+    let s = e.dispatch(Action::ToggleTask { id }, friday(9, 2)).unwrap();
+    assert_eq!(
+        s.data.pending_reminder().unwrap().reminder_time.as_deref(),
+        Some("09:01")
+    );
+    let mut bad = draft();
+    bad.focus_minutes = Some(0);
+    assert!(e
+        .dispatch(Action::SaveTask { task: bad }, friday(9, 2))
+        .is_err());
+}
+
+#[test]
+fn imported_partial_timer_keeps_remaining_time_and_defers_reminders() {
+    let mut e = engine();
+    let mut d = draft();
+    d.due_date = Some("2026-10-09".into());
+    d.reminder_time = Some("09:00".into());
+    let mut data = e
+        .dispatch(Action::SaveTask { task: d }, friday(8, 0))
+        .unwrap()
+        .data;
+    data.timer.remaining_secs = 6;
+    data.timer.started_at = None;
+    let s = e
+        .dispatch(
+            Action::Import {
+                data: Box::new(data),
+            },
+            friday(9, 0),
+        )
+        .unwrap();
+    assert!(s.data.pending_reminder().is_none());
+    let s = e.dispatch(Action::StartTimer, friday(9, 0)).unwrap();
+    assert_eq!(s.remaining_secs, 6);
+    assert!(!e.snapshot(friday(9, 0) + 6).unwrap().data.timer.running);
 }

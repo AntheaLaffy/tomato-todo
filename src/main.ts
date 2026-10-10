@@ -152,8 +152,9 @@ const logo = `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M
 let state: Snapshot;
 let page = "focus";
 let filter = "active";
+let reminderSeen = "";
 let priority = "all";
-let sort = "created";
+let sort = "time";
 let search = "";
 let immersive = false;
 let noiseKind = "off";
@@ -262,10 +263,29 @@ function accept(next: Snapshot) {
         : "休息结束，开始下一段专注吧。",
     );
   }
+  const reminder = pendingReminder();
+  const reminderKey = reminder
+    ? `${reminder.id}/${reminder.dueDate}/${reminder.reminderTime}`
+    : "";
+  const reveal = reminderKey && reminderKey !== reminderSeen;
+  reminderSeen = reminderKey;
+  if (reveal && !settingsDirty && !$("#modal-root").innerHTML) {
+    page = "focus";
+    immersive = false;
+  }
   serial = state.data.timer.completionSerial;
   applyTheme();
   if (changed && (protectedNow() || !(page === "settings" && settingsDirty)))
     render();
+  if (reveal) {
+    toast(`到时间了：${reminder!.title}`);
+    if (!settingsDirty && !$("#modal-root").innerHTML)
+      requestAnimationFrame(() =>
+        document
+          .querySelector(".reminder-banner")
+          ?.scrollIntoView({ block: "center" }),
+      );
+  }
   updateClock();
 }
 function applyTheme() {
@@ -333,7 +353,7 @@ function render() {
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.1</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar"><div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
-  <main>${page === "focus" ? focusPage() : page === "stats" ? statsPage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  <main>${reminderBanner()}${page === "focus" ? focusPage() : page === "stats" ? statsPage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
   bindForms();
   icons();
   updateClock();
@@ -355,6 +375,28 @@ function metric(
   color: string,
 ) {
   return `<div class="metric"><span class="metric-icon ${color}">${icon(iconName)}</span><div><p>${label}</p><div class="metric-value">${value}<small>${unit}</small></div></div><span class="metric-detail">${detail}</span></div>`;
+}
+function pendingReminder() {
+  if (
+    !state ||
+    state.data.timer.running ||
+    state.data.timer.startedAt !== null ||
+    state.data.timer.remainingSecs !== state.data.timer.durationSecs ||
+    state.data.lock.active
+  )
+    return undefined;
+  return state.data.tasks
+    .filter((t) => !t.completed && t.reminderPending)
+    .sort((a, b) =>
+      `${a.dueDate} ${a.reminderTime} ${a.id}`.localeCompare(
+        `${b.dueDate} ${b.reminderTime} ${b.id}`,
+      ),
+    )[0];
+}
+function reminderBanner() {
+  const t = pendingReminder();
+  if (!t) return "";
+  return `<section class="reminder-banner" role="region" aria-label="任务时间提醒"><div><small>${escape(t.reminderTime)} · ${t.focusMinutes || state.data.settings.focusMinutes} 分钟专注</small><h2>${escape(t.title)}</h2><p>到计划时间了，准备好就开始吧。</p></div><div class="reminder-actions"><button class="button primary" data-start-reminder="${escape(t.id)}">${icon("play")} 一键开始</button></div></section>`;
 }
 function focusPage() {
   const s = state.stats;
@@ -387,8 +429,14 @@ function taskList(tasks: Task[], compact = false) {
   const items = [...tasks].sort((a, b) =>
     sort === "priority"
       ? b.priority - a.priority
-      : sort === "due"
-        ? (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
+      : sort === "time"
+        ? (a.dueDate || "9999-12-31").localeCompare(
+            b.dueDate || "9999-12-31",
+          ) ||
+          (a.reminderTime || "99:99").localeCompare(
+            b.reminderTime || "99:99",
+          ) ||
+          a.createdAt - b.createdAt
         : a.createdAt - b.createdAt,
   );
   if (!items.length)
@@ -398,7 +446,7 @@ function taskList(tasks: Task[], compact = false) {
       const p = projectOf(task),
         done = completedPomodoros(task),
         selected = task.id === state.data.timer.taskId;
-      return `<article class="task-row ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}"><button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}">${task.completed ? icon("check") : ""}</button><button class="task-body" data-edit-task="${task.id}"><span class="task-title">${escape(task.title)}</span><span class="task-meta">${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.repeat !== "none" ? `<span>${icon("refresh-cw")}${{ daily: "每天", weekdays: "工作日", weekly: "每周" }[task.repeat]}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${!task.completed ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button></div></article>`;
+      return `<article data-task-id="${escape(task.id)}" class="task-row ${task.reminderPending ? "reminded" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}"><button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}">${task.completed ? icon("check") : ""}</button><button class="task-body" data-edit-task="${task.id}"><span class="task-title">${escape(task.title)}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.repeat !== "none" ? `<span>${icon("refresh-cw")}${{ daily: "每天", weekdays: "工作日", weekly: "每周" }[task.repeat]}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${!task.completed ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button></div></article>`;
     })
     .join("");
 }
@@ -446,7 +494,7 @@ function tasksPage() {
     )
     .join(
       "",
-    )}</select><select id="task-sort" aria-label="排序"><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="due" ${sort === "due" ? "selected" : ""}>截止日期</option></select>${project ? `<button class="icon-btn" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>` : ""}</div></div><div id="tasks-results">${page === "planned" ? groupedTasks(tasks) : taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>`;
+    )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${project ? `<button class="icon-btn" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>` : ""}</div></div><div id="tasks-results">${page === "planned" ? groupedTasks(tasks) : taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>`;
 }
 function groupedTasks(tasks: Task[]) {
   if (!tasks.length) return taskList([]);
@@ -743,7 +791,7 @@ function taskDialog(id?: string) {
     task?.projectId || (page.startsWith("project:") ? page.slice(8) : "");
   const subs = task?.subtasks.map((s) => ({ ...s })) || [];
   modal(
-    `${modalHeader(task ? "编辑任务" : "种下一个小目标", "把事情写下来，就已经开始了。")}<form id="task-form"><label class="form-field"><span>任务名称</span><input name="title" placeholder="你想完成什么？" maxlength="200" required autofocus value="${escape(task?.title)}"></label><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">收件箱 · 不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>优先级</span><select name="priority">${[
+    `${modalHeader(task ? "编辑任务" : "种下一个小目标", "把事情写下来，就已经开始了。")}<form id="task-form"><label class="form-field"><span>任务名称</span><input name="title" placeholder="你想完成什么？" maxlength="200" required autofocus value="${escape(task?.title)}"></label><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">收件箱 · 不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>提醒时间 <small>可选，到点唤出任务</small></span><input name="reminderTime" type="time" value="${escape(task?.reminderTime)}"></label><label class="form-field"><span>单次专注时长 <small>可选，留空跟随全局设置</small></span><input name="focusMinutes" type="number" min="1" max="180" placeholder="${state.data.settings.focusMinutes} 分钟" value="${task?.focusMinutes || ""}"></label><label class="form-field"><span>优先级</span><select name="priority">${[
       [0, "无优先级"],
       [1, "低优先级"],
       [2, "中优先级"],
@@ -755,7 +803,7 @@ function taskDialog(id?: string) {
       )
       .join(
         "",
-      )}</select></label><label class="form-field"><span>预计番茄数</span><input name="estimate" type="number" min="1" max="99" required value="${task?.estimate || 1}"></label></div><label class="form-field"><span>重复计划 <small>完成后自动创建下一次任务</small></span><select name="repeat">${[
+      )}</select></label><label class="form-field"><span>预计番茄数</span><input name="estimate" type="number" min="1" max="99" required value="${task?.estimate || 1}"></label></div><p class="subtle small">时间要求明确时填写提醒时间与单次时长；灵活任务留空即可，不会自动唤出窗口。提醒需要计划日期，重复任务沿用此时间。</p><label class="form-field"><span>重复计划 <small>完成后自动创建下一次任务</small></span><select name="repeat">${[
       ["none", "不重复"],
       ["daily", "每天"],
       ["weekdays", "工作日"],
@@ -825,6 +873,10 @@ function taskDialog(id?: string) {
           notes: f.get("notes"),
           projectId: f.get("projectId") || null,
           dueDate: f.get("dueDate") || null,
+          reminderTime: f.get("reminderTime") || null,
+          focusMinutes: f.get("focusMinutes")
+            ? Number(f.get("focusMinutes"))
+            : null,
           priority: Number(f.get("priority")),
           estimate: Number(f.get("estimate")),
           repeat: f.get("repeat"),
@@ -1189,12 +1241,12 @@ async function importPlan() {
     if (!plan) return;
     if (
       plan.format !== "tomato-todo-plan" ||
-      plan.version !== 1 ||
+      ![1, 2].includes(plan.version) ||
       !Array.isArray(plan.tasks) ||
       !Array.isArray(plan.projects)
     ) {
       throw new Error(
-        "请选择 tomato-todo-plan v1 计划文件；完整备份请使用“导入备份”。",
+        "请选择 tomato-todo-plan v1/v2 计划文件；完整备份请使用“导入备份”。",
       );
     }
     const existing = new Set(state.data.tasks.map((t) => t.id));
@@ -1204,7 +1256,7 @@ async function importPlan() {
     ).length;
     confirmDialog(
       "合并学习计划？",
-      `文件含 ${plan.tasks.length} 个任务，预计新增 ${added} 个。同 ID 的已有任务和进度保留；新任务从未完成开始。预计番茄数按当前 ${state.data.settings.focusMinutes} 分钟向上折算，设置和专注记录保留。${whitelisted ? `文件里 ${whitelisted} 个项目的应用白名单会覆盖本机同名项目。` : ""}`,
+      `文件含 ${plan.tasks.length} 个任务，预计新增 ${added} 个。同 ID 的已有任务和进度保留；新任务从未完成开始。指定单次时长的任务保持其安排，其余预计番茄数按当前 ${state.data.settings.focusMinutes} 分钟向上折算，设置和专注记录保留。${whitelisted ? `文件里 ${whitelisted} 个项目的应用白名单会覆盖本机同名项目。` : ""}`,
       "导入计划",
       async () => {
         await act({ type: "importPlan", plan }, "学习计划已合并");
@@ -1218,6 +1270,11 @@ document.addEventListener("click", async (e) => {
   const el = (e.target as Element).closest<HTMLElement>("button");
   if (!el || el.hasAttribute("disabled")) return;
   const d = el.dataset;
+  if (d.startReminder) {
+    if (await act({ type: "startReminder", id: d.startReminder }))
+      navigate("focus");
+    return;
+  }
   if (d.page) {
     navigate(d.page);
     return;
