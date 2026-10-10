@@ -460,6 +460,44 @@ fn plan_import_updates_configuration_while_keeping_progress() {
 }
 
 #[test]
+fn plan_replace_removes_unplanned_incomplete_tasks_but_keeps_history() {
+    let mut e = engine();
+    let mut a = draft();
+    a.title = "保留".into();
+    a.due_date = Some("2026-10-12".into());
+    let mut b = draft();
+    b.title = "已完成".into();
+    b.due_date = Some("2026-10-13".into());
+    e.dispatch(Action::SaveTask { task: a }, 1000).unwrap();
+    let s = e.dispatch(Action::SaveTask { task: b }, 1001).unwrap();
+    let keep = s
+        .data
+        .tasks
+        .iter()
+        .find(|t| t.title == "保留")
+        .unwrap()
+        .id
+        .clone();
+    let done = s
+        .data
+        .tasks
+        .iter()
+        .find(|t| t.title == "已完成")
+        .unwrap()
+        .id
+        .clone();
+    e.dispatch(Action::ToggleTask { id: done.clone() }, 1002)
+        .unwrap();
+    let mut plan = e.snapshot(1003).unwrap().data.export_plan();
+    // A full-plan file that forgots the incomplete task must remove it.
+    plan.tasks.retain(|t| t.id != keep);
+    plan.replace = true;
+    let s = e.dispatch(Action::ImportPlan { plan }, 1004).unwrap();
+    assert!(!s.data.tasks.iter().any(|t| t.id == keep));
+    assert!(s.data.tasks.iter().any(|t| t.id == done));
+}
+
+#[test]
 fn effective_whitelist_prefers_project_list_over_global() {
     let mut e = engine();
     let mut settings = Settings::default();

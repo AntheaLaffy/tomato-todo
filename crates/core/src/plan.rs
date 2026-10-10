@@ -23,6 +23,15 @@ pub struct PlanFile {
     pub goals: Vec<PlanGoal>,
     #[serde(default)]
     pub habits: Vec<Habit>,
+    /// When true the file is the whole plan: incomplete instances, goals,
+    /// templates and habits it does not mention are removed. Progress and fixed
+    /// verdicts are never touched.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub replace: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -362,6 +371,110 @@ impl PlanFile {
         }
         next.node_bindings
             .retain(|b| !released.contains(&b.task_id));
+        if self.replace {
+            // The file is the whole plan. Drop the incomplete things it no longer
+            // names, but never history: completed instances and fixed verdicts stay.
+            let planned_tasks: HashSet<&str> = self.tasks.iter().map(|t| t.id.as_str()).collect();
+            let decided: HashSet<String> = next
+                .goals
+                .iter()
+                .flat_map(|g| g.nodes.iter())
+                .filter(|n| n.result.is_some())
+                .map(|n| n.spec.id.clone())
+                .collect();
+            let mut removed_tasks: Vec<String> = Vec::new();
+            next.tasks.retain(|t| {
+                if planned_tasks.contains(t.id.as_str())
+                    || t.completed
+                    || t.node_id.as_ref().is_some_and(|id| decided.contains(id))
+                {
+                    return true;
+                }
+                removed_tasks.push(t.id.clone());
+                false
+            });
+            next.node_bindings
+                .retain(|b| !removed_tasks.contains(&b.task_id));
+            let planned_goals: HashSet<&str> = self.goals.iter().map(|g| g.id.as_str()).collect();
+            let removed_goals: Vec<String> = next
+                .goals
+                .iter()
+                .filter(|g| {
+                    !planned_goals.contains(g.id.as_str())
+                        && !g.nodes.iter().any(|n| n.result.is_some() || n.emitted)
+                        && !next.node_bindings.iter().any(|b| b.goal_id == g.id)
+                })
+                .map(|g| g.id.clone())
+                .collect();
+            if !removed_goals.is_empty() {
+                next.goals.retain(|g| !removed_goals.contains(&g.id));
+                for task in &mut next.tasks {
+                    if task
+                        .goal_id
+                        .as_ref()
+                        .is_some_and(|id| removed_goals.contains(id))
+                    {
+                        task.goal_id = None;
+                        task.node_id = None;
+                    }
+                }
+                for template in &mut next.templates {
+                    if template
+                        .shape
+                        .goal_id
+                        .as_ref()
+                        .is_some_and(|id| removed_goals.contains(id))
+                    {
+                        template.shape.goal_id = None;
+                    }
+                }
+                next.visions.retain(|v| {
+                    !v.goal_id
+                        .as_ref()
+                        .is_some_and(|id| removed_goals.contains(id))
+                });
+            }
+            let planned_habits: HashSet<&str> = self.habits.iter().map(|h| h.id.as_str()).collect();
+            let removed_habits: Vec<String> = next
+                .habits
+                .iter()
+                .filter(|h| !planned_habits.contains(h.id.as_str()))
+                .map(|h| h.id.clone())
+                .collect();
+            if !removed_habits.is_empty() {
+                next.habits.retain(|h| !removed_habits.contains(&h.id));
+                for task in &mut next.tasks {
+                    if task
+                        .habit_id
+                        .as_ref()
+                        .is_some_and(|id| removed_habits.contains(id))
+                    {
+                        task.habit_id = None;
+                    }
+                }
+                for template in &mut next.templates {
+                    if template
+                        .shape
+                        .habit_id
+                        .as_ref()
+                        .is_some_and(|id| removed_habits.contains(id))
+                    {
+                        template.shape.habit_id = None;
+                    }
+                }
+            }
+            let planned_templates: HashSet<&str> =
+                self.templates.iter().map(|t| t.id.as_str()).collect();
+            let removed_templates: Vec<String> = next
+                .templates
+                .iter()
+                .filter(|t| !planned_templates.contains(t.id.as_str()))
+                .map(|t| t.id.clone())
+                .collect();
+            for id in &removed_templates {
+                next.delete_template(id);
+            }
+        }
         next.validate()?;
         *data = next;
         Ok(())
@@ -413,6 +526,7 @@ impl AppData {
         PlanFile {
             format: "tomato-todo-plan".into(),
             version: 4,
+            replace: false,
             templates: self.templates.clone(),
             prints: self.prints.clone(),
             goals: self
