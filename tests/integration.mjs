@@ -1164,41 +1164,50 @@ test(
         d.setUTCDate(d.getUTCDate() + days);
         return d.toISOString().slice(0, 10);
       };
-      const field = (row, key) => row.locator(`[data-node-field="${key}"]`);
+      const field = (key) =>
+        page.locator(`#node-inspector [data-node-field="${key}"]`);
       await page.locator("[data-page=goals]").first().click();
       await page.getByRole("button", { name: "新建目标", exact: true }).click();
       await page.locator("#goal-form [name=name]").fill("节点验证组");
-      await page.locator("#add-mainline-node").click();
-      let row = page.locator("[data-node-row]").last();
-      await field(row, "name").fill("独立前置");
-      await field(row, "start").fill(`${date(0)}T00:00`);
-      await field(row, "end").fill(`${date(0)}T08:00`);
-      await field(row, "signalKind").selectOption("none");
-      await page.locator("#add-mainline-node").click();
-      row = page.locator("[data-node-row]").last();
-      await field(row, "name").fill("导学");
-      await field(row, "end").fill(`${date(1)}T00:00`);
-      await field(row, "signalKind").selectOption("success");
-      await field(row, "signalAt").fill(`${date(3)}T00:00`);
-      await row.locator("summary").filter({ hasText: "阻断外来" }).click();
-      await field(row, "blockFailure").selectOption("completed");
-      await field(row, "blockSuccess").selectOption("unpaired");
-      await page.locator("#add-mainline-node").click();
-      row = page.locator("[data-node-row]").last();
-      await field(row, "name").fill("验收结束");
-      await field(row, "end").fill(`${date(2)}T00:00`);
-      await field(row, "signalKind").selectOption("failure");
-      await field(row, "direction").selectOption("head");
-      await field(row, "condition").selectOption("completed");
-      await field(row, "signalAt").fill(`${date(-1)}T00:00`);
-      await row.locator("summary").filter({ hasText: "阶段完成要求" }).click();
-      await field(row, "confirmationRequired").check();
+      const addNode = () => page.locator(".node-add.tail").click();
+      await addNode();
+      await field("name").fill("独立前置");
+      await field("start").fill(`${date(0)}T00:00`);
+      await field("end").fill(`${date(0)}T08:00`);
+      await field("signalKind").selectOption("none");
+      await addNode();
+      await field("name").fill("导学");
+      await field("end").fill(`${date(1)}T00:00`);
+      await field("signalKind").selectOption("success");
+      await field("signalAt").fill(`${date(3)}T00:00`);
+      await page
+        .locator("#node-inspector summary")
+        .filter({ hasText: "阻断外来" })
+        .click();
+      await field("blockFailure").selectOption("completed");
+      await field("blockSuccess").selectOption("unpaired");
+      await addNode();
+      await field("name").fill("验收结束");
+      await field("end").fill(`${date(2)}T00:00`);
+      await field("signalKind").selectOption("failure");
+      await field("direction").selectOption("head");
+      await field("condition").selectOption("completed");
+      await field("signalAt").fill(`${date(-1)}T00:00`);
+      await page
+        .locator("#node-inspector summary")
+        .filter({ hasText: "阶段完成要求" })
+        .click();
+      await field("confirmationRequired").check();
       await page.setViewportSize({ width: 360, height: 900 });
       await page.screenshot({
         path: join(dir, "node-editor-mobile.png"),
         fullPage: true,
       });
-      assert.ok(await row.evaluate((el) => el.scrollWidth <= el.clientWidth));
+      assert.ok(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      );
       await page.setViewportSize({ width: 1280, height: 1000 });
       await page.getByRole("button", { name: "保存目标", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -1286,12 +1295,9 @@ test(
       await page.getByRole("button", { name: "关闭", exact: true }).click();
       await card.locator("[data-edit-goal]").click();
       await page.locator("#goal-form [name=name]").fill("组改名");
-      await expect(
-        page.locator(`[data-node-row="${ids[2]}"] [data-node-field=start]`),
-      ).toBeDisabled();
-      await field(page.locator(`[data-node-row="${ids[2]}"]`), "name").fill(
-        "节点改名",
-      );
+      await page.locator(`[data-node-row="${ids[2]}"]`).click();
+      await expect(field("start")).toBeDisabled();
+      await field("name").fill("节点改名");
       await page.getByRole("button", { name: "保存目标", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       snapshot = await (await fetch(`${url}/api/snapshot`)).json();
@@ -1308,10 +1314,9 @@ test(
       await page.locator("[data-page=goals]").first().click();
       await page.getByRole("button", { name: "新建目标", exact: true }).click();
       await page.locator("#goal-form [name=name]").fill("末检查组");
-      await page.locator("#add-mainline-node").click();
-      row = page.locator("[data-node-row]");
-      await field(row, "name").fill("末节点");
-      await field(row, "signalAt").fill(`${date(-1)}T00:00`);
+      await page.locator(".node-add.tail").click();
+      await field("name").fill("末节点");
+      await field("signalAt").fill(`${date(-1)}T00:00`);
       await page.getByRole("button", { name: "保存目标", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       snapshot = await (await fetch(`${url}/api/snapshot`)).json();

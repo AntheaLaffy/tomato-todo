@@ -58,6 +58,7 @@ import {
 } from "lucide";
 import { listen } from "@tauri-apps/api/event";
 import { initPonder, openPonderList } from "./ponder";
+import { createNodeGraph } from "./nodegraph";
 import {
   desktop,
   dispatch,
@@ -2087,199 +2088,34 @@ function projectDialog(id?: string) {
         true,
       );
 }
-function nodeEditorHtml(
-  spec: NodeSpec,
-  runtime: MainlineNode | undefined,
-  last: boolean,
-) {
-  const locked = !!runtime?.result;
-  const field = (
-    key: string,
-    type: string,
-    value: string | number,
-    extra = "",
-  ) =>
-    `<input data-node-field="${key}" name="node${key}" type="${type}" value="${escape(String(value))}" ${extra}>`;
-  const options = <T extends string>(
-    entries: [T, string][],
-    selected: string,
-  ) =>
-    entries
-      .map(
-        ([key, label]) =>
-          `<option value="${key}" ${selected === key ? "selected" : ""}>${label}</option>`,
-      )
-      .join("");
-  const blocks = Object.entries(blockLabels) as [BlockRule, string][];
-  const signal = spec.signal;
-  return `<section class="node-editor" data-node-row="${escape(spec.id)}" data-locked="${locked}" data-last-end="${escape(spec.end)}"><div class="goal-head"><h3>阶段节点</h3><button type="button" class="icon-btn" data-remove-node ${runtime?.result || runtime?.emitted || (runtime && state.data.nodeBindings.some((b) => b.nodeId === spec.id)) || state.data.signalEvents.some((e) => e.deliveries.some((d) => d.nodeId === spec.id)) ? "disabled" : ""} aria-label="移除节点">${icon("x")}</button></div><label class="form-field"><span>节点名称</span>${field("name", "text", spec.name, 'required maxlength="80"')}</label><div class="form-grid"><label class="form-field"><span>配对起始时间</span>${field("start", "datetime-local", spec.start, "required")}</label><label class="form-field"><span>配对结束时间（不含）</span>${field("end", "datetime-local", spec.end, "required")}</label></div><details class="editor-details" ${spec.requiredTasks > 1 || spec.confirmationRequired ? "open" : ""}><summary>阶段完成要求 <small>默认配对任务全部完成</small></summary><label class="form-field"><span>至少配对几条任务</span>${field("requiredTasks", "number", spec.requiredTasks, 'min="1" max="50000" required')}<small>没有配对任务时不会视为完成；所有已配对任务都必须完成。</small></label><label class="setting-row"><span><strong>还需要手动确认阶段要求</strong><small>用于验收、考试或其他不能只靠任务勾选判断的要求。</small></span><input data-node-field="confirmationRequired" class="switch" type="checkbox" ${spec.confirmationRequired ? "checked" : ""}></label></details><label class="form-field"><span>发出的信号</span><select data-node-field="signalKind">${options([["none", "不发信号"], ["success", "裁定成功"], ["failure", "裁定失败"], ...(last ? ([["check", "末节点检查"]] as [string, string][]) : [])], signal?.kind ?? "none")}</select><small>成功或失败都会报废配对实例，裁定不可撤销。</small></label><div data-signal-controls><div class="form-grid"><label class="form-field"><span>何时发出</span>${field("signalAt", "datetime-local", signal?.at ?? spec.end, "required")}</label><label class="form-field"><span>传播方向</span><select data-node-field="direction">${options(
-    [
-      ["head", "向头节点"],
-      ["tail", "向尾节点"],
-    ],
-    signal?.direction ?? "head",
-  )}</select></label><label class="form-field"><span>到时还需满足</span><select data-node-field="condition">${options(
-    [
-      ["always", "不检查自身完成情况"],
-      ["completed", "自身节点已经完成"],
-      ["incomplete", "自身节点尚未完成"],
-    ],
-    signal?.condition ?? "always",
-  )}</select></label></div><details class="editor-details" ${spec.blockSuccess !== "never" || spec.blockFailure !== "never" ? "open" : ""}><summary>阻断外来报废信号 <small>成功与失败分别设置</small></summary><label class="form-field"><span>接收成功信号时</span><select data-node-field="blockSuccess">${options(blocks, spec.blockSuccess)}</select></label><label class="form-field"><span>接收失败信号时</span><select data-node-field="blockFailure">${options(blocks, spec.blockFailure)}</select></label><p class="subtle small">条件按本节点的配对及完成情况判断。自身信号和末节点检查始终接受。</p></details></div>${locked ? `<p class="editor-hint">已裁定${verdictLabel(runtime!.result!.verdict)}，只能改名，规则与范围已冻结。</p>` : runtime?.emitted ? '<p class="editor-hint">信号已发出，不能改写原信号。</p>' : ""}</section>`;
-}
 function goalDialog(id?: string) {
   const goal = state.data.goals.find((g) => g.id === id);
-  let specs = goal?.nodes.map((n) => structuredClone(n.spec)) ?? [];
+  const specs = goal?.nodes.map((n) => structuredClone(n.spec)) ?? [];
   modal(
-    `${modalHeader(goal ? "编辑目标组与主线" : "新建目标", "主线管理节点与裁定，实例仍由模板印刷。")}
-    <form id="goal-form"><label class="form-field"><span>任务组名称</span><input name="name" required maxlength="40" autofocus value="${escape(goal?.name)}" placeholder="例如：操作系统学习"></label>${goal ? `<details class="editor-details"><summary>永久配对标识符</summary><p class="identity-value">${escape(goal.id)}</p><p class="subtle small">改名和编辑主线都不会改变；删除后的 ID 也不能用于新建实体。</p></details>` : '<p class="editor-hint">保存时生成永久唯一的任务组标识符。</p>'}<div id="mainline-editor"></div><button type="button" id="add-mainline-node" class="text-button">${icon("plus")} 添加节点</button><p class="subtle small">按执行开始时间匹配，区间不重叠。到时未完成不会自行过期，只有信号能够裁定。</p><div class="modal-actions">${goal && !goal.nodes.some((n) => n.result || n.emitted) ? '<button type="button" class="text-button danger-text" id="delete-goal">删除目标组</button>' : "<span></span>"}<div><button type="button" class="button secondary" data-action="close-modal">取消</button><button type="submit" class="button primary">保存目标</button></div></div></form>`,
+    `${modalHeader(goal ? "编辑目标组与主线" : "新建目标", "点节点编辑，拖拽调整顺序；主线负责裁定，实例仍由模板印刷。")}
+    <form id="goal-form"><label class="form-field"><span>任务组名称</span><input name="name" required maxlength="40" autofocus value="${escape(goal?.name)}" placeholder="例如：操作系统学习"></label>${goal ? `<details class="editor-details"><summary>永久配对标识符</summary><p class="identity-value">${escape(goal.id)}</p><p class="subtle small">改名和编辑主线都不会改变；删除后的 ID 也不能用于新建实体。</p></details>` : ""}<div id="node-graph-host"></div><p class="subtle small">按执行开始时间匹配，区间不重叠。到时未完成不会自行过期，只有信号能够裁定。</p><div class="modal-actions">${goal && !goal.nodes.some((n) => n.result || n.emitted) ? '<button type="button" class="text-button danger-text" id="delete-goal">删除目标组</button>' : "<span></span>"}<div><button type="button" class="button secondary" data-action="close-modal">取消</button><button type="submit" class="button primary">保存目标</button></div></div></form>`,
     true,
   );
   const form = $<HTMLFormElement>("#goal-form");
-  const get = (row: Element, key: string) =>
-    row.querySelector<HTMLInputElement | HTMLSelectElement>(
-      `[data-node-field="${key}"]`,
-    )!;
-  const collect = (): NodeSpec[] =>
-    [...form.querySelectorAll<HTMLElement>("[data-node-row]")].map((row) => {
-      const kind = get(row, "signalKind").value;
-      return {
-        id: row.dataset.nodeRow!,
-        name: get(row, "name").value,
-        start: get(row, "start").value,
-        end: get(row, "end").value,
-        requiredTasks: Number(get(row, "requiredTasks").value),
-        confirmationRequired: (
-          get(row, "confirmationRequired") as HTMLInputElement
-        ).checked,
-        signal:
-          kind === "none"
-            ? null
-            : {
-                kind: kind as "success" | "failure" | "check",
-                direction: get(row, "direction").value as "head" | "tail",
-                at: get(row, "signalAt").value,
-                condition: get(row, "condition").value as
-                  "always" | "completed" | "incomplete",
-              },
-        blockSuccess:
-          kind === "none"
-            ? "never"
-            : (get(row, "blockSuccess").value as BlockRule),
-        blockFailure:
-          kind === "none"
-            ? "never"
-            : (get(row, "blockFailure").value as BlockRule),
-      };
-    });
-  const update = () => {
-    for (const row of form.querySelectorAll<HTMLElement>("[data-node-row]")) {
-      const kind = get(row, "signalKind").value,
-        hasSignal = kind !== "none",
-        check = kind === "check";
-      const runtime = goal?.nodes.find(
-        (n) => n.spec.id === row.dataset.nodeRow,
+  const graph = createNodeGraph($("#node-graph-host"), {
+    specs,
+    goal,
+    icon,
+    escape,
+    progress: (nodeId) => nodeProgress(goal?.id ?? "", nodeId),
+    canDelete: (nodeId) => {
+      const node = goal?.nodes.find((n) => n.spec.id === nodeId);
+      if (!node || node.result || node.emitted) return false;
+      if (state.data.nodeBindings.some((b) => b.nodeId === nodeId))
+        return false;
+      return !state.data.signalEvents.some((e) =>
+        e.deliveries.some((d) => d.nodeId === nodeId),
       );
-      (row.querySelector("[data-signal-controls]") as HTMLElement).hidden =
-        !hasSignal;
-      if (check) {
-        get(row, "direction").value = "head";
-        get(row, "condition").value = "always";
-      }
-      row
-        .querySelectorAll<HTMLInputElement | HTMLSelectElement>(
-          "[data-node-field]",
-        )
-        .forEach((input) => {
-          const key = input.dataset.nodeField!;
-          const signalField = [
-            "signalAt",
-            "direction",
-            "condition",
-            "blockSuccess",
-            "blockFailure",
-          ].includes(key);
-          input.disabled =
-            (row.dataset.locked === "true" && key !== "name") ||
-            (signalField && !hasSignal) ||
-            (check && ["direction", "condition"].includes(key)) ||
-            (!!runtime?.emitted &&
-              ["signalKind", "signalAt", "direction", "condition"].includes(
-                key,
-              ));
-        });
-      get(row, "end").setCustomValidity(
-        get(row, "end").value <= get(row, "start").value
-          ? "结束时间必须晚于起始时间"
-          : "",
-      );
-    }
-  };
-  const draw = () => {
-    $("#mainline-editor").innerHTML = specs
-      .map((s, i) =>
-        nodeEditorHtml(
-          s,
-          goal?.nodes.find((n) => n.spec.id === s.id),
-          i === specs.length - 1,
-        ),
-      )
-      .join("");
-    $("#add-mainline-node").toggleAttribute(
-      "disabled",
-      !!goal?.nodes.at(-1)?.emitted || !!goal?.nodes.at(-1)?.result,
-    );
-    icons();
-    update();
-  };
-  $("#add-mainline-node").onclick = () => {
-    specs = collect();
-    const previous = specs.at(-1);
-    if (previous?.signal?.kind === "check") {
-      previous.signal = null;
-      previous.blockSuccess = "never";
-      previous.blockFailure = "never";
-    }
-    const start = previous?.end ?? `${state.today}T00:00`;
-    const end = `${shiftedDate(start.slice(0, 10), 7)}T${start.slice(11)}`;
-    specs.push({
-      id: crypto.randomUUID(),
-      name: "",
-      start,
-      end,
-      requiredTasks: 1,
-      confirmationRequired: false,
-      signal: {
-        kind: "check",
-        direction: "head",
-        at: end,
-        condition: "always",
-      },
-      blockSuccess: "never",
-      blockFailure: "never",
-    });
-    draw();
-  };
-  form.addEventListener("input", (e) => {
-    const input = e.target as HTMLInputElement;
-    if (input.dataset.nodeField === "end") {
-      const row = input.closest<HTMLElement>("[data-node-row]")!;
-      if (get(row, "signalAt").value === row.dataset.lastEnd)
-        get(row, "signalAt").value = input.value;
-      row.dataset.lastEnd = input.value;
-    }
-    update();
-  });
-  form.addEventListener("change", update);
-  form.addEventListener("click", (e) => {
-    const button = (e.target as Element).closest("[data-remove-node]");
-    if (!button) return;
-    specs = collect().filter(
-      (s) =>
-        s.id !==
-        button.closest<HTMLElement>("[data-node-row]")!.dataset.nodeRow,
-    );
-    draw();
+    },
+    verdict: verdictLabel,
+    signalLabel,
+    blockLabels,
+    shiftDate: shiftedDate,
   });
   form.onsubmit = async (event) => {
     event.preventDefault();
@@ -2289,7 +2125,7 @@ function goalDialog(id?: string) {
           type: "saveGoal",
           id: goal?.id ?? null,
           name: form.querySelector<HTMLInputElement>("[name=name]")!.value,
-          nodes: collect(),
+          nodes: graph.getSpecs(),
         },
         "目标组与主线已保存",
       )
@@ -2308,7 +2144,6 @@ function goalDialog(id?: string) {
         },
         true,
       );
-  draw();
 }
 
 function chooseTask() {
