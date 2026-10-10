@@ -1189,6 +1189,13 @@ impl AppData {
                 t.habit_id.as_ref().is_none_or(|h| habit_ids.contains(h)),
                 "任务引用了不存在的习惯",
             )?;
+            // Repeating and rolling over must never combine: the pair would pile
+            // up every failed instance forever. Repetition belongs to habits,
+            // which expire instead of rolling over.
+            ensure(
+                !(t.goal_id.is_some() && t.repeat != Repeat::None),
+                "目标管辖的任务不能重复；重复的例行事项请建成习惯",
+            )?;
             ensure(
                 t.due_date.as_ref().is_none_or(|d| {
                     d.len() == 10 && NaiveDate::parse_from_str(d, "%Y-%m-%d").is_ok()

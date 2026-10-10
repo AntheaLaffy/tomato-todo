@@ -734,6 +734,40 @@ fn habit_validation_rejects_overlapping_days_and_bad_times() {
 }
 
 #[test]
+fn goal_work_may_not_repeat() {
+    let mut e = engine();
+    let s = e
+        .dispatch(
+            Action::SaveGoal {
+                id: None,
+                name: "OpenCamp".into(),
+                target: 1.0,
+                unit: "节".into(),
+                measure: GoalMeasure::Count,
+                due_date: None,
+            },
+            friday(8, 0),
+        )
+        .unwrap();
+    let goal = s.data.goals[0].id.clone();
+    let mut task = draft();
+    task.goal_id = Some(goal.clone());
+    task.repeat = Repeat::Daily;
+    assert!(e
+        .dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
+        .is_err());
+    // A one-off goal task is fine; so is a repeating task outside any goal.
+    task.repeat = Repeat::None;
+    e.dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
+        .unwrap();
+    let mut habit = draft();
+    habit.repeat = Repeat::Daily;
+    habit.due_date = Some("2026-10-09".into());
+    e.dispatch(Action::SaveTask { task: habit }, friday(8, 0))
+        .unwrap();
+}
+
+#[test]
 fn protection_rejects_mutations_until_emergency_or_completion() {
     let mut e = engine();
     let settings = Settings {

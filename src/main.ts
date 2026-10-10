@@ -997,6 +997,22 @@ function taskDialog(id?: string) {
     }
   });
   drawSubs();
+  // Goal work must be one-off, so a goal disables the repeat selector.
+  const goalSelect = document.querySelector<HTMLSelectElement>(
+    "#task-form [name=goalId]",
+  );
+  const repeatSelect = document.querySelector<HTMLSelectElement>(
+    "#task-form [name=repeat]",
+  );
+  const syncRepeat = () => {
+    if (!goalSelect || !repeatSelect) return;
+    if (goalSelect.value) {
+      repeatSelect.value = "none";
+      repeatSelect.disabled = true;
+    } else repeatSelect.disabled = false;
+  };
+  goalSelect?.addEventListener("change", syncRepeat);
+  syncRepeat();
   $("#task-form").onsubmit = async (e) => {
     e.preventDefault();
     addSub();
