@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3348
+lines: 3183
 generated_at: 2026-10-11
 ---
 
@@ -8,51 +8,51 @@ generated_at: 2026-10-11
 
 | 用途                                                | Lines     | Notes                                       |
 | --------------------------------------------------- | --------- | ------------------------------------------- |
-| 导入、状态、管辖与格式化                            | 1–438     | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 分发、快照、导航与提醒                              | 439–581   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 今日待办、本周日程日历、待补队列与静态实例列表      | 582–727   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 任务、目标、习惯模板、愿景与统计设置                | 728–1230  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 保护、定时锁机、沉浸与刷新                          | 1231–1359 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1360–2129 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 容器、搜索与设置操作                                | 2130–2597 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 文件导入、模板动作与页面事件                        | 2598–3207 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 右键菜单、批量删除/移出、拖拽与快捷键               | 3208–3289 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动、概念讲解挂载与轮询                            | 3290–3348 | 概念目标与讲解内容在 src/ponder.ts          |
+| 导入、状态、管辖与格式化                            | 1–439     | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 分发、快照、导航与提醒                              | 440–582   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 今日待办、本周日程日历、待补队列与静态实例列表      | 583–728   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 任务、目标、习惯模板、愿景与统计设置                | 729–1231  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 保护、定时锁机、沉浸与刷新                          | 1232–1444 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1445–2090 | 节点图在 src/nodegraph.ts                   |
+| 容器、搜索与设置操作                                | 2091–2432 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 文件导入、模板动作与页面事件                        | 2433–3042 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 右键菜单、批量删除/移出、拖拽与快捷键               | 3043–3124 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 启动、概念讲解挂载与轮询                            | 3125–3183 | 概念目标与讲解内容在 src/ponder.ts          |
 
 ## Symbols
 
 | Symbol               | Type     | Line |
 | -------------------- | -------- | ---- |
-| focusPage            | function | 582  |
-| isCatchUp            | function | 612  |
-| taskList             | function | 629  |
-| isoDate              | const    | 661  |
-| schedulePage         | function | 663  |
-| tasksPage            | function | 728  |
-| goalsPage            | function | 778  |
-| habitsTab            | function | 835  |
-| visionDialog         | function | 909  |
-| lineOutcomeLabel     | const    | 969  |
-| spanLabel            | const    | 984  |
-| goalStatsCard        | function | 986  |
-| crossSectionCard     | function | 1006 |
-| statsPage            | function | 1024 |
-| savePreferences      | function | 1088 |
-| settingsPage         | function | 1177 |
-| projectWhitelistCard | function | 1191 |
-| guardPage            | function | 1231 |
-| templatesCard        | function | 1444 |
-| datesForPrinting     | function | 1455 |
-| printDialog          | function | 1483 |
-| templateDialog       | function | 1539 |
-| taskDialog           | function | 1933 |
-| goalDialog           | function | 2130 |
-| importPlan           | function | 2598 |
-| selectControls       | function | 3208 |
-| detachSelected       | function | 3213 |
-| deleteSelectedTasks  | function | 3223 |
-| sortProjects         | function | 3248 |
-| boot                 | function | 3290 |
+| focusPage            | function | 583  |
+| isCatchUp            | function | 613  |
+| taskList             | function | 630  |
+| isoDate              | const    | 662  |
+| schedulePage         | function | 664  |
+| tasksPage            | function | 729  |
+| goalsPage            | function | 779  |
+| habitsTab            | function | 836  |
+| visionDialog         | function | 910  |
+| lineOutcomeLabel     | const    | 970  |
+| spanLabel            | const    | 985  |
+| goalStatsCard        | function | 987  |
+| crossSectionCard     | function | 1007 |
+| statsPage            | function | 1025 |
+| savePreferences      | function | 1089 |
+| settingsPage         | function | 1178 |
+| projectWhitelistCard | function | 1192 |
+| guardPage            | function | 1232 |
+| templatesCard        | function | 1445 |
+| datesForPrinting     | function | 1456 |
+| printDialog          | function | 1484 |
+| templateDialog       | function | 1540 |
+| taskDialog           | function | 1934 |
+| goalDialog           | function | 2091 |
+| importPlan           | function | 2433 |
+| selectControls       | function | 3043 |
+| detachSelected       | function | 3048 |
+| deleteSelectedTasks  | function | 3058 |
+| sortProjects         | function | 3083 |
+| boot                 | function | 3125 |
 
 模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通/目标待补呈现。
 
@@ -62,7 +62,7 @@ generated_at: 2026-10-11
 
 统计页：goalStatsCard 读 `stats.goals`（整线裁定 Success/Failure/Pending 与逐节点时序），crossSectionCard 读 `stats.days` 的每日完成/缺勤/作废/主线裁定与报废，把同一时段的主线与其它任务并排看；两者都由核心计算，前端不重算成败。
 
-主线：goalsTabContent 显示节点进度、配对与信号追溯，nodeEditorHtml/goalDialog 编辑配置，confirmNode 保存人工确认。Task.nodeId 与 Snapshot.nodeProgress 由核心计算；成功/失败实例只读，历史 ID 不复用，恢复只还原登记的原任务。
+主线：goalsTabContent 显示节点进度、配对与信号追溯，goalDialog 挂载 src/nodegraph.ts 的节点图编辑配置，confirmNode 保存人工确认。Task.nodeId 与 Snapshot.nodeProgress 由核心计算；成功/失败实例只读，历史 ID 不复用，恢复只还原登记的原任务。
 
 音效：accept 按旧/新 Snapshot 与成功 Action 选择一次音效；sound-events.ts 同时供提醒横幅选队列。soundPreviewControls 与设置保存共享 soundVolume；轮询使用快照版本丢弃操作期间的旧响应。
 

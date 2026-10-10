@@ -40,6 +40,7 @@ generated_at: 2026-10-10
 | audio.ts        | 声音   | 本地背景噪音、11 种关键节点短音效、音量与安全音频激活                               |
 | sound-events.ts | 声音   | 按已接受快照选择一次音效，共享提醒队列排序、静音/导入抑制与同时事件优先级           |
 | agent.ts        | 桥接   | 对话页与状态轮询、设置/记忆/方案/信号浮层、登录与审阅应用、自动唤醒切页             |
+| nodegraph.ts    | 界面   | 主线节点图：横向节点卡、信号横条、缩略图与节点检查器，拖拽重排                      |
 | ponder.ts       | 引导   | 概念登记表与讲解机制：悬停胶囊、长按 G 打开讲解面、全部概念列表                     |
 
-主线入口：main.ts 的 goalsTabContent/nodeEditorHtml/goalDialog，Snapshot.nodeProgress 为核心计算结果。成功/失败实例只读；删除配对任务可从组内恢复原实体；条件阻断分别针对成功与失败。
+主线入口：main.ts 的 goalsTabContent/goalDialog 与 src/nodegraph.ts 的节点图，Snapshot.nodeProgress 为核心计算结果。成功/失败实例只读；删除配对任务可从组内恢复原实体；条件阻断分别针对成功与失败。

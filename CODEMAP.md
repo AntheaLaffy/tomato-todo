@@ -23,7 +23,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | --- | --- | --- | --- |
 | 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/main.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md |
 | 目标容器与过期补做 | 业务核心 / 界面 | crates/core/src/nodes.rs 的配对/信号与 lib.rs 的 Goal、src/main.ts 的 goalDialog | src/types.ts、docs/BACKUP_FORMAT.md |
-| 主线节点、信号与永久 ID | 业务核心 / 界面 | crates/core/src/nodes.rs、identities.rs、src/main.ts 的 goalDialog | docs/NODE_DESIGN.md、node_tests.rs、plan.rs、src/types.ts 与文件契约 |
+| 主线节点、信号与永久 ID | 业务核心 / 界面 | crates/core/src/nodes.rs、identities.rs、src/nodegraph.ts | docs/NODE_DESIGN.md、src/main.ts 的 goalDialog、node_tests.rs、plan.rs、src/types.ts 与文件契约 |
 | 习惯分组与周期印刷 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 habitsTab | templates.rs 的 materialize_templates、src/types.ts、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Vision、src/main.ts 的 visionsTab | src/types.ts、docs/BACKUP_FORMAT.md |
 | 模板、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 templateDialog/printDialog | crates/core/src/plan.rs、src/types.ts、docs/CODEMAP.md |
