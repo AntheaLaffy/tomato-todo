@@ -969,6 +969,10 @@ main {
   padding: 19px 11px;
   border-bottom: 1px solid var(--line);
   position: relative;
+  /* Skip style/layout/paint for rows outside the viewport so a long list stays
+     responsive; the browser remembers measured heights after first paint. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
 }
 .task-row:last-child {
   border-bottom-color: transparent;

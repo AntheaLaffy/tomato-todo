@@ -1,7 +1,7 @@
 import "./style.css";
 import { agentPage, mountAgent, setupAgent } from "./agent";
 import {
-  createIcons,
+  type IconNode,
   Sun,
   Moon,
   Timer,
@@ -86,6 +86,7 @@ import type {
   DesktopStatus,
   GuardInfo,
   Goal,
+  NodeProgress,
   NodeSpec,
   MainlineNode,
   BlockRule,
@@ -166,10 +167,42 @@ const escape = (text: unknown) =>
         c
       ]!,
   );
-const icon = (name: string, cls = "") =>
-  `<i data-lucide="${name}" class="${cls}" aria-hidden="true"></i>`;
-const icons = () =>
-  createIcons({ icons: iconSet, attrs: { "stroke-width": 1.7 } });
+const kebabName = (name: string) =>
+  name
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+    .replace(/([a-zA-Z])([0-9])/g, "$1-$2")
+    .toLowerCase();
+const iconNodes: Record<string, IconNode> = {};
+for (const [name, node] of Object.entries(iconSet))
+  iconNodes[kebabName(name)] = node;
+type IconElement = [
+  string,
+  Record<string, string | number | undefined>,
+  IconElement[]?,
+];
+const iconMarkup = ([tag, attrs, children]: IconElement): string => {
+  const attributes = Object.entries(attrs)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => ` ${key}="${value}"`)
+    .join("");
+  return children?.length
+    ? `<${tag}${attributes}>${children.map(iconMarkup).join("")}</${tag}>`
+    : `<${tag}${attributes}/>`;
+};
+// Emit the finished <svg> instead of an <i data-lucide> placeholder. Rebuilding
+// thousands of placeholders with JS-created SVG nodes was the largest single
+// cost when opening a page with many tasks.
+const icon = (name: string, cls = "") => {
+  const node = iconNodes[name];
+  if (!node) return "";
+  const classes = `lucide lucide-${name}${cls ? ` ${cls}` : ""}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" data-lucide="${name}" aria-hidden="true" class="${classes}">${node
+    .map(iconMarkup)
+    .join("")}</svg>`;
+};
+// Icons are inlined above, so there is nothing left to upgrade after a render.
+const icons = () => {};
 const logo = `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 12C8 5 3 19 8 32c3 9 12 12 16 8 5 4 15 0 17-9C45 17 38 6 24 12Z" fill="currentColor"/><path d="m24 13-8-5 8 2 5-6-1 7 8 1-10 3" fill="#7c997a"/><path d="M14 22c-1 4 0 7 2 9" stroke="white" stroke-opacity=".65" stroke-width="3" stroke-linecap="round"/></svg>`;
 let state: Snapshot;
 let page = "focus";
@@ -190,6 +223,7 @@ let nativeStatus: DesktopStatus | null = null;
 let pending = false;
 let serial = -1;
 let snapshotRevision = 0;
+let dataSignature = "";
 let disconnected = false;
 let settingsDirty = false;
 let settingsRevision = 0;
@@ -255,8 +289,63 @@ const strictNow = () =>
   state.data.lock.active
     ? state.data.lock.active.strict
     : protectedNow() && state.data.settings.protection.strict;
+// Rendering a task list asks the same questions once per row ("which project?",
+// "which goal?", "how many pomodoros?"). Those linear scans turned a page with
+// hundreds of tasks into hundreds of milliseconds, so build the lookups once per
+// snapshot and invalidate them when accept() swaps in a new object.
+interface Derived {
+  projects: Map<string, Project>;
+  goals: Map<string, Goal>;
+  nodes: Map<string, Map<string, MainlineNode>>;
+  progress: Map<string, NodeProgress>;
+  pomodoros: Map<string, number>;
+  activeByProject: Map<string, number>;
+  activeTotal: number;
+}
+let derivedSource: Snapshot | null = null;
+let derived!: Derived;
+function ensureDerived(): Derived {
+  if (derivedSource === state) return derived;
+  const projects = new Map<string, Project>();
+  for (const p of state.data.projects) projects.set(p.id, p);
+  const goals = new Map<string, Goal>();
+  const nodes = new Map<string, Map<string, MainlineNode>>();
+  for (const g of state.data.goals) {
+    goals.set(g.id, g);
+    nodes.set(g.id, new Map(g.nodes.map((n) => [n.spec.id, n])));
+  }
+  const progress = new Map<string, NodeProgress>();
+  for (const p of state.nodeProgress)
+    progress.set(`${p.goalId}/${p.nodeId}`, p);
+  const pomodoros = new Map<string, number>();
+  for (const s of state.data.sessions)
+    if (s.completed && s.taskId)
+      pomodoros.set(s.taskId, (pomodoros.get(s.taskId) ?? 0) + 1);
+  const activeByProject = new Map<string, number>();
+  let activeTotal = 0;
+  for (const t of state.data.tasks) {
+    if (t.completed) continue;
+    activeTotal++;
+    if (t.projectId)
+      activeByProject.set(
+        t.projectId,
+        (activeByProject.get(t.projectId) ?? 0) + 1,
+      );
+  }
+  derived = {
+    projects,
+    goals,
+    nodes,
+    progress,
+    pomodoros,
+    activeByProject,
+    activeTotal,
+  };
+  derivedSource = state;
+  return derived;
+}
 const projectOf = (task: Task) =>
-  state.data.projects.find((p) => p.id === task.projectId);
+  ensureDerived().projects.get(task.projectId ?? "");
 // Jurisdiction is defined once in the Rust core; read its frozen kind instead of
 // re-deriving the category here.
 const isHabit = (task: Task) => state.taskKinds[task.id] === "habit";
@@ -270,16 +359,17 @@ const daysLabel = (days: number[]) => {
 };
 
 const isTimed = (task: Task) => !!task.reminderTime;
-const goalOf = (task: Task) =>
-  state.data.goals.find((g) => g.id === task.goalId);
+const goalOf = (task: Task) => ensureDerived().goals.get(task.goalId ?? "");
 const nodeOf = (task: Task) =>
-  goalOf(task)?.nodes.find((n) => n.spec.id === task.nodeId);
+  task.goalId && task.nodeId
+    ? ensureDerived().nodes.get(task.goalId)?.get(task.nodeId)
+    : undefined;
 const isVoid = (task: Task) =>
   task.goalId
     ? !!nodeOf(task)?.result
     : !task.completed && isTimed(task) && task.reminderExpired;
 const nodeProgress = (goalId: string, nodeId: string) =>
-  state.nodeProgress.find((p) => p.goalId === goalId && p.nodeId === nodeId)!;
+  ensureDerived().progress.get(`${goalId}/${nodeId}`)!;
 const verdictLabel = (verdict: string | null | undefined) =>
   verdict === "success" ? "成功" : verdict === "failure" ? "失败" : "尚未裁定";
 const signalLabel = (kind: string) =>
@@ -294,7 +384,7 @@ const blockLabels: Record<BlockRule, string> = {
   completed: "节点已经完成时阻断",
 };
 const completedPomodoros = (task: Task) =>
-  state.data.sessions.filter((s) => s.taskId === task.id && s.completed).length;
+  ensureDerived().pomodoros.get(task.id) ?? 0;
 const time = (seconds: number) =>
   `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 const duration = (seconds: number) =>
@@ -350,11 +440,13 @@ function accept(next: Snapshot, action?: Record<string, unknown>) {
   snapshotRevision++;
   const cue = soundForTransition(state, next, action);
   const wasProtected = state ? protectedNow() : false;
+  // Stringify once and reuse it as the next baseline; the poll runs every second
+  // and comparing two full copies was pure overhead on large histories.
+  const signature = JSON.stringify(next.data);
   const changed =
-    !state ||
-    JSON.stringify(state.data) !== JSON.stringify(next.data) ||
-    state.today !== next.today;
+    !state || state.today !== next.today || signature !== dataSignature;
   state = next;
+  dataSignature = signature;
   if (!state.data.settings.sound || state.data.settings.soundVolume === 0)
     stopSound();
   else if (cue) playSound(cue, state.data.settings.soundVolume);
@@ -430,6 +522,7 @@ function render() {
   }
   const d = state.data,
     s = state.stats;
+  const look = ensureDerived();
   $("#app").innerHTML = `<aside class="sidebar">
     <button class="brand" data-page="focus"><span class="brand-mark">${logo}</span><span>番茄 <b>Todo</b><small>让专注，成为日常</small></span></button>
     <div class="workspace-label">我的空间 <span>PERSONAL</span></div>
@@ -445,12 +538,12 @@ function render() {
     ]
       .map(
         ([id, ic]) =>
-          `<button class="nav-item ${page === id ? "active" : ""}" data-page="${id}">${icon(ic)}<span>${labels[id]}</span>${id === "tasks" ? `<b>${d.tasks.filter((t) => !t.completed).length}</b>` : id === "focus" ? '<span class="nav-dot"></span>' : ""}</button>`,
+          `<button class="nav-item ${page === id ? "active" : ""}" data-page="${id}">${icon(ic)}<span>${labels[id]}</span>${id === "tasks" ? `<b>${look.activeTotal}</b>` : id === "focus" ? '<span class="nav-dot"></span>' : ""}</button>`,
       )
       .join("")}</nav>
     <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
-    <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${d.tasks.filter((t) => t.projectId === p.id && !t.completed).length}</b></button>`).join("")}</nav>
-    <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("sprout").replace("sprout", "leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
+    <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${look.activeByProject.get(p.id) ?? 0}</b></button>`).join("")}</nav>
+    <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.6.1</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar"><div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="ponder-list" aria-label="概念讲解">${icon("lightbulb")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
@@ -556,8 +649,11 @@ function taskList(tasks: Task[], compact = false) {
         done = completedPomodoros(task),
         selected = task.id === state.data.timer.taskId,
         picked = selectMode && selectedTaskIds.has(task.id),
-        catchUp = isCatchUp(task);
-      return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}" ${isVoid(task) ? "disabled" : ""}>${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${goalOf(task) ? `<span>${icon("target")}${escape(goalOf(task)!.name)}${nodeOf(task) ? ` · ${escape(nodeOf(task)!.spec.name)}` : ""}${isVoid(task) ? " · 已报废" : ""}</span>` : ""}${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed && !isVoid(task) ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
+        catchUp = isCatchUp(task),
+        goal = goalOf(task),
+        node = goal ? nodeOf(task) : undefined,
+        voided = isVoid(task);
+      return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}" ${voided ? "disabled" : ""}>${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${goal ? `<span>${icon("target")}${escape(goal.name)}${node ? ` · ${escape(node.spec.name)}` : ""}${voided ? " · 已报废" : ""}</span>` : ""}${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed && !voided ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
     })
     .join("");
 }

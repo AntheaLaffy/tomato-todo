@@ -1858,7 +1858,9 @@ impl Engine {
             identities::reconcile(&self.data, &mut next, None)?;
             next.validate()?;
             self.persist(&next)?;
-            self.data = next;
+            // This branch only runs on a real change, so paying for a second
+            // copy here keeps the hot per-second path down to a single clone.
+            self.data = next.clone();
         }
         Ok(Snapshot {
             node_progress: self.data.all_node_progress(),
@@ -1870,7 +1872,7 @@ impl Engine {
                 .collect(),
             remaining_secs: self.data.timer.remaining(at),
             stats: self.data.stats(at),
-            data: self.data.clone(),
+            data: next,
             today: date_at(at),
             server_time: at,
         })
