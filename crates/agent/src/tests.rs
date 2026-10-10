@@ -182,6 +182,40 @@ fn user_skills_are_readable_from_the_agent_dir() {
         .is_err());
 }
 #[test]
+fn conversations_switch_and_delete() {
+    let mut store = Store::default();
+    let first = store.new_conversation(10);
+    store.message("user", "第一段".into(), 11, false);
+    let second = store.new_conversation(20);
+    store.message("user", "第二段".into(), 21, false);
+    assert_eq!(store.active.as_deref(), Some(second.as_str()));
+    assert_eq!(store.messages().len(), 1);
+    assert_eq!(store.messages()[0].text, "第二段");
+    assert_eq!(store.conversations_view().len(), 2);
+    store.switch_conversation(&first).unwrap();
+    assert_eq!(store.messages()[0].text, "第一段");
+    store.delete_conversation(&first).unwrap();
+    assert_eq!(store.active.as_deref(), Some(second.as_str()));
+    assert_eq!(store.conversations_view().len(), 1);
+}
+#[test]
+fn legacy_single_conversation_migrates() {
+    let dir = tempfile::tempdir().unwrap();
+    let legacy = json!({
+        "messages":[{"id":"m","role":"user","text":"旧消息","at":5,"automatic":false}],
+        "sessionFile":"/tmp/legacy.json"
+    });
+    fs::write(
+        dir.path().join("state.json"),
+        serde_json::to_vec(&legacy).unwrap(),
+    )
+    .unwrap();
+    let store = Store::load(dir.path()).unwrap();
+    assert_eq!(store.conversations_view().len(), 1);
+    assert_eq!(store.messages()[0].text, "旧消息");
+    assert_eq!(store.active_session().as_deref(), Some("/tmp/legacy.json"));
+}
+#[test]
 fn wake_waits_for_idle_respects_quiet_and_deduplicates_across_restart() {
     let dir = tempfile::tempdir().unwrap();
     let count = Arc::new(AtomicUsize::new(0));

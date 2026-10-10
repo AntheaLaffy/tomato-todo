@@ -66,6 +66,13 @@ export type AgentStatus = {
     evidence: unknown;
   }[];
   files: { name: string; bytes: number; reviewable: boolean }[];
+  conversations: {
+    id: string;
+    title: string;
+    updatedAt: number;
+    messageCount: number;
+    active: boolean;
+  }[];
   questions: {
     id: string;
     header: string;
@@ -98,7 +105,8 @@ const memoryEdits: Record<string, string> = {};
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
-let sheet: "settings" | "memory" | "plans" | "signals" | null = null;
+let sheet:
+  "settings" | "memory" | "plans" | "signals" | "conversations" | null = null;
 let openedAuthUrl = "";
 type Usage = {
   deepseek?: {
@@ -145,6 +153,7 @@ export function agentPage(): string {
     <button class="button small" data-agent="plans">方案${badge(files)}</button>
     <button class="button small" data-agent="memory">记忆</button>
     <button class="button small" data-agent="signals">信号${badge(signals)}</button>
+    <button class="button small" data-agent="conversations">会话</button>
     <button class="button small" data-agent="settings">设置</button>
     <button class="button small" data-agent="new">新对话</button>
   </div></div>
@@ -176,7 +185,7 @@ function renderChat() {
   if (!status) return;
   replace(
     "agent-run-status",
-    `<div class="agent-state ${status.error ? "error" : ""}">${status.busy ? esc(status.authenticating ? "正在登录…" : status.tool ? `正在检查：${status.tool}` : "正在分析…") : status.error ? esc(status.error) : "准备好了"}</div>`,
+    `<div class="agent-state ${status.error ? "error" : status.busy ? "busy" : ""}">${status.busy ? `<i class="agent-spinner"></i>${esc(status.authenticating ? "正在登录…" : status.tool ? `正在调用：${status.tool}` : "正在分析…")}` : status.error ? esc(status.error) : "准备好了"}</div>`,
   );
   const messages = status.messages.slice(-60);
   const html = messages
@@ -359,6 +368,7 @@ function sheetHtml(): string {
     memory: "记忆",
     plans: "方案与文件",
     signals: "学情信号",
+    conversations: "会话",
   };
   const body = () => {
     if (currentSheet === "settings")
@@ -374,6 +384,15 @@ function sheetHtml(): string {
       <div class="agent-actions"><button class="button primary" type="submit">保存</button><button class="button" type="button" data-agent="login">登录 Codex</button><button class="button" type="button" data-agent="logout">退出</button></div></form>
       <div id="agent-auth">${authHtml()}</div>
       <details class="agent-more"><summary>MCP 与私有目录</summary><pre id="agent-mcp">${esc(pretty(s.mcpConfig))}</pre><p class="muted" id="agent-directory">${esc(s.dataDir)}</p></details>`;
+    if (currentSheet === "conversations")
+      return `<div class="agent-actions"><button class="button small" data-agent="new">新对话</button></div><div id="agent-conversations">${
+        (s.conversations ?? [])
+          .map(
+            (c) =>
+              `<div class="agent-conversation-row ${c.active ? "active" : ""}"><button class="agent-conversation-open" type="button" data-agent="switch-conversation" data-id="${esc(c.id)}"><b>${esc(c.title)}</b><small>${new Date(c.updatedAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${c.messageCount} 条</small></button><button class="icon-btn tiny" type="button" data-agent="delete-conversation" data-id="${esc(c.id)}" aria-label="删除会话">✕</button></div>`,
+          )
+          .join("") || `<p class="agent-empty">还没有会话。</p>`
+      }</div>`;
     if (currentSheet === "memory")
       return `<div id="agent-memories">${
         s.memories
@@ -570,7 +589,14 @@ async function action(button: HTMLButtonElement) {
     case "memory":
     case "plans":
     case "signals":
+    case "conversations":
       openSheet(button.dataset.agent as NonNullable<typeof sheet>);
+      break;
+    case "switch-conversation":
+      await call({ op: "switch_conversation", id: button.dataset.id });
+      break;
+    case "delete-conversation":
+      await call({ op: "delete_conversation", id: button.dataset.id });
       break;
     case "close-sheet":
       sheet = null;

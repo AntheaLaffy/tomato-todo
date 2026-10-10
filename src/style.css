@@ -4374,3 +4374,67 @@ body.ponder-open #toast {
   border-color: var(--accent);
   outline: none;
 }
+
+/* 运行状态：忙碌时用强调色 + 脉冲点，别藏成灰字。 */
+.agent-state.busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.agent-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: agent-pulse 1s ease-in-out infinite;
+}
+@keyframes agent-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+/* 会话列表。 */
+.agent-conversation-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.agent-conversation-row.active {
+  border-color: var(--accent);
+}
+.agent-conversation-open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 12px;
+  text-align: left;
+}
+.agent-conversation-open b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.agent-conversation-open small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.agent-conversation-row .icon-btn {
+  margin-right: 8px;
+}

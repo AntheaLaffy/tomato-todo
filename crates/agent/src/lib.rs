@@ -269,12 +269,43 @@ impl Agent {
                 if inner.live.busy {
                     return Err("请先停止当前分析".into());
                 }
-                inner.store.session_file = None;
-                inner.store.messages.clear();
+                inner.store.new_conversation(now());
                 inner.live.questions = Value::Null;
                 inner.live.plan = Value::Null;
                 inner.store.save(&self.dir)?;
                 drop(inner);
+                self.status()
+            }
+            "switch_conversation" => {
+                let id = nonempty_text(&args, "id", 100)?;
+                let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                if inner.live.busy {
+                    return Err("请先停止当前分析".into());
+                }
+                inner.store.switch_conversation(&id)?;
+                inner.live.questions = Value::Null;
+                inner.live.plan = Value::Null;
+                inner.store.save(&self.dir)?;
+                drop(inner);
+                self.status()
+            }
+            "delete_conversation" => {
+                let id = nonempty_text(&args, "id", 100)?;
+                let session = {
+                    let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                    if inner.live.busy {
+                        return Err("请先停止当前分析".into());
+                    }
+                    let session = inner.store.delete_conversation(&id)?;
+                    inner.store.save(&self.dir)?;
+                    session
+                };
+                if let Some(path) = session {
+                    let path = PathBuf::from(path);
+                    if path.starts_with(self.dir.join("sessions")) {
+                        let _ = fs::remove_file(path);
+                    }
+                }
                 self.status()
             }
             "tool" => self.call(
@@ -328,7 +359,7 @@ impl Agent {
             };
             inner.store.message("user", displayed, now(), automatic);
             inner.store.save(&self.dir)?;
-            json!({"op":"prompt","automatic":automatic,"jobId":inner.live.job_id,"text":text,"images":images,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.session_file,"tools":tools::definitions(automatic)})
+            json!({"op":"prompt","automatic":automatic,"jobId":inner.live.job_id,"text":text,"images":images,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":tools::definitions(automatic)})
         };
         if let Err(error) = self.send(command) {
             self.failure(&error);
@@ -409,7 +440,7 @@ impl Agent {
                 if let Some(path) = event["path"].as_str() {
                     let path = PathBuf::from(path);
                     if path.starts_with(self.dir.join("sessions")) {
-                        inner.store.session_file = Some(path.to_string_lossy().into_owned());
+                        inner.store.set_session(&path.to_string_lossy(), now());
                     }
                 }
             }
@@ -461,7 +492,7 @@ impl Agent {
     pub fn status(&self) -> AppResult<Value> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
