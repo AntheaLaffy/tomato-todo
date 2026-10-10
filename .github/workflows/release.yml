@@ -68,25 +68,7 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: 番茄 Todo ${{ env.RELEASE_TAG }}
           fail_on_unmatched_files: true
+          body_path: .github/releases/${{ env.RELEASE_TAG }}.md
           files: |
             target/release/bundle/deb/*.deb
             dist/release/*.tar.gz
-          body: |
-            首个公开版本：Rust + Tauri 的 Linux 桌面番茄钟与任务工具。
-
-            ## 亮点
-
-            - 任务、项目、子任务、重复规则、搜索与筛选
-            - 番茄钟、统计与专注历史（Rust 状态机，重启后按实际截止时间恢复）
-            - 学习计划 JSON v1 导入/导出，按 ID 合并去重
-            - 完整备份导入/导出（SQLite + JSON）
-            - niri / Wayland 专注保护、应用白名单与定时锁机
-            - 系统托盘、登录自启动、明暗主题与本地声音
-
-            ## 下载
-
-            - `*.deb`：Debian / Ubuntu，需要 GTK 3 与 WebKitGTK 4.1。
-            - `*-x86_64-linux.tar.gz`：Arch 等发行版；解压后运行
-              `python3 install.py --binary ./tomato-todo --autostart`。
-
-            桌面环境支持范围见 [README](https://github.com/AntheaLaffy/tomato-todo#桌面环境适配)。
