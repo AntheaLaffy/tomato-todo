@@ -16,6 +16,8 @@ pub struct Preferences {
     pub quiet_start: String,
     pub quiet_end: String,
     pub web_search: String,
+    /// 编程沙箱权限：workspace 只写工作区，full 用用户身份完整访问。
+    pub coding_access: String,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -30,6 +32,7 @@ impl Default for Preferences {
             quiet_start: "22:00".into(),
             quiet_end: "08:00".into(),
             web_search: "cached".into(),
+            coding_access: "workspace".into(),
         }
     }
 }
@@ -37,6 +40,9 @@ impl Preferences {
     pub fn validate(&self) -> AppResult<()> {
         if !["disabled", "cached", "live"].contains(&self.web_search.as_str()) {
             return Err("联网模式需为 disabled/cached/live".into());
+        }
+        if !["workspace", "full"].contains(&self.coding_access.as_str()) {
+            return Err("编程权限需为 workspace/full".into());
         }
         if !["deepseek", "openai-codex"].contains(&self.provider.as_str())
             || self.model.len() > 200

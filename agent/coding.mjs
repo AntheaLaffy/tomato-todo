@@ -5,9 +5,10 @@ import { resolve, join, relative, dirname, isAbsolute } from "node:path";
 import { spawn } from "node:child_process";
 import { minimatch } from "minimatch";
 
-export async function codingTools(dir, runtimeRoot) {
-  const workspace=join(dir,"workspace"), coding=join(workspace,"coding");
+export async function codingTools(dir, runtimeRoot, preferences = {}) {
+  const workspace=join(dir,"workspace"), coding=join(workspace,"coding"), tools=join(dir,"tools");
   await mkdir(coding,{recursive:true,mode:0o700});
+  await mkdir(tools,{recursive:true,mode:0o700});
   const inside=(root,path)=>path===root || (!relative(root,path).startsWith("..") && !isAbsolute(relative(root,path)));
   async function path(value,writing=false) {
     const translated=value==="/workspace"||value.startsWith("/workspace/")?join(workspace,value.slice("/workspace".length)):value;
@@ -21,11 +22,12 @@ export async function codingTools(dir, runtimeRoot) {
   const write=async(p,value)=>{const safe=await path(p,true);if(Buffer.byteLength(value)>8*1024*1024)throw new Error("文件超过8MB");await mkdir(dirname(safe),{recursive:true,mode:0o700});await writeFile(safe,value,{mode:0o600});};
   const checkRead=async(p)=>access(await path(p));
   const checkWrite=async(p)=>{await path(p,true);};
+  const full=preferences.codingAccess==="full";
   const exec=async(command,cwd,options)=>{
     await path(cwd,true);
-    const args=["--die-with-parent","--new-session","--unshare-all","--ro-bind","/usr","/usr","--ro-bind-try","/lib","/lib","--ro-bind-try","/lib64","/lib64","--ro-bind-try","/bin","/bin","--ro-bind-try","/etc/ld.so.cache","/etc/ld.so.cache","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--ro-bind",workspace,"/workspace","--bind",coding,"/workspace/coding","--ro-bind",runtimeRoot,"/runtime","--clearenv","--setenv","PATH","/runtime/bin:/usr/bin:/bin","--setenv","HOME","/tmp","--setenv","LANG","C.UTF-8","--chdir","/workspace/coding","/usr/bin/bash","--noprofile","--norc","-c",command];
-    return new Promise((resolve,reject)=>{
-      const child=spawn("bwrap",args,{stdio:["ignore","pipe","pipe"]});
+    await mkdir(tools,{recursive:true,mode:0o700});
+    const run=(bin,args,spawnOptions)=>new Promise((resolve,reject)=>{
+      const child=spawn(bin,args,{stdio:["ignore","pipe","pipe"],...spawnOptions});
       let total=0,limited=false;
       const receive=(bytes)=>{total+=bytes.length;if(total<=1024*1024)options.onData(bytes);else if(!limited){limited=true;options.onData(Buffer.from("\n[输出超过1MB，已停止]\n"));child.kill("SIGKILL");}};
       child.stdout.on("data",receive);child.stderr.on("data",receive);
@@ -33,7 +35,16 @@ export async function codingTools(dir, runtimeRoot) {
       const timer=setTimeout(stop,Math.min(options.timeout?options.timeout*1000:60000,120000));
       child.on("error",reject);child.on("close",(code)=>{clearTimeout(timer);options.signal?.removeEventListener("abort",stop);resolve({exitCode:code??137});});
     });
+    // Isolation is a user-chosen policy, not a privilege boundary: the process runs
+    // as the user either way, so "full" only grants access the user already has and
+    // never escalates. "workspace" keeps the design's file boundary and still lets
+    // the terminal install toolchains over the host network.
+    if(full) return run("/usr/bin/bash",["--noprofile","--norc","-c",command],{cwd});
+    const net=["--unshare-all","--share-net","--ro-bind-try","/etc/resolv.conf","/etc/resolv.conf","--ro-bind-try","/etc/hosts","/etc/hosts","--ro-bind-try","/etc/nsswitch.conf","/etc/nsswitch.conf","--ro-bind-try","/etc/ssl","/etc/ssl","--ro-bind-try","/etc/pki","/etc/pki","--ro-bind-try","/etc/ca-certificates","/etc/ca-certificates","--ro-bind-try","/etc/ca-certificates.conf","/etc/ca-certificates.conf","--ro-bind-try","/etc/passwd","/etc/passwd","--ro-bind-try","/etc/group","/etc/group","--ro-bind-try","/etc/gitconfig","/etc/gitconfig"];
+    const args=["--die-with-parent","--new-session",...net,"--ro-bind","/usr","/usr","--ro-bind-try","/lib","/lib","--ro-bind-try","/lib64","/lib64","--ro-bind-try","/bin","/bin","--ro-bind-try","/etc/ld.so.cache","/etc/ld.so.cache","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--ro-bind",workspace,"/workspace","--bind",coding,"/workspace/coding","--bind",tools,"/tools","--ro-bind",runtimeRoot,"/runtime","--clearenv","--setenv","PATH","/tools/.cargo/bin:/tools/.npm/bin:/tools/npm-global/bin:/runtime/bin:/usr/bin:/bin","--setenv","HOME","/tools","--setenv","CARGO_HOME","/tools/.cargo","--setenv","RUSTUP_HOME","/tools/.rustup","--setenv","npm_config_cache","/tools/npm-cache","--setenv","npm_config_prefix","/tools/npm-global","--setenv","XDG_CACHE_HOME","/tools/cache","--setenv","XDG_CONFIG_HOME","/tools/config","--setenv","LANG","C.UTF-8","--setenv","TERM","dumb","--chdir","/workspace/coding","/usr/bin/bash","--noprofile","--norc","-c",command];
+    return run("bwrap",args,{});
   };
+
   const definitions=[
     createReadToolDefinition(coding,{autoResizeImages:false,operations:{readFile:read,access:checkRead,detectImageMimeType:async(p)=>{const b=await read(p);if(b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return "image/png";if(b[0]===255&&b[1]===216)return "image/jpeg";if(b.subarray(0,4).toString()==="RIFF"&&b.subarray(8,12).toString()==="WEBP")return "image/webp";return null;}}}),
     createWriteToolDefinition(coding,{operations:{writeFile:write,mkdir:async(p)=>mkdir(await path(p,true),{recursive:true,mode:0o700})}}),

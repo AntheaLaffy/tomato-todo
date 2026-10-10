@@ -95,7 +95,7 @@ export async function createStudySession({
       };
     },
   }));
-  const coding=await codingTools(dir,root);customTools.push(...coding);
+  const coding=await codingTools(dir,root,command.preferences??{});customTools.push(...coding);
   const toolNames=[...definitions.map(t=>t.name),...coding.map(t=>t.name),"codemode","tool_search"];
   const { session } = await createAgentSession({
     cwd,

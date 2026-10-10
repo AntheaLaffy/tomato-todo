@@ -4208,3 +4208,54 @@ body.ponder-open #toast {
 .settings-line .switch {
   margin-left: auto;
 }
+
+/* 对话卡角落里的用量状态：余额与订阅额度，低调可刷新。 */
+.agent-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.agent-usage-line {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-usage-refresh {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+}
+.agent-usage-refresh:hover {
+  color: var(--accent);
+}
+.agent-usage-more {
+  position: relative;
+}
+.agent-usage-more summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  list-style: none;
+}
+.agent-usage-more summary::-webkit-details-marker {
+  display: none;
+}
+.agent-usage-more[open] pre {
+  position: absolute;
+  right: 0;
+  bottom: 22px;
+  z-index: 5;
+  width: min(420px, 70vw);
+  max-height: 40vh;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}

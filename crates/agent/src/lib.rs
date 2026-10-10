@@ -121,6 +121,23 @@ impl Agent {
         let op = args["op"].as_str().ok_or("缺少 Agent 操作")?;
         match op {
             "status" => self.status(),
+            "usage" => {
+                let id = uuid::Uuid::new_v4().to_string();
+                let (tx, rx) = std::sync::mpsc::channel();
+                self.network_pending
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .insert(id.clone(), tx);
+                let result = self.send(json!({"op":"usage","id":id})).and_then(|_| {
+                    rx.recv_timeout(std::time::Duration::from_secs(20))
+                        .map_err(|_| "获取用量超时".to_string())?
+                });
+                self.network_pending
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .remove(&id);
+                result
+            }
             "download_file" => {
                 let _lock = self.workspace_lock.lock().map_err(|e| e.to_string())?;
                 files::download(&self.dir.join("workspace"), &args)
@@ -576,6 +593,8 @@ impl Agent {
                     "study-planning",
                     "study-memory",
                     "tomato-files",
+                    "tomato-workspace",
+                    "tomato-guide",
                 ]
                 .contains(&name.as_str())
                 {
@@ -778,7 +797,7 @@ impl Agent {
                         let s = engine.snapshot(now())?;
                         let inner = self.inner.lock().map_err(|e| e.to_string())?;
                         Ok(
-                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":["study-diagnosis","study-planning","study-memory","tomato-files"],"permission":"仅分析、提问、编辑私有工作文件；应用需用户确认"}),
+                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":["study-diagnosis","study-planning","study-memory","tomato-files","tomato-workspace","tomato-guide"],"permission":"仅分析、提问、编辑私有工作文件；应用需用户确认"}),
                         )
                     }
                     _ => Err("未知工具".into()),

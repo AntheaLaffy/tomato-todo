@@ -53,6 +53,50 @@ const credentials = {
       delete data[provider];
     }),
 };
+async function usageJson(url, headers) {
+  const response = await fetch(url, {
+    headers: { accept: "application/json", ...headers },
+    signal: AbortSignal.timeout(12000),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return text ? JSON.parse(text) : {};
+}
+// Provider-side quota is not part of the Pi SDK: DeepSeek exposes a balance
+// endpoint, and the ChatGPT subscription exposes rate-limit windows through the
+// same backend Codex CLI reads. Both are best-effort; an error is reported as-is.
+async function usageReport() {
+  const report = {};
+  const deepseek = await credentials.read("deepseek");
+  if (deepseek?.key) {
+    try {
+      const data = await usageJson("https://api.deepseek.com/user/balance", {
+        authorization: `Bearer ${deepseek.key}`,
+      });
+      report.deepseek = {
+        available: data.is_available === true,
+        balances: data.balance_infos ?? [],
+      };
+    } catch (error) {
+      report.deepseek = { error: String(error.message) };
+    }
+  }
+  const codex = await credentials.read("openai-codex");
+  if (codex?.access) {
+    try {
+      report.codex = await usageJson(
+        "https://chatgpt.com/backend-api/wham/usage",
+        {
+          authorization: `Bearer ${codex.access}`,
+          "chatgpt-account-id": codex.accountId ?? "",
+        },
+      );
+    } catch (error) {
+      report.codex = { error: String(error.message) };
+    }
+  }
+  return report;
+}
 const initialized = (async () => {
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await chmod(dir, 0o700);
@@ -208,6 +252,7 @@ async function authentication(command) {
   authAbort = undefined;
 }
 async function handle(command) {
+  if(command.op==="usage") {try{emit({type:"network_result",id:command.id,result:await usageReport()});}catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
   if(command.op==="network") {try{const result=await networkTool(command.name,command.arguments,{runtime:await initialized,credentials,preferences:command.preferences},AbortSignal.timeout(20000));emit({type:"network_result",id:command.id,result});}catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
   if (command.op === "tool_result") {
     const request = pending.get(command.id);

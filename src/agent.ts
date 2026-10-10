@@ -11,6 +11,7 @@ type Preferences = {
   cooldownHours: number;
   quietStart: string;
   quietEnd: string;
+  codingAccess: string;
 };
 type Memory = {
   id: string;
@@ -78,6 +79,7 @@ const defaults: Preferences = {
   cooldownHours: 24,
   quietStart: "22:00",
   quietEnd: "08:00",
+  codingAccess: "workspace",
 };
 let status: AgentStatus | null = null;
 let review: Review | null = null;
@@ -91,6 +93,21 @@ let refreshing = false;
 let serial = 0;
 let sheet: "settings" | "memory" | "plans" | "signals" | null = null;
 let openedAuthUrl = "";
+type Usage = {
+  deepseek?: {
+    available?: boolean;
+    balances?: {
+      currency: string;
+      total_balance: string;
+      granted_balance?: string;
+      topped_up_balance?: string;
+    }[];
+    error?: string;
+  };
+  codex?: Record<string, unknown> & { error?: string };
+};
+let usage: Usage | null = null;
+let usageLoading = false;
 let hooks: {
   active: () => boolean;
   wake: () => void;
@@ -130,7 +147,7 @@ export function agentPage(): string {
       <div id="agent-messages" class="agent-messages" aria-live="polite"></div>
       <form id="agent-chat">
         <textarea id="agent-text" name="text" rows="3" maxlength="32000" placeholder="问点什么，或贴一段最近的安排">${esc(draft)}</textarea>
-        <div class="agent-actions"><span>对话与记忆保存在本机</span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
+        <div class="agent-actions"><span class="agent-usage" id="agent-usage">${usageHtml()}</span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
       </form>
     </section>
     <div id="agent-sheet" class="agent-sheet" hidden></div>
@@ -194,6 +211,75 @@ function authHtml() {
   ${event?.message && !event.url ? `<p class="muted">${esc(event.message)}</p>` : ""}
   ${event?.type === "prompt" ? `<form id="agent-login-answer"><input name="text" autocomplete="off" placeholder="${esc(event.placeholder ?? "粘贴回调链接或代码")}" autofocus><button class="button small" type="submit">继续</button></form>` : ""}`;
 }
+function compactCodex(codex: Record<string, unknown>) {
+  const limit = (codex.rate_limit ??
+    codex.rateLimits ??
+    codex.rate_limits ??
+    {}) as Record<
+    string,
+    | {
+        used_percent?: number;
+        usedPercent?: number;
+        reset_after_seconds?: number;
+        limit_window_seconds?: number;
+      }
+    | undefined
+  >;
+  const bits: string[] = [];
+  const percent = (value: (typeof limit)[string]) =>
+    value
+      ? `${Math.round(Number(value.used_percent ?? value.usedPercent ?? 0))}%`
+      : null;
+  const primary = percent(limit.primary_window ?? limit.primary);
+  const secondary = percent(limit.secondary_window ?? limit.secondary);
+  if (primary) bits.push(`5h ${primary}`);
+  if (secondary) bits.push(`7d ${secondary}`);
+  if (typeof codex.plan_type === "string") bits.push(codex.plan_type);
+  if (limit.limit_reached) bits.push("已达上限");
+  const credits = codex.credits as
+    { has_credits?: boolean; unlimited?: boolean } | undefined;
+  if (credits && !credits.unlimited && !credits.has_credits)
+    bits.push("无额外额度");
+  return bits.join(" · ") || "已登录";
+}
+function usageHtml() {
+  if (usageLoading) return '<span class="muted">用量查询中…</span>';
+  if (!usage)
+    return '<button class="text-button" type="button" data-agent="refresh-usage">查询用量</button>';
+  const parts: string[] = [];
+  const deepseek = usage.deepseek;
+  if (deepseek?.error) parts.push(`DeepSeek ${deepseek.error}`);
+  else if (deepseek?.balances?.length)
+    parts.push(
+      `DeepSeek ${deepseek.balances.map((b) => `${b.currency} ${b.total_balance}`).join("，")}`,
+    );
+  const codex = usage.codex;
+  if (codex?.error) parts.push(`Codex ${codex.error}`);
+  else if (codex) parts.push(`Codex ${compactCodex(codex)}`);
+  return `<span class="agent-usage-line">${esc(parts.join(" · ") || "无可用后端")}</span><button class="agent-usage-refresh" type="button" data-agent="refresh-usage" aria-label="刷新用量">↻</button><details class="agent-usage-more"><summary>用量详情</summary><pre>${esc(pretty(redactedUsage()))}</pre></details>`;
+}
+function redactedUsage() {
+  const copy = structuredClone(usage) as Record<string, any>;
+  if (copy?.codex) delete copy.codex.email;
+  return copy;
+}
+function renderUsage() {
+  const element = document.getElementById("agent-usage");
+  if (element) element.innerHTML = usageHtml();
+}
+async function loadUsage() {
+  if (usageLoading) return;
+  usageLoading = true;
+  renderUsage();
+  try {
+    usage = await agentCall<Usage>({ op: "usage" });
+  } catch (error) {
+    usage = { deepseek: { error: String(error) } };
+  } finally {
+    usageLoading = false;
+    renderUsage();
+  }
+}
 function sheetHtml(): string {
   const s = status;
   const currentSheet = sheet;
@@ -216,6 +302,7 @@ function sheetHtml(): string {
         <label>自动唤醒上限（次/日）<input name="maxAutoWakesPerDay" type="number" min="0" max="12" value="${esc(field("maxAutoWakesPerDay", String(p.maxAutoWakesPerDay)))}"></label>
         <label>冷却（小时）<input name="cooldownHours" type="number" min="1" max="168" value="${esc(field("cooldownHours", String(p.cooldownHours)))}"></label>
         <label>安静时段<input type="time" name="quietStart" value="${esc(field("quietStart", p.quietStart))}"> – <input type="time" name="quietEnd" value="${esc(field("quietEnd", p.quietEnd))}"></label>
+        <label>编程权限<select name="codingAccess"><option value="workspace" ${field("codingAccess", p.codingAccess) === "workspace" ? "selected" : ""}>仅工作区</option><option value="full" ${field("codingAccess", p.codingAccess) === "full" ? "selected" : ""}>完整访问（用你的身份）</option></select><small class="muted">仅工作区时终端只能写 coding/ 与 tools/；完整访问时以你的用户权限运行，可改工作区之外的文件。</small></label>
       </div><div class="agent-checks"><label class="agent-check"><input type="checkbox" name="enabled" ${checked("enabled", p.enabled)}>启用</label><label class="agent-check"><input type="checkbox" name="automatic" ${checked("automatic", p.automatic)}>异常时自动唤醒</label></div>
       <div class="agent-actions"><button class="button primary" type="submit">保存</button><button class="button" type="button" data-agent="login">登录 Codex</button><button class="button" type="button" data-agent="logout">退出</button></div></form>
       <div id="agent-auth">${authHtml()}</div>
@@ -347,6 +434,7 @@ export function mountAgent() {
   });
   update();
   void refreshAgent();
+  void loadUsage();
 }
 async function submit(form: HTMLFormElement) {
   const data = new FormData(form),
@@ -368,6 +456,7 @@ async function submit(form: HTMLFormElement) {
       cooldownHours: Number(data.get("cooldownHours")),
       quietStart: String(data.get("quietStart")),
       quietEnd: String(data.get("quietEnd")),
+      codingAccess: String(data.get("codingAccess") ?? "workspace"),
     };
     await call({
       op: "configure",
@@ -423,6 +512,10 @@ async function action(button: HTMLButtonElement) {
       if (desktop) await openAgentLogin();
       else if (status?.authEvent?.url?.startsWith("https://auth.openai.com/"))
         window.open(status.authEvent.url, "_blank", "noopener");
+      break;
+    case "refresh-usage":
+      usage = null;
+      void loadUsage();
       break;
     case "delete-memory":
       await call({ op: "memory_delete", id: button.dataset.id });
