@@ -27,6 +27,7 @@ generated_at: 2026-10-10
 | 关键节点音效与音量               | 声音/契约 | audio.ts、sound-events.ts、main.ts 的 accept/soundPreviewControls                                                           | types.ts、Rust Settings、备份契约、tests/audio.mjs                                                                   |
 | 侧栏项目排序与右键菜单           | 界面      | main.ts 的 showContextMenu/hideContextMenu/sortProjects 与捕获阶段的外部点击关闭                                            | tests/integration.mjs 的打开/排序/保存/关闭回归                                                                      |
 | 学习助手界面                     | 界面/桥接 | agent.ts 的 agentPage/mountAgent/setupAgent/refreshAgent                                                                    | api.ts 的 agentCall、main.ts 的 revealAgent/轮询、style.css、docs/AGENT.md、tests/agent.mjs                          |
+| 概念讲解（思索）                 | 界面/引导 | ponder.ts 的 PONDER_TARGETS/initPonder/openPonderList                                                                       | main.ts 的 data-ponder 与 data-action="ponder-list"、style.css、tests/integration.mjs                                |
 
 ## 文件
 
@@ -39,5 +40,6 @@ generated_at: 2026-10-10
 | audio.ts        | 声音   | 本地背景噪音、11 种关键节点短音效、音量与安全音频激活                               |
 | sound-events.ts | 声音   | 按已接受快照选择一次音效，共享提醒队列排序、静音/导入抑制与同时事件优先级           |
 | agent.ts        | 桥接   | 学习助手页面与状态轮询、连接/联网配置、记忆编辑、审阅与应用交互和自动唤醒切页       |
+| ponder.ts       | 引导   | 概念登记表与讲解机制：悬停胶囊、长按 G 打开讲解面、全部概念列表                     |
 
 主线入口：main.ts 的 goalsTabContent/nodeEditorHtml/goalDialog，Snapshot.nodeProgress 为核心计算结果。成功/失败实例只读；删除配对任务可从组内恢复原实体；条件阻断分别针对成功与失败。

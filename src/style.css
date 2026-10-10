@@ -3701,3 +3701,197 @@ main {
     margin-right: 4px;
   }
 }
+
+/* 概念讲解（Ponder）：悬停出胶囊，长按 G 打开；触屏长按或 Ctrl+G 也能进。 */
+#ponder-hint {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 30px #51442d1a;
+  font-size: 13px;
+  pointer-events: none;
+  overflow: hidden;
+}
+#ponder-hint[hidden] {
+  display: none;
+}
+#ponder-hint kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ponder-hint-label {
+  color: var(--muted);
+}
+.ponder-hint-name {
+  color: var(--accent);
+}
+.ponder-hint-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+#ponder-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+}
+#ponder-layer[hidden] {
+  display: none;
+}
+.ponder-scrim {
+  position: absolute;
+  inset: 0;
+  background: #1c1a1666;
+}
+:root[data-theme="dark"] .ponder-scrim {
+  background: #00000099;
+}
+.ponder-spot {
+  position: absolute;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px #1c1a1666;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  pointer-events: none;
+  transition:
+    left 0.18s ease,
+    top 0.18s ease,
+    width 0.18s ease,
+    height 0.18s ease;
+}
+:root[data-theme="dark"] .ponder-spot {
+  box-shadow: 0 0 0 9999px #00000099;
+}
+.ponder-spot[hidden] {
+  display: none;
+}
+.ponder-panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(74vh, 720px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 60px #51442d33;
+  overflow: hidden;
+}
+.ponder-panel header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px 12px;
+}
+.ponder-panel h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.ponder-category {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ponder-panel header .icon-btn {
+  margin-left: auto;
+}
+.ponder-body {
+  padding: 0 20px 8px;
+  overflow-y: auto;
+}
+.ponder-section + .ponder-section {
+  margin-top: 14px;
+}
+.ponder-section h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--accent);
+}
+.ponder-section p {
+  margin: 0;
+  color: var(--secondary);
+  line-height: 1.65;
+}
+.ponder-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--line);
+}
+.ponder-related-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+.ponder-chip,
+.ponder-list-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 5px 10px;
+  font-size: 13px;
+}
+.ponder-chip:hover,
+.ponder-list-item:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ponder-foot .button {
+  margin-left: auto;
+}
+.ponder-list-heading {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ponder-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+.ponder-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+}
+.ponder-list-item small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+body.ponder-open #toast {
+  display: none;
+}

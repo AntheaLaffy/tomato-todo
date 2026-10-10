@@ -1362,3 +1362,67 @@ test(
     }
   },
 );
+
+test(
+  "concept explanations: hovering reveals the capsule and holding G opens the note",
+  { timeout: 60_000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tomato-ponder-"));
+    const url = "http://127.0.0.1:4324";
+    const server = spawn("target/debug/tomato-preview", [], {
+      env: {
+        ...process.env,
+        TOMATO_PORT: "4324",
+        TOMATO_DATA_PATH: join(dir, "ponder.sqlite3"),
+      },
+      stdio: "pipe",
+    });
+    let browser;
+    try {
+      for (let i = 0; i < 100; i++) {
+        try {
+          if ((await fetch(`${url}/api/snapshot`)).ok) break;
+        } catch {}
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      browser = await chromium.launch({
+        executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+        headless: true,
+        args: ["--no-sandbox"],
+      });
+      const page = await browser.newPage({
+        viewport: { width: 1280, height: 1000 },
+      });
+      const errors = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      await page.goto(url);
+      // Hovering a registered concept shows the hold hint after the delay.
+      await page.locator(".focus-card").hover();
+      const hint = page.locator("#ponder-hint");
+      await expect(hint).toBeVisible({ timeout: 4000 });
+      await expect(hint).toContainText("番茄钟与单次时长");
+      // Holding G for the hold duration opens the explanation for that concept.
+      await page.keyboard.down("g");
+      await expect(page.locator("#ponder-title")).toHaveText(
+        "番茄钟与单次时长",
+        { timeout: 4000 },
+      );
+      await page.keyboard.up("g");
+      await expect(page.locator("#ponder-layer")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#ponder-layer")).toBeHidden();
+      // The topbar list reaches every concept, including page-level ones.
+      await page.locator('[data-action="ponder-list"]').click();
+      await expect(page.locator("#ponder-layer")).toBeVisible();
+      await page.locator(".ponder-list-item", { hasText: "待补队列" }).click();
+      await expect(page.locator("#ponder-title")).toHaveText("待补队列");
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#ponder-layer")).toBeHidden();
+      assert.deepEqual(errors, []);
+      console.log(`ponder artifacts: ${dir}`);
+    } finally {
+      await browser?.close();
+      server.kill("SIGTERM");
+    }
+  },
+);
