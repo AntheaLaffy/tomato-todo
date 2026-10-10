@@ -1754,6 +1754,15 @@ main {
   padding: 18px 0;
   border-bottom: 1px solid var(--line);
 }
+.setting-row > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.setting-row > input,
+.setting-row > select {
+  flex-shrink: 0;
+}
 .setting-row:last-child {
   border-bottom: 0;
   padding-bottom: 2px;
@@ -1911,6 +1920,13 @@ main {
 .guard-card {
   padding-bottom: 19px;
   margin-bottom: 23px;
+}
+.guard-strict-card {
+  padding: 24px;
+}
+.guard-strict-card > p {
+  margin-top: 14px;
+  overflow-wrap: anywhere;
 }
 .guard-modes {
   display: grid;
@@ -2949,6 +2965,12 @@ main {
   gap: 24px;
   margin-bottom: 24px;
 }
+.lock-grid > section {
+  min-width: 0;
+}
+.lock-strict-setting {
+  margin: 8px 0 14px;
+}
 .lock-presets {
   flex-wrap: wrap;
   margin: 20px 0;
@@ -3039,5 +3061,156 @@ main {
   .reminder-banner {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+.templates-card {
+  margin-top: 24px;
+}
+.template-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.modal [hidden] {
+  display: none !important;
+}
+.templates-card .goal-section {
+  margin: 0 24px;
+  padding: 18px 0;
+}
+#template-form .modal-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 1;
+  padding: 16px 0;
+  background: var(--surface);
+}
+.editor-hint {
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 1.7;
+  margin: -6px 0 18px;
+  overflow-wrap: anywhere;
+}
+.editor-details {
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+.editor-details > summary {
+  cursor: pointer;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.editor-details > summary small {
+  color: var(--muted);
+  margin-left: 8px;
+}
+.editor-details[open] > summary {
+  margin-bottom: 18px;
+}
+
+.calendar-entry {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 0;
+}
+.calendar-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.calendar-slot-head .form-field {
+  flex: 1;
+  min-width: 0;
+}
+.calendar-entry input {
+  min-width: 0;
+  width: 100%;
+}
+.calendar-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.mainline-node,
+.node-editor {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  margin: 14px 0;
+  min-width: 0;
+}
+.mainline-node h4,
+.node-editor h3 {
+  margin: 0;
+}
+.mainline-node.success {
+  border-left: 4px solid var(--sage);
+}
+.mainline-node.failure {
+  border-left: 4px solid var(--accent);
+}
+.node-editor [data-signal-controls] {
+  min-width: 0;
+}
+.identity-value {
+  overflow-wrap: anywhere;
+  font-family: monospace;
+}
+.signal-event {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+.signal-event ul {
+  padding-left: 20px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.preserve-lines {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-checkbox:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.node-editor .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.node-editor .form-field {
+  min-width: 0;
+}
+.node-editor input,
+.node-editor select {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+.node-editor input.switch {
+  width: 34px;
+}
+#goal-form .modal-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 1;
+  padding: 16px 0;
+  background: var(--surface);
+}
+.mainline-node p,
+.signal-event {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 680px) {
+  .node-editor .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mainline-node {
+    padding: 12px;
   }
 }
