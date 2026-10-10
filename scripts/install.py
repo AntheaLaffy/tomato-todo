@@ -53,7 +53,7 @@ def install(args):
     entry = data / "applications" / (DESKTOP_ID + ".desktop")
     autostart = config / "autostart" / (APP_ID + ".desktop")
     if not source.is_file():
-        raise ValueError("Build the release binary first: npm run desktop:build")
+        raise ValueError("Build the release binary first: pnpm run desktop:build")
     if launcher.exists() or launcher.is_symlink():
         if not launcher.is_symlink() or launcher.resolve() != binary:
             raise ValueError(f"Refusing to replace an unrelated launcher: {launcher}")

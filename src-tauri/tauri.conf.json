@@ -4,9 +4,9 @@
   "version": "0.2.0",
   "identifier": "studio.tomato.todo",
   "build": {
-    "beforeDevCommand": "npm run dev:ui",
+    "beforeDevCommand": "pnpm run dev:ui",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "pnpm run build",
     "frontendDist": "../dist"
   },
   "app": {

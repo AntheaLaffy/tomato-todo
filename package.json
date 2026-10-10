@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@12.10.1",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:ui": "vite --host 127.0.0.1",
@@ -10,8 +11,8 @@
     "desktop": "tauri dev",
     "desktop:build": "tauri build --no-bundle",
     "desktop:deb": "tauri build --bundles deb",
-    "test": "cargo test -p tomato-core -p tomato-todo && cargo build -p tomato-preview && npm run build && node --test tests/integration.mjs tests/install.mjs",
-    "test:native": "npm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/native.mjs",
+    "test": "cargo test -p tomato-core -p tomato-todo && cargo build -p tomato-preview && pnpm run build && node --test tests/integration.mjs tests/install.mjs",
+    "test:native": "pnpm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/native.mjs",
     "format": "cargo fmt --all && prettier --write src scripts tests package.json",
     "format:check": "cargo fmt --all --check && prettier --check \"src/**/*.{ts,css}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" package.json",
     "check": "tsc --noEmit && cargo clippy --workspace --all-targets -- -D warnings",
