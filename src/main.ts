@@ -226,6 +226,20 @@ const progressLabel = (g: Goal) => {
   const done = goalProgress(g);
   return `${g.measure === "time" ? done.toFixed(1) : done}/${g.target}`;
 };
+const goalOf = (task: Task) =>
+  state.data.goals.find((g) => g.id === task.goalId);
+// Failure belongs to the goal, not the task: its work can be made up any time
+// before the deadline, then the goal fails and everything under it is void.
+const goalState = (g: Goal): "achieved" | "failed" | "active" => {
+  if (goalProgress(g) >= g.target) return "achieved";
+  if (g.dueDate && g.dueDate < state.today) return "failed";
+  return "active";
+};
+const isVoid = (task: Task) => {
+  if (isExpiredHabit(task)) return true;
+  const goal = goalOf(task);
+  return !!goal && goalState(goal) === "failed";
+};
 const completedPomodoros = (task: Task) =>
   state.data.sessions.filter((s) => s.taskId === task.id && s.completed).length;
 const time = (seconds: number) =>
@@ -438,9 +452,7 @@ function focusPage() {
   );
   const todayTasks = state.data.tasks.filter(
     (t) =>
-      !t.completed &&
-      (!t.dueDate || t.dueDate <= state.today) &&
-      !isExpiredHabit(t),
+      !t.completed && (!t.dueDate || t.dueDate <= state.today) && !isVoid(t),
   );
   return `${heading("今天，也要慢慢向前。", `${weekday} <span class="dot-separator">·</span> 专注当下，让每一小步都有回响。`)}
     <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办，按自己的节奏来`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
@@ -485,7 +497,8 @@ function taskList(tasks: Task[], compact = false) {
           !!task.goalId &&
           !!task.dueDate &&
           task.dueDate < state.today &&
-          !task.completed;
+          !task.completed &&
+          !isVoid(task);
       return `<article data-task-id="${escape(task.id)}" class="task-row ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}"><button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}">${task.completed ? icon("check") : ""}</button><button class="task-body" data-edit-task="${task.id}"><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.repeat !== "none" ? `<span>${icon("refresh-cw")}${{ daily: "每天", weekdays: "工作日", weekly: "每周" }[task.repeat]}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${!task.completed ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button></div></article>`;
     })
     .join("");
@@ -554,10 +567,21 @@ function goalsTabContent(goals: Goal[]) {
     return `<div class="empty-state"><div class="empty-illustration">${icon("target")}</div><h3>还没有目标</h3><p>把需要长期积累的事建成目标，把听课、作业等任务挂到它下面。</p><button class="text-button" data-action="new-goal">新建目标 →</button></div>`;
   return goals
     .map((g) => {
+      const status = goalState(g);
       const remaining = state.data.tasks.filter(
         (t) => t.goalId === g.id && !t.completed,
       );
-      return `<section class="goal-section"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${g.id}" aria-label="编辑目标">${icon("pencil")}</button></div><div class="goal-figure"><b>${progressLabel(g)}</b><span>${escape(g.unit)}${g.dueDate ? ` · 截止 ${dateLabel(g.dueDate)}` : ""}</span></div><div class="progress-track"><i style="width:${Math.min(100, (goalProgress(g) / g.target) * 100)}%"></i></div><h4 class="group-title">待完成<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : '<p class="subtle small">这个目标暂时没有待完成的任务。</p>'}</section>`;
+      const note =
+        status === "achieved"
+          ? " · 已达成"
+          : status === "failed"
+            ? " · 已逾期，任务作废"
+            : "";
+      const body =
+        status === "failed"
+          ? `<h4 class="group-title">已作废<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : ""}<p class="subtle small">目标已逾期，这些任务不再补做。</p>`
+          : `<h4 class="group-title">待完成<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : '<p class="subtle small">这个目标暂时没有待完成的任务。</p>'}`;
+      return `<section class="goal-section"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${g.id}" aria-label="编辑目标">${icon("pencil")}</button></div><div class="goal-figure"><b>${progressLabel(g)}</b><span>${escape(g.unit)}${g.dueDate ? ` · 截止 ${dateLabel(g.dueDate)}` : ""}${note}</span></div><div class="progress-track"><i style="width:${Math.min(100, (goalProgress(g) / g.target) * 100)}%"></i></div>${body}</section>`;
     })
     .join("");
 }
