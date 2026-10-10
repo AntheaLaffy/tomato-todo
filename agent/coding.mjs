@@ -23,27 +23,66 @@ export async function codingTools(dir, runtimeRoot, preferences = {}) {
   const checkRead=async(p)=>access(await path(p));
   const checkWrite=async(p)=>{await path(p,true);};
   const full=preferences.codingAccess==="full";
+  const net=["--unshare-all","--share-net","--ro-bind-try","/etc/resolv.conf","/etc/resolv.conf","--ro-bind-try","/etc/hosts","/etc/hosts","--ro-bind-try","/etc/nsswitch.conf","/etc/nsswitch.conf","--ro-bind-try","/etc/ssl","/etc/ssl","--ro-bind-try","/etc/pki","/etc/pki","--ro-bind-try","/etc/ca-certificates","/etc/ca-certificates","--ro-bind-try","/etc/ca-certificates.conf","/etc/ca-certificates.conf","--ro-bind-try","/etc/passwd","/etc/passwd","--ro-bind-try","/etc/group","/etc/group","--ro-bind-try","/etc/gitconfig","/etc/gitconfig"];
+  const mounts=["--ro-bind","/usr","/usr","--ro-bind-try","/lib","/lib","--ro-bind-try","/lib64","/lib64","--ro-bind-try","/bin","/bin","--ro-bind-try","/etc/ld.so.cache","/etc/ld.so.cache","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--ro-bind",workspace,"/workspace","--bind",coding,"/workspace/coding","--bind",tools,"/tools","--ro-bind",runtimeRoot,"/runtime"];
+  const env=["--clearenv","--setenv","PATH","/tools/.cargo/bin:/tools/.npm/bin:/tools/npm-global/bin:/runtime/bin:/usr/bin:/bin","--setenv","HOME","/tools","--setenv","CARGO_HOME","/tools/.cargo","--setenv","RUSTUP_HOME","/tools/.rustup","--setenv","npm_config_cache","/tools/npm-cache","--setenv","npm_config_prefix","/tools/npm-global","--setenv","XDG_CACHE_HOME","/tools/cache","--setenv","XDG_CONFIG_HOME","/tools/config","--setenv","LANG","C.UTF-8","--setenv","TERM","dumb"];
+  // One long-lived bash per session keeps cwd, exported variables and background
+  // processes across calls. A random sentinel line ends each command, so multi-line
+  // input still works and the exit code comes back on a marker.
+  let shell=null,current=null,shellChain=Promise.resolve();
+  function startShell(){
+    const id=Math.random().toString(36).slice(2);
+    const end=`__END_${id}__`,rc=`__RC_${id}__`,ps1=`__PS1_${id}__`;
+    const args=full?["--noprofile","--norc"]:["--die-with-parent","--new-session",...net,...mounts,...env,"--chdir","/workspace/coding","/usr/bin/bash","--noprofile","--norc"];
+    const child=spawn(full?"/usr/bin/bash":"bwrap",args,{stdio:["pipe","pipe","pipe"],...(full?{cwd:coding}:{})});
+    const state={child,end,rc,ps1,buffer:""};
+    child.stdin.write(`while IFS= read -r __line; do\n  if [ "$__line" = "${end}" ]; then\n    eval "$__buf"\n    printf '\\n${rc}%s\\n${ps1}\\n' "$?"\n    __buf=""\n  else\n    __buf="\${__buf}\${__line}\n"\n  fi\ndone\n`);
+    const receive=(bytes)=>onShellData(state,bytes);
+    child.stdout.on("data",receive);child.stderr.on("data",receive);
+    child.on("error",()=>{});
+    child.on("close",()=>{if(shell===state)shell=null;if(current){const entry=current;current=null;clearTimeout(entry.timer);entry.reject(new Error("终端已退出"));}});
+    return state;
+  }
+  function emit(entry,text){
+    if(!text)return;
+    const size=Buffer.byteLength(text);
+    if(entry.total+size>1024*1024){const room=Math.max(0,1024*1024-entry.total);if(room)entry.options.onData(Buffer.from(text.slice(0,room)));entry.options.onData(Buffer.from("\n[输出超过1MB，已停止]\n"));fail(entry,new Error("输出超过1MB"));return;}
+    entry.total+=size;entry.options.onData(Buffer.from(text));
+  }
+  function fail(entry,error){
+    if(current===entry)current=null;clearTimeout(entry.timer);entry.reject(error);
+    if(shell){try{shell.child.kill("SIGKILL");}catch{}shell=null;}
+  }
+  function onShellData(state,bytes){
+    state.buffer+=bytes.toString("utf8");
+    if(!current)return;
+    const entry=current;
+    const match=new RegExp("\\n"+state.rc+"(\\d+)\\n"+state.ps1+"\\n").exec(state.buffer);
+    if(match){emit(entry,state.buffer.slice(0,match.index));state.buffer=state.buffer.slice(match.index+match[0].length);current=null;clearTimeout(entry.timer);entry.resolve({exitCode:Number(match[1])});return;}
+    const keep=state.rc.length+state.ps1.length+16;
+    if(state.buffer.length>keep){emit(entry,state.buffer.slice(0,state.buffer.length-keep));state.buffer=state.buffer.slice(-keep);}
+  }
+  function runOnce(command,cwd,options){
+    if(!shell)shell=startShell();
+    return new Promise((resolve,reject)=>{
+      const state=shell;
+      const stop=()=>fail(entry,new Error("命令已停止"));
+      const entry={resolve:(value)=>{options.signal?.removeEventListener("abort",stop);resolve(value);},reject,options,total:0,timer:0};
+      current=entry;
+      entry.timer=setTimeout(()=>fail(entry,new Error("命令超时")),Math.min(options.timeout?options.timeout*1000:120000,600000));
+      options.signal?.addEventListener("abort",stop,{once:true});
+      state.child.stdin.write(`${command}\n${state.end}\n`);
+    });
+  }
   const exec=async(command,cwd,options)=>{
     await path(cwd,true);
     await mkdir(tools,{recursive:true,mode:0o700});
-    const run=(bin,args,spawnOptions)=>new Promise((resolve,reject)=>{
-      const child=spawn(bin,args,{stdio:["ignore","pipe","pipe"],...spawnOptions});
-      let total=0,limited=false;
-      const receive=(bytes)=>{total+=bytes.length;if(total<=1024*1024)options.onData(bytes);else if(!limited){limited=true;options.onData(Buffer.from("\n[输出超过1MB，已停止]\n"));child.kill("SIGKILL");}};
-      child.stdout.on("data",receive);child.stderr.on("data",receive);
-      const stop=()=>child.kill("SIGKILL");options.signal?.addEventListener("abort",stop,{once:true});
-      const timer=setTimeout(stop,Math.min(options.timeout?options.timeout*1000:60000,120000));
-      child.on("error",reject);child.on("close",(code)=>{clearTimeout(timer);options.signal?.removeEventListener("abort",stop);resolve({exitCode:code??137});});
-    });
-    // Isolation is a user-chosen policy, not a privilege boundary: the process runs
-    // as the user either way, so "full" only grants access the user already has and
-    // never escalates. "workspace" keeps the design's file boundary and still lets
-    // the terminal install toolchains over the host network.
-    if(full) return run("/usr/bin/bash",["--noprofile","--norc","-c",command],{cwd});
-    const net=["--unshare-all","--share-net","--ro-bind-try","/etc/resolv.conf","/etc/resolv.conf","--ro-bind-try","/etc/hosts","/etc/hosts","--ro-bind-try","/etc/nsswitch.conf","/etc/nsswitch.conf","--ro-bind-try","/etc/ssl","/etc/ssl","--ro-bind-try","/etc/pki","/etc/pki","--ro-bind-try","/etc/ca-certificates","/etc/ca-certificates","--ro-bind-try","/etc/ca-certificates.conf","/etc/ca-certificates.conf","--ro-bind-try","/etc/passwd","/etc/passwd","--ro-bind-try","/etc/group","/etc/group","--ro-bind-try","/etc/gitconfig","/etc/gitconfig"];
-    const args=["--die-with-parent","--new-session",...net,"--ro-bind","/usr","/usr","--ro-bind-try","/lib","/lib","--ro-bind-try","/lib64","/lib64","--ro-bind-try","/bin","/bin","--ro-bind-try","/etc/ld.so.cache","/etc/ld.so.cache","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--ro-bind",workspace,"/workspace","--bind",coding,"/workspace/coding","--bind",tools,"/tools","--ro-bind",runtimeRoot,"/runtime","--clearenv","--setenv","PATH","/tools/.cargo/bin:/tools/.npm/bin:/tools/npm-global/bin:/runtime/bin:/usr/bin:/bin","--setenv","HOME","/tools","--setenv","CARGO_HOME","/tools/.cargo","--setenv","RUSTUP_HOME","/tools/.rustup","--setenv","npm_config_cache","/tools/npm-cache","--setenv","npm_config_prefix","/tools/npm-global","--setenv","XDG_CACHE_HOME","/tools/cache","--setenv","XDG_CONFIG_HOME","/tools/config","--setenv","LANG","C.UTF-8","--setenv","TERM","dumb","--chdir","/workspace/coding","/usr/bin/bash","--noprofile","--norc","-c",command];
-    return run("bwrap",args,{});
+    const job=()=>runOnce(command,cwd,options);
+    const result=shellChain.then(job,job);
+    shellChain=result.catch(()=>{});
+    return result;
   };
+  process.on("exit",()=>{try{shell?.child.kill("SIGKILL");}catch{}});
 
   const definitions=[
     createReadToolDefinition(coding,{autoResizeImages:false,operations:{readFile:read,access:checkRead,detectImageMimeType:async(p)=>{const b=await read(p);if(b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return "image/png";if(b[0]===255&&b[1]===216)return "image/jpeg";if(b.subarray(0,4).toString()==="RIFF"&&b.subarray(8,12).toString()==="WEBP")return "image/webp";return null;}}}),
