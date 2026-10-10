@@ -16,45 +16,45 @@ export type SoundCue =
 type Note = [frequency: number, offset: number, duration: number];
 const scores: Record<SoundCue, Note[]> = {
   start: [
-    [392, 0, 0.18],
-    [523.25, 0.1, 0.28],
+    [392, 0, 0.38],
+    [523.25, 0.14, 0.55],
   ],
-  resume: [[523.25, 0, 0.22]],
-  pause: [[392, 0, 0.2]],
+  resume: [[523.25, 0, 0.55]],
+  pause: [[392, 0, 0.5]],
   stop: [
-    [392, 0, 0.16],
-    [293.66, 0.09, 0.22],
+    [392, 0, 0.4],
+    [293.66, 0.16, 0.5],
   ],
   focusEnd: [
-    [523.25, 0, 0.65],
-    [659.25, 0.16, 0.65],
-    [783.99, 0.32, 0.85],
+    [523.25, 0, 0.85],
+    [659.25, 0.22, 0.95],
+    [783.99, 0.44, 1.15],
   ],
   breakEnd: [
-    [659.25, 0, 0.38],
-    [783.99, 0.18, 0.55],
-    [1046.5, 0.36, 0.6],
+    [659.25, 0, 0.55],
+    [783.99, 0.24, 0.7],
+    [1046.5, 0.48, 0.9],
   ],
   breakStart: [
-    [523.25, 0, 0.24],
-    [392, 0.12, 0.4],
+    [523.25, 0, 0.45],
+    [392, 0.18, 0.65],
   ],
   taskComplete: [
-    [659.25, 0, 0.26],
-    [783.99, 0.1, 0.4],
+    [659.25, 0, 0.44],
+    [783.99, 0.14, 0.62],
   ],
   reminder: [
-    [587.33, 0, 0.35],
-    [783.99, 0.24, 0.45],
+    [587.33, 0, 0.5],
+    [783.99, 0.32, 0.7],
   ],
   lockStart: [
-    [392, 0, 0.42],
-    [329.63, 0.17, 0.5],
-    [261.63, 0.34, 0.65],
+    [392, 0, 0.6],
+    [329.63, 0.24, 0.7],
+    [261.63, 0.48, 0.9],
   ],
   lockEnd: [
-    [392, 0, 0.32],
-    [523.25, 0.17, 0.5],
+    [392, 0, 0.55],
+    [523.25, 0.24, 0.75],
   ],
 };
 
@@ -106,9 +106,12 @@ export function playSound(cue: SoundCue, level: number) {
     gain.gain.value = 0;
     gain.gain.setValueAtTime(0, start);
     gain.gain.linearRampToValueAtTime(amplitude, start + 0.012);
+    // Give the ear a short stable onset before the bell decays. A slow tail
+    // makes the cue perceptible without needing repeated reminders.
+    gain.gain.setValueAtTime(amplitude, start + Math.min(0.1, duration * 0.2));
     gain.gain.exponentialRampToValueAtTime(
-      amplitude * 0.001,
-      start + duration - 0.025,
+      amplitude * 0.02,
+      start + duration - 0.07,
     );
     gain.gain.linearRampToValueAtTime(0, start + duration);
     osc.connect(gain).connect(ctx.destination);

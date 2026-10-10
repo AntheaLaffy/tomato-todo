@@ -188,6 +188,8 @@ let serial = -1;
 let snapshotRevision = 0;
 let disconnected = false;
 let settingsDirty = false;
+let settingsRevision = 0;
+let settingsSave: Promise<boolean> | null = null;
 let blockedCount = 0;
 let lastFocus: HTMLElement | null = null;
 let undo: (() => Promise<void>) | null = null;
@@ -362,18 +364,12 @@ function applyTheme() {
         : "light"
       : theme;
 }
-function navigate(next: string) {
+async function navigate(next: string) {
   if (protectedNow()) return toast("专注保护中，先把眼前这件事做好。");
-  if (page === "settings" && settingsDirty && next !== page)
-    return confirmDialog(
-      "还有未保存的设置",
-      "离开后将放弃这些修改。",
-      "放弃修改",
-      () => {
-        settingsDirty = false;
-        navigate(next);
-      },
-    );
+  if (page === "settings" && next === page) return;
+  if (page === "settings" && settingsDirty && next !== page) {
+    if (!(await savePreferences())) return;
+  }
   page = next;
   search = "";
   filter = "active";
@@ -418,7 +414,7 @@ function render() {
     <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
     <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${d.tasks.filter((t) => t.projectId === p.id && !t.completed).length}</b></button>`).join("")}</nav>
     <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("sprout").replace("sprout", "leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
-    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.6.0</span></div></div>
+    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.6.1</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar"><div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
   <main>${reminderBanner()}${page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
@@ -951,6 +947,83 @@ function settingNumber(
 function settingSwitch(name: keyof Settings, label: string, hint: string) {
   return `<label class="setting-row"><span><strong>${label}</strong><small>${hint}</small></span><input class="switch" name="${name}" type="checkbox" ${state.data.settings[name] ? "checked" : ""}></label>`;
 }
+function preferencesStatus(message: string) {
+  const status = document.getElementById("settings-status");
+  if (status) status.textContent = message;
+}
+async function savePreferences(): Promise<boolean> {
+  if (settingsSave) return settingsSave;
+  if (!settingsDirty) return true;
+  const form = document.querySelector<HTMLFormElement>("#settings-form");
+  if (!form || !form.checkValidity()) {
+    preferencesStatus("有无效的设置，请修正后再离开");
+    return false;
+  }
+  // Manual save and page navigation can arrive together. Share one save, and
+  // never replace the form while an input has focus or a newer edit is pending.
+  settingsSave = (async () => {
+    if (pending) {
+      preferencesStatus("其他操作进行中，设置尚未保存");
+      return false;
+    }
+    const revision = settingsRevision;
+    const f = new FormData(form);
+    const settings = { ...state.data.settings };
+    for (const key of [
+      "focusMinutes",
+      "shortBreakMinutes",
+      "longBreakMinutes",
+      "longBreakEvery",
+      "dailyGoal",
+      "soundVolume",
+    ] as const)
+      settings[key] = Number(f.get(key));
+    for (const key of [
+      "autoBreak",
+      "autoFocus",
+      "sound",
+      "notifications",
+    ] as const)
+      settings[key] = f.has(key);
+    if (desktop) settings.alwaysOnTop = f.has("alwaysOnTop");
+    settings.theme = f.get("theme") as Settings["theme"];
+    preferencesStatus("正在保存…");
+    if (
+      desktop &&
+      nativeStatus &&
+      form.elements.namedItem("autostart") &&
+      (nativeStatus.autostart !== f.has("autostart") ||
+        nativeStatus.closeToTray !== f.has("closeToTray"))
+    ) {
+      try {
+        nativeStatus = await saveDesktopSettings(
+          f.has("autostart"),
+          f.has("closeToTray"),
+        );
+      } catch (error) {
+        preferencesStatus(
+          `保存失败：${String(error)}；修改已保留，下次离开时重试`,
+        );
+        return false;
+      }
+    }
+    const success = await act({ type: "saveSettings", settings });
+    if (!success) {
+      preferencesStatus("保存失败，修改已保留，下次离开时重试");
+      return false;
+    }
+    settingsDirty = revision !== settingsRevision;
+    preferencesStatus(
+      settingsDirty ? "还有新的修改，等待下次离开时保存" : "已保存",
+    );
+    return !settingsDirty;
+  })();
+  try {
+    return await settingsSave;
+  } finally {
+    settingsSave = null;
+  }
+}
 function soundPreviewControls() {
   const options: [SoundCue, string][] = [
     ["start", "开始专注"],
@@ -965,11 +1038,11 @@ function soundPreviewControls() {
     ["lockStart", "开始锁机"],
     ["lockEnd", "锁机结束"],
   ];
-  return `<label class="setting-row"><span><strong>试听类型</strong><small>使用当前填写的音量，试听后记得保存</small></span><select id="sound-preview" aria-label="试听类型">${options.map(([cue, label]) => `<option value="${cue}" ${cue === "focusEnd" ? "selected" : ""}>${label}</option>`).join("")}</select></label><button type="button" class="text-button" data-action="test-sound">${icon("volume-2")} 试听音效</button>`;
+  return `<label class="setting-row"><span><strong>试听类型</strong><small>使用当前填写的音量，离开时自动保存</small></span><select id="sound-preview" aria-label="试听类型">${options.map(([cue, label]) => `<option value="${cue}" ${cue === "focusEnd" ? "selected" : ""}>${label}</option>`).join("")}</select></label><button type="button" class="text-button" data-action="test-sound">${icon("volume-2")} 试听音效</button>`;
 }
 function settingsPage() {
   const s = state.data.settings;
-  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>外观主题</strong><small>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务与步骤，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用下方备份。</div></section><section class="card settings-card data-settings"><h2>${icon("download")} 数据与备份</h2><p>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note">${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section><section class="settings-tip">${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div></div><div class="settings-save"><span id="settings-status">更改后记得保存</span><button type="submit" class="button primary">${icon("check")} 保存设置</button></div></form>`;
+  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><div><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><section class="card settings-card data-settings"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务与步骤，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用数据与备份。</div></section><section class="settings-tip">${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>外观主题</strong><small>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings"><h2>${icon("download")} 数据与备份</h2><p>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note">${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section></div></div><div class="settings-save"><span id="settings-status" role="status" aria-live="polite">离开偏好页时自动保存</span><button type="submit" class="button primary">${icon("check")} 保存配置</button></div></form>`;
 }
 function desktopSettingsCard() {
   if (!desktop || !nativeStatus) return "";
@@ -2208,54 +2281,23 @@ function bindForms() {
         },
       );
     });
-  document
-    .querySelector<HTMLFormElement>("#settings-form")
-    ?.addEventListener("input", () => {
+  const settingsForm =
+    document.querySelector<HTMLFormElement>("#settings-form");
+  settingsForm?.addEventListener("input", (e) => {
+    if (!(e.target as HTMLInputElement).name) return;
+    settingsDirty = true;
+    settingsRevision++;
+    $("#settings-status").textContent =
+      "离开偏好页时自动保存，也可点击保存配置";
+  });
+  settingsForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!settingsSave) {
       settingsDirty = true;
-      $("#settings-status").textContent = "有未保存的更改";
-    });
-  document
-    .querySelector<HTMLFormElement>("#settings-form")
-    ?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const f = new FormData(e.target as HTMLFormElement);
-      const settings = { ...state.data.settings };
-      for (const key of [
-        "focusMinutes",
-        "shortBreakMinutes",
-        "longBreakMinutes",
-        "longBreakEvery",
-        "dailyGoal",
-        "soundVolume",
-      ] as const)
-        settings[key] = Number(f.get(key));
-      for (const key of [
-        "autoBreak",
-        "autoFocus",
-        "sound",
-        "notifications",
-      ] as const)
-        settings[key] = f.has(key);
-      if (desktop) settings.alwaysOnTop = f.has("alwaysOnTop");
-      settings.theme = f.get("theme") as Settings["theme"];
-      if (desktop && nativeStatus) {
-        try {
-          nativeStatus = await saveDesktopSettings(
-            f.has("autostart"),
-            f.has("closeToTray"),
-          );
-        } catch (error) {
-          toast(`桌面设置未保存：${String(error)}`);
-          return;
-        }
-      }
-      if (
-        await act({ type: "saveSettings", settings }, "已保存，按你的节奏来。")
-      ) {
-        settingsDirty = false;
-        render();
-      }
-    });
+      settingsRevision++;
+    }
+    void savePreferences();
+  });
   document
     .querySelector<HTMLInputElement>("#task-search")
     ?.addEventListener("input", (e) => {

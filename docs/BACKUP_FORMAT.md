@@ -51,7 +51,7 @@
 - `focusMinutes`：1—180；`shortBreakMinutes`：1—60；`longBreakMinutes`：1—120。
 - `longBreakEvery`：2—12；`dailyGoal`：1—30，以上均为整数。
 - `autoBreak`、`autoFocus`、`sound`、`notifications`、`alwaysOnTop`：布尔值。
-- `soundVolume`：整数 0—100，默认 40；旧 v3 文件可省略。`sound` 控制所有关键节点音效，背景噪音单独调节。
+- `soundVolume`：整数 0—100，默认 100；旧 v3 文件可省略。`sound` 控制所有关键节点音效，背景噪音单独调节。
 - `theme`：`light`、`dark`、`system`。
 - `protection`：见下表；旧文件可省略，默认关闭。
 

@@ -12,7 +12,7 @@ fn sound_volume_defaults_for_old_backups_and_round_trips_with_range_validation()
         .unwrap()
         .remove("soundVolume");
     let data: AppData = serde_json::from_value(old).unwrap();
-    assert_eq!(data.settings.sound_volume, 40);
+    assert_eq!(data.settings.sound_volume, 100);
     let mut e = engine();
     for level in [0, 65, 100] {
         let settings = Settings {

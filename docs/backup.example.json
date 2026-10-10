@@ -28,7 +28,7 @@
       "whitelist": [],
       "strict": false
     },
-    "soundVolume": 40
+    "soundVolume": 100
   },
   "timer": {
     "mode": "focus",

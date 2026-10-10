@@ -9,6 +9,7 @@ generated_at: 2026-10-10
 
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
+| 验证偏好页 | 验证 | integration.mjs | 保存时机、失败保留输入、左右分列与 360/700/1280px 防外溢 |
 | 验证前端业务 | 验证 | integration.mjs | package.json |
 | 验证侧栏排序菜单 | 验证 | integration.mjs 的项目排序 | src/main.ts 的菜单捕获阶段关闭与 sortProjects |
 | 验证音效与静音 | 验证 | audio.mjs、integration.mjs | src/audio.ts、src/sound-events.ts、native.mjs |

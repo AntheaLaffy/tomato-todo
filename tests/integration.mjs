@@ -192,7 +192,7 @@ test(
       await expect(page.locator(".clock")).toHaveText("25:00");
       await page.getByRole("button", { name: "偏好设置", exact: true }).click();
       await page.locator("[name=focusMinutes]").fill("30");
-      await expect(page.locator("[name=soundVolume]")).toHaveValue("40");
+      await expect(page.locator("[name=soundVolume]")).toHaveValue("100");
       await page.locator("[name=soundVolume]").fill("23");
       await expect(page.locator("#sound-preview option")).toHaveCount(11);
       await page.locator("#sound-preview").selectOption("reminder");
@@ -202,10 +202,109 @@ test(
         .poll(() => page.evaluate(() => window.audioNotes))
         .toBe(notesBeforePreview + 2);
       await page.locator("[name=sound]").uncheck();
-      await page.getByRole("button", { name: "保存设置", exact: true }).click();
-      await expect(page.locator("#settings-status")).toHaveText(
-        "更改后记得保存",
+      // Editing or losing window focus must not write or replace the form.
+      const volumeField = await page
+        .locator("[name=soundVolume]")
+        .elementHandle();
+      await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+      await page.waitForTimeout(1100);
+      const beforeLeave = (await (await fetch(`${url}/api/snapshot`)).json())
+        .data.settings;
+      assert.equal(beforeLeave.focusMinutes, 25);
+      assert.equal(beforeLeave.soundVolume, 100);
+      assert.equal(await volumeField.evaluate((el) => el.isConnected), true);
+      await page.getByRole("button", { name: "数据统计", exact: true }).click();
+      await expect(page.locator("#settings-form")).toHaveCount(0);
+      await page.getByRole("button", { name: "偏好设置", exact: true }).click();
+      await expect(page.locator("[name=focusMinutes]")).toHaveValue("30");
+      await expect(page.locator("[name=soundVolume]")).toHaveValue("23");
+      await page.locator("[name=soundVolume]").fill("24");
+      let manualSaves = 0;
+      await page.route("**/api/action", async (route) => {
+        if (route.request().postDataJSON()?.type === "saveSettings") {
+          manualSaves++;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+        await route.continue();
+      });
+      await page.getByRole("button", { name: "保存配置", exact: true }).click();
+      await page.getByRole("button", { name: "保存配置", exact: true }).click();
+      await expect(page.locator("#settings-status")).toHaveText("已保存");
+      assert.equal(
+        manualSaves,
+        1,
+        "Repeated saves must share the in-flight request",
       );
+      await page.unroute("**/api/action");
+      await page.locator("[name=soundVolume]").fill("23");
+      await page.getByRole("button", { name: "保存配置", exact: true }).click();
+      await expect(page.locator("#settings-status")).toHaveText("已保存");
+      await page.locator("[name=focusMinutes]").fill("");
+      await page.getByRole("button", { name: "数据统计", exact: true }).click();
+      await expect(page.locator("#settings-status")).toContainText(
+        "有无效的设置",
+      );
+      await expect(page.locator("#settings-form")).toBeVisible();
+      await page.locator("[name=focusMinutes]").fill("30");
+      await page.locator("[name=soundVolume]").fill("22");
+      await page.route("**/api/action", async (route) => {
+        if (route.request().postDataJSON()?.type === "saveSettings")
+          await route.fulfill({ status: 500, body: "模拟保存失败" });
+        else await route.continue();
+      });
+      await page.getByRole("button", { name: "数据统计", exact: true }).click();
+      await expect(page.locator("#settings-status")).toContainText("保存失败");
+      await expect(page.locator("[name=soundVolume]")).toHaveValue("22");
+      assert.equal(
+        (await (await fetch(`${url}/api/snapshot`)).json()).data.settings
+          .soundVolume,
+        23,
+      );
+      await page.unroute("**/api/action");
+      await page.locator("[name=soundVolume]").fill("23");
+      await page.getByRole("button", { name: "数据统计", exact: true }).click();
+      await expect(page.locator("#settings-form")).toHaveCount(0);
+      await page.getByRole("button", { name: "偏好设置", exact: true }).click();
+      const focusCard = page
+        .locator(".settings-grid > div")
+        .first()
+        .locator(".settings-card")
+        .first();
+      const planCard = page.locator(".settings-card").filter({
+        has: page.getByRole("heading", { name: "学习计划", exact: true }),
+      });
+      const backupCard = page.locator(".settings-card").filter({
+        has: page.getByRole("heading", { name: "数据与备份", exact: true }),
+      });
+      const focusBounds = await focusCard.boundingBox(),
+        planBounds = await planCard.boundingBox(),
+        backupBounds = await backupCard.boundingBox();
+      assert.ok(
+        focusBounds.height < 800,
+        "Focus settings must not stretch to the full column height",
+      );
+      assert.ok(
+        planBounds.y > focusBounds.y + focusBounds.height &&
+          Math.abs(planBounds.x - focusBounds.x) < 1,
+      );
+      assert.ok(
+        backupBounds.x > planBounds.x,
+        "Plan and backup should occupy separate columns",
+      );
+      for (const width of [360, 700, 1280]) {
+        await page.setViewportSize({ width, height: 1000 });
+        assert.ok(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+          `Settings overflow at ${width}px`,
+        );
+      }
+      await page.setViewportSize({ width: 1440, height: 1050 });
+      await page.screenshot({
+        path: join(dir, "preferences.png"),
+        fullPage: true,
+      });
       await page.reload();
       await expect(page.locator(".clock")).toHaveText("30:00");
       assert.equal(await page.evaluate(() => window.audioNotes), 0);

@@ -256,7 +256,7 @@ pub enum GuardMode {
     Whitelist,
 }
 fn default_sound_volume() -> u8 {
-    40
+    100
 }
 impl Default for Settings {
     fn default() -> Self {

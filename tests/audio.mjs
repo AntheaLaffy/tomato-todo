@@ -251,12 +251,21 @@ test(
             const audio = await import(url);
             audio.playSound(cue, level);
             const data = (await ctx.startRendering()).getChannelData(0);
+            let first = -1,
+              last = -1;
+            for (let i = 0; i < data.length; i++) {
+              if (Math.abs(data[i]) > 0.002) {
+                if (first === -1) first = i;
+                last = i;
+              }
+            }
             results.push({
               cue,
               level,
               peak: data.reduce((m, n) => Math.max(m, Math.abs(n)), 0),
               tail: data.slice(-4800).every((n) => n === 0),
               finite: data.every(Number.isFinite),
+              audibleSpan: first < 0 ? 0 : (last - first) / 48000,
             });
             URL.revokeObjectURL(url);
           }
@@ -321,6 +330,11 @@ test(
         assert.ok(result.peak < 0.5, JSON.stringify(result));
         if (result.level === 0) assert.equal(result.peak, 0);
         else assert.ok(result.peak > 0.01, JSON.stringify(result));
+        if (result.level === 100)
+          assert.ok(
+            result.audibleSpan >= 0.4 && result.audibleSpan < 1.8,
+            JSON.stringify(result),
+          );
       }
       for (const cue of new Set(results.map((r) => r.cue))) {
         const peak = (level) =>

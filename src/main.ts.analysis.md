@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3115
+lines: 3157
 generated_at: 2026-10-11
 ---
 
@@ -8,49 +8,51 @@ generated_at: 2026-10-11
 
 | 用途                                                | Lines     | Notes                                       |
 | --------------------------------------------------- | --------- | ------------------------------------------- |
-| 导入、状态、管辖与格式化                            | 1–293     | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 分发、快照、导航与提醒                              | 294–454   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 今日待办、本周日程日历、待补队列与静态实例列表      | 455–597   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 任务、目标、习惯模板、愿景与统计设置                | 598–1023  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 保护、定时锁机、沉浸与刷新                          | 1024–1149 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1150–1811 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 容器、搜索与设置操作                                | 1812–2368 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 文件导入、模板动作与页面事件                        | 2369–2947 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 右键菜单、批量删除/移出、拖拽与快捷键               | 2948–3066 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动与轮询                                          | 3067–3115 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 导入、状态、管辖与格式化                            | 1–295     | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 分发、快照、导航与提醒                              | 296–450   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 今日待办、本周日程日历、待补队列与静态实例列表      | 451–593   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 任务、目标、习惯模板、愿景与统计设置                | 594–1096  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 保护、定时锁机、沉浸与刷新                          | 1097–1222 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1223–1884 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 容器、搜索与设置操作                                | 1885–2410 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 文件导入、模板动作与页面事件                        | 2411–2989 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 右键菜单、批量删除/移出、拖拽与快捷键               | 2990–3108 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 启动与轮询                                          | 3109–3157 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 
 ## Symbols
 
 | Symbol               | Type     | Line |
 | -------------------- | -------- | ---- |
-| focusPage            | function | 455  |
-| isCatchUp            | function | 485  |
-| taskList             | function | 502  |
-| isoDate              | const    | 531  |
-| schedulePage         | function | 533  |
-| tasksPage            | function | 598  |
-| goalsPage            | function | 648  |
-| habitsTab            | function | 705  |
-| visionDialog         | function | 779  |
-| lineOutcomeLabel     | const    | 839  |
-| spanLabel            | const    | 854  |
-| goalStatsCard        | function | 856  |
-| crossSectionCard     | function | 876  |
-| statsPage            | function | 894  |
-| projectWhitelistCard | function | 984  |
-| guardPage            | function | 1024 |
-| templatesCard        | function | 1201 |
-| datesForPrinting     | function | 1212 |
-| printDialog          | function | 1240 |
-| templateDialog       | function | 1296 |
-| taskDialog           | function | 1690 |
-| goalDialog           | function | 1887 |
-| importPlan           | function | 2386 |
-| selectControls       | function | 2990 |
-| detachSelected       | function | 2995 |
-| deleteSelectedTasks  | function | 3005 |
-| sortProjects         | function | 3030 |
-| boot                 | function | 3072 |
+| focusPage            | function | 451  |
+| isCatchUp            | function | 481  |
+| taskList             | function | 498  |
+| isoDate              | const    | 527  |
+| schedulePage         | function | 529  |
+| tasksPage            | function | 594  |
+| goalsPage            | function | 644  |
+| habitsTab            | function | 701  |
+| visionDialog         | function | 775  |
+| lineOutcomeLabel     | const    | 835  |
+| spanLabel            | const    | 850  |
+| goalStatsCard        | function | 852  |
+| crossSectionCard     | function | 872  |
+| statsPage            | function | 890  |
+| projectWhitelistCard | function | 1057  |
+| guardPage            | function | 1097 |
+| templatesCard        | function | 1274 |
+| datesForPrinting     | function | 1285 |
+| printDialog          | function | 1313 |
+| templateDialog       | function | 1369 |
+| taskDialog           | function | 1763 |
+| goalDialog           | function | 1960 |
+| importPlan           | function | 2428 |
+| selectControls       | function | 3032 |
+| detachSelected       | function | 3037 |
+| deleteSelectedTasks  | function | 3047 |
+| sortProjects         | function | 3072 |
+| savePreferences | function | 954 |
+| settingsPage | function | 1043 |
+| boot                 | function | 3114 |
 
 模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通/目标待补呈现。
 
@@ -65,3 +67,5 @@ generated_at: 2026-10-11
 音效：accept 按旧/新 Snapshot 与成功 Action 选择一次音效；sound-events.ts 同时供提醒横幅选队列。soundPreviewControls 与设置保存共享 soundVolume；轮询使用快照版本丢弃操作期间的旧响应。
 
 侧栏排序：sort-projects 使用 showContextMenu；外部点击在捕获阶段关闭旧菜单，避免打开菜单的同次点击在冒泡阶段将其关闭。排序持久化仍使用 reorderProjects；项目右键菜单共享关闭逻辑。
+
+偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/备份。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。

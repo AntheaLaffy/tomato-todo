@@ -9,6 +9,7 @@ generated_at: 2026-10-10
 
 | 任务                             | Domain    | Target                                                                                                              | Also Check                                                                                                           |
 | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 偏好布局与保存时机 | 界面 | main.ts 的 settingsPage/savePreferences/navigate、style.css 的 settings-grid | tests/integration.mjs 的失焦/离页/手动/失败与布局检查 |
 | 调整页面布局                     | 界面      | main.ts.analysis.md、style.css.analysis.md                                                                          | —                                                                                                                    |
 | 任务到点提醒                     | 界面      | main.ts 的 pendingReminder/reminderBanner/taskDialog                                                                | Rust reminders.rs、桌面轮询                                                                                          |
 | 模板编辑、自动预印与手动整批印刷 | 界面/契约 | main.ts 的 templateDialog/focusBudget/printDialog/templatesCard（临时 / 手动 / 自动渐进披露）、types.ts 的 Template | crates/core/src/templates.rs、plan.rs、docs/CODEMAP.md                                                               |
