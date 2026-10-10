@@ -496,7 +496,7 @@ impl Agent {
             inner.live.wake_serial += 1;
             inner.store.save(&self.dir)?;
             inner.live.busy = true;
-            format!("本地检测到一个学习安排信号。看一眼当前数据和已确认背景，用一两句话说你注意到了什么、想问什么，不要罗列清单。仅分析、提问和生成待审阅文件，不应用修改。信号：{}",serde_json::to_string(&eligible).map_err(|e|e.to_string())?)
+            format!("本地检测到一个学习安排信号。看一眼当前数据和已确认背景，用一两句话说你注意到了什么、你的建议（怎么调、为什么）和想问的一个点，不要罗列清单。这一轮只分析、提问和准备待审阅文件，不直接改数据；用户回应后即可直接调整。信号：{}",serde_json::to_string(&eligible).map_err(|e|e.to_string())?)
         };
         (self.wake)();
         self.prompt(prompt, true, vec![])
@@ -854,7 +854,7 @@ impl Agent {
                         let s = engine.snapshot(now())?;
                         let inner = self.inner.lock().map_err(|e| e.to_string())?;
                         Ok(
-                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":["study-diagnosis","study-planning","study-memory","tomato-files","tomato-workspace","tomato-guide"],"permission":"仅分析、提问、编辑私有工作文件；应用需用户确认"}),
+                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":["study-diagnosis","study-planning","study-memory","tomato-files","tomato-workspace","tomato-guide"],"permission":"用户主动发起时可直接执行允许的操作；自动唤醒仅分析、提问与准备文件。保护规则不可绕开。"}),
                         )
                     }
                     _ => Err("未知工具".into()),

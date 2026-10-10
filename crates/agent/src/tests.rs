@@ -76,6 +76,7 @@ fn failed_patch_and_invalid_candidate_leave_files_and_data_untouched() {
 fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
     private_directory(&dir.join("workspace")).unwrap();
     let engine = Arc::new(Mutex::new(Engine::open(":memory:").unwrap()));
+    let apply_engine = engine.clone();
     Arc::new(Agent {
         engine,
         dir: dir.into(),
@@ -85,7 +86,16 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
             live: Live::default(),
         }),
         process: Mutex::new(None),
-        apply: Arc::new(|_, _| Err("unexpected apply".into())),
+        apply: Arc::new(move |action, expected| {
+            let mut engine = apply_engine.lock().map_err(|e| e.to_string())?;
+            let current = engine.snapshot(time())?;
+            if let Some(expected) = expected {
+                if !current.data.reminder_idle() || files::fingerprint(&current.data)? != expected {
+                    return Err("数据已变化或计时已启动，请重新审阅".into());
+                }
+            }
+            engine.dispatch(action, time())
+        }),
         wake: Arc::new(move || {
             wakes.fetch_add(1, Ordering::SeqCst);
         }),
@@ -119,6 +129,41 @@ fn agent_cannot_apply_or_dispatch_and_memories_need_confirmation() {
     assert_eq!(store.memories[0].text, "用户确认的时间限制");
     let info = agent.status().unwrap();
     assert!(info.get("apiKey").is_none());
+}
+#[test]
+fn interactive_calls_can_configure_tasks_directly() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    // An automatic wake may only analyse; the same call is authorised once the user asks.
+    assert_eq!(
+        agent
+            .call("create_task", &json!({"title":"刷题"}), true)
+            .unwrap_err(),
+        "工具未授权"
+    );
+    let created = agent
+        .call(
+            "create_task",
+            &json!({"title":"刷题","estimate":2,"dueDate":"2026-10-12"}),
+            false,
+        )
+        .unwrap();
+    let id = created["data"]["tasks"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let moved = agent
+        .call(
+            "move_tasks",
+            &json!({"ids":[*id.clone()],"dueDate":"2026-10-13"}),
+            false,
+        )
+        .unwrap();
+    assert_eq!(moved["data"]["tasks"][0]["dueDate"], "2026-10-13");
+    let done = agent
+        .call("complete_task", &json!({"id":*id.clone()}), false)
+        .unwrap();
+    assert_eq!(done["data"]["tasks"][0]["completed"], true);
 }
 #[test]
 fn wake_waits_for_idle_respects_quiet_and_deduplicates_across_restart() {
