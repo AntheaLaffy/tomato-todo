@@ -8,12 +8,13 @@ use std::{
 };
 use uuid::Uuid;
 pub mod guard;
+pub mod habits;
 pub mod lock;
 pub mod plan;
 pub mod reminders;
 
 pub type AppResult<T> = Result<T, String>;
-fn id() -> String {
+pub(crate) fn id() -> String {
     Uuid::new_v4().to_string()
 }
 pub fn now() -> i64 {
@@ -62,6 +63,29 @@ pub struct Goal {
     pub due_date: Option<String>,
 }
 
+/// One "weekdays at a time" band of a routine.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HabitSlot {
+    /// 1 = Monday … 7 = Sunday.
+    pub days: Vec<u8>,
+    pub time: String,
+}
+
+/// A weekly routine that materializes one ordinary task per scheduled day, so a
+/// habit can run at different times on different days without manual bookkeeping.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Habit {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_minutes: Option<u32>,
+    pub slots: Vec<HabitSlot>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Subtask {
@@ -79,6 +103,8 @@ pub struct Task {
     pub project_id: Option<String>,
     #[serde(default)]
     pub goal_id: Option<String>,
+    #[serde(default)]
+    pub habit_id: Option<String>,
     pub due_date: Option<String>,
     #[serde(default)]
     pub reminder_time: Option<String>,
@@ -90,6 +116,10 @@ pub struct Task {
     pub reminder_fired: bool,
     #[serde(default)]
     pub reminder_pending: bool,
+    /// Set once the task's day has passed or its planned block is over. A
+    /// routine (timed, no goal) is spent from then on; it does not roll over.
+    #[serde(default)]
+    pub reminder_expired: bool,
     pub completed: bool,
     pub completed_at: Option<i64>,
     pub created_at: i64,
@@ -272,6 +302,8 @@ pub struct AppData {
     pub projects: Vec<Project>,
     #[serde(default)]
     pub goals: Vec<Goal>,
+    #[serde(default)]
+    pub habits: Vec<Habit>,
     pub settings: Settings,
     pub timer: Timer,
     pub sessions: Vec<Session>,
@@ -304,6 +336,7 @@ impl Default for AppData {
                 },
             ],
             goals: vec![],
+            habits: vec![],
             settings: Settings::default(),
             timer: Timer::default(),
             sessions: vec![],
@@ -363,6 +396,18 @@ pub enum Action {
     DeleteGoal {
         id: String,
     },
+    SaveHabit {
+        id: Option<String>,
+        name: String,
+        #[serde(default)]
+        project_id: Option<String>,
+        #[serde(default)]
+        focus_minutes: Option<u32>,
+        slots: Vec<HabitSlot>,
+    },
+    DeleteHabit {
+        id: String,
+    },
     SelectTask {
         id: Option<String>,
     },
@@ -402,6 +447,8 @@ pub struct DayStat {
     pub date: String,
     pub seconds: u64,
     pub pomodoros: u32,
+    /// Routines (timed, no goal) whose day passed without being completed.
+    pub missed: u32,
 }
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -549,7 +596,8 @@ impl AppData {
     }
     /// Advance at most one phase after downtime: never fabricate unattended focus sessions.
     pub fn tick(&mut self, at: i64) -> bool {
-        let changed = self.tick_with_lock(at);
+        let materialized = self.materialize_habits(at);
+        let changed = self.tick_with_lock(at) || materialized;
         self.tick_reminders(at) || changed
     }
     fn tick_with_lock(&mut self, at: i64) -> bool {
@@ -681,6 +729,7 @@ impl AppData {
                     notes: d.notes,
                     project_id: d.project_id,
                     goal_id: d.goal_id,
+                    habit_id: old.and_then(|t| t.habit_id.clone()),
                     reminder_fired: old.is_some_and(|t| {
                         t.due_date == d.due_date
                             && t.reminder_time == d.reminder_time
@@ -690,6 +739,11 @@ impl AppData {
                         t.due_date == d.due_date
                             && t.reminder_time == d.reminder_time
                             && t.reminder_pending
+                    }),
+                    reminder_expired: old.is_some_and(|t| {
+                        t.due_date == d.due_date
+                            && t.reminder_time == d.reminder_time
+                            && t.reminder_expired
                     }),
                     focus_minutes: d.focus_minutes,
                     reminder_time: d.reminder_time,
@@ -865,6 +919,42 @@ impl AppData {
                     }
                 }
             }
+            Action::SaveHabit {
+                id: hid,
+                name,
+                project_id,
+                focus_minutes,
+                slots,
+            } => {
+                if let Some(hid) = hid {
+                    let h = self
+                        .habits
+                        .iter_mut()
+                        .find(|h| h.id == hid)
+                        .ok_or("习惯不存在")?;
+                    h.name = name.trim().into();
+                    h.project_id = project_id;
+                    h.focus_minutes = focus_minutes;
+                    h.slots = slots;
+                } else {
+                    self.habits.push(Habit {
+                        id: id(),
+                        name: name.trim().into(),
+                        project_id,
+                        focus_minutes,
+                        slots,
+                    });
+                }
+            }
+            Action::DeleteHabit { id } => {
+                self.habits.retain(|h| h.id != id);
+                // Existing occurrences keep running as ordinary timed tasks.
+                for task in &mut self.tasks {
+                    if task.habit_id.as_ref() == Some(&id) {
+                        task.habit_id = None;
+                    }
+                }
+            }
             Action::SelectTask { id } => {
                 if id
                     .as_ref()
@@ -955,11 +1045,13 @@ impl AppData {
                         notes: notes.into(),
                         project_id: self.projects.get(index).map(|p| p.id.clone()),
                         goal_id: None,
+                        habit_id: None,
                         due_date: Some(today.clone()),
                         reminder_time: None,
                         focus_minutes: None,
                         reminder_fired: false,
                         reminder_pending: false,
+                        reminder_expired: false,
                         priority,
                         estimate,
                         completed: false,
@@ -1050,6 +1142,19 @@ impl AppData {
                 "无效的目标日期",
             )?;
         }
+        let mut habit_ids = HashSet::new();
+        ensure(self.habits.len() <= 500, "习惯数量超出限制")?;
+        for h in &self.habits {
+            ensure(
+                !h.id.is_empty() && habit_ids.insert(&h.id),
+                "习惯 ID 重复或为空",
+            )?;
+            habits::validate(h)?;
+            ensure(
+                h.project_id.as_ref().is_none_or(|p| ids.contains(p)),
+                "习惯引用了不存在的项目",
+            )?;
+        }
         let projects = ids;
         let mut tasks = HashSet::new();
         for t in &self.tasks {
@@ -1079,6 +1184,10 @@ impl AppData {
             ensure(
                 t.goal_id.as_ref().is_none_or(|g| goal_ids.contains(g)),
                 "任务引用了不存在的目标",
+            )?;
+            ensure(
+                t.habit_id.as_ref().is_none_or(|h| habit_ids.contains(h)),
+                "任务引用了不存在的习惯",
             )?;
             ensure(
                 t.due_date.as_ref().is_none_or(|d| {
@@ -1136,15 +1245,28 @@ impl AppData {
             entry.0 += session.duration_secs as u64;
             entry.1 += u32::from(session.completed);
         }
+        let mut missed_by_day: HashMap<&str, u32> = HashMap::new();
+        for t in &self.tasks {
+            if t.reminder_expired && t.goal_id.is_none() {
+                if let Some(date) = t.due_date.as_deref() {
+                    *missed_by_day.entry(date).or_default() += 1;
+                }
+            }
+        }
         let days: Vec<DayStat> = (0..28)
             .rev()
             .map(|n| {
                 let date = current.checked_sub_days(Days::new(n)).unwrap().to_string();
                 let (seconds, pomodoros) = by_day.get(&date).copied().unwrap_or_default();
+                let missed = missed_by_day
+                    .get(date.as_str())
+                    .copied()
+                    .unwrap_or_default();
                 DayStat {
                     date,
                     seconds,
                     pomodoros,
+                    missed,
                 }
             })
             .collect();

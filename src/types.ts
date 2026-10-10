@@ -14,6 +14,17 @@ export interface Goal {
   measure: "count" | "time";
   dueDate: string | null;
 }
+export interface HabitSlot {
+  days: number[];
+  time: string;
+}
+export interface Habit {
+  id: string;
+  name: string;
+  projectId: string | null;
+  focusMinutes: number | null;
+  slots: HabitSlot[];
+}
 export interface PlanProject {
   id: string;
   name: string;
@@ -31,11 +42,13 @@ export interface Task {
   notes: string;
   projectId: string | null;
   goalId: string | null;
+  habitId: string | null;
   dueDate: string | null;
   reminderTime: string | null;
   focusMinutes: number | null;
   reminderFired: boolean;
   reminderPending: boolean;
+  reminderExpired: boolean;
   priority: number;
   estimate: number;
   completed: boolean;
@@ -106,6 +119,7 @@ export interface AppData {
   tasks: Task[];
   projects: Project[];
   goals: Goal[];
+  habits: Habit[];
   settings: Settings;
   timer: Timer;
   sessions: Session[];
@@ -140,7 +154,12 @@ export interface Snapshot {
     totalSeconds: number;
     totalPomodoros: number;
     streak: number;
-    days: { date: string; seconds: number; pomodoros: number }[];
+    days: {
+      date: string;
+      seconds: number;
+      pomodoros: number;
+      missed: number;
+    }[];
   };
   remainingSecs: number;
   today: string;

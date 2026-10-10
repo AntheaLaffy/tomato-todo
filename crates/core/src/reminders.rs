@@ -74,14 +74,21 @@ impl AppData {
         let mut changed = false;
         for t in &mut self.tasks {
             let today = t.due_date.as_deref() == Some(&date);
-            // Past its whole planned block, an unstarted reminder is void: it
-            // no longer fires or pulls the window back today.
-            let expired = today
-                && t.reminder_time
-                    .as_deref()
-                    .and_then(minutes_of)
-                    .is_some_and(|start| now_minutes > start + window_minutes(t, settings));
-            if (t.completed || !today || expired) && t.reminder_pending {
+            let past = t.due_date.as_deref().is_some_and(|d| d < date.as_str());
+            let start = t.reminder_time.as_deref().and_then(minutes_of);
+            // A timed task is spent once its day has passed, or once its planned
+            // block is over today; from then on it neither fires nor rolls over.
+            let expired = match start {
+                Some(s) if !t.completed => {
+                    past || (today && now_minutes > s + window_minutes(t, settings))
+                }
+                _ => false,
+            };
+            if expired && !t.reminder_expired {
+                t.reminder_expired = true;
+                changed = true;
+            }
+            if (t.completed || expired || !today) && t.reminder_pending {
                 t.reminder_pending = false;
                 changed = true;
             }
@@ -93,10 +100,7 @@ impl AppData {
                 && !t.reminder_fired
                 && today
                 && !expired
-                && t.reminder_time
-                    .as_deref()
-                    .and_then(minutes_of)
-                    .is_some_and(|start| start <= now_minutes)
+                && start.is_some_and(|s| s <= now_minutes)
             {
                 t.reminder_fired = true;
                 t.reminder_pending = true;

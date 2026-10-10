@@ -606,6 +606,134 @@ fn goal_validation_rejects_bad_fields() {
 }
 
 #[test]
+fn expired_routines_count_as_misses_but_goal_work_does_not() {
+    let mut e = engine();
+    let mut routine = draft();
+    routine.due_date = Some("2026-10-09".into());
+    routine.reminder_time = Some("09:00".into());
+    routine.focus_minutes = Some(25);
+    routine.estimate = 1;
+    e.dispatch(Action::SaveTask { task: routine }, friday(8, 0))
+        .unwrap();
+    // The same schedule under a goal is a catch-up, not a routine miss.
+    let s = e
+        .dispatch(
+            Action::SaveGoal {
+                id: None,
+                name: "OpenCamp".into(),
+                target: 1.0,
+                unit: "节".into(),
+                measure: GoalMeasure::Count,
+                due_date: None,
+            },
+            friday(8, 0),
+        )
+        .unwrap();
+    let goal = s.data.goals[0].id.clone();
+    let mut goal_task = draft();
+    goal_task.due_date = Some("2026-10-09".into());
+    goal_task.reminder_time = Some("09:00".into());
+    goal_task.focus_minutes = Some(25);
+    goal_task.estimate = 1;
+    goal_task.goal_id = Some(goal);
+    e.dispatch(Action::SaveTask { task: goal_task }, friday(8, 0))
+        .unwrap();
+    let s = e.snapshot(friday(12, 0)).unwrap();
+    assert!(s.data.tasks.iter().all(|t| t.reminder_expired));
+    let day = s
+        .stats
+        .days
+        .iter()
+        .find(|d| d.date == "2026-10-09")
+        .unwrap();
+    assert_eq!(day.missed, 1);
+}
+
+#[test]
+fn habits_materialize_today_once_and_detach_on_delete() {
+    let mut e = engine();
+    let s = e
+        .dispatch(
+            Action::SaveHabit {
+                id: None,
+                name: "午饭".into(),
+                project_id: None,
+                focus_minutes: Some(25),
+                slots: vec![
+                    HabitSlot {
+                        days: vec![1, 2, 3, 4, 5],
+                        time: "12:00".into(),
+                    },
+                    HabitSlot {
+                        days: vec![6, 7],
+                        time: "12:40".into(),
+                    },
+                ],
+            },
+            friday(8, 0),
+        )
+        .unwrap();
+    let habit = s.data.habits[0].id.clone();
+    let todays: Vec<_> = s
+        .data
+        .tasks
+        .iter()
+        .filter(|t| t.habit_id.as_deref() == Some(habit.as_str()))
+        .collect();
+    assert_eq!(todays.len(), 1);
+    assert_eq!(todays[0].reminder_time.as_deref(), Some("12:00"));
+    assert_eq!(todays[0].due_date.as_deref(), Some("2026-10-09"));
+    // Ticking again must not duplicate the occurrence.
+    let s = e.snapshot(friday(8, 1)).unwrap();
+    assert_eq!(
+        s.data
+            .tasks
+            .iter()
+            .filter(|t| t.habit_id.as_deref() == Some(habit.as_str()))
+            .count(),
+        1
+    );
+    // Deleting the habit leaves the occurrence as an ordinary timed task.
+    e.dispatch(Action::DeleteHabit { id: habit }, friday(8, 2))
+        .unwrap();
+    assert!(e
+        .snapshot(friday(8, 2))
+        .unwrap()
+        .data
+        .tasks
+        .iter()
+        .all(|t| t.habit_id.is_none()));
+}
+
+#[test]
+fn habit_validation_rejects_overlapping_days_and_bad_times() {
+    let mut e = engine();
+    let slot = |days: Vec<u8>, time: &str| HabitSlot {
+        days,
+        time: time.into(),
+    };
+    for slots in [
+        vec![slot(vec![1, 2], "12:00"), slot(vec![2, 3], "12:30")],
+        vec![slot(vec![], "12:00")],
+        vec![slot(vec![1], "25:00")],
+        vec![],
+    ] {
+        assert!(e
+            .dispatch(
+                Action::SaveHabit {
+                    id: None,
+                    name: "习惯".into(),
+                    project_id: None,
+                    focus_minutes: None,
+                    slots,
+                },
+                friday(8, 0),
+            )
+            .is_err());
+    }
+}
+
+#[test]
 fn protection_rejects_mutations_until_emergency_or_completion() {
     let mut e = engine();
     let settings = Settings {

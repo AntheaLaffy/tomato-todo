@@ -116,6 +116,14 @@ test(
       await expect(
         page.locator(".goal-section").filter({ hasText: "OpenCamp" }),
       ).toBeVisible();
+      await page.locator("[data-goals-tab=habits]").click();
+      await expect(page.locator("[data-goals-tab=habits]")).toHaveClass(
+        /active/,
+      );
+      await expect(
+        page.getByRole("button", { name: "新建习惯", exact: true }),
+      ).toBeVisible();
+      await page.locator("[data-goals-tab=goals]").click();
       await page.locator("[data-page=focus]").first().click();
       await page.getByRole("button", { name: "开始专注", exact: true }).click();
       await expect(
@@ -312,6 +320,22 @@ test(
       });
       await page.reload();
       await expect(reminder).toHaveCount(0);
+      // A weekly habit materializes today's occurrence from its schedule.
+      await page.locator("[data-page=goals]").first().click();
+      await page.locator("[data-goals-tab=habits]").click();
+      await page.getByRole("button", { name: "新建习惯", exact: true }).click();
+      await page.locator("#habit-form [name=name]").fill("午饭");
+      const slot = page.locator("[data-slot]").first();
+      for (const day of [1, 2, 3, 4, 5, 6, 7])
+        await slot.locator(`input[value="${day}"]`).check();
+      await slot.locator("input[type=time]").fill("12:00");
+      await page.getByRole("button", { name: "保存习惯", exact: true }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      const habitSection = page
+        .locator(".goal-section")
+        .filter({ hasText: "午饭" });
+      await expect(habitSection).toBeVisible();
+      await expect(habitSection.locator("[data-task-id]")).toHaveCount(1);
       assert.deepEqual(errors, []);
     } finally {
       await browser?.close();

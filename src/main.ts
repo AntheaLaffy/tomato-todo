@@ -74,6 +74,7 @@ import type {
   DesktopStatus,
   GuardInfo,
   Goal,
+  Habit,
   Mode,
   Project,
   Settings,
@@ -152,6 +153,7 @@ const icons = () =>
 const logo = `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 12C8 5 3 19 8 32c3 9 12 12 16 8 5 4 15 0 17-9C45 17 38 6 24 12Z" fill="currentColor"/><path d="m24 13-8-5 8 2 5-6-1 7 8 1-10 3" fill="#7c997a"/><path d="M14 22c-1 4 0 7 2 9" stroke="white" stroke-opacity=".65" stroke-width="3" stroke-linecap="round"/></svg>`;
 let state: Snapshot;
 let page = "focus";
+let goalsTab = "goals";
 let filter = "active";
 let reminderSeen = "";
 let priority = "all";
@@ -172,7 +174,7 @@ let toastTimer: ReturnType<typeof setTimeout>;
 const labels: Record<string, string> = {
   focus: "今日专注",
   tasks: "全部任务",
-  goals: "目标",
+  goals: "目标与习惯",
   stats: "数据统计",
   guard: "专注保护",
   lock: "定时锁机",
@@ -194,6 +196,19 @@ const strictNow = () =>
     : protectedNow() && state.data.settings.protection.strict;
 const projectOf = (task: Task) =>
   state.data.projects.find((p) => p.id === task.projectId);
+// Categories are derived, not stored: a goal task accumulates, any other timed
+// task is a routine (a spent one does not roll over), the rest is flexible.
+const isHabit = (task: Task) => !task.goalId && !!task.reminderTime;
+const dayLabel = (d: number) => "一二三四五六日"[d - 1] ?? "?";
+const daysLabel = (days: number[]) => {
+  const sorted = [...days].sort((a, b) => a - b);
+  if (sorted.length === 7) return "每天";
+  if (sorted.join() === "1,2,3,4,5") return "工作日";
+  if (sorted.join() === "6,7") return "周末";
+  return "周" + sorted.map(dayLabel).join("");
+};
+const isExpiredHabit = (task: Task) =>
+  isHabit(task) && task.reminderExpired && !task.completed;
 const goalProgress = (g: Goal) => {
   if (g.measure === "time") {
     const ids = new Set(
@@ -422,7 +437,10 @@ function focusPage() {
     { month: "long", day: "numeric", weekday: "long" },
   );
   const todayTasks = state.data.tasks.filter(
-    (t) => !t.completed && (!t.dueDate || t.dueDate <= state.today),
+    (t) =>
+      !t.completed &&
+      (!t.dueDate || t.dueDate <= state.today) &&
+      !isExpiredHabit(t),
   );
   return `${heading("今天，也要慢慢向前。", `${weekday} <span class="dot-separator">·</span> 专注当下，让每一小步都有回响。`)}
     <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办，按自己的节奏来`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
@@ -521,22 +539,108 @@ function tasksPage() {
 }
 function goalsPage() {
   const goals = state.data.goals;
-  return `${heading("目标", "把长期的事，放在一起慢慢推进。", "LONG GAMES, SMALL STEPS", false)}
-  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs"><button class="active">全部目标 <span>${goals.length}</span></button></div><div class="toolbar-controls"><button class="button secondary small-button" data-action="new-goal">${icon("plus")} 新建目标</button></div></div>
-  ${
-    goals.length
-      ? goals
-          .map((g) => {
-            const remaining = state.data.tasks.filter(
-              (t) => t.goalId === g.id && !t.completed,
-            );
-            return `<section class="goal-section"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${g.id}" aria-label="编辑目标">${icon("pencil")}</button></div><div class="goal-figure"><b>${progressLabel(g)}</b><span>${escape(g.unit)}${g.dueDate ? ` · 截止 ${dateLabel(g.dueDate)}` : ""}</span></div><div class="progress-track"><i style="width:${Math.min(100, (goalProgress(g) / g.target) * 100)}%"></i></div><h4 class="group-title">待完成<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : '<p class="subtle small">这个目标暂时没有待完成的任务。</p>'}</section>`;
-          })
-          .join("")
-      : `<div class="empty-state"><div class="empty-illustration">${icon("target")}</div><h3>还没有目标</h3><p>把需要长期积累的事建成目标，把听课、作业等任务挂到它下面。</p><button class="text-button" data-action="new-goal">新建目标 →</button></div>`
-  }
+  const habits = state.data.tasks.filter((t) => isHabit(t) && !t.completed);
+  return `${heading("目标与习惯", "长期的事慢慢积累，日常的事一次做完。", "LONG GAMES, SMALL STEPS", false)}
+  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs"><button data-goals-tab="goals" class="${goalsTab === "goals" ? "active" : ""}">目标 <span>${goals.length}</span></button><button data-goals-tab="habits" class="${goalsTab === "habits" ? "active" : ""}">习惯 <span>${state.data.habits.length}</span></button></div><div class="toolbar-controls">${
+    goalsTab === "habits"
+      ? `<button class="button secondary small-button" data-action="new-habit">${icon("plus")} 新建习惯</button>`
+      : `<button class="button secondary small-button" data-action="new-goal">${icon("plus")} 新建目标</button>`
+  }</div></div>
+  ${goalsTab === "habits" ? habitsTab(habits) : goalsTabContent(goals)}
   </section>`;
 }
+function goalsTabContent(goals: Goal[]) {
+  if (!goals.length)
+    return `<div class="empty-state"><div class="empty-illustration">${icon("target")}</div><h3>还没有目标</h3><p>把需要长期积累的事建成目标，把听课、作业等任务挂到它下面。</p><button class="text-button" data-action="new-goal">新建目标 →</button></div>`;
+  return goals
+    .map((g) => {
+      const remaining = state.data.tasks.filter(
+        (t) => t.goalId === g.id && !t.completed,
+      );
+      return `<section class="goal-section"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${g.id}" aria-label="编辑目标">${icon("pencil")}</button></div><div class="goal-figure"><b>${progressLabel(g)}</b><span>${escape(g.unit)}${g.dueDate ? ` · 截止 ${dateLabel(g.dueDate)}` : ""}</span></div><div class="progress-track"><i style="width:${Math.min(100, (goalProgress(g) / g.target) * 100)}%"></i></div><h4 class="group-title">待完成<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : '<p class="subtle small">这个目标暂时没有待完成的任务。</p>'}</section>`;
+    })
+    .join("");
+}
+function habitsTab(habits: Task[]) {
+  const managed = state.data.habits;
+  const adhoc = habits.filter((t) => !t.habitId);
+  if (!managed.length && !adhoc.length)
+    return `<div class="empty-state"><div class="empty-illustration">${icon("clock-3")}</div><h3>还没有习惯</h3><p>把每天要做的事建成习惯，可以为不同星期设置不同时间；过期未做会从今日待办移出并计一次缺勤。</p><button class="text-button" data-action="new-habit">新建习惯 →</button></div>`;
+  return [
+    ...managed.map((h) => {
+      const project = state.data.projects.find((p) => p.id === h.projectId);
+      const schedule = h.slots
+        .map((s) => `${daysLabel(s.days)} ${s.time}`)
+        .join(" · ");
+      const today = state.data.tasks.filter(
+        (t) => t.habitId === h.id && !t.completed,
+      );
+      return `<section class="goal-section"><div class="goal-head"><h3>${icon("clock-3")} ${escape(h.name)}</h3><button class="icon-btn" data-edit-habit="${h.id}" aria-label="编辑习惯">${icon("pencil")}</button></div><p class="habit-meta">${project ? `${escape(project.name)} · ` : ""}${escape(schedule)}${h.focusMinutes ? ` · ${h.focusMinutes} 分钟/次` : ""}</p>${today.length ? taskList(today) : '<p class="subtle small">今天没有这一次。</p>'}</section>`;
+    }),
+    ...(adhoc.length
+      ? [
+          `<h3 class="group-title">临时定时任务<span>${adhoc.length}</span></h3>${taskList(adhoc)}`,
+        ]
+      : []),
+  ].join("");
+}
+function habitDialog(id?: string) {
+  const h = state.data.habits.find((h) => h.id === id);
+  const slotRow = (days: number[], time: string) =>
+    `<div class="habit-slot" data-slot><div class="slot-days">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label><input type="checkbox" value="${d}" ${days.includes(d) ? "checked" : ""}>${dayLabel(d)}</label>`).join("")}</div><input type="time" value="${escape(time)}" aria-label="时段"><button type="button" class="icon-btn tiny" data-remove-slot aria-label="移除时段">${icon("x")}</button></div>`;
+  const slots = h?.slots.length ? h.slots : [{ days: [], time: "" }];
+  modal(
+    `${modalHeader(h ? "编辑习惯" : "新建习惯", "同一个习惯，可以每天不同时间。")}<form id="habit-form"><label class="form-field"><span>习惯名称</span><input name="name" maxlength="40" required autofocus value="${escape(h?.name)}" placeholder="例如：午饭"></label><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${h?.projectId === p.id ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>单次时长 <small>可选</small></span><input name="focusMinutes" type="number" min="1" max="180" value="${h?.focusMinutes ?? ""}" placeholder="${state.data.settings.focusMinutes} 分钟"></label></div><div class="form-field"><span>每周时段</span><div id="habit-slots">${slots.map((s) => slotRow(s.days, s.time)).join("")}</div><button type="button" class="text-button" id="add-slot">${icon("plus")} 添加时段</button></div><div class="modal-actions">${h ? `<button type="button" class="text-button danger-text" id="delete-habit">删除习惯</button>` : "<span></span>"}<button type="submit" class="button primary">保存习惯</button></div></form>`,
+  );
+  $("#add-slot").onclick = () =>
+    $("#habit-slots").insertAdjacentHTML("beforeend", slotRow([], ""));
+  $("#habit-form").addEventListener("click", (e) => {
+    const btn = (e.target as Element).closest("[data-remove-slot]");
+    if (btn && document.querySelectorAll("[data-slot]").length > 1)
+      (btn as HTMLElement).closest("[data-slot]")?.remove();
+  });
+  $("#habit-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    const formSlots = [
+      ...document.querySelectorAll<HTMLElement>("[data-slot]"),
+    ].map((row) => ({
+      days: [...row.querySelectorAll<HTMLInputElement>("input:checked")].map(
+        (c) => Number(c.value),
+      ),
+      time: row.querySelector<HTMLInputElement>("input[type=time]")!.value,
+    }));
+    if (
+      await act(
+        {
+          type: "saveHabit",
+          id: h?.id || null,
+          name: f.get("name"),
+          projectId: f.get("projectId") || null,
+          focusMinutes: f.get("focusMinutes")
+            ? Number(f.get("focusMinutes"))
+            : null,
+          slots: formSlots,
+        },
+        "习惯已保存",
+      )
+    )
+      closeModal();
+  };
+  if (h)
+    $("#delete-habit").onclick = () =>
+      confirmDialog(
+        "删除这个习惯？",
+        "已经生成的当天任务会保留为普通定时任务。",
+        "删除习惯",
+        async () => {
+          await act({ type: "deleteHabit", id: h.id }, "习惯已删除");
+          closeModal();
+        },
+        true,
+      );
+}
+
 function weekChart(large: boolean) {
   const days = state.stats.days.slice(-7),
     max = Math.max(60 * 60, ...days.map((d) => d.seconds));
@@ -552,7 +656,14 @@ function statsPage() {
       (totals.get(session.projectName) || 0) + session.durationSecs,
     ),
   );
-  return `${heading("你的投入，都有迹可循。", "不和别人比较，只看见自己的每一点进步。", "YOUR TIME, WELL SPENT", false)}<div class="metrics">${metric("clock-3", "累计专注", Math.floor(s.totalSeconds / 60), "分钟", "每一分钟都算数", "coral")}${metric("target", "完成番茄", s.totalPomodoros, "个", "完整完成的专注周期", "sage")}${metric("flame", "连续专注", s.streak, "天", "从一个小小的坚持开始", "amber")}</div>
+  return `${heading("你的投入，都有迹可循。", "不和别人比较，只看见自己的每一点进步。", "YOUR TIME, WELL SPENT", false)}<div class="metrics">${metric("clock-3", "累计专注", Math.floor(s.totalSeconds / 60), "分钟", "每一分钟都算数", "coral")}${metric("target", "完成番茄", s.totalPomodoros, "个", "完整完成的专注周期", "sage")}${metric("flame", "连续专注", s.streak, "天", "从一个小小的坚持开始", "amber")}${metric(
+    "alert-circle",
+    "习惯缺勤",
+    s.days.reduce((a, d) => a + d.missed, 0),
+    "次",
+    "近 28 天未完成的定时习惯",
+    "coral",
+  )}</div>
   <div class="stats-grid"><section class="card"><div class="card-heading"><h2>最近 7 天</h2><span class="subtle small">总计 ${duration(s.days.slice(-7).reduce((n, d) => n + d.seconds, 0))}</span></div>${weekChart(true)}</section><section class="card distribution"><div class="card-heading"><h2>时间花在哪里</h2>${icon("folder")}</div>${
     totals.size
       ? [...totals]
@@ -1332,6 +1443,11 @@ document.addEventListener("click", async (e) => {
       navigate("focus");
     return;
   }
+  if (d.goalsTab) {
+    goalsTab = d.goalsTab;
+    render();
+    return;
+  }
   if (d.page) {
     navigate(d.page);
     return;
@@ -1401,6 +1517,10 @@ document.addEventListener("click", async (e) => {
   }
   if (d.editGoal) {
     goalDialog(d.editGoal);
+    return;
+  }
+  if (d.editHabit) {
+    habitDialog(d.editHabit);
     return;
   }
   if (d.guardMode) {
@@ -1519,6 +1639,9 @@ document.addEventListener("click", async (e) => {
       break;
     case "new-goal":
       goalDialog();
+      break;
+    case "new-habit":
+      habitDialog();
       break;
     case "close-modal":
       closeModal();

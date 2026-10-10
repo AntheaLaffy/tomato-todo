@@ -11,6 +11,8 @@ generated_at: 2026-10-10
 | --- | --- | --- | --- |
 | 修改任务/重复规则 | 业务核心 | lib.rs 的 AppData::apply | tests.rs、src/types.ts |
 | 目标容器与待补 | 业务核心 | lib.rs 的 Goal/goal_progress | src/main.ts 的 goalDialog/taskList、docs/BACKUP_FORMAT.md |
+| 过期习惯与缺勤统计 | 业务核心 | reminders.rs 的 tick_reminders、lib.rs 的 stats/DayStat.missed | src/main.ts 的 isExpiredHabit、docs/BACKUP_FORMAT.md |
+| 习惯时段与当天生成 | 业务核心 | habits.rs、lib.rs 的 materialize_habits | src/main.ts 的 habitDialog/habitsTab、docs/BACKUP_FORMAT.md |
 | 计划合并/导出与文件校验 | 文件契约 | plan.rs | docs/CODEMAP.md、tests.rs、桌面/预览与 TypeScript 消费方 |
 | 修复倒计时与统计 | 业务核心 | lib.rs 的 tick/stats/Engine | tests.rs、桌面后台线程 |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
@@ -20,8 +22,8 @@ generated_at: 2026-10-10
 
 | Symbol | Source | Line |
 | --- | --- | --- |
-| AppData / Action | lib.rs | L:269 / L:321 |
-| Engine | lib.rs | L:1182 |
+| AppData / Action | lib.rs | L:299 / L:354 |
+| Engine | lib.rs | L:1304 |
 | guard | guard.rs | L:1 |
 
 ## 文件
@@ -34,3 +36,4 @@ generated_at: 2026-10-10
 | guard.rs | 桌面保护 | niri IPC 能力检测、精确应用匹配和回焦 |
 | tests.rs | 验证 | 状态、持久化、保护与计划往返/失败原子性回归测试 |
 | reminders.rs | 时间安排 | 日期/时间与单次时长校验、当天待处理队列、计时/锁机延后、跨日清理 |
+| habits.rs | 习惯 | 每周时段校验（星期不重复、HH:MM）与按当天星期生成未重复的当天任务 |

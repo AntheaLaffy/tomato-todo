@@ -17,6 +17,7 @@ generated_at: 2026-10-10
 | 修改桌面设置 | 桥接 | api.ts、main.ts 的 desktopSettingsCard | src-tauri/src/desktop.rs；浏览器隐藏这些设置 |
 | 项目专属应用白名单 | 界面/桥接 | main.ts 的 projectWhitelistCard/addProjectWhitelist、types.ts 的 PlanProject | crates/core/src/plan.rs、src-tauri/src/main.rs 的保护循环、docs/CODEMAP.md；项目页承载编辑，专注保护页只管通用白名单 |
 | 目标容器与待补 | 界面 | main.ts 的 goalDialog/tasksPage/taskList、types.ts 的 Goal | crates/core/src/lib.rs 的 Goal/goal_progress、docs/BACKUP_FORMAT.md |
+| 习惯时段与当天生成 | 界面 | main.ts 的 goalsPage/habitsTab/habitDialog、types.ts 的 Habit | crates/core/src/habits.rs、docs/BACKUP_FORMAT.md |
 | 定时锁机/严格模式界面 | 界面 | main.ts 的 lockPage/lockDialog/guardPage/renderImmersive | types.ts、crates/core/src/lock.rs、桌面桥接 |
 
 ## 文件

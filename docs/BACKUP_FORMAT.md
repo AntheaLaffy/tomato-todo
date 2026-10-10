@@ -11,6 +11,7 @@
 | `version` | 数据版本 | 固定 `1` |
 | `projects` | 项目数组 | 最多 500 项，`id/name/color/appWhitelist` 同计划格式；`appWhitelist` 可选；提供时专注该项目的任务用这份专属清单替代通用白名单 |
 | `goals` | 目标数组 | 最多 500 项；含 `name`、`target`(>0)、`unit`、`measure`(`count` 按已完成任务数 / `time` 按累计专注小时)，可选 `dueDate`；旧文件省略时为空 |
+| `habits` | 习惯数组 | 最多 500 项；含 `name`、`slots`(`days` 1—7 与 `time` HH:MM，同一个星期只能出现一次)，可选 `projectId`、`focusMinutes`；旧文件省略时为空 |
 | `tasks` | 全部任务，包括已完成任务 | 最多 50,000 项 |
 | `settings` | 番茄钟、主题与专注保护设置 | 必填 |
 | `timer` | 当前计时器 | 必填 |
@@ -23,7 +24,9 @@
 
 任务包含学习计划中的全部字段，另有 `completed`（布尔值）、`completedAt`（Unix 秒或 null）、`createdAt`（Unix 秒）、`nextTaskId`（下一次重复任务 ID 或 null）。子任务另有 `done` 布尔值。`completed` 必须与 `completedAt` 是否存在一致。完整备份中的 `notes`、`priority`、`estimate`、`tags`、`subtasks`、`completed`、`createdAt` 不能省略；`repeat` 默认为 `none`。
 
-任务带可选的 `goalId`，指向所属目标；属于目标的过期未完成任务会在今日专注里标为「待补」。旧备份缺少 `goals` 或 `goalId` 时按空处理。
+任务带可选的 `goalId`（所属目标）与 `habitId`（所属习惯）。属于目标的过期未完成任务会在今日专注里标为「待补」；习惯按 `slots` 的星期生成当天任务（`habitId` 指向习惯，`reminderTime` 取该时段）。旧备份缺少 `goals`、`habits`、`goalId` 或 `habitId` 时按空处理。
+
+提醒的送达状态 `reminderFired` / `reminderPending` / `reminderExpired` 属于本机执行记录：`reminderExpired` 表示该定时任务的当日已过或计划块已结束。无 `goalId` 的定时任务（养习惯）过期后不再进入今日待办，但会计入每日缺勤统计；旧备份缺这些字段时默认为 `false`。
 
 历史记录包含 `id`、`taskId`（可空）、`taskTitle`、`projectName`、`startedAt`、`endedAt`、`durationSecs`（1—10800）、`completed`。开始和结束均为 Unix 秒，结束不能早于开始，ID 在历史中唯一。已删除任务可保留历史，故历史任务 ID 不强制要求仍在当前列表里。睡眠/小憩锁机不生成专注记录。
 
