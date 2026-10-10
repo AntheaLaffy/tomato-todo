@@ -14,6 +14,8 @@
 - 助手设置新增用量查询：DeepSeek 显示账户余额（总额/赠送/充值），Codex 显示 5 小时与每周窗口的已用比例、重置时间、套餐与额度；原始数据可展开查看，邮箱等字段不显示。
 - 助手需要用户决定时可用 `request_user_input` 给出 1–3 个带选项的问题，界面渲染成按钮（推荐项排第一），点一下即回答；借鉴 Codex 的提问工具。
 - 多步工作可用 `update_plan` 维护步骤清单（至多一个进行中），对话页显示进度并可手动清除；系统提示会附带当前编程权限档位，助手不必猜。
+- 支持宿主技能：助手会扫描 `~/.agents/skills/` 与私有 `agent/skills/`，`get_context` 列出当前可用技能，`read_skill` 直接读取；技能名限目录名，不能越出技能根。内置六个技能不受影响。
+- 随包收录四个通用技能：`writing-for-readers`（改动说明只写「为什么」）、`shell-scripting`、`shell-data-wrangling`、`regex`，均带练习材料；部分改编自 MIT《The Missing Semester》（CC BY-NC-SA 4.0，出处随技能保留）。
 
 ### 变更
 

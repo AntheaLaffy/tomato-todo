@@ -166,6 +166,22 @@ fn interactive_calls_can_configure_tasks_directly() {
     assert_eq!(done["data"]["tasks"][0]["completed"], true);
 }
 #[test]
+fn user_skills_are_readable_from_the_agent_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = dir.path().join("skills/my-skill");
+    fs::create_dir_all(&skill).unwrap();
+    fs::write(skill.join("SKILL.md"), "# 自定义技能").unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    assert!(agent.available_skills().contains(&"my-skill".to_string()));
+    let read = agent
+        .call("read_skill", &json!({"name":"my-skill"}), true)
+        .unwrap();
+    assert_eq!(read["text"], "# 自定义技能");
+    assert!(agent
+        .call("read_skill", &json!({"name":"../secret"}), true)
+        .is_err());
+}
+#[test]
 fn wake_waits_for_idle_respects_quiet_and_deduplicates_across_restart() {
     let dir = tempfile::tempdir().unwrap();
     let count = Arc::new(AtomicUsize::new(0));

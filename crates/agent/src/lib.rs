@@ -339,6 +339,34 @@ impl Agent {
             let _ = inner.store.save(&self.dir);
         }
     }
+    fn skill_roots(&self) -> Vec<PathBuf> {
+        let mut roots = vec![self.resources.join("skills"), self.dir.join("skills")];
+        if let Some(home) = std::env::var_os("HOME") {
+            roots.push(PathBuf::from(home).join(".agents/skills"));
+        }
+        roots
+    }
+    fn available_skills(&self) -> Vec<String> {
+        let mut names: Vec<String> = Vec::new();
+        for root in self.skill_roots() {
+            let Ok(entries) = fs::read_dir(&root) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                if !entry.path().join("SKILL.md").is_file() {
+                    continue;
+                }
+                if let Some(name) = entry.file_name().to_str() {
+                    let name = name.to_string();
+                    if !names.contains(&name) {
+                        names.push(name);
+                    }
+                }
+            }
+        }
+        names.sort();
+        names
+    }
     fn event(&self, event: Value) {
         let Ok(mut inner) = self.inner.lock() else {
             return;
@@ -645,26 +673,21 @@ impl Agent {
             }
             "read_skill" => {
                 let name = nonempty_text(args, "name", 60)?;
-                if ![
-                    "study-diagnosis",
-                    "study-planning",
-                    "study-memory",
-                    "tomato-files",
-                    "tomato-workspace",
-                    "tomato-guide",
-                ]
-                .contains(&name.as_str())
-                {
-                    return Err("未知内置技能".into());
-                }
                 let reference = args["reference"].as_str().unwrap_or("SKILL.md");
-                if Path::new(reference)
-                    .components()
-                    .any(|c| !matches!(c, std::path::Component::Normal(_)))
-                {
-                    return Err("技能参考路径无效".into());
+                for value in [&name, &reference.to_string()] {
+                    if Path::new(value)
+                        .components()
+                        .any(|c| !matches!(c, std::path::Component::Normal(_)))
+                    {
+                        return Err("技能路径无效".into());
+                    }
                 }
-                let path = self.resources.join("skills").join(&name).join(reference);
+                let path = self
+                    .skill_roots()
+                    .into_iter()
+                    .map(|root| root.join(&name).join(reference))
+                    .find(|path| path.is_file())
+                    .ok_or("未知技能")?;
                 let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
                 if text.len() > 128 * 1024 {
                     return Err("参考文件过大".into());
@@ -852,9 +875,10 @@ impl Agent {
                     }
                     "get_context" => {
                         let s = engine.snapshot(now())?;
+                        let skills = self.available_skills();
                         let inner = self.inner.lock().map_err(|e| e.to_string())?;
                         Ok(
-                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":["study-diagnosis","study-planning","study-memory","tomato-files","tomato-workspace","tomato-guide"],"permission":"用户主动发起时可直接执行允许的操作；自动唤醒仅分析、提问与准备文件。保护规则不可绕开。"}),
+                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":skills,"permission":"用户主动发起时可直接执行允许的操作；自动唤醒仅分析、提问与准备文件。保护规则不可绕开。"}),
                         )
                     }
                     _ => Err("未知工具".into()),
