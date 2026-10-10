@@ -613,7 +613,16 @@ fn expired_routines_count_as_misses_but_goal_work_does_not() {
     routine.reminder_time = Some("09:00".into());
     routine.focus_minutes = Some(25);
     routine.estimate = 1;
+    routine.repeat = Repeat::Daily;
     e.dispatch(Action::SaveTask { task: routine }, friday(8, 0))
+        .unwrap();
+    // A one-off timed task (an appointment) also expires, but is not a lapse.
+    let mut appointment = draft();
+    appointment.due_date = Some("2026-10-09".into());
+    appointment.reminder_time = Some("15:00".into());
+    appointment.focus_minutes = Some(25);
+    appointment.estimate = 1;
+    e.dispatch(Action::SaveTask { task: appointment }, friday(8, 0))
         .unwrap();
     // The same schedule under a goal is a catch-up, not a routine miss.
     let s = e
@@ -638,7 +647,7 @@ fn expired_routines_count_as_misses_but_goal_work_does_not() {
     goal_task.goal_id = Some(goal);
     e.dispatch(Action::SaveTask { task: goal_task }, friday(8, 0))
         .unwrap();
-    let s = e.snapshot(friday(12, 0)).unwrap();
+    let s = e.snapshot(friday(16, 0)).unwrap();
     assert!(s.data.tasks.iter().all(|t| t.reminder_expired));
     let day = s
         .stats

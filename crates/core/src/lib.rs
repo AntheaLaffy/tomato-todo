@@ -130,6 +130,13 @@ pub struct Task {
     #[serde(default)]
     pub next_task_id: Option<String>,
 }
+impl Task {
+    /// Repetition is what makes a miss a habit miss. A one-off timed item is an
+    /// appointment: it is spent when its time passes, but it is not a lapse.
+    pub fn is_habit(&self) -> bool {
+        self.goal_id.is_none() && (self.habit_id.is_some() || self.repeat != Repeat::None)
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1254,7 +1261,7 @@ impl AppData {
         }
         let mut missed_by_day: HashMap<&str, u32> = HashMap::new();
         for t in &self.tasks {
-            if t.reminder_expired && t.goal_id.is_none() {
+            if t.reminder_expired && t.is_habit() {
                 if let Some(date) = t.due_date.as_deref() {
                     *missed_by_day.entry(date).or_default() += 1;
                 }

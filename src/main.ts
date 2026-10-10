@@ -198,7 +198,8 @@ const projectOf = (task: Task) =>
   state.data.projects.find((p) => p.id === task.projectId);
 // Categories are derived, not stored: a goal task accumulates, any other timed
 // task is a routine (a spent one does not roll over), the rest is flexible.
-const isHabit = (task: Task) => !task.goalId && !!task.reminderTime;
+const isHabit = (task: Task) =>
+  !task.goalId && (!!task.habitId || task.repeat !== "none");
 const dayLabel = (d: number) => "一二三四五六日"[d - 1] ?? "?";
 const daysLabel = (days: number[]) => {
   const sorted = [...days].sort((a, b) => a - b);
@@ -207,8 +208,7 @@ const daysLabel = (days: number[]) => {
   if (sorted.join() === "6,7") return "周末";
   return "周" + sorted.map(dayLabel).join("");
 };
-const isExpiredHabit = (task: Task) =>
-  isHabit(task) && task.reminderExpired && !task.completed;
+const isTimed = (task: Task) => !!task.reminderTime;
 const goalProgress = (g: Goal) => {
   if (g.measure === "time") {
     const ids = new Set(
@@ -236,9 +236,12 @@ const goalState = (g: Goal): "achieved" | "failed" | "active" => {
   return "active";
 };
 const isVoid = (task: Task) => {
-  if (isExpiredHabit(task)) return true;
+  if (task.completed) return false;
   const goal = goalOf(task);
-  return !!goal && goalState(goal) === "failed";
+  if (goal) return goalState(goal) === "failed";
+  // A timed non-goal item — a routine or a one-off appointment — is spent once
+  // its time passes, whether or not it repeats.
+  return isTimed(task) && task.reminderExpired;
 };
 const completedPomodoros = (task: Task) =>
   state.data.sessions.filter((s) => s.taskId === task.id && s.completed).length;
