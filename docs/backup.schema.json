@@ -27,6 +27,13 @@
       },
       "maxItems": 500
     },
+    "visions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/vision"
+      },
+      "maxItems": 500
+    },
     "tasks": {
       "type": "array",
       "items": {
@@ -60,6 +67,21 @@
     "sessions"
   ],
   "$defs": {
+    "vision": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "notes": { "type": "string", "maxLength": 50000 },
+        "projectId": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "goalId": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        }
+      }
+    },
     "habit": {
       "type": "object",
       "required": ["id", "name", "slots"],

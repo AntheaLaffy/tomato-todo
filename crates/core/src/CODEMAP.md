@@ -13,6 +13,7 @@ generated_at: 2026-10-10
 | 目标容器与待补 | 业务核心 | lib.rs 的 Goal/goal_progress | src/main.ts 的 goalDialog/taskList、docs/BACKUP_FORMAT.md |
 | 过期习惯与缺勤统计 | 业务核心 | reminders.rs 的 tick_reminders、lib.rs 的 stats/DayStat.missed | src/main.ts 的 isExpiredHabit、docs/BACKUP_FORMAT.md |
 | 习惯时段与当天生成 | 业务核心 | habits.rs、lib.rs 的 materialize_habits | src/main.ts 的 habitDialog/habitsTab、docs/BACKUP_FORMAT.md |
+| 愿景标记 | 业务核心 | lib.rs 的 Vision/SaveVision | src/main.ts 的 visionDialog/visionsTab、docs/BACKUP_FORMAT.md |
 | 计划合并/导出与文件校验 | 文件契约 | plan.rs | docs/CODEMAP.md、tests.rs、桌面/预览与 TypeScript 消费方 |
 | 修复倒计时与统计 | 业务核心 | lib.rs 的 tick/stats/Engine | tests.rs、桌面后台线程 |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
@@ -22,15 +23,15 @@ generated_at: 2026-10-10
 
 | Symbol | Source | Line |
 | --- | --- | --- |
-| AppData / Action | lib.rs | L:299 / L:354 |
-| Engine | lib.rs | L:1304 |
+| AppData / Action | lib.rs | L:324 / L:382 |
+| Engine | lib.rs | L:1412 |
 | guard | guard.rs | L:1 |
 
 ## 文件
 
 | File | Domain | Function |
 | --- | --- | --- |
-| lib.rs | 业务核心 | 数据模型、Action、计时、重复任务、目标、统计、Engine 持久化 |
+| lib.rs | 业务核心 | 数据模型、Action、计时、重复任务、目标、习惯、愿景、统计、Engine 持久化 |
 | plan.rs | 文件契约 | v1/v2 计划 DTO、导出未完成任务、原子合并、稳定 ID 去重、番茄时长换算 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
 | guard.rs | 桌面保护 | niri IPC 能力检测、精确应用匹配和回焦 |

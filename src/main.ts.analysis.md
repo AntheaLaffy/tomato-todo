@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 1843
+lines: 2000
 generated_at: 2026-10-10
 ---
 
@@ -8,75 +8,86 @@ generated_at: 2026-10-10
 
 | 用途 | Lines | Notes |
 | --- | --- | --- |
-| 导入、视图状态与格式化 | 1–252 | 接口改动核对 Rust 核心与适配层 |
-| 命令分发、快照与导航 | 253–392 | 接口改动核对 Rust 核心与适配层 |
-| 提醒、专注、任务、目标、习惯、统计与设置 | 393–722 | 接口改动核对 Rust 核心与适配层 |
-| 项目白名单、专注保护与定时锁机 | 723–855 | 接口改动核对 Rust 核心与适配层 |
-| 沉浸界面、时钟与弹窗基础 | 856–924 | 接口改动核对 Rust 核心与适配层 |
-| 任务、项目、目标、习惯与辅助弹窗 | 925–1188 | 接口改动核对 Rust 核心与适配层 |
-| 表单、保护与导入 | 1189–1436 | 接口改动核对 Rust 核心与适配层 |
-| 全局事件 | 1437–1803 | 接口改动核对 Rust 核心与适配层 |
-| 启动与轮询 | 1804–1843 | 接口改动核对 Rust 核心与适配层 |
+| 导入、视图状态与格式化 | 1–272 | 接口改动核对 Rust 核心与适配层 |
+| 命令分发、快照与导航 | 273–412 | 接口改动核对 Rust 核心与适配层 |
+| 提醒、专注、任务、统计与设置 | 413–511 | 接口改动核对 Rust 核心与适配层 |
+| 任务、目标、习惯、愿景页与对话框 | 512–776 | 接口改动核对 Rust 核心与适配层 |
+| 统计、设置与项目白名单 | 777–895 | 接口改动核对 Rust 核心与适配层 |
+| 专注保护、定时锁机、沉浸与弹窗基础 | 896–1057 | 接口改动核对 Rust 核心与适配层 |
+| 任务、项目、目标等弹窗 | 1058–1337 | 接口改动核对 Rust 核心与适配层 |
+| 表单、保护与导入 | 1338–1585 | 接口改动核对 Rust 核心与适配层 |
+| 全局事件 | 1586–1960 | 接口改动核对 Rust 核心与适配层 |
+| 启动与轮询 | 1961–2000 | 接口改动核对 Rust 核心与适配层 |
 
 ## Symbols
 
 | Symbol | Type | Line |
 | --- | --- | --- |
-| isHabit | const | 201 |
-| dayLabel | const | 202 |
-| daysLabel | const | 203 |
-| goalProgress | const | 212 |
-| progressLabel | const | 225 |
-| toast | function | 253 |
-| act | function | 265 |
-| accept | function | 282 |
-| applyTheme | function | 323 |
-| navigate | function | 332 |
-| render | function | 359 |
-| heading | function | 393 |
-| metric | function | 401 |
-| pendingReminder | function | 411 |
-| reminderBanner | function | 428 |
-| focusPage | function | 433 |
-| timerContent | function | 454 |
-| taskList | function | 463 |
-| tasksPage | function | 493 |
-| goalsPage | function | 540 |
-| goalsTabContent | function | 552 |
-| habitsTab | function | 564 |
-| habitDialog | function | 587 |
-| weekChart | function | 644 |
-| statsPage | function | 649 |
-| settingNumber | function | 696 |
-| settingSwitch | function | 706 |
-| settingsPage | function | 709 |
-| desktopSettingsCard | function | 713 |
-| projectWhitelistCard | function | 723 |
-| guardPage | function | 763 |
-| refreshGuard | function | 793 |
-| lockPage | function | 802 |
-| saveLockSchedule | function | 813 |
-| lockDialog | function | 826 |
-| renderImmersive | function | 856 |
-| updateClock | function | 868 |
-| modal | function | 889 |
-| closeModal | function | 903 |
-| confirmDialog | function | 910 |
-| taskDialog | function | 925 |
-| projectDialog | function | 1033 |
-| goalDialog | function | 1068 |
-| chooseTask | function | 1105 |
-| searchDialog | function | 1111 |
-| helpDialog | function | 1134 |
-| soundDialog | function | 1150 |
-| emergencyDialog | function | 1169 |
-| bindForms | function | 1189 |
-| updateTaskResults | function | 1315 |
-| addWhitelist | function | 1329 |
-| saveProjectWhitelist | function | 1344 |
-| addProjectWhitelist | function | 1351 |
-| removeProjectWhitelist | function | 1360 |
-| toggleTimer | function | 1368 |
-| importBackup | function | 1389 |
-| importPlan | function | 1406 |
-| boot | function | 1804 |
+| projectOf | const | 198 |
+| isHabit | const | 202 |
+| dayLabel | const | 206 |
+| daysLabel | const | 207 |
+| isTimed | const | 214 |
+| goalProgress | const | 215 |
+| progressLabel | const | 228 |
+| goalOf | const | 232 |
+| goalState | const | 236 |
+| isVoid | const | 241 |
+| toast | function | 273 |
+| act | function | 285 |
+| accept | function | 302 |
+| applyTheme | function | 343 |
+| navigate | function | 352 |
+| render | function | 379 |
+| heading | function | 413 |
+| metric | function | 421 |
+| pendingReminder | function | 431 |
+| reminderBanner | function | 448 |
+| focusPage | function | 453 |
+| timerContent | function | 472 |
+| taskList | function | 481 |
+| tasksPage | function | 512 |
+| goalsPage | function | 559 |
+| goalsTabContent | function | 573 |
+| habitsTab | function | 596 |
+| habitDialog | function | 619 |
+| goalVisions | function | 676 |
+| visionCard | function | 685 |
+| visionsTab | function | 693 |
+| projectVisionCard | function | 709 |
+| visionDialog | function | 722 |
+| weekChart | function | 777 |
+| statsPage | function | 782 |
+| settingNumber | function | 829 |
+| settingSwitch | function | 839 |
+| settingsPage | function | 842 |
+| desktopSettingsCard | function | 846 |
+| projectWhitelistCard | function | 856 |
+| guardPage | function | 896 |
+| refreshGuard | function | 926 |
+| lockPage | function | 935 |
+| saveLockSchedule | function | 946 |
+| lockDialog | function | 959 |
+| renderImmersive | function | 989 |
+| updateClock | function | 1001 |
+| modal | function | 1022 |
+| closeModal | function | 1036 |
+| confirmDialog | function | 1043 |
+| taskDialog | function | 1058 |
+| projectDialog | function | 1182 |
+| goalDialog | function | 1217 |
+| chooseTask | function | 1254 |
+| searchDialog | function | 1260 |
+| helpDialog | function | 1283 |
+| soundDialog | function | 1299 |
+| emergencyDialog | function | 1318 |
+| bindForms | function | 1338 |
+| updateTaskResults | function | 1464 |
+| addWhitelist | function | 1478 |
+| saveProjectWhitelist | function | 1493 |
+| addProjectWhitelist | function | 1500 |
+| removeProjectWhitelist | function | 1509 |
+| toggleTimer | function | 1517 |
+| importBackup | function | 1538 |
+| importPlan | function | 1555 |
+| boot | function | 1961 |

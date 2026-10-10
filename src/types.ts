@@ -25,6 +25,13 @@ export interface Habit {
   focusMinutes: number | null;
   slots: HabitSlot[];
 }
+export interface Vision {
+  id: string;
+  name: string;
+  notes: string;
+  projectId: string | null;
+  goalId: string | null;
+}
 export interface PlanProject {
   id: string;
   name: string;
@@ -120,6 +127,7 @@ export interface AppData {
   projects: Project[];
   goals: Goal[];
   habits: Habit[];
+  visions: Vision[];
   settings: Settings;
   timer: Timer;
   sessions: Session[];

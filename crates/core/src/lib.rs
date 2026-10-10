@@ -86,6 +86,22 @@ pub struct Habit {
     pub slots: Vec<HabitSlot>,
 }
 
+/// A motivational marker: a name plus some prose that can belong to a project, a
+/// goal, or stand on its own as the overall vision. It carries no jurisdiction —
+/// no progress to catch up on, no failure, no missed days.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Vision {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_id: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Subtask {
@@ -134,7 +150,9 @@ impl Task {
     /// Repetition is what makes a miss a habit miss. A one-off timed item is an
     /// appointment: it is spent when its time passes, but it is not a lapse.
     pub fn is_habit(&self) -> bool {
-        self.goal_id.is_none() && (self.habit_id.is_some() || self.repeat != Repeat::None)
+        self.reminder_time.is_some()
+            && self.goal_id.is_none()
+            && (self.habit_id.is_some() || self.repeat != Repeat::None)
     }
 }
 
@@ -311,6 +329,8 @@ pub struct AppData {
     pub goals: Vec<Goal>,
     #[serde(default)]
     pub habits: Vec<Habit>,
+    #[serde(default)]
+    pub visions: Vec<Vision>,
     pub settings: Settings,
     pub timer: Timer,
     pub sessions: Vec<Session>,
@@ -344,6 +364,7 @@ impl Default for AppData {
             ],
             goals: vec![],
             habits: vec![],
+            visions: vec![],
             settings: Settings::default(),
             timer: Timer::default(),
             sessions: vec![],
@@ -413,6 +434,19 @@ pub enum Action {
         slots: Vec<HabitSlot>,
     },
     DeleteHabit {
+        id: String,
+    },
+    SaveVision {
+        id: Option<String>,
+        name: String,
+        #[serde(default)]
+        notes: String,
+        #[serde(default)]
+        project_id: Option<String>,
+        #[serde(default)]
+        goal_id: Option<String>,
+    },
+    DeleteVision {
         id: String,
     },
     SelectTask {
@@ -887,6 +921,7 @@ impl AppData {
                         task.project_id = None;
                     }
                 }
+                self.visions.retain(|a| a.project_id.as_ref() != Some(&id));
             }
             Action::SaveGoal {
                 id: gid,
@@ -925,6 +960,7 @@ impl AppData {
                         task.goal_id = None;
                     }
                 }
+                self.visions.retain(|a| a.goal_id.as_ref() != Some(&id));
             }
             Action::SaveHabit {
                 id: hid,
@@ -962,6 +998,34 @@ impl AppData {
                     }
                 }
             }
+            Action::SaveVision {
+                id: aid,
+                name,
+                notes,
+                project_id,
+                goal_id,
+            } => {
+                if let Some(aid) = aid {
+                    let a = self
+                        .visions
+                        .iter_mut()
+                        .find(|a| a.id == aid)
+                        .ok_or("愿景不存在")?;
+                    a.name = name.trim().into();
+                    a.notes = notes;
+                    a.project_id = project_id;
+                    a.goal_id = goal_id;
+                } else {
+                    self.visions.push(Vision {
+                        id: id(),
+                        name: name.trim().into(),
+                        notes,
+                        project_id,
+                        goal_id,
+                    });
+                }
+            }
+            Action::DeleteVision { id } => self.visions.retain(|a| a.id != id),
             Action::SelectTask { id } => {
                 if id
                     .as_ref()
@@ -1162,6 +1226,31 @@ impl AppData {
                 "习惯引用了不存在的项目",
             )?;
         }
+        let mut vision_ids = HashSet::new();
+        ensure(self.visions.len() <= 500, "愿景数量超出限制")?;
+        for a in &self.visions {
+            ensure(
+                !a.id.is_empty() && vision_ids.insert(&a.id),
+                "愿景 ID 重复或为空",
+            )?;
+            ensure(
+                !a.name.trim().is_empty() && a.name.chars().count() <= 40,
+                "愿景名称需为 1–40 个字符",
+            )?;
+            ensure(a.notes.len() <= 50_000, "愿景内容过长")?;
+            ensure(
+                !(a.project_id.is_some() && a.goal_id.is_some()),
+                "愿景只能属于一个项目或一个目标",
+            )?;
+            ensure(
+                a.project_id.as_ref().is_none_or(|p| ids.contains(p)),
+                "愿景引用了不存在的项目",
+            )?;
+            ensure(
+                a.goal_id.as_ref().is_none_or(|g| goal_ids.contains(g)),
+                "愿景引用了不存在的目标",
+            )?;
+        }
         let projects = ids;
         let mut tasks = HashSet::new();
         for t in &self.tasks {
@@ -1202,6 +1291,11 @@ impl AppData {
             ensure(
                 !(t.goal_id.is_some() && t.repeat != Repeat::None),
                 "目标管辖的任务不能重复；重复的例行事项请建成习惯",
+            )?;
+            // Timed is a necessary condition for both jurisdictions.
+            ensure(
+                !(t.goal_id.is_some() && t.reminder_time.is_none()),
+                "目标管辖的任务需要精确时间",
             )?;
             ensure(
                 t.due_date.as_ref().is_none_or(|d| {

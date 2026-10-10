@@ -76,6 +76,7 @@ import type {
   Goal,
   Habit,
   Mode,
+  Vision,
   Project,
   Settings,
   Snapshot,
@@ -174,7 +175,7 @@ let toastTimer: ReturnType<typeof setTimeout>;
 const labels: Record<string, string> = {
   focus: "今日专注",
   tasks: "全部任务",
-  goals: "目标与习惯",
+  goals: "目标·习惯·愿景",
   stats: "数据统计",
   guard: "专注保护",
   lock: "定时锁机",
@@ -199,7 +200,9 @@ const projectOf = (task: Task) =>
 // Categories are derived, not stored: a goal task accumulates, any other timed
 // task is a routine (a spent one does not roll over), the rest is flexible.
 const isHabit = (task: Task) =>
-  !task.goalId && (!!task.habitId || task.repeat !== "none");
+  !!task.reminderTime &&
+  !task.goalId &&
+  (!!task.habitId || task.repeat !== "none");
 const dayLabel = (d: number) => "一二三四五六日"[d - 1] ?? "?";
 const daysLabel = (days: number[]) => {
   const sorted = [...days].sort((a, b) => a - b);
@@ -527,7 +530,7 @@ function tasksPage() {
   if (priority !== "all")
     tasks = tasks.filter((t) => t.priority === Number(priority));
   return `${heading(escape(project?.name || "把想做的事，慢慢完成。"), `还有 ${count} 件事等着你。清空头脑，让清单帮你记住。`, "SMALL STEPS, REAL PROGRESS")}
-  ${project ? projectWhitelistCard(project) : ""}
+  ${project ? projectWhitelistCard(project) + projectVisionCard(project) : ""}
   <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs">${[
     ["active", "待完成"],
     ["completed", "已完成"],
@@ -556,13 +559,15 @@ function tasksPage() {
 function goalsPage() {
   const goals = state.data.goals;
   const habits = state.data.tasks.filter((t) => isHabit(t) && !t.completed);
-  return `${heading("目标与习惯", "长期的事慢慢积累，日常的事一次做完。", "LONG GAMES, SMALL STEPS", false)}
-  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs"><button data-goals-tab="goals" class="${goalsTab === "goals" ? "active" : ""}">目标 <span>${goals.length}</span></button><button data-goals-tab="habits" class="${goalsTab === "habits" ? "active" : ""}">习惯 <span>${state.data.habits.length}</span></button></div><div class="toolbar-controls">${
+  return `${heading("目标、习惯与愿景", "长期的事慢慢积累，日常的事一次做完，远方的事写下来。", "LONG GAMES, SMALL STEPS", false)}
+  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs"><button data-goals-tab="goals" class="${goalsTab === "goals" ? "active" : ""}">目标 <span>${goals.length}</span></button><button data-goals-tab="habits" class="${goalsTab === "habits" ? "active" : ""}">习惯 <span>${state.data.habits.length}</span></button><button data-goals-tab="visions" class="${goalsTab === "visions" ? "active" : ""}">愿景 <span>${state.data.visions.length}</span></button></div><div class="toolbar-controls">${
     goalsTab === "habits"
       ? `<button class="button secondary small-button" data-action="new-habit">${icon("plus")} 新建习惯</button>`
-      : `<button class="button secondary small-button" data-action="new-goal">${icon("plus")} 新建目标</button>`
+      : goalsTab === "visions"
+        ? `<button class="button secondary small-button" data-new-vision="">${icon("plus")} 新建愿景</button>`
+        : `<button class="button secondary small-button" data-action="new-goal">${icon("plus")} 新建目标</button>`
   }</div></div>
-  ${goalsTab === "habits" ? habitsTab(habits) : goalsTabContent(goals)}
+  ${goalsTab === "habits" ? habitsTab(habits) : goalsTab === "visions" ? visionsTab() : goalsTabContent(goals)}
   </section>`;
 }
 function goalsTabContent(goals: Goal[]) {
@@ -584,7 +589,7 @@ function goalsTabContent(goals: Goal[]) {
         status === "failed"
           ? `<h4 class="group-title">已作废<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : ""}<p class="subtle small">目标已逾期，这些任务不再补做。</p>`
           : `<h4 class="group-title">待完成<span>${remaining.length}</span></h4>${remaining.length ? taskList(remaining) : '<p class="subtle small">这个目标暂时没有待完成的任务。</p>'}`;
-      return `<section class="goal-section"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${g.id}" aria-label="编辑目标">${icon("pencil")}</button></div><div class="goal-figure"><b>${progressLabel(g)}</b><span>${escape(g.unit)}${g.dueDate ? ` · 截止 ${dateLabel(g.dueDate)}` : ""}${note}</span></div><div class="progress-track"><i style="width:${Math.min(100, (goalProgress(g) / g.target) * 100)}%"></i></div>${body}</section>`;
+      return `<section class="goal-section"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${g.id}" aria-label="编辑目标">${icon("pencil")}</button></div><div class="goal-figure"><b>${progressLabel(g)}</b><span>${escape(g.unit)}${g.dueDate ? ` · 截止 ${dateLabel(g.dueDate)}` : ""}${note}</span></div><div class="progress-track"><i style="width:${Math.min(100, (goalProgress(g) / g.target) * 100)}%"></i></div>${goalVisions(g)}${body}</section>`;
     })
     .join("");
 }
@@ -668,6 +673,107 @@ function habitDialog(id?: string) {
       );
 }
 
+function goalVisions(goal: Goal) {
+  return state.data.visions
+    .filter((v) => v.goalId === goal.id)
+    .map(
+      (v) =>
+        `<p class="vision-line">${icon("sparkles")} <b>${escape(v.name)}</b>${v.notes ? ` — ${escape(v.notes)}` : ""}</p>`,
+    )
+    .join("");
+}
+function visionCard(v: Vision) {
+  const owner = v.projectId
+    ? state.data.projects.find((p) => p.id === v.projectId)?.name || "项目"
+    : v.goalId
+      ? `目标 · ${state.data.goals.find((g) => g.id === v.goalId)?.name || ""}`
+      : "总愿景";
+  return `<section class="vision-card"><div class="vision-head"><h3>${icon("sparkles")} ${escape(v.name)}</h3><button class="icon-btn" data-edit-vision="${v.id}" aria-label="编辑愿景">${icon("pencil")}</button></div><span class="vision-owner">${escape(owner)}</span>${v.notes ? `<p class="vision-notes">${escape(v.notes)}</p>` : ""}</section>`;
+}
+function visionsTab() {
+  const all = state.data.visions;
+  if (!all.length)
+    return `<div class="empty-state"><div class="empty-illustration">${icon("sparkles")}</div><h3>还没有愿景</h3><p>写下你真正想去的地方、想成为的样子。它不影响任务和进度，只写给你自己看。</p><button class="text-button" data-new-vision="">新建愿景 →</button></div>`;
+  const global = all.filter((v) => !v.projectId && !v.goalId);
+  const owned = all.filter((v) => v.projectId || v.goalId);
+  return [
+    ...global.map((v) => visionCard(v)),
+    ...(owned.length
+      ? [
+          `<h3 class="group-title">项目与目标的愿景<span>${owned.length}</span></h3>`,
+          ...owned.map((v) => visionCard(v)),
+        ]
+      : []),
+  ].join("");
+}
+function projectVisionCard(project: Project) {
+  const items = state.data.visions.filter((v) => v.projectId === project.id);
+  return `<section class="card vision-card"><div class="card-heading"><div><h2>愿景</h2><p class="subtle small">这个项目想达成什么；只写给自己看，不参与任务与进度。</p></div><button class="button secondary small-button" data-new-vision="project:${project.id}">${icon("plus")} 添加愿景</button></div>${
+    items.length
+      ? items
+          .map(
+            (v) =>
+              `<div class="vision-row"><div><b>${escape(v.name)}</b>${v.notes ? `<p>${escape(v.notes)}</p>` : ""}</div><button class="icon-btn" data-edit-vision="${v.id}" aria-label="编辑愿景">${icon("pencil")}</button></div>`,
+          )
+          .join("")
+      : '<p class="subtle small">还没有愿景。</p>'
+  }</section>`;
+}
+function visionDialog(id?: string, ownerArg?: string) {
+  const v = state.data.visions.find((v) => v.id === id);
+  const owner = v
+    ? v.projectId
+      ? `project:${v.projectId}`
+      : v.goalId
+        ? `goal:${v.goalId}`
+        : ""
+    : ownerArg || "";
+  const options: [string, string][] = [
+    ["", "总愿景（顶层）"],
+    ...state.data.projects.map((p): [string, string] => [
+      `project:${p.id}`,
+      `项目 · ${p.name}`,
+    ]),
+    ...state.data.goals.map((g): [string, string] => [
+      `goal:${g.id}`,
+      `目标 · ${g.name}`,
+    ]),
+  ];
+  modal(
+    `${modalHeader(v ? "编辑愿景" : "新建愿景", "它是方向，不是任务：不影响进度，也不会有缺勤。")}<form id="vision-form"><label class="form-field"><span>愿景</span><input name="name" maxlength="40" required autofocus value="${escape(v?.name)}" placeholder="例如：考上北大"></label><label class="form-field"><span>归属</span><select name="owner">${options.map(([val, label]) => `<option value="${val}" ${owner === val ? "selected" : ""}>${escape(label)}</option>`).join("")}</select></label><label class="form-field"><span>写点什么 <small>鸡汤、目标值、想去的地方…</small></span><textarea name="notes" rows="5" placeholder="研究生工资、未来的生活…">${escape(v?.notes)}</textarea></label><div class="modal-actions">${v ? `<button type="button" class="text-button danger-text" id="delete-vision">删除愿景</button>` : "<span></span>"}<button type="submit" class="button primary">保存愿景</button></div></form>`,
+  );
+  $("#vision-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    const chosen = String(f.get("owner") || "");
+    if (
+      await act(
+        {
+          type: "saveVision",
+          id: v?.id || null,
+          name: f.get("name"),
+          notes: f.get("notes"),
+          projectId: chosen.startsWith("project:") ? chosen.slice(8) : null,
+          goalId: chosen.startsWith("goal:") ? chosen.slice(5) : null,
+        },
+        "愿景已保存",
+      )
+    )
+      closeModal();
+  };
+  if (v)
+    $("#delete-vision").onclick = () =>
+      confirmDialog(
+        "删除这个愿景？",
+        "只是这段文字，不影响任务与进度。",
+        "删除愿景",
+        async () => {
+          await act({ type: "deleteVision", id: v.id }, "愿景已删除");
+          closeModal();
+        },
+        true,
+      );
+}
 function weekChart(large: boolean) {
   const days = state.stats.days.slice(-7),
     max = Math.max(60 * 60, ...days.map((d) => d.seconds));
@@ -1564,6 +1670,14 @@ document.addEventListener("click", async (e) => {
   }
   if (d.editHabit) {
     habitDialog(d.editHabit);
+    return;
+  }
+  if (d.newVision !== undefined) {
+    visionDialog(undefined, d.newVision);
+    return;
+  }
+  if (d.editVision) {
+    visionDialog(d.editVision);
     return;
   }
   if (d.guardMode) {

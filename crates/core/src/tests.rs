@@ -526,11 +526,14 @@ fn goals_group_tasks_and_track_count_progress() {
     let goal = s.data.goals[0].id.clone();
     let mut d1 = draft();
     d1.goal_id = Some(goal.clone());
+    d1.reminder_time = Some("09:00".into());
     d1.due_date = Some("2026-10-09".into());
     let s = e.dispatch(Action::SaveTask { task: d1 }, 1000).unwrap();
     let task = s.data.tasks[0].id.clone();
     let mut d2 = draft();
     d2.goal_id = Some(goal.clone());
+    d2.reminder_time = Some("09:00".into());
+    d2.due_date = Some("2026-10-09".into());
     e.dispatch(Action::SaveTask { task: d2 }, 1000).unwrap();
     assert_eq!(e.snapshot(1000).unwrap().data.goal_progress(&goal), 0.0);
     e.dispatch(Action::ToggleTask { id: task }, 1000).unwrap();
@@ -560,6 +563,8 @@ fn time_goal_accumulates_focused_hours() {
     let goal = s.data.goals[0].id.clone();
     let mut d = draft();
     d.goal_id = Some(goal.clone());
+    d.reminder_time = Some("09:00".into());
+    d.due_date = Some("2026-10-09".into());
     d.focus_minutes = Some(30);
     let s = e.dispatch(Action::SaveTask { task: d }, 1000).unwrap();
     let task = s.data.tasks[0].id.clone();
@@ -765,15 +770,105 @@ fn goal_work_may_not_repeat() {
     assert!(e
         .dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
         .is_err());
-    // A one-off goal task is fine; so is a repeating task outside any goal.
+    // A timed, one-off goal task is fine.
     task.repeat = Repeat::None;
+    task.reminder_time = Some("09:00".into());
+    task.due_date = Some("2026-10-09".into());
     e.dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
         .unwrap();
+    // Timed is necessary: a goal task without a time is rejected.
+    task.reminder_time = None;
+    assert!(e
+        .dispatch(Action::SaveTask { task: task.clone() }, friday(8, 0))
+        .is_err());
+    // A repeating task outside any goal is fine (it is a habit only if timed).
     let mut habit = draft();
     habit.repeat = Repeat::Daily;
     habit.due_date = Some("2026-10-09".into());
     e.dispatch(Action::SaveTask { task: habit }, friday(8, 0))
         .unwrap();
+}
+
+#[test]
+fn visions_attach_to_a_project_or_goal_or_stand_alone() {
+    let mut e = engine();
+    e.dispatch(
+        Action::SaveVision {
+            id: None,
+            name: "考上北大".into(),
+            notes: "研究生工资与未来".into(),
+            project_id: None,
+            goal_id: None,
+        },
+        1000,
+    )
+    .unwrap();
+    let project = e.snapshot(1000).unwrap().data.projects[0].id.clone();
+    e.dispatch(
+        Action::SaveVision {
+            id: None,
+            name: "英语一 80".into(),
+            notes: String::new(),
+            project_id: Some(project.clone()),
+            goal_id: None,
+        },
+        1000,
+    )
+    .unwrap();
+    let s = e
+        .dispatch(
+            Action::SaveGoal {
+                id: None,
+                name: "OpenCamp".into(),
+                target: 1.0,
+                unit: "节".into(),
+                measure: GoalMeasure::Count,
+                due_date: Some("2026-12-31".into()),
+            },
+            1000,
+        )
+        .unwrap();
+    let goal = s.data.goals[0].id.clone();
+    e.dispatch(
+        Action::SaveVision {
+            id: None,
+            name: "结营证书".into(),
+            notes: String::new(),
+            project_id: None,
+            goal_id: Some(goal.clone()),
+        },
+        1000,
+    )
+    .unwrap();
+    assert_eq!(e.snapshot(1000).unwrap().data.visions.len(), 3);
+    // Two owners at once, or a missing reference, is rejected.
+    for (pid, gid) in [
+        (Some(project.clone()), Some(goal.clone())),
+        (Some("missing".into()), None),
+    ] {
+        assert!(e
+            .dispatch(
+                Action::SaveVision {
+                    id: None,
+                    name: "无效".into(),
+                    notes: String::new(),
+                    project_id: pid,
+                    goal_id: gid,
+                },
+                1000,
+            )
+            .is_err());
+    }
+    // Deleting the owner drops its marker.
+    e.dispatch(Action::DeleteProject { id: project }, 1000)
+        .unwrap();
+    assert!(e
+        .snapshot(1000)
+        .unwrap()
+        .data
+        .visions
+        .iter()
+        .all(|a| a.project_id.is_none()));
 }
 
 #[test]

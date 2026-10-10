@@ -336,6 +336,16 @@ test(
         .filter({ hasText: "午饭" });
       await expect(habitSection).toBeVisible();
       await expect(habitSection.locator("[data-task-id]")).toHaveCount(1);
+      // Visions are markers with no jurisdiction.
+      await page.locator("[data-goals-tab=visions]").click();
+      await page.getByRole("button", { name: "新建愿景", exact: true }).click();
+      await page.locator("#vision-form [name=name]").fill("考上北大");
+      await page.locator("#vision-form [name=notes]").fill("研究生工资与未来");
+      await page.getByRole("button", { name: "保存愿景", exact: true }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(
+        page.locator(".vision-card").filter({ hasText: "考上北大" }),
+      ).toBeVisible();
       assert.deepEqual(errors, []);
     } finally {
       await browser?.close();
