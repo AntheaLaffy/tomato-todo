@@ -86,6 +86,7 @@ execFileSync("tar", [
 await chmod(join(bundle, "bin/node"), 0o755);
 for (const name of [
   "worker.mjs",
+  "codex-config.mjs",
   "mcp-config.mjs",
   "session.mjs",
   "coding.mjs",

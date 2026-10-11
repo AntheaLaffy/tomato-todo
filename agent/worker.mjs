@@ -1,12 +1,13 @@
 // The host owns software mutations; this worker gets only the review tool set.
 import { createInterface } from "node:readline";
 import { readFile, writeFile, rename, mkdir, chmod } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { closeStudySession, createStudySession, mcpStatus } from "./session.mjs";
 import { mcpCommand } from "./mcp-config.mjs";
 import { networkTool } from "./web.mjs";
+import { codexAuthDocument, codexAuthPath, codexProviderConfigs, normalizeCodexCredential, readCodexConfig } from "./codex-config.mjs";
 
 process.umask(0o077);
 const dir = resolve(process.argv[2]);
@@ -25,6 +26,22 @@ async function credentialData() {
     throw new Error("认证文件损坏或无法读取，原文件已保留");
   }
 }
+async function codexCredential() {
+  try { return normalizeCodexCredential(JSON.parse(await readFile(codexAuthPath, "utf8"))); }
+  catch (error) { if (error.code === "ENOENT") return undefined; throw new Error("Codex CLI 认证文件损坏或无法读取"); }
+}
+async function syncCodexCredential(value, prior) {
+  if (!value) return;
+  let previous;
+  try { previous = JSON.parse(await readFile(codexAuthPath, "utf8")); } catch (error) { if (error.code === "ENOENT") return; throw error; }
+  // Pi's login does not return the id_token required by Codex CLI. Only update
+  // a pre-existing CLI login so its complete authentication document survives.
+  if (!previous?.tokens?.id_token || previous.tokens.refresh_token !== prior?.refresh || previous.tokens.account_id !== value.accountId) return;
+  const temp = `${codexAuthPath}.${randomUUID()}.tmp`;
+  await mkdir(dirname(codexAuthPath), { recursive: true, mode: 0o700 });
+  await writeFile(temp, JSON.stringify(codexAuthDocument(value, previous), null, 2), { mode: 0o600 });
+  await rename(temp, codexAuthPath);
+}
 function mutateCredential(fn) {
   const operation = credentialsQueue.then(async () => {
     const data = await credentialData();
@@ -38,21 +55,42 @@ function mutateCredential(fn) {
   return operation;
 }
 const credentials = {
-  read: async (provider) => (await credentialData())[provider],
-  list: async () =>
-    Object.entries(await credentialData()).map(([providerId, value]) => ({
+  read: async (provider) => provider === "openai-codex"
+    ? ((await codexCredential()) ?? (await credentialData())[provider])
+    : (await credentialData())[provider],
+  list: async () => {
+    const data = await credentialData();
+    const cli = await codexCredential();
+    if (cli) data["openai-codex"] = cli;
+    return Object.entries(data).map(([providerId, value]) => ({
       providerId,
       type: value.type,
-    })),
+    }));
+  },
   modify: (provider, fn) =>
     mutateCredential(async (data) => {
-      const value = await fn(data[provider]);
+      const prior = provider === "openai-codex" ? ((await codexCredential()) ?? data[provider]) : data[provider];
+      const value = await fn(prior);
       if (value) data[provider] = value;
+      if (provider === "openai-codex" && value) await syncCodexCredential(value, prior);
       return data[provider];
     }),
   delete: (provider) =>
     mutateCredential(async (data) => {
       delete data[provider];
+      if (provider === "openai-codex") {
+        try {
+          const document = JSON.parse(await readFile(codexAuthPath, "utf8"));
+          if (document?.tokens) {
+            delete document.tokens;
+            delete document.auth_mode;
+            delete document.last_refresh;
+            const temp = `${codexAuthPath}.${randomUUID()}.tmp`;
+            await writeFile(temp, JSON.stringify(document, null, 2), { mode: 0o600 });
+            await rename(temp, codexAuthPath);
+          }
+        } catch (error) { if (error.code !== "ENOENT") throw error; }
+      }
     }),
 };
 async function usageJson(url, headers) {
@@ -107,27 +145,37 @@ async function usageReport(provider) {
 const initialized = (async () => {
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await chmod(dir, 0o700);
-  return ModelRuntime.create({
+  const runtime = await ModelRuntime.create({
     credentials,
     modelsPath: null,
     modelsStorePath: join(dir, "models-cache.json"),
     allowModelNetwork: false,
     refreshOnCreate: false,
   });
+  // Codex CLI's provider table is the source of truth for third-party endpoints.
+  // Refreshing this on process start makes edits made by `codex` visible without
+  // copying secrets into the todo data directory.
+  const config = await readCodexConfig();
+  for (const provider of codexProviderConfigs(config)) {
+    if (provider.id === "openai-codex" || !provider.baseUrl) continue;
+    runtime.registerProvider(provider.id, provider);
+  }
+  return runtime;
 })();
 async function authStatus() {
   const runtime = await initialized;
   const stored = await credentialData();
-  const providers = Object.fromEntries(
-    ["deepseek", "openai-codex"].map((provider) => [
+  const configured = async (provider) => Boolean((await credentials.read(provider)) || runtime.hasConfiguredAuth(provider));
+  const providers = Object.fromEntries(await Promise.all(
+    ["deepseek", "openai-codex", ...runtime.getRegisteredProviderIds()].filter((provider, index, all) => all.indexOf(provider) === index).map(async (provider) => [
       provider,
       {
-        configured: Boolean(stored[provider]),
+        configured: await configured(provider),
         models: runtime
           .getModels(provider)
           .map((m) => ({ id: m.id, name: m.name, vision:m.input.includes("image") })),
       },
-    ]),
+    ])),
   );
   providers["exa"]={configured:Boolean(stored["exa"]),models:[]};
   emit({ type: "auth", providers });
@@ -213,6 +261,12 @@ async function authentication(command) {
   const runtime = await initialized;
   authAbort = new AbortController();
   if (command.op === "logout") await runtime.logout(command.provider);
+  else if (command.op === "login" && await codexCredential()) {
+    await authStatus();
+    emit({ type: "done", text: "已使用 Codex CLI 登录" });
+    authAbort = undefined;
+    return;
+  }
   else if (command.op!=="api_key" || command.key)
     await runtime.login(
       command.op === "api_key" ? "deepseek" : "openai-codex",

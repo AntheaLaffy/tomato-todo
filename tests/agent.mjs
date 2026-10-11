@@ -11,6 +11,33 @@ import { ModelRuntime } from "../agent/node_modules/@earendil-works/pi-coding-ag
 import { closeStudySession, createStudySession } from "../agent/session.mjs";
 import { mcpCommand } from "../agent/mcp-config.mjs";
 import { parseExa, publicAddress } from "../agent/web.mjs";
+import { codexAuthDocument, codexProviderConfigs, normalizeCodexCredential, parseCodexConfig } from "../agent/codex-config.mjs";
+
+test("Codex CLI provider and OAuth files map to Pi without network access", async () => {
+  const config = parseCodexConfig(`model = "gpt-6-sol"
+model_provider = "custom"
+[model_providers.custom]
+name = "Custom"
+base_url = "https://example.test/v1"
+wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = "test-token"`);
+  config.providers.unselected = { base_url: "https://unused.test/v1", wire_api: "responses" };
+  assert.equal(codexProviderConfigs(config).length, 1);
+  const [provider] = codexProviderConfigs(config);
+  assert.equal(provider.id, "custom");
+  assert.equal(provider.api, "openai-responses");
+  assert.equal(provider.models[0].id, "gpt-6-sol");
+  const runtime = await ModelRuntime.create({ modelsPath: null, refreshOnCreate: false, allowModelNetwork: false });
+  runtime.registerProvider(provider.id, provider);
+  assert.equal(runtime.getModel("custom", "gpt-6-sol")?.baseUrl, "https://example.test/v1");
+  const credential = normalizeCodexCredential({ tokens: { access_token: "access", refresh_token: "refresh", account_id: "account", expires: 123456 } });
+  assert.deepEqual(credential, { type: "oauth", access: "access", refresh: "refresh", accountId: "account", expires: 123456 });
+  const shared = codexAuthDocument(credential, { auth_mode: "chatgpt", tokens: { id_token: "id" } });
+  assert.equal(shared.tokens.id_token, "id");
+  assert.equal(shared.tokens.access_token, "access");
+  assert.ok(Number.isFinite(Date.parse(shared.last_refresh)));
+});
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(fn, tries = 100) {

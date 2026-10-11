@@ -368,8 +368,9 @@ function authHtml() {
   if (!s) return "";
   const event = s.authEvent;
   const provider = (name: string, label: string, ready: string) =>
-    `<span class="agent-dot ${s.providers?.[name]?.configured ? "on" : ""}"></span>${label} ${s.providers?.[name]?.configured ? ready : "未连接"}`;
-  return `<div class="agent-auth">${provider("deepseek", "DeepSeek", "已配置")} · ${provider("openai-codex", "Codex", "已登录")} · <span class="agent-dot ${s.providers?.exa?.configured ? "on" : ""}"></span>Exa ${s.providers?.exa?.configured ? "已配置 Key" : "免 Key"}</div>
+    `<span class="agent-dot ${s.providers?.[name]?.configured ? "on" : ""}"></span>${esc(label)} ${s.providers?.[name]?.configured ? ready : "未连接"}`;
+  const extra = Object.keys(s.providers ?? {}).filter((name) => !["deepseek", "openai-codex", "exa"].includes(name)).map((name) => provider(name, name, "已配置")).join(" · ");
+  return `<div class="agent-auth">${provider("deepseek", "DeepSeek", "已配置")} · ${provider("openai-codex", "Codex", "已登录")}${extra ? ` · ${extra}` : ""} · <span class="agent-dot ${s.providers?.exa?.configured ? "on" : ""}"></span>Exa ${s.providers?.exa?.configured ? "已配置 Key" : "免 Key"}</div>
   ${event?.url ? `<p class="muted">已在浏览器打开登录页。${event.instructions ? esc(event.instructions) : ""}</p><button class="button small" type="button" data-agent="open-login">重新打开登录页</button>` : ""}
   ${event?.message && !event.url ? `<p class="muted">${esc(event.message)}</p>` : ""}
   ${event?.type === "prompt" ? `<form id="agent-login-answer"><input name="text" autocomplete="off" placeholder="${esc(event.placeholder ?? "粘贴回调链接或代码")}" autofocus><button class="button small" type="submit">继续</button></form>` : ""}`;
@@ -432,6 +433,7 @@ function modelSelectHtml() {
   const providers: [string, string][] = [
     ["deepseek", "DeepSeek"],
     ["openai-codex", "Codex"],
+    ...Object.keys(s.providers).filter((id) => !["deepseek", "openai-codex", "exa"].includes(id)).map((id) => [id, id] as [string, string]),
   ];
   const current = `${s.preferences.provider}|${s.preferences.model ?? ""}`;
   const groups = providers
@@ -453,7 +455,7 @@ function modelSelectHtml() {
         options.push(
           `<option value="${id}|${esc(s.preferences.model)}" selected>${esc(s.preferences.model)}</option>`,
         );
-      return `<optgroup label="${label}">${options.join("")}</optgroup>`;
+      return `<optgroup label="${esc(label)}">${options.join("")}</optgroup>`;
     })
     .join("");
   return `<select id="agent-model-select" aria-label="后端与模型">${groups}</select>`;
