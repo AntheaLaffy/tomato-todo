@@ -324,38 +324,40 @@ function questionHtml(): string {
     for (const key of Object.keys(answers)) delete answers[key];
   }
   const other = (question: (typeof questions)[number]) =>
-    `<form class="agent-other" data-question="${esc(question.id)}"><input name="text" maxlength="2000" placeholder="其他想法（回车发送）" aria-label="${esc(question.question)}的自定义回答"><button class="button small" type="submit">发送</button></form>`;
+    `<form class="agent-other" data-question="${esc(question.id)}"><input name="text" maxlength="2000" placeholder="其他想法…" aria-label="${esc(question.question)}的自定义回答"><button class="button small" type="submit">发送</button></form>`;
   return questions
     .map((question) => {
       const picked = answers[question.id] ?? [];
       const review = question.intent?.kind === "plan-review";
+      // 单选也是「先点、再确认」：点了不会立刻替你回话，和 ChatGPT 的选择卡一样。
       const options = question.options
-        .map((option) => {
+        .map((option, index) => {
           const chosen = picked.includes(option.label);
           const approve = review && option.label === question.intent?.approve;
           const classes = [
-            "agent-option",
-            question.multiSelect ? "toggle" : "",
+            "agent-choice",
+            question.multiSelect ? "multi" : "single",
             chosen ? "picked" : "",
             approve ? "approve" : "",
           ]
             .filter(Boolean)
             .join(" ");
-          const action = question.multiSelect
-            ? "toggle-question"
-            : approve
-              ? "approve"
-              : "answer";
-          return `<button class="${classes}" type="button" data-agent="${action}" data-question="${esc(question.id)}" data-label="${esc(option.label)}" data-text="${esc(`${question.header}：${option.label}`)}"${option.description ? ` title="${esc(option.description)}"` : ""}><b>${esc(option.label)}</b><small>${esc(option.description)}</small></button>`;
+          return `<button class="${classes}" type="button" data-agent="choose" data-question="${esc(question.id)}" data-label="${esc(option.label)}"><i class="agent-choice-mark" aria-hidden="true"></i><span class="agent-choice-text"><b>${esc(option.label)}</b><small>${esc(option.description)}</small></span><kbd>${index + 1}</kbd></button>`;
         })
         .join("");
-      if (review)
-        return `<section class="agent-proposal" data-plan-review="${esc(question.id)}"><div class="agent-proposal-strip"><i></i>待批准</div><div class="agent-proposal-body"><h3>${esc(question.header)}</h3><p>${esc(question.question)}</p>${question.detail ? `<pre>${esc(question.detail)}</pre>` : ""}</div><div class="agent-proposal-actions"><button class="button" type="button" data-agent="discuss">讨论</button>${options}</div></section>`;
-      const submit =
-        question.multiSelect && picked.length
-          ? `<button class="button small primary" type="button" data-agent="answer-multi" data-question="${esc(question.id)}">提交选择（${picked.length}）</button>`
-          : "";
-      return `<div class="agent-question"><div class="agent-question-head">${esc(question.header)}</div><p>${esc(question.question)}</p>${question.detail ? `<p class="agent-question-detail">${esc(question.detail)}</p>` : ""}<div class="agent-question-options">${options}</div><div class="agent-question-foot">${submit}${other(question)}</div></div>`;
+      if (review) {
+        const approveLabel = question.intent?.approve ?? "";
+        return `<section class="agent-proposal" data-plan-review="${esc(question.id)}"><div class="agent-proposal-strip"><i></i>待批准</div><div class="agent-proposal-body"><h3>${esc(question.header)}</h3><p>${esc(question.question)}</p>${question.detail ? `<pre>${esc(question.detail)}</pre>` : ""}</div><div class="agent-proposal-actions"><button class="button" type="button" data-agent="discuss">讨论</button><button class="button primary" type="button" data-agent="approve" data-text="${esc(`${question.header}：${approveLabel}`)}">${esc(approveLabel || "批准")}</button>${question.options
+          .filter((option) => option.label !== approveLabel)
+          .map(
+            (option) =>
+              `<button class="agent-choice single" type="button" data-agent="choose" data-question="${esc(question.id)}" data-label="${esc(option.label)}"><i class="agent-choice-mark" aria-hidden="true"></i><span class="agent-choice-text"><b>${esc(option.label)}</b><small>${esc(option.description)}</small></span></button>`,
+          )
+          .join(
+            "",
+          )}${picked.length ? `<button class="button primary" type="button" data-agent="answer-choice" data-question="${esc(question.id)}">确认选择</button>` : ""}</div></section>`;
+      }
+      return `<div class="agent-question"><div class="agent-question-head">${esc(question.header)}</div><p class="agent-question-title">${esc(question.question)}</p>${question.detail ? `<p class="agent-question-detail">${esc(question.detail)}</p>` : ""}<div class="agent-choices">${options}</div><div class="agent-question-foot"><button class="button primary agent-choice-confirm" type="button" data-agent="answer-choice" data-question="${esc(question.id)}" ${picked.length ? "" : "disabled"}>确认选择${picked.length ? `（${picked.length}）` : ""}</button>${question.multiSelect ? "" : ""}${other(question)}</div></div>`;
     })
     .join("");
 }
@@ -834,7 +836,22 @@ async function action(button: HTMLButtonElement) {
       if (button.dataset.text)
         await call({ op: "send", text: button.dataset.text });
       break;
-    // Multi-select: toggle here, submit once — never answer mid-selection.
+    // 点选只改选中状态，发送交给「确认选择」——不会点一下就替用户回话。
+    case "choose": {
+      const id = button.dataset.question!,
+        label = button.dataset.label!;
+      const question = status?.questions.find((item) => item.id === id);
+      const picked = answers[id] ?? [];
+      answers[id] = question?.multiSelect
+        ? picked.includes(label)
+          ? picked.filter((item) => item !== label)
+          : [...picked, label]
+        : picked.includes(label)
+          ? []
+          : [label];
+      renderChat();
+      break;
+    }
     case "toggle-question": {
       const id = button.dataset.question!,
         label = button.dataset.label!;
@@ -843,6 +860,17 @@ async function action(button: HTMLButtonElement) {
         ? picked.filter((item) => item !== label)
         : [...picked, label];
       renderChat();
+      break;
+    }
+    case "answer-choice": {
+      const id = button.dataset.question!;
+      const question = status?.questions.find((item) => item.id === id);
+      const picked = answers[id] ?? [];
+      if (!question || !picked.length) throw new Error("请先选一项");
+      await call({
+        op: "send",
+        text: `${question.header}：${picked.join("、")}`,
+      });
       break;
     }
     case "answer-multi": {

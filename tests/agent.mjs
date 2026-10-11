@@ -610,10 +610,12 @@ test(
       });
       await asked.goto(url);
       await asked.locator('[data-page="agent"]').click();
-      await asked.locator('[data-label="英语（推荐）"]').click();
-      await asked.locator('[data-label="数学"]').click();
-      await expect(asked.locator(".agent-option.picked")).toHaveCount(2);
-      await asked.locator('[data-agent="answer-multi"]').click();
+      await asked
+        .locator('[data-agent="choose"][data-label="英语（推荐）"]')
+        .click();
+      await asked.locator('[data-agent="choose"][data-label="数学"]').click();
+      await expect(asked.locator(".agent-choice.picked")).toHaveCount(2);
+      await asked.locator('[data-agent="answer-choice"]').click();
       assert.deepEqual(sent, ["选科目：英语（推荐）、数学"]);
       pending = [
         {

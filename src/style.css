@@ -4943,3 +4943,84 @@ body.ponder-open #toast {
 .ponder-chip:hover {
   color: var(--accent);
 }
+
+/* 选择卡：点选一行（无线按钮/复选框），再按「确认选择」——和常见对话产品的选择卡一致。 */
+.agent-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.agent-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.agent-choice:hover {
+  border-color: var(--accent);
+}
+.agent-choice-mark {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--muted);
+  background: var(--surface);
+}
+.agent-choice.single .agent-choice-mark {
+  border-radius: 50%;
+}
+.agent-choice.multi .agent-choice-mark {
+  border-radius: 4px;
+}
+.agent-choice.picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.agent-choice.picked .agent-choice-mark {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 4px var(--accent);
+}
+.agent-choice.picked .agent-choice-mark::after {
+  content: "";
+}
+.agent-choice.approve {
+  border-color: var(--accent);
+}
+.agent-choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.agent-choice-text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.agent-choice-text small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.agent-choice kbd {
+  color: var(--muted);
+  font-size: 11px;
+}
+.agent-question-title {
+  margin: 4px 0 10px;
+  font-weight: 600;
+}
+.agent-choice-confirm {
+  min-width: 132px;
+}
+.agent-choice-confirm[disabled] {
+  opacity: 0.55;
+}
