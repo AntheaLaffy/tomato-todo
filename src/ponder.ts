@@ -79,7 +79,7 @@ export const PONDER_TARGETS: PonderTarget[] = [
     id: "catch-up",
     title: "待补队列",
     category: "专注",
-    selectors: ['[data-ponder="catch-up"]', ".catch-up-chip"],
+    selectors: ['[data-ponder="catch-up"]', ".today-card", ".catch-up-chip"],
     sections: [
       {
         heading: "设计理念",
@@ -153,7 +153,11 @@ export const PONDER_TARGETS: PonderTarget[] = [
     id: "recurring",
     title: "每周分时与重复",
     category: "任务",
-    selectors: [".editor-details", ".editor-hint"],
+    selectors: [
+      "#template-printing-options",
+      ".editor-details",
+      '[data-action="new-template"]',
+    ],
     sections: [
       {
         heading: "设计理念",
@@ -676,10 +680,7 @@ export const PONDER_TARGETS: PonderTarget[] = [
     id: "agent-backend",
     title: "后端与模型",
     category: "智能体",
-    selectors: [
-      '#agent-config-form label:has(select[name="provider"])',
-      '#agent-config-form label:has(input[name="model"])',
-    ],
+    selectors: ["#agent-model-select", "#agent-model"],
     sections: [
       {
         heading: "设计理念",

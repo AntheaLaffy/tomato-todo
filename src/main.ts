@@ -57,7 +57,7 @@ import {
   Lightbulb,
 } from "lucide";
 import { listen } from "@tauri-apps/api/event";
-import { initPonder, openPonderList } from "./ponder";
+import { initPonder, openPonder, openPonderList } from "./ponder";
 import {
   handOptions,
   handStep,
@@ -566,13 +566,33 @@ function render() {
   icons();
   updateClock();
 }
+// 每一页的思索条目：悬停整页不弹胶囊（整页都是它），所以在标题旁给一个
+// 明确的入口，点开就是这一页的「设计理念 + 怎么用」。
+const PONDER_OF_PAGE: Record<string, string> = {
+  focus: "focus",
+  tasks: "tasks",
+  goals: "goals",
+  stats: "stats",
+  schedule: "schedule",
+  agent: "agent",
+  guard: "guard",
+  lock: "lock",
+  settings: "settings",
+};
+function ponderChip() {
+  const id = page.startsWith("project:")
+    ? "projects"
+    : PONDER_OF_PAGE[page as string];
+  if (!id) return "";
+  return `<button class="text-button ponder-chip" data-action="ponder-page" data-ponder-id="${id}" aria-label="这一页为什么这样设计">${icon("lightbulb")} 这一页为什么这样设计</button>`;
+}
 function heading(
   title: string,
   subtitle: string,
   eyebrow = "A LITTLE FOCUS, A BETTER DAY",
   action = true,
 ) {
-  return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p></div>${action ? `<button class="button primary" data-action="new-task">${icon("plus")} 新建任务 <kbd>N</kbd></button>` : ""}</div>`;
+  return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p>${ponderChip()}</div>${action ? `<button class="button primary" data-action="new-task">${icon("plus")} 新建任务 <kbd>N</kbd></button>` : ""}</div>`;
 }
 function metric(
   iconName: string,
@@ -3042,6 +3062,9 @@ document.addEventListener("click", async (e) => {
       break;
     case "new-lock":
       lockDialog();
+      break;
+    case "ponder-page":
+      openPonder((d.ponderId as string) ?? "focus");
       break;
     case "new-block":
       blockDialog();

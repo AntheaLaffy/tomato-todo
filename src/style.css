@@ -4934,3 +4934,12 @@ body.ponder-open #toast {
   gap: 4px;
   font-size: 13px;
 }
+
+/* 标题旁的思索入口：低调但看得见。 */
+.ponder-chip {
+  margin-top: 6px;
+  color: var(--secondary);
+}
+.ponder-chip:hover {
+  color: var(--accent);
+}

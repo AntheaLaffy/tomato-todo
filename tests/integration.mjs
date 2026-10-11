@@ -1413,6 +1413,12 @@ test(
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(url);
+      // 每页标题旁有明确的思索入口：点开就是这一页的设计理念。
+      await page.locator('[data-action="ponder-page"]').first().click();
+      await expect(page.locator("#ponder-title")).toHaveText("今日专注");
+      await expect(page.locator("#ponder-layer")).toContainText("设计理念");
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#ponder-layer")).toBeHidden();
       // Hovering a registered concept shows the hold hint after the delay.
       await page.locator(".focus-card").hover();
       const hint = page.locator("#ponder-hint");
