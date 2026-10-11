@@ -576,6 +576,7 @@ test(
       const asked = await browser.newPage();
       const sent = [];
       let cannedHand = null;
+      let cannedDeeds = null;
       let pending = [
         {
           id: "subjects",
@@ -597,6 +598,7 @@ test(
         reviewed: [],
         questions: pending,
         hand: cannedHand,
+        deeds: cannedDeeds,
       });
       await asked.route("**/api/agent", async (route) => {
         const body = route.request().postDataJSON();
@@ -648,6 +650,19 @@ test(
       await asked.locator('[data-page="agent"]').click();
       await expect(asked.locator(".hand-actor.on")).toBeVisible();
       await expect(asked.locator(".hand-caption")).toContainText("看得见的手");
+      // 助手这一轮改过的东西会在界面上被指出来（deeds 批次）。
+      cannedHand = null;
+      cannedDeeds = {
+        serial: 1,
+        at: Math.floor(Date.now() / 1000),
+        items: [{ text: "课表里记下了「英语」", selector: ".blocks-card" }],
+      };
+      await asked.reload();
+      await asked.locator('[data-page="agent"]').click();
+      await expect(asked.locator(".hand-caption")).toContainText(
+        "课表里记下了「英语」",
+        { timeout: 8000 },
+      );
       await asked.evaluate(() => window.tomatoHand.hide());
       await asked.close();
       assert.deepEqual(errors, []);

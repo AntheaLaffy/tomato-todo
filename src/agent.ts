@@ -94,6 +94,12 @@ export type AgentStatus = {
     label?: string;
     steps: HandStep[];
   } | null;
+  /** 助手这一轮改了什么；界面按 serial 演一遍，让用户看见改动落在哪儿。 */
+  deeds: {
+    serial: number;
+    at: number;
+    items: { text: string; selector?: string }[];
+  } | null;
   dataDir: string;
   mcpConfig: unknown;
 };
@@ -120,6 +126,7 @@ const memoryEdits: Record<string, string> = {};
 const answers: Record<string, string[]> = {};
 let questionsSignature = "";
 let handSerial = 0;
+let deedsSerial = 0;
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
@@ -519,10 +526,35 @@ function playHand() {
   if (Date.now() / 1000 - hand.at > 120) return;
   void runHandScript({ steps: hand.steps, label: hand.label });
 }
+/**
+ * 演「这一轮我改了什么」：先点回改动所在的页面，再把手停在那一行上，说一句人话。
+ * 元素找不到（比如那条任务不在当前日期）就只说话——比演错地方好。
+ */
+function playDeeds() {
+  const deeds = status?.deeds;
+  if (!deeds || deeds.serial <= deedsSerial || !deeds.items.length) return;
+  deedsSerial = deeds.serial;
+  if (Date.now() / 1000 - deeds.at > 120) return;
+  const first = deeds.items.find((item) => item.selector);
+  const steps: HandStep[] = [];
+  if (first?.selector?.startsWith("[data-block-id")) {
+    steps.push({ kind: "click", target: '[data-page="schedule"]', real: true });
+    steps.push({ kind: "wait", ms: 600 });
+  }
+  for (const item of deeds.items) {
+    if (item.selector) {
+      steps.push({ kind: "move", target: item.selector });
+      steps.push({ kind: "highlight", target: item.selector, ms: 1100 });
+    }
+    steps.push({ kind: "say", lines: [item.text] });
+  }
+  void runHandScript({ steps, label: "助手" });
+}
 function update() {
   if (!hooks?.active() || !status) return;
   renderChat();
   playHand();
+  playDeeds();
   const active = document.activeElement;
   const typing =
     active instanceof Element &&

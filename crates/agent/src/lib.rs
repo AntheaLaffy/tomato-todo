@@ -43,6 +43,10 @@ struct Live {
     /// 助手的「手」：一段待演的动作脚本，界面按 serial 演一次。
     hand: Value,
     hand_serial: u64,
+    /// 这一轮助手改动了什么：轮末打包成一批「事迹」，界面回去时演给用户看。
+    pending_deeds: Vec<Value>,
+    deeds: Value,
+    deeds_serial: u64,
 }
 struct Inner {
     store: Store,
@@ -123,6 +127,35 @@ impl Agent {
         )
     }
     /// Ask the packaged runtime something and wait for its `network_result` reply.
+    /// 记一笔「这一轮助手改了什么」，轮末由 `flush_deeds` 打包给界面演一遍。
+    fn note_deed(&self, text: impl Into<String>, selector: Option<String>) {
+        if let Ok(mut inner) = self.inner.lock() {
+            let text: String = text.into();
+            let mut deed = json!({"text":text});
+            if let Some(selector) = selector {
+                deed["selector"] = json!(selector);
+            }
+            inner.live.pending_deeds.push(deed);
+            // 一轮里改得再多也只演前几件，免得变成流水账。
+            if inner.live.pending_deeds.len() > 6 {
+                inner.live.pending_deeds.remove(0);
+            }
+        }
+    }
+    /// 轮末把这一轮的事迹打包成一批（带自增 serial），界面按 serial 演一次。
+    /// 调用者已经握着 `inner`，所以不再加锁。
+    fn flush_deeds(inner: &mut Inner) {
+        if inner.live.pending_deeds.is_empty() {
+            return;
+        }
+        let items = std::mem::take(&mut inner.live.pending_deeds);
+        inner.live.deeds_serial += 1;
+        inner.live.deeds = json!({
+            "serial":inner.live.deeds_serial,
+            "at":now(),
+            "items":items,
+        });
+    }
     /// Used for provider quota, network tools and MCP configuration, which all live
     /// on the Node side rather than in this process.
     fn ask_worker(self: &Arc<Self>, mut value: Value, seconds: u64) -> AppResult<Value> {
@@ -482,6 +515,8 @@ impl Agent {
                         w.status = "completed".into();
                     }
                 }
+                // 一轮结束了：这一轮改过的东西打包给界面演一遍。
+                Self::flush_deeds(&mut inner);
             }
             "error" => {
                 inner.live.busy = false;
@@ -514,7 +549,7 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -869,7 +904,69 @@ impl Agent {
                 task["id"] = Value::Null;
                 let action = serde_json::from_value(json!({"type":"saveTask","task":task}))
                     .map_err(|e| e.to_string())?;
-                serde_json::to_value((self.apply)(action, None)?).map_err(|e| e.to_string())
+                let snapshot = (self.apply)(action, None)?;
+                let title = args["title"].as_str().unwrap_or_default().to_string();
+                let selector = snapshot
+                    .data
+                    .tasks
+                    .iter()
+                    .max_by_key(|task| task.created_at)
+                    .map(|task| format!("[data-task-id=\"{}\"]", task.id));
+                self.note_deed(format!("建了任务「{title}」"), selector);
+                serde_json::to_value(snapshot).map_err(|e| e.to_string())
+            }
+            // 课表阻塞时段：模型能直接增删，和界面上那张卡片是同一份数据。
+            "save_block" | "delete_block" => {
+                let title = args["title"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
+                let known = args["id"].as_str().map(String::from);
+                // 删掉之后名字就没了，先记下来，好给用户一句说明。
+                let removed = if name == "delete_block" {
+                    known.as_ref().and_then(|id| {
+                        let mut engine = self.engine.lock().ok()?;
+                        let snapshot = engine.snapshot(now()).ok()?;
+                        snapshot
+                            .data
+                            .blocks
+                            .iter()
+                            .find(|block| &block.id == id)
+                            .map(|block| block.title.clone())
+                    })
+                } else {
+                    None
+                };
+                let mut value = args.clone();
+                value["type"] = json!(if name == "save_block" {
+                    "saveBlock"
+                } else {
+                    "deleteBlock"
+                });
+                if name == "save_block" && value.get("id").is_none() {
+                    value["id"] = Value::Null;
+                }
+                let action = serde_json::from_value(value).map_err(|e| e.to_string())?;
+                let snapshot = (self.apply)(action, None)?;
+                if name == "save_block" {
+                    let selector = snapshot
+                        .data
+                        .blocks
+                        .iter()
+                        .find(|block| !title.is_empty() && block.title == title)
+                        .map(|block| format!("[data-block-id=\"{}\"]", block.id));
+                    self.note_deed(format!("课表里记下了「{title}」"), selector);
+                } else {
+                    self.note_deed(
+                        match removed {
+                            Some(title) => format!("删掉了课表时段「{title}」"),
+                            None => "删掉了一个课表时段".to_string(),
+                        },
+                        None,
+                    );
+                }
+                serde_json::to_value(snapshot).map_err(|e| e.to_string())
             }
             "update_task" | "move_tasks" | "complete_task" => {
                 let (action, base) = {
@@ -945,7 +1042,25 @@ impl Agent {
                     };
                     (action, base)
                 };
-                serde_json::to_value((self.apply)(action, Some(base))?).map_err(|e| e.to_string())
+                let snapshot = (self.apply)(action, Some(base))?;
+                // 任务改动是助手最常做的事：把动到的那条标出来，回去时演给用户看。
+                let selector = match name {
+                    "complete_task" => args["id"]
+                        .as_str()
+                        .map(|id| format!("[data-task-id=\"{id}\"]")),
+                    _ => None,
+                };
+                let text = match name {
+                    "complete_task" => "把这条任务勾掉了".to_string(),
+                    "move_tasks" => format!(
+                        "把 {} 个任务挪到了 {}",
+                        args["ids"].as_array().map(Vec::len).unwrap_or(0),
+                        args["dueDate"].as_str().unwrap_or("另一天")
+                    ),
+                    _ => "改了一条任务".to_string(),
+                };
+                self.note_deed(text, selector);
+                serde_json::to_value(snapshot).map_err(|e| e.to_string())
             }
             "create_project" | "save_vision" => {
                 let mut value = args.clone();
@@ -991,7 +1106,32 @@ impl Agent {
                 if matches!(action, Action::EmergencyUnlock) {
                     return Err("MCP 不能紧急解锁".into());
                 }
-                serde_json::to_value((self.apply)(action, None)?).map_err(|e| e.to_string())
+                // 兜底路径也要留下痕迹：按 Action 类型给一句人话，能定位就带上选择器。
+                let deed = match &action {
+                    Action::SaveBlock { title, .. } => {
+                        Some((format!("课表里记下了「{title}」"), None))
+                    }
+                    Action::DeleteBlock { .. } => Some(("删掉了一个课表时段".to_string(), None)),
+                    Action::ToggleTask { id } => Some((
+                        "勾掉了一条任务".to_string(),
+                        Some(format!("[data-task-id=\"{id}\"]")),
+                    )),
+                    Action::DeleteTask { .. } => Some(("删掉了一条任务".to_string(), None)),
+                    Action::RestoreTask { .. } => Some(("找回了一条任务".to_string(), None)),
+                    Action::ImportPlan { .. } => Some(("导入了学习计划".to_string(), None)),
+                    Action::Import { .. } => Some(("恢复了备份".to_string(), None)),
+                    Action::SaveGoal { name, .. } => Some((format!("更新了主线「{name}」"), None)),
+                    Action::SaveHabit { name, .. } => Some((format!("更新了习惯「{name}」"), None)),
+                    Action::SaveVision { name, .. } => {
+                        Some((format!("记下了愿景「{name}」"), None))
+                    }
+                    _ => None,
+                };
+                let snapshot = (self.apply)(action, None)?;
+                if let Some((text, selector)) = deed {
+                    self.note_deed(text, selector);
+                }
+                serde_json::to_value(snapshot).map_err(|e| e.to_string())
             }
             // Declining a proposal only forgets the review: the file stays in the
             // workspace until the user asks for something else.

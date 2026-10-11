@@ -104,6 +104,44 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
     })
 }
 #[test]
+fn what_the_assistant_changed_becomes_a_deed_batch_for_the_ui() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    // 改数据本身也要能用（这条分支曾经在恢复时漏掉过）。
+    let saved = agent
+        .call(
+            "save_block",
+            &json!({"title":"模式识别与机器学习","days":[1],"start":"19:30","end":"21:40","attention":"required"}),
+            false,
+        )
+        .unwrap();
+    let block_id = saved["data"]["blocks"][0]["id"].as_str().unwrap().to_string();
+    // 轮末（界面看到的 "done"）才打包成一批，带自增 serial。
+    agent.event(json!({"type":"done","text":"加好了"}));
+    let status = agent.status().unwrap();
+    assert_eq!(status["deeds"]["serial"], json!(1));
+    assert_eq!(status["deeds"]["items"][0]["text"], json!("课表里记下了「模式识别与机器学习」"));
+    assert_eq!(
+        status["deeds"]["items"][0]["selector"],
+        json!(format!("[data-block-id=\"{block_id}\"]"))
+    );
+    // 没有改动的一轮不产生新的批次。
+    agent.event(json!({"type":"done","text":"只是在聊"}));
+    assert_eq!(agent.status().unwrap()["deeds"]["serial"], json!(1));
+    // 兜底路径（dispatch）也留痕。
+    agent
+        .call(
+            "dispatch",
+            &json!({"action":{"type":"deleteBlock","id":block_id}}),
+            false,
+        )
+        .unwrap();
+    agent.event(json!({"type":"done","text":""}));
+    let status = agent.status().unwrap();
+    assert_eq!(status["deeds"]["serial"], json!(2));
+    assert_eq!(status["deeds"]["items"][0]["text"], json!("删掉了一个课表时段"));
+}
+#[test]
 fn show_me_stores_a_bounded_script_and_bumps_its_serial() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
