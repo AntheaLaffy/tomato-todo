@@ -274,7 +274,7 @@ impl Agent {
                 } else {
                     nonempty_text(&args, "text", 32000)?
                 };
-                self.prompt(text, false, images)?;
+                self.prompt(text, false, false, images)?;
                 self.status()
             }
             "cancel" => {
@@ -383,6 +383,7 @@ impl Agent {
         self: &Arc<Self>,
         text: String,
         automatic: bool,
+        scheduled: bool,
         images: Vec<Value>,
     ) -> AppResult<()> {
         let command = {
@@ -402,7 +403,7 @@ impl Agent {
             inner.live.questions = Value::Null;
             inner.live.text.clear();
             inner.live.error = None;
-            inner.live.automatic = automatic;
+            inner.live.automatic = automatic && !scheduled;
             inner.live.job_id = uuid::Uuid::new_v4().to_string();
             let displayed = if images.is_empty() {
                 text.clone()
@@ -411,7 +412,7 @@ impl Agent {
             };
             inner.store.message("user", displayed, now(), automatic);
             inner.store.save(&self.dir)?;
-            json!({"op":"prompt","automatic":automatic,"jobId":inner.live.job_id,"text":text,"images":images,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":tools::definitions(automatic)})
+            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"jobId":inner.live.job_id,"text":text,"images":images,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":tools::definitions(automatic)})
         };
         if let Err(error) = self.send(command) {
             self.failure(&error);
@@ -549,11 +550,60 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
         let at = snapshot.server_time;
+        // 用户排定的定时任务排在最前：它们是用户明确的安排，所以不受「自动唤醒」
+        // 开关、每日上限、冷却和安静时段限制——但助手得是启用且已连接的状态。
+        let due: Option<(String, String, String, u32)> = {
+            let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+            let p = inner.store.preferences.clone();
+            let ready = p.enabled
+                && inner.live.auth[&p.provider]["configured"] == true
+                && !inner.live.busy
+                && snapshot.data.reminder_idle();
+            let now = Local.timestamp_opt(at, 0).single().map(|t| t.naive_local());
+            match (ready, now) {
+                (true, Some(now)) => {
+                    let hit = inner.store.schedules.iter().find(|s| s.due(now)).map(|s| {
+                        (
+                            s.id.clone(),
+                            s.name.clone(),
+                            s.instruction.clone(),
+                            s.remind_minutes,
+                        )
+                    });
+                    if let Some((id, name, instruction, remind)) = hit.clone() {
+                        for s in &mut inner.store.schedules {
+                            if s.id == id {
+                                s.fired_at = Some(at);
+                            }
+                        }
+                        inner.store.save(&self.dir)?;
+                        Some((id, name, instruction, remind))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        };
+        if let Some((_id, name, instruction, remind)) = due {
+            let remind_note = if remind > 0 {
+                format!("（用户希望在到点前 {remind} 分钟被提醒：需要的话建一条带提醒的任务。）")
+            } else {
+                String::new()
+            };
+            let text = format!("这是你为用户排定的定时任务「{name}」，现在到点了{remind_note}。按下面的指令现在去办：能直接用工具做完的就做完（包括 MCP、建/改任务），不要只写方案；做完用一两句话说清做了什么、结果如何、以及需要用户本人补做的动作。指令：{instruction}");
+            self.inner
+                .lock()
+                .map_err(|e| e.to_string())?
+                .live
+                .wake_serial += 1;
+            return self.prompt(text, false, true, vec![]);
+        }
         let prompt = {
             let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
             if at - inner.live.last_scan >= 60 || inner.live.last_scan == 0 {
@@ -625,7 +675,7 @@ impl Agent {
             format!("本地检测到一个学习安排信号。看一眼当前数据和已确认背景，用一两句话说你注意到了什么、你的建议（怎么调、为什么）和想问的一个点，不要罗列清单。这一轮只分析、提问和准备待审阅文件，不直接改数据；用户回应后即可直接调整。信号：{}",serde_json::to_string(&eligible).map_err(|e|e.to_string())?)
         };
         (self.wake)();
-        self.prompt(prompt, true, vec![])
+        self.prompt(prompt, true, false, vec![])
     }
     pub fn call_job(self: &Arc<Self>, name: &str, args: &Value, job_id: &str) -> AppResult<Value> {
         let automatic = {
@@ -814,6 +864,48 @@ impl Agent {
                 Ok(
                     json!({"playing":true,"serial":serial,"note":"脚本交给界面播放；讲稿内容由你写，界面只负责演。"}),
                 )
+            }
+            // 定时任务：用户排定「到点让助手去做」，助手也能自己排（例如抢座位）。
+            "list_schedules" => {
+                let inner = self.inner.lock().map_err(|e| e.to_string())?;
+                Ok(json!({"schedules":inner.store.schedules}))
+            }
+            "save_schedule" | "delete_schedule" => {
+                let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                if name == "delete_schedule" {
+                    let id = args["id"].as_str().ok_or("缺少定时任务 id")?;
+                    let before = inner.store.schedules.len();
+                    inner.store.schedules.retain(|s| s.id != id);
+                    if inner.store.schedules.len() == before {
+                        return Err("没有这个定时任务".into());
+                    }
+                    inner.store.save(&self.dir)?;
+                    return Ok(json!({"deleted":id,"schedules":inner.store.schedules}));
+                }
+                let mut schedule: crate::state::Schedule =
+                    serde_json::from_value(args.clone()).map_err(|e| e.to_string())?;
+                if schedule.id.trim().is_empty() {
+                    schedule.id = uuid::Uuid::new_v4().to_string();
+                }
+                schedule.validate()?;
+                let exists = inner.store.schedules.iter().any(|s| s.id == schedule.id);
+                if !exists && inner.store.schedules.len() >= 20 {
+                    return Err("定时任务最多 20 条".into());
+                }
+                if let Some(existing) = inner
+                    .store
+                    .schedules
+                    .iter_mut()
+                    .find(|s| s.id == schedule.id)
+                {
+                    // 改时间或指令不该让它当天重复触发，保留已触发记录。
+                    schedule.fired_at = existing.fired_at;
+                    *existing = schedule.clone();
+                } else {
+                    inner.store.schedules.push(schedule.clone());
+                }
+                inner.store.save(&self.dir)?;
+                Ok(json!({"saved":schedule.id,"schedules":inner.store.schedules}))
             }
             "request_user_input" => {
                 let questions = args["questions"].as_array().cloned().unwrap_or_default();

@@ -120,12 +120,104 @@ fn short_title(text: &str) -> String {
     }
     title
 }
+/// 用户排定的一次任务或固定节奏的任务。到点由助手自己去做，而不是只分析：
+/// 这是用户预先授权过的一次动作，因此这一轮带完整工具集（含 MCP），也不受异常
+/// 唤醒的冷却、每日上限和安静时段限制。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Schedule {
+    /// 新建时留空，保存时由调用方补一个 uuid。
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    /// 本机时间。`repeat` 为 once 时是 `YYYY-MM-DDTHH:MM`，否则只取 `HH:MM`。
+    pub at: String,
+    #[serde(default = "default_repeat")]
+    pub repeat: String,
+    /// 交给助手去做的事，写清目标与边界。
+    pub instruction: String,
+    /// 提前多少分钟提醒（0 = 不提醒）。助手据此建带提醒的任务。
+    #[serde(default)]
+    pub remind_minutes: u32,
+    #[serde(default = "yes")]
+    pub enabled: bool,
+    /// 上次触发时间；一次性的任务用它防重，周期性的用它按天去重。
+    #[serde(default)]
+    pub fired_at: Option<i64>,
+}
+fn default_repeat() -> String {
+    "once".into()
+}
+fn yes() -> bool {
+    true
+}
+impl Schedule {
+    pub fn validate(&self) -> AppResult<()> {
+        if self.id.is_empty() || self.name.trim().is_empty() || self.name.chars().count() > 40 {
+            return Err("定时任务需要 1–40 字的名称".into());
+        }
+        if self.instruction.trim().is_empty() || self.instruction.chars().count() > 2000 {
+            return Err("定时任务的指令需为 1–2000 字".into());
+        }
+        if !["once", "daily", "weekdays"].contains(&self.repeat.as_str()) {
+            return Err("定时任务周期需为 once/daily/weekdays".into());
+        }
+        if self.remind_minutes > 240 {
+            return Err("提前提醒最多 240 分钟".into());
+        }
+        let parsed = if self.repeat == "once" {
+            chrono::NaiveDateTime::parse_from_str(&self.at, "%Y-%m-%dT%H:%M").is_ok()
+        } else {
+            chrono::NaiveTime::parse_from_str(&self.at, "%H:%M").is_ok()
+        };
+        if !parsed {
+            return Err("定时任务时间格式不对".into());
+        }
+        Ok(())
+    }
+    /// 这个时刻该不该触发？`now` 是本机时间。
+    pub fn due(&self, now: chrono::NaiveDateTime) -> bool {
+        if !self.enabled {
+            return false;
+        }
+        use chrono::{Datelike, NaiveDate, TimeZone, Timelike};
+        let fired_today = self.fired_at.is_some_and(|at| {
+            chrono::Local
+                .timestamp_opt(at, 0)
+                .single()
+                .is_some_and(|t| {
+                    NaiveDate::from_ymd_opt(t.year(), t.month(), t.day())
+                        == NaiveDate::from_ymd_opt(now.year(), now.month(), now.day())
+                })
+        });
+        if self.repeat == "once" {
+            let Ok(target) = chrono::NaiveDateTime::parse_from_str(&self.at, "%Y-%m-%dT%H:%M")
+            else {
+                return false;
+            };
+            let late = now.signed_duration_since(target).num_minutes();
+            return self.fired_at.is_none() && (0..=30).contains(&late);
+        }
+        let Ok(target) = chrono::NaiveTime::parse_from_str(&self.at, "%H:%M") else {
+            return false;
+        };
+        if self.repeat == "weekdays" && now.weekday().number_from_monday() > 5 {
+            return false;
+        }
+        let same_minute = now.hour() == target.hour() && now.minute().abs_diff(target.minute()) < 1;
+        same_minute && !fired_today
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Store {
     pub preferences: Preferences,
     pub memories: Vec<Memory>,
     pub wakes: Vec<WakeRecord>,
+    /// 用户排定的定时任务：到点由助手自己去做（可以用 MCP 和改数据）。
+    #[serde(default)]
+    pub schedules: Vec<Schedule>,
     pub conversations: Vec<Conversation>,
     pub active: Option<String>,
     /// Legacy single-conversation fields, read once for migration and never written back.

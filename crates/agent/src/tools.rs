@@ -18,6 +18,7 @@ pub fn definitions(agent: bool) -> Vec<Value> {
         tool("get_snapshot","读取完整软件快照；大数据优先使用 get_context 与按 ID 查询。",json!({}),&[],true),
         tool("get_tasks","按项目/目标/完成状态分页读取任务，不重复灌入整个备份。",json!({"projectId":{"type":"string"},"goalId":{"type":"string"},"completed":{"type":"boolean"},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":100}}),&[],true),
         tool("get_memories","读取已确认事实和待确认假设；不把 AI 假设当作用户事实。",json!({}),&[],true),
+        tool("list_schedules","列出用户排定（或你之前排定）的定时任务：名称、时间、周期、指令、提前提醒、是否已触发。",json!({}),&[],true),
         tool("list_mcp_servers","列出应用 mcp.json 里配置的 MCP 服务器（名称、启用状态、exposure、启动命令或 URL、来源）与配置/连接错误。座位、图书馆等外部系统都通过这类服务器接入。",json!({}),&[],true),
         tool("remember","保存有来源的长期记忆。模型产生的结论以未确认假设保存，用户可确认、改写和删除。",json!({"kind":{"type":"string","enum":["profile","preference","progress","hypothesis","reflection"]},"text":{"type":"string","maxLength":8000},"source":{"type":"string","maxLength":300}}),&["kind","text","source"],false),
         tool("read_skill","按需读取内置技能或该技能的参考文件；分析前选择匹配技能。",json!({"name":{"type":"string"},"reference":{"type":"string"}}),&["name"],true),
@@ -116,6 +117,20 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             "从应用 mcp.json 删除一个 MCP 服务器；不影响其它配置。",
             json!({"name":{"type":"string"}}),
             &["name"],
+            false,
+        ));
+        list.push(tool(
+            "save_schedule",
+            "排一个定时任务：到点由你（助手）直接去办，而不是只分析——这一轮你会拿到完整工具（含 MCP）与改数据的权限，请按 instruction 做完并回报。排期前先想清楚：什么时候一定有网、需要用户本人补做什么（例如座位预约后必须按时签到，否则 3 次会被拉黑）、要不要提前提醒、要不要提前锁机防拖沓。`at` 用本机时间：once 写 `YYYY-MM-DDTHH:MM`，daily/weekdays 只写 `HH:MM`。不传 id 即新建；传 id 则更新（保留已触发记录）。",
+            json!({"id":{"type":["string","null"]},"name":{"type":"string","maxLength":40},"at":{"type":"string"},"repeat":{"type":"string","enum":["once","daily","weekdays"]},"instruction":{"type":"string","maxLength":2000},"remindMinutes":{"type":"integer","minimum":0,"maximum":240},"enabled":{"type":"boolean"}}),
+            &["name", "at", "instruction"],
+            false,
+        ));
+        list.push(tool(
+            "delete_schedule",
+            "删掉一个定时任务（按 id）。",
+            json!({"id":{"type":"string"}}),
+            &["id"],
             false,
         ));
         list.push(tool(

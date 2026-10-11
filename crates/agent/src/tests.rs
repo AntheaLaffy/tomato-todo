@@ -104,6 +104,84 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
     })
 }
 #[test]
+fn schedules_are_saved_validated_and_only_fire_once_a_day() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    // 助手自己排一条「每天固定时刻办事」的任务，并把提前提醒写进去。
+    let saved = agent
+        .call(
+            "save_schedule",
+            &json!({"name":"抢图书馆座位","at":"21:50","repeat":"weekdays","instruction":"用 seat MCP 预约明天的座位，并建一条按时签到的任务提醒我","remindMinutes":15}),
+            false,
+        )
+        .unwrap();
+    assert!(saved["saved"].as_str().is_some_and(|id| !id.is_empty()));
+    let listed = agent.call("list_schedules", &json!({}), false).unwrap();
+    let schedule = &listed["schedules"][0];
+    assert_eq!(schedule["name"], json!("抢图书馆座位"));
+    assert_eq!(schedule["enabled"], json!(true));
+    assert_eq!(schedule["remindMinutes"], json!(15));
+    // due() 只在该时刻那一分钟、且当天没触发过时为真。
+    let parsed: crate::state::Schedule = serde_json::from_value(schedule.clone()).unwrap();
+    let at = |h, m| {
+        chrono::NaiveDate::from_ymd_opt(2026, 10, 12)
+            .unwrap()
+            .and_hms_opt(h, m, 0)
+            .unwrap()
+    };
+    assert!(parsed.due(at(21, 50)));
+    assert!(!parsed.due(at(21, 49)));
+    assert!(!parsed.due(at(21, 51)));
+    let mut fired = parsed.clone();
+    fired.fired_at = Some(
+        chrono::Local
+            .with_ymd_and_hms(2026, 10, 12, 21, 50, 0)
+            .unwrap()
+            .timestamp(),
+    );
+    assert!(!fired.due(at(21, 50)), "同一天不重复触发");
+    // 周末不触发（weekdays）。
+    let saturday = |h, m| {
+        chrono::NaiveDate::from_ymd_opt(2026, 10, 17)
+            .unwrap()
+            .and_hms_opt(h, m, 0)
+            .unwrap()
+    };
+    assert!(!parsed.due(saturday(21, 50)));
+    // 坏输入被拒：时间格式、周期、缺指令。
+    assert!(agent
+        .call(
+            "save_schedule",
+            &json!({"name":"x","at":"25:99","instruction":"y"}),
+            false
+        )
+        .is_err());
+    assert!(agent
+        .call(
+            "save_schedule",
+            &json!({"name":"x","at":"21:50","repeat":"hourly","instruction":"y"}),
+            false
+        )
+        .is_err());
+    assert!(agent
+        .call("save_schedule", &json!({"name":"x","at":"21:50"}), false)
+        .is_err());
+    let id = schedule["id"].as_str().unwrap().to_string();
+    assert_eq!(
+        agent
+            .call("delete_schedule", &json!({"id":id}), false)
+            .unwrap()["deleted"],
+        json!(id)
+    );
+    assert_eq!(
+        agent.status().unwrap()["schedules"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+}
+#[test]
 fn what_the_assistant_changed_becomes_a_deed_batch_for_the_ui() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
