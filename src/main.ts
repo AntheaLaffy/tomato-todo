@@ -460,7 +460,10 @@ function accept(next: Snapshot, action?: Record<string, unknown>) {
   if (!state.data.settings.sound || state.data.settings.soundVolume === 0)
     stopSound();
   else if (cue) playSound(cue, state.data.settings.soundVolume);
-  if (!wasProtected && protectedNow()) closeModal();
+  if (!wasProtected && protectedNow()) {
+    closeModal();
+    void hideHand();
+  }
   if (serial !== -1 && state.data.timer.completionSerial > serial) {
     toast(
       state.data.timer.lastFinishedMode === "focus"
@@ -3238,7 +3241,11 @@ function installHand() {
     enabled: state?.data.settings.sound ?? false,
     volume: state?.data.settings.soundVolume ?? 0,
   });
-  handOptions({ sound });
+  handOptions({
+    sound,
+    // 锁机、专注保护或沉浸计时占屏时不演；进入这些状态立刻收手。
+    suppressed: () => Boolean(state && (state.data.lock.active || immersive)),
+  });
   (window as unknown as Record<string, unknown>).tomatoHand = {
     sound,
     show: (label?: string) => showHand(label),

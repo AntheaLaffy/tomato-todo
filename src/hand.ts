@@ -29,6 +29,8 @@ export type HandScript = {
 export type HandOptions = {
   /** 音效开关与音量（跟随软件的「关键节点音效」设置）。 */
   sound?: () => { enabled: boolean; volume: number };
+  /** 什么时候不该演：锁机、沉浸计时这类占满屏幕的状态。 */
+  suppressed?: () => boolean;
   /** 每个动作前后的观感速度，1 为标准，>1 更慢。 */
   pace?: number;
 };
@@ -466,6 +468,8 @@ export function runHandScript(
 ) {
   options = { ...options, ...optionOverrides };
   script = script.then(async () => {
+    // 锁机或沉浸计时占着屏幕时不出手：那是用户明确说了「别打扰」的状态。
+    if (options.suppressed?.()) return;
     showHand(next.label ?? "助手");
     if (next.accent) layer?.style.setProperty("--hand-accent", next.accent);
     await wait(180);
@@ -476,7 +480,10 @@ export function runHandScript(
 /** 一步一动，方便助手边做边说，或者外部按需驱动。 */
 export function handStep(step: HandStep, optionOverrides: HandOptions = {}) {
   options = { ...options, ...optionOverrides };
-  script = script.then(() => apply(step));
+  script = script.then(() => {
+    if (options.suppressed?.()) return;
+    return apply(step);
+  });
   return script;
 }
 export function handPosition() {

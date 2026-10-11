@@ -18,7 +18,7 @@
 | 接口前缀 | `/api`（相对同源，前端写死 `fetch`） |
 | 鉴权 | **只有 `JSESSIONID`**：`credentials:"include"`，没有任何 Authorization 头或 token |
 | 后端 | nginx + 多实例（每次响应带 `x-debug-server: hit-this-server`） |
-| 旁路登录 | `GET /sso/scau/?buildingId` → 302 `https://cas.scau.edu.cn/lyuapServer/login?service=…`（CAS，未采用） |
+| 旁路登录 | `GET /sso/scau/?buildingId` → 302 `https://cas.scau.edu.cn/lyuapServer/login?service=…`；**这条（统一身份认证）才是推荐路径，免验证码，见下文** |
 | 幂等头 | `/op/*` 需要 `Idempotent-Token`（先 `GET /api/op/idempotent/token`）；座位预约主流程用不到 |
 
 ## 接口
@@ -226,29 +226,62 @@ uv run --python 3.12 --with ddddocr python solvers/ddddocr_cli.py <图片>
 
 ## 真账号登录实测（2026-10-11）
 
-求解器接上以后，登录链路一路跑到了密码校验那一层：
+两套凭据是分开的，实测结论如下：
+
+| 登录方式 | 凭据 | 结果 |
+| --- | --- | --- |
+| 站点自带的账号密码（`/api/web/user/login`） | 门户密码、旧系统两个候选 | 全部 `password erro`（账号存在，密码不对）——**用户的密码不属于这套本地账号** |
+| 统一身份认证（CAS） | 门户密码 | **登录成功**，418ms，拿到 ticket 与业务会话 |
+
+所以「密码不对」不是密码错了，而是**走错了入口**：人工登录时用的是页面上那个
+「统一身份认证登录」按钮，它跟站点自带的用户名密码是两套凭据。为避免账号被锁，
+本地那套在失败 4 次后就停手了。
+
+## 统一身份认证（CAS）链路：完全免验证码
+
+这是最终采用的登录方式（`LIBSEAT_LOGIN_MODE=cas`，默认）。协议来自
+`cas.scau.edu.cn/lyuapServer` 的 SPA（`app.<hash>.js`），实测三步：
 
 ```
-第 3 张 3RPF -> password erro      ← 验证码被接受，账号存在，密码不对
-第 1 张 9CAF -> password erro
+1. POST {CAS}/v1/tickets        form-urlencoded: username / password / service
+   -> {"tgt":"TGT-182318-…","ticket":"ST-182318-…"}
+2. GET  https://libseat.scau.edu.cn/sso/scau?ticket=ST-…
+   -> 302 到 /?casLogin=1，并下发 webuser cookie
+3. POST /api/web/pc/user        -> {"isOk":true,"data":{"user":{…}}}   # 会话已建立
 ```
 
-试过的候选密码（用户提供）全部被拒：新门户密码、旧系统的两个候选。
-三次都回 `password erro`（不是 `user can not find`，所以**账号本身在系统里是存在的**），
-说明这个站点要的是它自己那套凭据，跟门户密码不是一回事。为避免账号被锁，
-失败到第 4 次就停了——凭据问题得由本人确认或重置，不该由程序去试。
+三个关键细节（都是踩过的坑）：
 
-顺带确认了统一身份认证（CAS）那一侧的情况：
+- **密码不是 PKCS#1**。前端用的是「BigInt + Barrett 分块裸 RSA」：`chunkSize = 2 × 模数最高非零 16 位字`
+  （1024 位模数 → 126 字节），明文按 `charCodeAt` 逐字节**小端**打包成 16 位字，
+  `powMod(block, e)` 后每个 16 位字输出固定 4 位 hex、高位零字省略、分块之间空格分隔。
+  用标准 PKCS#1 v1.5 会被判 `PASSERROR`（服务端解密“成功”但明文是垃圾），换成分块裸 RSA 立刻拿到 ticket。
+- **公钥硬编码在前端** `app.<hash>.js` 的 module 7（`public_exponent:"010001"` + `modulus:"00b5ee…"`），
+  没有单独的取公钥接口；学校换密钥时按同一位置重新提取。
+- **`webuser` 是 JWT，有效期 7 天**：
+  `{"iss":"zwyy-system","iat":…,"exp":…,"userId":…,"username":"…","userType":"webuser"}`，
+  `exp - iat = 604800` 秒。这就是「不用反复登录」的底气。
 
-| 探测 | 结果 |
-| --- | --- |
-| 登录页入口 | 有「统一身份认证登录」按钮 → `/sso/scau/` → 302 `cas.scau.edu.cn/lyuapServer/login` |
-| `GET /lyuapServer/kaptcha` | `{"kaptchaType":"1","content":"-1","uid":-1}` —— 看起来是「本次不需要验证码」 |
-| `POST /lyuapServer/v1/tickets`（CAS REST） | `500 系统内部错误`，REST 没开 |
-| CAS 前端 | 是 SPA（`app.<hash>.js`），登录接口与密码加密方式还得再逆一轮 |
+### 顺带把最初那个问题回答清楚了
 
-也就是说：**CAS 那条路很可能根本不弹验证码**（kaptchaType=1），代价是要再逆一轮 CAS 的 SPA；
-而本地登录这条路的验证码已经被 ddddocr 拿下了，卡点只剩密码本身。
+> 登录成功以后，下一次登录还需不需要图形验证码？
+
+在**已登录的会话**上用站点自带的登录接口再登一次（不带验证码）：
+
+```
+T2 已登录会话 + 不带验证码再登录 -> 验证码错误 → 仍然需要验证码
+```
+
+也就是本地登录这条路上，**验证码是每次都要的**，跟会话说不上话（会话里没有「验过码」的豁免）。
+但这个问题已经不重要了：CAS 那条路**从头到尾没有验证码**，而且会话能活 7 天。
+
+结论——「固化成脚本、不用 agent 参与」是成立的，而且比预想的更简单：
+
+| 方案 | 验证码 | agent 出场 |
+| --- | --- | --- |
+| CAS + 会话复用（**采用**） | 无 | 不需要（脚本自己在 401 时重登） |
+| 本地登录 + 会话复用 | 每次登录一张 | 不需要（ddddocr 44%，5 次重试 ≈95%） |
+| 本地登录 + agent 读图 | 每次登录一张 | 每次都得出场（约 10% 命中，最差） |
 
 ## 边界与未验证
 
