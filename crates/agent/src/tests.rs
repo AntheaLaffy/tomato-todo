@@ -361,6 +361,11 @@ fn only_a_user_request_may_edit_mcp_servers_and_course_blocks() {
     let (wake, user) = (names(true), names(false));
     // Reading what is configured is fine on a wake; editing it is not.
     assert!(wake.contains(&"list_mcp_servers".to_string()));
+    // 向用户提问的选择卡必须两种模式都能用：曾经只在唤醒里，正常对话拿不到。
+    for tool in ["request_user_input", "update_plan"] {
+        assert!(wake.contains(&tool.to_string()), "{tool} missing on a wake");
+        assert!(user.contains(&tool.to_string()), "{tool} missing for user turns");
+    }
     for tool in [
         "add_mcp_server",
         "remove_mcp_server",
