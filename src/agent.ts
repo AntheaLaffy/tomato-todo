@@ -138,6 +138,8 @@ const memoryEdits: Record<string, string> = {};
 const answers: Record<string, string[]> = {};
 let questionsSignature = "";
 let handSerial = 0;
+/** 正在编辑的定时任务 id；null 表示新建。 */
+let editingSchedule: string | null = null;
 let deedsSerial = 0;
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
@@ -510,15 +512,16 @@ function sheetHtml(): string {
       }</div>`;
     if (currentSheet === "schedules") {
       const list = s.schedules ?? [];
+      const editing = list.find((x) => x.id === editingSchedule) ?? null;
       return `<p class="subtle small">到点后助手拿到完整工具（含 MCP）直接办事，不受自动唤醒的开关、上限、冷却与安静时段限制；晚到 30 分钟以上不补做。</p><div id="agent-schedules">${
         list
           .map(
             (x) =>
-              `<div class="agent-schedule ${x.enabled ? "" : "off"}"><div><b>${esc(x.name)}</b><small>${esc(x.at)}${x.repeat === "daily" ? " · 每天" : x.repeat === "weekdays" ? " · 工作日" : ""}${x.remindMinutes ? ` · 提前 ${x.remindMinutes} 分钟提醒` : ""}${x.lockBeforeMinutes ? ` · 提前 ${x.lockBeforeMinutes} 分钟严格锁机` : ""}${x.firedAt ? " · 已触发过" : ""}</small><p>${esc(x.instruction)}</p></div><div class="button-row"><button class="button small" data-agent="toggle-schedule" data-id="${esc(x.id)}">${x.enabled ? "停用" : "启用"}</button><button class="button small" data-agent="delete-schedule" data-id="${esc(x.id)}">删除</button></div></div>`,
+              `<div class="agent-schedule ${x.enabled ? "" : "off"}"><div><b>${esc(x.name)}</b><small>${esc(x.at)}${x.repeat === "daily" ? " · 每天" : x.repeat === "weekdays" ? " · 工作日" : ""}${x.remindMinutes ? ` · 提前 ${x.remindMinutes} 分钟提醒` : ""}${x.lockBeforeMinutes ? ` · 提前 ${x.lockBeforeMinutes} 分钟严格锁机` : ""}${x.firedAt ? " · 已触发过" : ""}</small><p>${esc(x.instruction)}</p></div><div class="button-row"><button class="button small" data-agent="edit-schedule" data-id="${esc(x.id)}">编辑</button><button class="button small" data-agent="toggle-schedule" data-id="${esc(x.id)}">${x.enabled ? "停用" : "启用"}</button><button class="button small" data-agent="delete-schedule" data-id="${esc(x.id)}">删除</button></div></div>`,
           )
           .join("") ||
         '<p class="agent-empty">还没有定时任务。让助手排一个，例如「每晚 21:50 用 seat MCP 约明天的座位，并建一条按时签到的任务」。</p>'
-      }</div><form id="agent-schedule-new"><h3>新建定时任务</h3><label>名称<input name="name" maxlength="40" required placeholder="抢图书馆座位"></label><label>时间<input name="at" required placeholder="21:50 或 2026-10-12T21:50"></label><label>周期<select name="repeat"><option value="daily">每天</option><option value="weekdays">工作日</option><option value="once">只这一次（时间写全日期）</option></select></label><div class="form-grid"><label>提前提醒（分钟）<input name="remindMinutes" type="number" min="0" max="240" value="15"></label><label>提前锁机（分钟，0=不锁）<input name="lockBeforeMinutes" type="number" min="0" max="120" value="0"></label></div><label>要助手做什么<textarea name="instruction" rows="3" maxlength="2000" required placeholder="用 seat MCP 预约明天的座位，约到后建一条按时签到的任务并提醒我"></textarea></label><label class="setting-row"><span><strong>启用</strong><small>到点按上面的时间触发</small></span><input class="switch" name="enabled" type="checkbox" checked></label><div class="agent-actions"><button class="button primary small" type="submit">保存定时任务</button></div></form>`;
+      }</div><form id="agent-schedule-new" data-id="${editingSchedule ? esc(editingSchedule) : ""}"><h3>${editing ? "编辑定时任务" : "新建定时任务"}</h3><label>名称<input name="name" maxlength="40" required placeholder="抢图书馆座位" value="${editing ? esc(editing.name) : ""}"></label><label>时间<input name="at" required placeholder="21:50 或 2026-10-12T21:50" value="${editing ? esc(editing.at) : ""}"></label><label>周期<select name="repeat"><option value="daily" ${editing?.repeat === "daily" ? "selected" : ""}>每天</option><option value="weekdays" ${editing?.repeat === "weekdays" ? "selected" : ""}>工作日</option><option value="once" ${editing?.repeat === "once" ? "selected" : ""}>只这一次（时间写全日期）</option></select></label><div class="form-grid"><label>提前提醒（分钟）<input name="remindMinutes" type="number" min="0" max="240" value="${editing ? editing.remindMinutes : 15}"></label><label>提前锁机（分钟，0=不锁）<input name="lockBeforeMinutes" type="number" min="0" max="120" value="${editing ? editing.lockBeforeMinutes : 0}"></label></div><label>要助手做什么<textarea name="instruction" rows="3" maxlength="2000" required placeholder="用 seat MCP 预约明天的座位，约到后建一条按时签到的任务并提醒我">${editing ? esc(editing.instruction) : ""}</textarea></label><label class="setting-row"><span><strong>启用</strong><small>到点按上面的时间触发</small></span><input class="switch" name="enabled" type="checkbox" checked></label><div class="agent-actions"><button class="button primary small" type="submit">${editing ? "保存修改" : "保存定时任务"}</button>${editing ? '<button class="button small" type="button" data-agent="cancel-edit-schedule">取消编辑</button>' : ""}</div></form>`;
     }
     if (currentSheet === "memory")
       return `<div id="agent-memories">${
@@ -756,6 +759,7 @@ async function submit(form: HTMLFormElement) {
     form.reset();
   } else if (form.id === "agent-schedule-new") {
     await tool("save_schedule", {
+      ...(form.dataset.id ? { id: form.dataset.id } : {}),
       name: String(data.get("name") ?? "").trim(),
       at: String(data.get("at") ?? "").trim(),
       repeat: String(data.get("repeat") ?? "daily"),
@@ -765,7 +769,8 @@ async function submit(form: HTMLFormElement) {
       enabled: data.has("enabled"),
     });
     form.reset();
-    hooks.toast("定时任务已保存");
+    editingSchedule = null;
+    hooks.toast(form.dataset.id ? "定时任务已更新" : "定时任务已保存");
     await refreshAgent();
   } else if (form.id === "agent-memory-add") {
     await call({ op: "memory_save", text });
@@ -922,6 +927,14 @@ async function action(button: HTMLButtonElement) {
     }
     case "clear-plan":
       await call({ op: "clear_plan" });
+      break;
+    case "edit-schedule":
+      editingSchedule = button.dataset.id ?? null;
+      renderSheet();
+      break;
+    case "cancel-edit-schedule":
+      editingSchedule = null;
+      renderSheet();
       break;
     case "toggle-schedule": {
       const item = status?.schedules.find((x) => x.id === button.dataset.id);

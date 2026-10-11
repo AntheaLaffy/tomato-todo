@@ -579,6 +579,7 @@ test(
       const sent = [];
       let cannedHand = null;
       let cannedDeeds = null;
+      let cannedSchedules = [];
       let pending = [
         {
           id: "subjects",
@@ -601,6 +602,7 @@ test(
         questions: pending,
         hand: cannedHand,
         deeds: cannedDeeds,
+        schedules: cannedSchedules,
       });
       await asked.route("**/api/agent", async (route) => {
         const body = route.request().postDataJSON();
@@ -672,6 +674,39 @@ test(
       await expect(asked.locator("#agent-schedule-new")).toBeVisible();
       await expect(asked.locator("#agent-schedules")).toContainText(
         "还没有定时任务",
+      );
+      // 已有安排可以就地编辑：点「编辑」表单预填，保存时带上同一个 id。
+      cannedSchedules = [
+        {
+          id: "s1",
+          name: "抢图书馆座位",
+          at: "21:50",
+          repeat: "weekdays",
+          instruction: "用 seat MCP 约明天的座位",
+          remindMinutes: 15,
+          lockBeforeMinutes: 10,
+          enabled: true,
+          firedAt: null,
+        },
+      ];
+      await asked.reload();
+      await asked.locator('[data-page="agent"]').click();
+      await asked.locator('[data-agent="schedules"]').click();
+      await expect(asked.locator("#agent-schedules")).toContainText(
+        "抢图书馆座位",
+      );
+      await asked
+        .locator('#agent-schedules [data-agent="edit-schedule"]')
+        .first()
+        .click();
+      await expect(
+        asked.locator('#agent-schedule-new [name="name"]'),
+      ).toHaveValue("抢图书馆座位");
+      await expect(
+        asked.locator('#agent-schedule-new [name="lockBeforeMinutes"]'),
+      ).toHaveValue("10");
+      await expect(asked.locator("#agent-schedule-new")).toContainText(
+        "编辑定时任务",
       );
       await expect(
         asked.locator('#agent-schedule-new [name="lockBeforeMinutes"]'),
