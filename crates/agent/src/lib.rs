@@ -507,8 +507,11 @@ impl Agent {
     }
     pub fn status(&self) -> AppResult<Value> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
+        // Names of files the user already reviewed, so the UI can offer an explicit
+        // approve/decline instead of making them hunt through the sheets.
+        let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -717,9 +720,42 @@ impl Agent {
                     {
                         return Err("问题不能为空".into());
                     }
-                    let options = question["options"].as_array().map(Vec::len).unwrap_or(0);
-                    if !(2..=3).contains(&options) {
-                        return Err("每个问题提供 2–3 个选项".into());
+                    if question["detail"]
+                        .as_str()
+                        .is_some_and(|d| d.chars().count() > 2_000)
+                    {
+                        return Err("问题说明过长".into());
+                    }
+                    let labels = question["options"]
+                        .as_array()
+                        .map(|options| {
+                            options
+                                .iter()
+                                .filter_map(|option| option["label"].as_str().map(String::from))
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    if !(2..=6).contains(&labels.len()) {
+                        return Err("每个问题提供 2–6 个选项".into());
+                    }
+                    let unique: std::collections::HashSet<&String> = labels.iter().collect();
+                    if unique.len() != labels.len()
+                        || labels
+                            .iter()
+                            .any(|label| label.trim().is_empty() || label.chars().count() > 40)
+                    {
+                        return Err("选项名称需为 1–40 个字符且不重复".into());
+                    }
+                    // A plan-review intent names the label that approves; the UI marks
+                    // the other options as the way out, so the name must exist.
+                    if let Some(intent) = question.get("intent") {
+                        if intent["kind"] != "plan-review" {
+                            return Err("未知的提问意图".into());
+                        }
+                        let approve = intent["approve"].as_str().unwrap_or_default();
+                        if !labels.iter().any(|label| label == approve) {
+                            return Err("批准项必须是该问题的一个选项".into());
+                        }
                     }
                 }
                 self.inner.lock().map_err(|e| e.to_string())?.live.questions = json!(questions);
@@ -882,6 +918,20 @@ impl Agent {
                     return Err("MCP 不能紧急解锁".into());
                 }
                 serde_json::to_value((self.apply)(action, None)?).map_err(|e| e.to_string())
+            }
+            // Declining a proposal only forgets the review: the file stays in the
+            // workspace until the user asks for something else.
+            "reject_file" => {
+                let name = args["name"].as_str().ok_or("缺少文件名")?;
+                let removed = self
+                    .inner
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .live
+                    .reviewed
+                    .remove(name)
+                    .is_some();
+                Ok(json!({"declined":removed,"name":name}))
             }
             _ => {
                 let mut engine = self.engine.lock().map_err(|e| e.to_string())?;

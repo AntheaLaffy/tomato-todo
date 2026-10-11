@@ -32,7 +32,7 @@ pub fn definitions(agent: bool) -> Vec<Value> {
     if agent {
         list.push(tool(
             "request_user_input",
-            "需要用户做决定时，给出 1–3 个带选项的问题。每个问题 2–3 个互斥选项，推荐项放第一个并在标签后加「（推荐）」；不要写「其他」，界面会自动加自由输入。仅在缺少必要信息、偏好或确认时使用。",
+            "需要用户做决定时，给出 1–3 个带选项的问题。每个问题 2–6 个选项，推荐项放第一个并在标签后加「（推荐）」；不要写「其他」，界面自带自由输入。要一次挑多项时给该问题加 `multiSelect: true`。要求用户批准一份待审阅方案/计划时，用 `intent: {\"kind\":\"plan-review\",\"approve\":\"<批准项标签>\"}` 说明哪个选项代表批准，界面会把它渲染成「批准 / 讨论」卡片。",
             json!({"questions":{
                 "type":"array","minItems":1,"maxItems":3,
                 "items":{
@@ -41,8 +41,10 @@ pub fn definitions(agent: bool) -> Vec<Value> {
                         "id":{"type":"string","description":"snake_case 标识"},
                         "header":{"type":"string","maxLength":12,"description":"短标题"},
                         "question":{"type":"string","maxLength":200,"description":"一句话问题"},
+                        "detail":{"type":"string","maxLength":2000,"description":"补充说明或待审阅内容摘要"},
+                        "multiSelect":{"type":"boolean","description":"是否可多选，默认单选"},
                         "options":{
-                            "type":"array","minItems":2,"maxItems":3,
+                            "type":"array","minItems":2,"maxItems":6,
                             "items":{
                                 "type":"object",
                                 "properties":{
@@ -52,7 +54,8 @@ pub fn definitions(agent: bool) -> Vec<Value> {
                                 "required":["label","description"],
                                 "additionalProperties":false
                             }
-                        }
+                        },
+                        "intent":{"type":"object","description":"呈现意图；只有 plan-review 一种","properties":{"kind":{"type":"string","enum":["plan-review"]},"approve":{"type":"string","description":"代表批准的选项标签"}},"required":["kind","approve"],"additionalProperties":false}
                     },
                     "required":["id","header","question","options"],
                     "additionalProperties":false

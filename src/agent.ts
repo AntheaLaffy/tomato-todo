@@ -66,6 +66,8 @@ export type AgentStatus = {
     evidence: unknown;
   }[];
   files: { name: string; bytes: number; reviewable: boolean }[];
+  /** Files already validated and waiting for the user's approval. */
+  reviewed: string[];
   conversations: {
     id: string;
     title: string;
@@ -77,6 +79,9 @@ export type AgentStatus = {
     id: string;
     header: string;
     question: string;
+    detail?: string;
+    multiSelect?: boolean;
+    intent?: { kind: "plan-review"; approve: string };
     options: { label: string; description: string }[];
   }[];
   plan: { step: string; status: string }[];
@@ -102,6 +107,9 @@ let draft = "";
 let memoryDraft = "";
 let configDraft: Record<string, string | boolean> = {};
 const memoryEdits: Record<string, string> = {};
+/** Multi-select drafts, keyed by question id; cleared when the questions change. */
+const answers: Record<string, string[]> = {};
+let questionsSignature = "";
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
@@ -145,6 +153,14 @@ const checked = (name: string, fallback: boolean) =>
 
 // The conversation page stays a conversation: connection, keys, memory, files
 // and signals live in sheets that open on demand.
+/** Put text in the composer from elsewhere in the app (e.g. "hand me the timetable"). */
+export function prefillAgent(text: string) {
+  draft = text;
+  const box = document.getElementById(
+    "agent-text",
+  ) as HTMLTextAreaElement | null;
+  if (box) box.value = text;
+}
 export function agentPage(): string {
   const files = status?.files.length ?? 0;
   const signals = status?.anomalies.length ?? 0;
@@ -221,20 +237,7 @@ function renderChat() {
           .join("")}</ol></div>`
       : "",
   );
-  replace(
-    "agent-questions",
-    (status.questions ?? [])
-      .map(
-        (question) =>
-          `<div class="agent-question"><div class="agent-question-head">${esc(question.header)}</div><p>${esc(question.question)}</p><div class="agent-question-options">${question.options
-            .map(
-              (option) =>
-                `<button class="agent-option" type="button" data-agent="answer" data-text="${esc(`${question.header}：${option.label}`)}"><b>${esc(option.label)}</b><small>${esc(option.description)}</small></button>`,
-            )
-            .join("")}</div></div>`,
-      )
-      .join(""),
-  );
+  replace("agent-questions", questionHtml());
   const modelBox = document.getElementById("agent-model");
   if (modelBox && !modelBox.contains(document.activeElement))
     replace("agent-model", modelSelectHtml());
@@ -245,6 +248,54 @@ function renderChat() {
       status.busy ||
         !status.providers?.[status.preferences.provider]?.configured,
     );
+}
+/**
+ * The questions a turn is waiting on. A plan-review intent becomes an approval
+ * card (approve / discuss), `multiSelect` toggles instead of answering at once,
+ * and every question accepts free text — the shape deepseek-harness uses.
+ */
+function questionHtml(): string {
+  const questions = status?.questions ?? [];
+  const signature = JSON.stringify(questions);
+  if (signature !== questionsSignature) {
+    questionsSignature = signature;
+    for (const key of Object.keys(answers)) delete answers[key];
+  }
+  const other = (question: (typeof questions)[number]) =>
+    `<form class="agent-other" data-question="${esc(question.id)}"><input name="text" maxlength="2000" placeholder="其他想法（回车发送）" aria-label="${esc(question.question)}的自定义回答"><button class="button small" type="submit">发送</button></form>`;
+  return questions
+    .map((question) => {
+      const picked = answers[question.id] ?? [];
+      const review = question.intent?.kind === "plan-review";
+      const options = question.options
+        .map((option) => {
+          const chosen = picked.includes(option.label);
+          const approve = review && option.label === question.intent?.approve;
+          const classes = [
+            "agent-option",
+            question.multiSelect ? "toggle" : "",
+            chosen ? "picked" : "",
+            approve ? "approve" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          const action = question.multiSelect
+            ? "toggle-question"
+            : approve
+              ? "approve"
+              : "answer";
+          return `<button class="${classes}" type="button" data-agent="${action}" data-question="${esc(question.id)}" data-label="${esc(option.label)}" data-text="${esc(`${question.header}：${option.label}`)}"${option.description ? ` title="${esc(option.description)}"` : ""}><b>${esc(option.label)}</b><small>${esc(option.description)}</small></button>`;
+        })
+        .join("");
+      if (review)
+        return `<section class="agent-proposal" data-plan-review="${esc(question.id)}"><div class="agent-proposal-strip"><i></i>待批准</div><div class="agent-proposal-body"><h3>${esc(question.header)}</h3><p>${esc(question.question)}</p>${question.detail ? `<pre>${esc(question.detail)}</pre>` : ""}</div><div class="agent-proposal-actions"><button class="button" type="button" data-agent="discuss">讨论</button>${options}</div></section>`;
+      const submit =
+        question.multiSelect && picked.length
+          ? `<button class="button small primary" type="button" data-agent="answer-multi" data-question="${esc(question.id)}">提交选择（${picked.length}）</button>`
+          : "";
+      return `<div class="agent-question"><div class="agent-question-head">${esc(question.header)}</div><p>${esc(question.question)}</p>${question.detail ? `<p class="agent-question-detail">${esc(question.detail)}</p>` : ""}<div class="agent-question-options">${options}</div><div class="agent-question-foot">${submit}${other(question)}</div></div>`;
+    })
+    .join("");
 }
 function authHtml() {
   const s = status;
@@ -403,16 +454,22 @@ function sheetHtml(): string {
           .join("") || `<p class="agent-empty">还没有记忆。</p>`
       }</div>
       <form id="agent-memory-add"><textarea id="agent-memory-text" name="text" rows="2" maxlength="8000" placeholder="可用时间、当前阶段、长期愿景">${esc(memoryDraft)}</textarea><button class="button small" type="submit">保存为已确认</button></form>`;
-    if (currentSheet === "plans")
+    if (currentSheet === "plans") {
+      const reviewed = new Set(s.reviewed ?? []);
       return `<div class="agent-actions"><button class="button small" data-agent="export-plan">导出计划</button><button class="button small" data-agent="export-backup">导出备份</button></div><div id="agent-files">${
         s.files
           .map(
             (f) =>
-              `<div class="agent-file"><div><b>${esc(f.name)}</b><small>${(f.bytes / 1024).toFixed(1)} KB</small></div><button class="button small" data-agent="review" data-name="${esc(f.name)}">审阅</button><button class="button small" data-agent="download" data-name="${esc(f.name)}">导出</button></div>`,
+              `<div class="agent-file ${reviewed.has(f.name) ? "pending" : ""}"><div><b>${esc(f.name)}</b><small>${(f.bytes / 1024).toFixed(1)} KB${reviewed.has(f.name) ? " · 已审阅，待批准" : ""}</small></div><button class="button small" data-agent="review" data-name="${esc(f.name)}">审阅</button>${
+                reviewed.has(f.name)
+                  ? `<button class="button small primary" data-agent="approve-file" data-name="${esc(f.name)}">批准并应用</button><button class="button small" data-agent="reject" data-name="${esc(f.name)}">暂不批准</button>`
+                  : ""
+              }<button class="button small" data-agent="download" data-name="${esc(f.name)}">导出</button></div>`,
           )
           .join("") ||
         `<p class="agent-empty">还没有方案文件。让助手改安排，或先导出一份。</p>`
       }</div><div id="agent-review">${reviewHtml()}</div>`;
+    }
     return `<div id="agent-evidence">${
       s.anomalies
         .map(
@@ -426,7 +483,9 @@ function sheetHtml(): string {
 }
 function reviewHtml() {
   if (!review) return reviewing ? `<p>${esc(reviewing)}</p>` : "";
-  return `<div class="agent-review"><h3>${esc(review.name)}</h3><p>${esc(review.effects)}</p><div class="agent-diff-list">${review.changes.length ? review.changes.map((c) => `<details><summary>${esc(c.path)}</summary><div class="agent-diff"><pre>原值\n${esc(pretty(c.before))}</pre><pre>新值\n${esc(pretty(c.after))}</pre></div></details>`).join("") : "<p>没有数据变化。</p>"}</div>${review.truncated ? '<p class="muted">变化较多，只显示前100项。</p>' : ""}<label class="agent-check"><input type="checkbox" id="agent-apply-confirm">我已审阅</label><button class="button primary" data-agent="apply" ${review.changes.length ? "" : "disabled"}>应用修改</button></div>`;
+  // Approving is the consent: the diff sits right above the button, so no extra
+  // checkbox stands between the user's decision and the change.
+  return `<div class="agent-review"><h3>${esc(review.name)}</h3><p>${esc(review.effects)}</p><div class="agent-diff-list">${review.changes.length ? review.changes.map((c) => `<details><summary>${esc(c.path)}</summary><div class="agent-diff"><pre>原值\n${esc(pretty(c.before))}</pre><pre>新值\n${esc(pretty(c.after))}</pre></div></details>`).join("") : "<p>没有数据变化。</p>"}</div>${review.truncated ? '<p class="muted">变化较多，只显示前100项。</p>' : ""}<div class="agent-actions"><button class="button" type="button" data-agent="discuss">讨论后再定</button><button class="button" type="button" data-agent="reject" data-name="${esc(review.name)}">暂不批准</button><button class="button primary" data-agent="apply" ${review.changes.length ? "" : "disabled"}>批准并应用</button></div></div>`;
 }
 function renderSheet() {
   const element = document.getElementById("agent-sheet");
@@ -569,7 +628,18 @@ async function submit(form: HTMLFormElement) {
     hooks.toast("已保存");
   } else if (form.id === "agent-login-answer")
     await call({ op: "login_answer", text });
-  else if (form.id === "agent-memory-add") {
+  // Free-text answer to one question ("其他"), alongside any multi-select picks.
+  else if (form.dataset.question) {
+    const id = form.dataset.question;
+    const question = status?.questions.find((item) => item.id === id);
+    if (!text) return;
+    const picked = answers[id] ?? [];
+    const text_ = picked.length
+      ? `${question?.header ?? "回答"}：${picked.join("、")}；补充：${text}`
+      : text;
+    await call({ op: "send", text: text_ });
+    form.reset();
+  } else if (form.id === "agent-memory-add") {
     await call({ op: "memory_save", text });
     memoryDraft = "";
     form.reset();
@@ -627,6 +697,64 @@ async function action(button: HTMLButtonElement) {
       if (button.dataset.text)
         await call({ op: "send", text: button.dataset.text });
       break;
+    // Multi-select: toggle here, submit once — never answer mid-selection.
+    case "toggle-question": {
+      const id = button.dataset.question!,
+        label = button.dataset.label!;
+      const picked = answers[id] ?? [];
+      answers[id] = picked.includes(label)
+        ? picked.filter((item) => item !== label)
+        : [...picked, label];
+      renderChat();
+      break;
+    }
+    case "answer-multi": {
+      const id = button.dataset.question!;
+      const question = status?.questions.find((item) => item.id === id);
+      const picked = answers[id] ?? [];
+      if (!question || !picked.length) throw new Error("请先选择至少一项");
+      await call({
+        op: "send",
+        text: `${question.header}：${picked.join("、")}`,
+      });
+      break;
+    }
+    case "approve":
+      if (button.dataset.text)
+        await call({ op: "send", text: button.dataset.text });
+      break;
+    // Discussing means the user wants to talk it over, not answer: hand them the
+    // composer instead of sending anything on their behalf.
+    case "discuss": {
+      document.getElementById("agent-text")?.focus();
+      break;
+    }
+    case "reject":
+      await agentCall({ op: "reject_file", name });
+      hooks.toast("已暂缓这份提案，文件还在方案里");
+      await refreshAgent();
+      break;
+    case "approve-file": {
+      const file = await tool<{ fileHash: string }>("read_file", {
+        name,
+        pointer: "/version",
+      });
+      const checked = await tool<Review>("review_file", {
+        name,
+        fileHash: file.fileHash,
+      });
+      const snapshot = await tool<Snapshot>("apply_file", {
+        name,
+        fileHash: checked.fileHash,
+      });
+      hooks.accept(snapshot);
+      hooks.toast("已批准并应用");
+      review = null;
+      sheet = null;
+      renderSheet();
+      await refreshAgent();
+      break;
+    }
     case "clear-plan":
       await call({ op: "clear_plan" });
       break;
@@ -662,8 +790,11 @@ async function action(button: HTMLButtonElement) {
         });
       } finally {
         reviewing = "";
-        renderSheet();
       }
+      // Refresh first: the sheet marks this file as reviewed-then-pending, and the
+      // status carries which files are waiting for approval.
+      await refreshAgent();
+      renderSheet();
       break;
     }
     case "download": {
@@ -675,12 +806,7 @@ async function action(button: HTMLButtonElement) {
       break;
     }
     case "apply": {
-      if (
-        !review ||
-        !document.querySelector<HTMLInputElement>("#agent-apply-confirm")
-          ?.checked
-      )
-        throw new Error("请先确认已审阅");
+      if (!review) throw new Error("请先审阅这份文件");
       const snapshot = await tool<Snapshot>("apply_file", {
         name: review.name,
         fileHash: review.fileHash,

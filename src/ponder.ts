@@ -244,6 +244,30 @@ export const PONDER_TARGETS: PonderTarget[] = [
     related: ["tasks", "reminder"],
   },
   {
+    id: "blocks",
+    title: "课表阻塞时段",
+    category: "日程",
+    selectors: ['[data-ponder="blocks"]', ".blocks-card", ".block-row"],
+    sections: [
+      {
+        text: "课程、实验这类每周重复的固定占用登记在这里。它不是任务：不产生完成、不参与进度和缺勤统计，只告诉软件这段时间已经被占掉。",
+      },
+      {
+        heading: "先分清水课",
+        text: "每个时段标成「需专心」或「水课」。需专心的时段里排专注任务会被本地诊断当成真实冲突并给出课程名；水课只要求签到，课上写作业是计划内的事，冲突检测不会再误报。拿不准就按水课登记，课后再改。",
+      },
+      {
+        heading: "怎么开始",
+        text: "日程页「添加时段」填名称、星期、起止时间即可，跨午夜也支持（结束早于开始即跨天）。嫌麻烦就把课表整段发给学习助手，它按此补全阻塞时段——同样的数据也能随学习计划 v5 导出、改完再导入。",
+      },
+      {
+        heading: "周次限制要自己记",
+        text: "只上某几周或单双周的课（体质测试、形势与政策这类）目前没有按周过滤，把周次写进备注，到期自己删掉或改掉，别让软件替你猜。",
+      },
+    ],
+    related: ["schedule", "plan-file", "tasks"],
+  },
+  {
     id: "reminder",
     title: "到点提醒",
     category: "日程",

@@ -104,6 +104,31 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
     })
 }
 #[test]
+fn questions_take_multi_select_and_a_real_approve_label() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let ask = |questions: Value| {
+        agent.call(
+            "request_user_input",
+            &json!({ "questions": questions }),
+            true,
+        )
+    };
+    // Multi-select plus a plan-review intent whose approve label exists.
+    assert_eq!(
+        ask(json!([{"id":"apply","header":"确认","question":"写进软件？","detail":"新增 12 个任务","multiSelect":true,"options":[{"label":"批准","description":"按方案写入"},{"label":"先说说","description":"想改几处"}],"intent":{"kind":"plan-review","approve":"批准"}}]))
+            .unwrap()["shown"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        ask(json!([{"id":"x","header":"确认","question":"？","options":[{"label":"A","description":"a"},{"label":"B","description":"b"}],"intent":{"kind":"plan-review","approve":"C"}}]))
+            .unwrap_err(),
+        "批准项必须是该问题的一个选项"
+    );
+    assert!(ask(json!([{"id":"x","header":"确认","question":"？","options":[{"label":"A","description":"a"},{"label":"A","description":"b"}]}])).is_err());
+    assert!(ask(json!([{"id":"x","header":"确认","question":"？","options":[{"label":"only one","description":""}]}])).is_err());
+}
+#[test]
 fn only_a_user_request_may_edit_mcp_servers_and_course_blocks() {
     let names = |agent: bool| {
         crate::tools::definitions(agent)

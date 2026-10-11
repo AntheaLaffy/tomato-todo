@@ -528,7 +528,13 @@ test(
         .locator('[data-agent="review"][data-name="review.json"]')
         .click();
       await expect(page.locator("#agent-review")).toContainText("Review test");
-      await page.locator("#agent-apply-confirm").check();
+      // Reviewing lists the file as pending; approving IS the consent now.
+      await expect(page.locator(".agent-file.pending")).toContainText(
+        "已审阅，待批准",
+      );
+      await expect(
+        page.locator('#agent-files [data-agent="reject"]'),
+      ).toBeVisible();
       await page.locator('[data-agent="apply"]').click();
       await expect
         .poll(
@@ -564,6 +570,68 @@ test(
         path: "artifacts/agent-page.png",
         fullPage: true,
       });
+      // Questions and proposals, driven from a canned status on a second page:
+      // multi-select toggles before answering, a plan review approves with one
+      // button, and free text rides along with the picks.
+      const asked = await browser.newPage();
+      const sent = [];
+      let pending = [
+        {
+          id: "subjects",
+          header: "选科目",
+          question: "这周先补哪几科？",
+          multiSelect: true,
+          options: [
+            { label: "英语（推荐）", description: "进度最紧" },
+            { label: "数学", description: "高数还没开始" },
+          ],
+        },
+      ];
+      const canned = () => ({
+        ...currentStatus,
+        busy: false,
+        error: null,
+        messages: [],
+        files: [],
+        reviewed: [],
+        questions: pending,
+      });
+      await asked.route("**/api/agent", async (route) => {
+        const body = route.request().postDataJSON();
+        if (body?.op === "send") sent.push(body.text);
+        if (body?.op === "send") pending = [];
+        await route.fulfill({ json: canned() });
+      });
+      await asked.goto(url);
+      await asked.locator('[data-page="agent"]').click();
+      await asked.locator('[data-label="英语（推荐）"]').click();
+      await asked.locator('[data-label="数学"]').click();
+      await expect(asked.locator(".agent-option.picked")).toHaveCount(2);
+      await asked.locator('[data-agent="answer-multi"]').click();
+      assert.deepEqual(sent, ["选科目：英语（推荐）、数学"]);
+      pending = [
+        {
+          id: "apply",
+          header: "确认应用",
+          question: "把这份计划写进软件？",
+          detail: "新增 12 个任务，保留全部进度。",
+          options: [
+            { label: "批准", description: "按方案写入" },
+            { label: "先说说", description: "我想改几处" },
+          ],
+          intent: { kind: "plan-review", approve: "批准" },
+        },
+      ];
+      sent.length = 0;
+      await asked.reload();
+      await asked.locator('[data-page="agent"]').click();
+      await expect(asked.locator(".agent-proposal")).toContainText("待批准");
+      await expect(
+        asked.locator('.agent-proposal [data-agent="discuss"]'),
+      ).toBeVisible();
+      await asked.locator('.agent-proposal [data-agent="approve"]').click();
+      assert.deepEqual(sent, ["确认应用：批准"]);
+      await asked.close();
       assert.deepEqual(errors, []);
       // No key is echoed in status or copied to the app backup.
       await api({

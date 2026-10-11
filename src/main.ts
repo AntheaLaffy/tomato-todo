@@ -1,5 +1,5 @@
 import "./style.css";
-import { agentPage, mountAgent, setupAgent } from "./agent";
+import { agentPage, mountAgent, prefillAgent, setupAgent } from "./agent";
 import {
   type IconNode,
   Sun,
@@ -748,7 +748,7 @@ function schedulePage() {
 }
 function blockRows(): string {
   if (!state.data.blocks.length)
-    return '<p class="small-empty">还没有固定占用。把每周的课加进来，标成「水课」的时段就能用来写作业。</p>';
+    return `<div class="blocks-empty"><p><strong>还没有固定占用。</strong>把每周重复的课加进来，软件才知道哪些时间不是你的。</p><ol><li>「添加时段」填名称、星期和起止时间（体育、实验这类一节一节加）。</li><li>标成「需专心」的课，排任务会被提示冲突；标成「水课」的课，签到就行，课上可以写作业。</li><li>只上某几周的课，把周次写进备注，到期自己删。</li></ol><div class="button-row"><button class="button primary" data-action="new-block">${icon("plus")} 添加第一个时段</button><button class="button secondary" data-action="ask-agent-blocks">${icon("sparkles")} 把课表交给助手</button></div><p class="subtle small">鼠标停在这张卡片上按住 <kbd>G</kbd> 可以随时再看一遍说明。</p></div>`;
   const order = [...state.data.blocks].sort(
     (a, b) =>
       a.days[0] - b.days[0] ||
@@ -763,7 +763,7 @@ function blockRows(): string {
     .join("");
 }
 function blocksCard(): string {
-  return `<section class="card blocks-card"><div class="card-heading"><h2>课表与固定占用</h2><button class="button secondary" data-action="new-block">${icon("plus")} 添加时段</button></div><p class="subtle small">每周重复的课程、实验等占用。标成「需专心」的时段里排专注任务会提示冲突；标成「水课」的时段可以并行写作业。这部分也会随学习计划导出，编辑后再导入。</p><div class="block-list">${blockRows()}</div></section>`;
+  return `<section class="card blocks-card" data-ponder="blocks"><div class="card-heading"><h2>课表与固定占用</h2><button class="button secondary" data-action="new-block">${icon("plus")} 添加时段</button></div><p class="subtle small">每周重复的课程、实验等占用。标成「需专心」的时段里排专注任务会提示冲突；标成「水课」的时段可以并行写作业。这部分也会随学习计划导出，编辑后再导入。</p><div class="block-list">${blockRows()}</div></section>`;
 }
 function blockDialog(id?: string) {
   const b = state.data.blocks.find((x) => x.id === id);
@@ -3011,6 +3011,13 @@ document.addEventListener("click", async (e) => {
       break;
     case "new-block":
       blockDialog();
+      break;
+    // Hand the timetable to the assistant instead of typing it in by hand.
+    case "ask-agent-blocks":
+      prefillAgent(
+        "我这就把课表发给你：按它补全课表阻塞时段，需要专心的标 required，水课标 light，只上某几周的课把周次写进备注。",
+      );
+      await navigate("agent");
       break;
     case "undo": {
       const cb = undo;

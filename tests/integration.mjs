@@ -1421,6 +1421,14 @@ test(
       await expect(page.locator("#ponder-layer")).toBeVisible();
       await page.locator(".ponder-list-item", { hasText: "待补队列" }).click();
       await expect(page.locator("#ponder-title")).toHaveText("待补队列");
+      // The course-block concept explains itself, including how to start.
+      await page.keyboard.press("Escape");
+      await page.locator('[data-action="ponder-list"]').click();
+      await page.locator('[data-ponder-jump="blocks"]').click();
+      await expect(page.locator("#ponder-layer")).toContainText("先分清水课");
+      await expect(page.locator("#ponder-layer")).toContainText(
+        "周次限制要自己记",
+      );
       await page.keyboard.press("Escape");
       await expect(page.locator("#ponder-layer")).toBeHidden();
       // The same hint teaches each assistant setting in place, so a new user can
