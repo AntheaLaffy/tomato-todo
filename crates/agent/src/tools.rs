@@ -84,7 +84,6 @@ pub fn definitions(agent: bool) -> Vec<Value> {
                 &["plan"],
                 false,
             ));
-    if agent {}
     if !agent {
         list.push(tool("create_task","按用户明确要求创建任务。不要臆测可用时间或估时。",json!({"title":{"type":"string"},"notes":{"type":"string"},"projectId":{"type":["string","null"]},"goalId":{"type":["string","null"]},"dueDate":{"type":["string","null"]},"reminderTime":{"type":["string","null"]},"focusMinutes":{"type":["integer","null"]},"estimate":{"type":"integer","minimum":1},"priority":{"type":"integer","minimum":0,"maximum":3},"tags":{"type":"array","items":{"type":"string"}}}),&["title"],false));
         list.push(tool("update_task","按稳定 ID 仅修改指定字段，保留其他配置与完成历史；结构调整使用文件流程。",json!({"id":{"type":"string"},"changes":{"type":"object","properties":{"title":{"type":"string"},"notes":{"type":"string"},"projectId":{"type":["string","null"]},"dueDate":{"type":["string","null"]},"reminderTime":{"type":["string","null"]},"focusMinutes":{"type":["integer","null"]},"estimate":{"type":"integer"},"priority":{"type":"integer"},"tags":{"type":"array","items":{"type":"string"}},"scrapMinutes":{"type":"integer"}},"additionalProperties":false}}),&["id","changes"],false));
