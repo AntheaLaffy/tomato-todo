@@ -210,7 +210,7 @@ impl Schedule {
     }
     /// 这条安排相对 `now` 所在日期的目标时刻。
     pub fn target_time(&self, now: chrono::NaiveDateTime) -> Option<chrono::NaiveDateTime> {
-        use chrono::{Datelike, TimeZone};
+        use chrono::Datelike;
         if self.repeat == "once" {
             return chrono::NaiveDateTime::parse_from_str(&self.at, "%Y-%m-%dT%H:%M").ok();
         }
