@@ -45,8 +45,11 @@ export async function codingTools(dir, runtimeRoot, preferences = {}) {
   }
   function emit(entry,text){
     if(!text)return;
+    if(entry.overflow)return;
     const size=Buffer.byteLength(text);
-    if(entry.total+size>1024*1024){const room=Math.max(0,1024*1024-entry.total);if(room)entry.options.onData(Buffer.from(text.slice(0,room)));entry.options.onData(Buffer.from("\n[输出超过1MB，已停止]\n"));fail(entry,new Error("输出超过1MB"));return;}
+    // Pi keeps long runs alive and truncates what the model sees (the full output
+    // goes to a temp file there); a chatty build must not be killed for talking.
+    if(entry.total+size>1024*1024){const room=Math.max(0,1024*1024-entry.total);if(room)entry.options.onData(Buffer.from(text.slice(0,room)));entry.total+=room;entry.overflow=true;entry.options.onData(Buffer.from("\n[输出超过1MB，后续输出已省略，命令继续运行]\n"));return;}
     entry.total+=size;entry.options.onData(Buffer.from(text));
   }
   function fail(entry,error){
@@ -67,9 +70,11 @@ export async function codingTools(dir, runtimeRoot, preferences = {}) {
     return new Promise((resolve,reject)=>{
       const state=shell;
       const stop=()=>fail(entry,new Error("命令已停止"));
-      const entry={resolve:(value)=>{options.signal?.removeEventListener("abort",stop);resolve(value);},reject,options,total:0,timer:0};
+      const entry={resolve:(value)=>{options.signal?.removeEventListener("abort",stop);resolve(value);},reject,options,total:0,overflow:false,timer:0};
       current=entry;
-      entry.timer=setTimeout(()=>fail(entry,new Error("命令超时")),Math.min(options.timeout?options.timeout*1000:120000,600000));
+      // Pi's bash tool has no default timeout: left alone, a command runs until it
+      // finishes or the turn is stopped; only an explicitly requested timeout applies.
+      if(options.timeout)entry.timer=setTimeout(()=>fail(entry,new Error(`命令超时（${options.timeout} 秒）`)),options.timeout*1000);
       options.signal?.addEventListener("abort",stop,{once:true});
       state.child.stdin.write(`${command}\n${state.end}\n`);
     });

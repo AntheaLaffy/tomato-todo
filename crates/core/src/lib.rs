@@ -7,6 +7,7 @@ use std::{
     path::Path,
 };
 use uuid::Uuid;
+pub mod blocks;
 pub mod diagnostics;
 pub mod guard;
 pub mod habits;
@@ -346,6 +347,10 @@ pub struct AppData {
     #[serde(default)]
     pub identities: Vec<identities::Identity>,
     pub tasks: Vec<Task>,
+    /// Fixed commitments outside the plan (classes, labs). Descriptive only:
+    /// they carry no progress and never govern instances.
+    #[serde(default)]
+    pub blocks: Vec<blocks::Block>,
     #[serde(default)]
     pub templates: Vec<templates::Template>,
     #[serde(default)]
@@ -373,6 +378,7 @@ impl Default for AppData {
             version: 3,
             identities: vec![],
             tasks: vec![],
+            blocks: vec![],
             templates: vec![],
             prints: vec![],
             projects: vec![
@@ -522,6 +528,20 @@ pub enum Action {
         goal_id: Option<String>,
     },
     DeleteVision {
+        id: String,
+    },
+    SaveBlock {
+        id: Option<String>,
+        title: String,
+        days: Vec<u8>,
+        start: String,
+        end: String,
+        #[serde(default)]
+        attention: blocks::Attention,
+        #[serde(default)]
+        notes: String,
+    },
+    DeleteBlock {
         id: String,
     },
     SelectTask {
@@ -1270,6 +1290,34 @@ impl AppData {
                 }
             }
             Action::DeleteVision { id } => self.visions.retain(|a| a.id != id),
+            Action::SaveBlock {
+                id: bid,
+                title,
+                days,
+                start,
+                end,
+                attention,
+                notes,
+            } => {
+                let block = blocks::Block {
+                    id: bid.unwrap_or_else(id),
+                    title: title.trim().into(),
+                    days,
+                    start,
+                    end,
+                    attention,
+                    notes,
+                };
+                // Validate up front so a bad edit reports its own reason instead of
+                // surfacing as a generic whole-data failure.
+                block.validate()?;
+                if let Some(existing) = self.blocks.iter_mut().find(|b| b.id == block.id) {
+                    *existing = block;
+                } else {
+                    self.blocks.push(block);
+                }
+            }
+            Action::DeleteBlock { id } => self.blocks.retain(|b| b.id != id),
             Action::SelectTask { id } => {
                 if self
                     .tasks
@@ -1410,6 +1458,7 @@ impl AppData {
         templates::validate(self)?;
         nodes::validate(self)?;
         identities::validate(self)?;
+        blocks::validate(self)?;
         fn ensure(ok: bool, message: &str) -> AppResult<()> {
             if ok {
                 Ok(())

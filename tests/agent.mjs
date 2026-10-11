@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createInterface } from "node:readline";
-import { mkdtemp, readFile, stat, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, stat, mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { chromium, expect } from "@playwright/test";
 import { ModelRuntime } from "../agent/node_modules/@earendil-works/pi-coding-agent/dist/index.js";
-import { createStudySession } from "../agent/session.mjs";
+import { closeStudySession, createStudySession } from "../agent/session.mjs";
+import { mcpCommand } from "../agent/mcp-config.mjs";
 import { parseExa, publicAddress } from "../agent/web.mjs";
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -53,6 +54,154 @@ Plain snippet`;
   assert.equal(results[1].url, "https://example.com/a");
   assert.equal(results[1].publishedAt, null);
   assert.equal(parseExa(text, 1).length, 1);
+});
+
+test("MCP servers from the app's mcp.json reach user turns, never a wake", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tomato-mcp-"));
+  await writeFile(
+    join(dir, "mcp.json"),
+    JSON.stringify({
+      mcpServers: {
+        mock: {
+          command: process.execPath,
+          args: [resolve("tests/fixtures/mcp-echo.mjs")],
+        },
+      },
+    }),
+  );
+  const runtime = await ModelRuntime.create({
+    credentials: {
+      read: async () => undefined,
+      list: async () => [],
+      modify: async () => undefined,
+      delete: async () => {},
+    },
+    modelsPath: null,
+    refreshOnCreate: false,
+    allowModelNetwork: false,
+  });
+  runtime.registerProvider("deepseek", {
+    baseUrl: "http://127.0.0.1:1",
+    apiKey: "synthetic-test-key",
+    api: "openai-completions",
+    models: [
+      {
+        id: "fake",
+        name: "Fake local model",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 65536,
+        maxTokens: 4096,
+      },
+    ],
+  });
+  const command = {
+    provider: "deepseek",
+    model: "fake",
+    automatic: false,
+    tools: [],
+  };
+  const session = async (overrides) => {
+    const created = await createStudySession({
+      runtime,
+      dir,
+      root: resolve("agent"),
+      command: { ...command, ...overrides },
+      toolRequest: async () => ({}),
+    });
+    return created.session;
+  };
+  // Servers connect in the background, so the declared tools arrive shortly after.
+  const asked = await session({});
+  // The app keeps a curated tool list, so MCP tools are reached through codemode
+  // (the SDK default exposure) rather than declared to the model one by one.
+  let callable = [];
+  let registered = [];
+  for (let i = 0; i < 100; i++) {
+    callable = asked.getCallableToolNames();
+    registered = asked.getAllTools().map((tool) => tool.name);
+    if (callable.includes("mcp__mock__echo")) break;
+    await delay(100);
+  }
+  assert.ok(
+    registered.includes("mcp__mock__echo"),
+    `registered: ${registered.join(",")}`,
+  );
+  assert.ok(
+    callable.includes("mcp__mock__echo"),
+    `callable: ${callable.join(",")}`,
+  );
+  await closeStudySession(asked);
+
+  // An automatic wake must not hold a server that can order or cancel things.
+  const wake = await session({ automatic: true });
+  await delay(800);
+  assert.equal(
+    wake.getAllTools().filter((tool) => tool.name.startsWith("mcp__")).length,
+    0,
+  );
+  await closeStudySession(wake);
+});
+
+test("MCP servers can be listed, added and removed like codex mcp does", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tomato-mcp-cfg-"));
+  const args = { agentDir: dir, cwd: dir, action: "list" };
+  assert.deepEqual(await mcpCommand(args), { servers: [], errors: [] });
+  const added = await mcpCommand({
+    ...args,
+    action: "add",
+    server: {
+      name: "seat",
+      command: "/usr/bin/node",
+      args: ["server.mjs"],
+      exposure: "codemode",
+    },
+  });
+  assert.equal(added.added, "seat");
+  assert.equal(added.servers[0].transport, "stdio");
+  assert.equal(added.servers[0].exposure, "codemode");
+  // The SDK's validator is the gate: a bad entry fails here, with its reason.
+  await assert.rejects(
+    mcpCommand({
+      ...args,
+      action: "add",
+      server: { name: "bad name", command: "x" },
+    }),
+    /invalid server name/,
+  );
+  await assert.rejects(
+    mcpCommand({ ...args, action: "add", server: { name: "empty" } }),
+    /needs either/,
+  );
+  const http = await mcpCommand({
+    ...args,
+    action: "add",
+    server: {
+      name: "docs",
+      url: "https://example.com/mcp",
+      headers: { Authorization: "Bearer x" },
+    },
+  });
+  assert.equal(
+    http.servers.find((server) => server.name === "docs").transport,
+    "http",
+  );
+  assert.equal(http.servers.length, 2);
+  const removed = await mcpCommand({
+    ...args,
+    action: "remove",
+    server: { name: "seat" },
+  });
+  assert.equal(removed.removed, "seat");
+  assert.deepEqual(
+    removed.servers.map((server) => server.name),
+    ["docs"],
+  );
+  await assert.rejects(
+    mcpCommand({ ...args, action: "remove", server: { name: "seat" } }),
+    /没有名为 seat 的服务器/,
+  );
 });
 
 test(

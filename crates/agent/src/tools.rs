@@ -18,6 +18,7 @@ pub fn definitions(agent: bool) -> Vec<Value> {
         tool("get_snapshot","读取完整软件快照；大数据优先使用 get_context 与按 ID 查询。",json!({}),&[],true),
         tool("get_tasks","按项目/目标/完成状态分页读取任务，不重复灌入整个备份。",json!({"projectId":{"type":"string"},"goalId":{"type":"string"},"completed":{"type":"boolean"},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":100}}),&[],true),
         tool("get_memories","读取已确认事实和待确认假设；不把 AI 假设当作用户事实。",json!({}),&[],true),
+        tool("list_mcp_servers","列出应用 mcp.json 里配置的 MCP 服务器（名称、启用状态、exposure、启动命令或 URL、来源）与配置/连接错误。座位、图书馆等外部系统都通过这类服务器接入。",json!({}),&[],true),
         tool("remember","保存有来源的长期记忆。模型产生的结论以未确认假设保存，用户可确认、改写和删除。",json!({"kind":{"type":"string","enum":["profile","preference","progress","hypothesis","reflection"]},"text":{"type":"string","maxLength":8000},"source":{"type":"string","maxLength":300}}),&["kind","text","source"],false),
         tool("read_skill","按需读取内置技能或该技能的参考文件；分析前选择匹配技能。",json!({"name":{"type":"string"},"reference":{"type":"string"}}),&["name"],true),
         tool("export_backup","把最新完整备份导出为私有工作文件，返回来源指纹和文件哈希。批量修改优先导出、分段读取、JSON Patch、审阅，再由用户应用。",json!({"name":name}),&["name"],false),
@@ -98,6 +99,22 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             false,
         ));
         list.push(tool("save_vision","记录/更新用户愿景，与进度和裁定无关。新建时不传id。",json!({"id":{"type":["string","null"]},"name":{"type":"string"},"notes":{"type":"string"},"projectId":{"type":["string","null"]},"goalId":{"type":["string","null"]}}),&["name"],false));
+        list.push(tool("save_block","创建/更新计划之外的阻塞时段（课程、实验等固定占用）。`attention` 为 `required`（需专心，安排专注任务即冲突）或 `light`（水课，课上可并行写作业）。不传 id 即新建。",json!({"id":{"type":["string","null"]},"title":{"type":"string","maxLength":40},"days":{"type":"array","items":{"type":"integer","minimum":1,"maximum":7},"description":"1=周一…7=周日"},"start":{"type":"string","description":"HH:MM"},"end":{"type":"string","description":"HH:MM，早于开始表示跨午夜"},"attention":{"type":"string","enum":["required","light"]},"notes":{"type":"string","maxLength":2000}}),&["title","days","start","end"],false));
+        list.push(tool(
+            "delete_block",
+            "按 ID 删除一个阻塞时段；只删除课表占用，不影响任务与进度。",
+            json!({"id":{"type":"string"}}),
+            &["id"],
+            false,
+        ));
+        list.push(tool("add_mcp_server","把 MCP 服务器登记到应用自己的 mcp.json（语义同 codex mcp add），用于接入座位、图书馆一类外部系统。只在用户明确要求时使用：服务器以用户身份在沙箱之外运行，command 会执行任意程序。`command`（stdio）与 `url`（streamable HTTP）二选一；exposure 默认 codemode。",json!({"name":{"type":"string","maxLength":60},"command":{"type":"string"},"args":{"type":"array","items":{"type":"string"}},"env":{"type":"object","additionalProperties":{"type":"string"}},"url":{"type":"string"},"headers":{"type":"object","additionalProperties":{"type":"string"}},"exposure":{"type":"string","enum":["codemode","deferred","direct","hidden"]},"enabled":{"type":"boolean"},"description":{"type":"string"}}),&["name"],false));
+        list.push(tool(
+            "remove_mcp_server",
+            "从应用 mcp.json 删除一个 MCP 服务器；不影响其它配置。",
+            json!({"name":{"type":"string"}}),
+            &["name"],
+            false,
+        ));
         list.push(tool(
             "apply_file",
             "显式应用已审阅且未变化的文件。完整备份导入会暂停计时并停用锁机；保护中拒绝应用。",

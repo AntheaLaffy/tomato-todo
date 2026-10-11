@@ -409,7 +409,7 @@ fn v3_plan_and_backup_keep_the_ledger_and_do_not_reset_progress() {
     )
     .unwrap();
     let plan = e.data.export_plan();
-    assert_eq!(plan.version, 4);
+    assert_eq!(plan.version, 5);
     plan.validate().unwrap();
     let s = e
         .dispatch(Action::ImportPlan { plan: plan.clone() }, at(12, 8, 2))

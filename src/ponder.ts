@@ -227,7 +227,7 @@ export const PONDER_TARGETS: PonderTarget[] = [
     title: "本周日程",
     category: "日程",
     page: true,
-    selectors: ['main[data-ponder="schedule"]', ".week-card"],
+    selectors: ['main[data-ponder="schedule"]', ".week-card", ".blocks-card"],
     sections: [
       {
         text: "二维周历：横轴周一到周日，纵轴按提醒时间定位任务块。块高按预计专注时长加休息估算，不吸附整点。",
@@ -235,6 +235,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
       {
         heading: "只读呈现",
         text: "点任务块直接打开编辑；翻周查看其它日期。这里不修改任务，改时间请进任务编辑弹窗。",
+      },
+      {
+        heading: "课表占用",
+        text: "背景色带是每周重复的课程等固定占用。标成「需专心」的时段排任务会被提示冲突；标成「水课」的时段签到即可，可以并行写作业，冲突检测不会误报。",
       },
     ],
     related: ["tasks", "reminder"],
@@ -372,16 +376,16 @@ export const PONDER_TARGETS: PonderTarget[] = [
   },
   {
     id: "plan-file",
-    title: "学习计划文件 v4",
+    title: "学习计划文件 v5",
     category: FILES,
     selectors: ['[data-ponder="plan-file"]', '[data-action="export-plan"]'],
     sections: [
       {
-        text: "导出未完成实例、模板、主线与项目，方便编辑或交给 AI 维护。",
+        text: "导出未完成实例、模板、主线、项目与课表阻塞时段，方便编辑或交给 AI 维护。",
       },
       {
         heading: "导入是以文件为准的配置更新",
-        text: "相同 ID 的任务、节点、模板与项目按文件更新，完成进度、专注历史与节点裁定一律保留。文件没提到的实体默认不动。",
+        text: "相同 ID 的任务、节点、模板、项目与阻塞时段按文件更新，完成进度、专注历史与节点裁定一律保留。文件没提到的实体默认不动。",
       },
       {
         heading: "整份同步要显式声明",

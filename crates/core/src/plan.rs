@@ -15,6 +15,9 @@ pub struct PlanFile {
     pub pomodoro_minutes: u32,
     pub projects: Vec<PlanProject>,
     pub tasks: Vec<PlanTask>,
+    /// Fixed commitments outside the plan (course bands). Config only.
+    #[serde(default)]
+    pub blocks: Vec<crate::blocks::Block>,
     #[serde(default)]
     pub templates: Vec<Template>,
     #[serde(default)]
@@ -185,11 +188,14 @@ impl PlanFile {
         {
             return Err("任务时间安排需要计划 v2".into());
         }
-        if self.format != "tomato-todo-plan" || !matches!(self.version, 1..=4) {
+        if self.format != "tomato-todo-plan" || !matches!(self.version, 1..=5) {
             return Err("不支持的计划格式或版本".into());
         }
+        if self.version < 5 && !self.blocks.is_empty() {
+            return Err("课表阻塞时段需要计划 v5".into());
+        }
         if self.version >= 3 && self.tasks.iter().any(|t| t.repeat != Repeat::None) {
-            return Err("v3/v4 的实例不拥有重复规则，请使用模板".into());
+            return Err("v3+ 的实例不拥有重复规则，请使用模板".into());
         }
         if self.version < 4 && !self.goals.is_empty() {
             return Err("主线节点需要计划 v4".into());
@@ -224,6 +230,7 @@ impl PlanFile {
                 })
                 .collect(),
             tasks: self.tasks.iter().map(|t| t.task(0, t.estimate)).collect(),
+            blocks: self.blocks.clone(),
             templates: self.templates.clone(),
             prints: self.prints.clone(),
             goals: self.goals.iter().map(PlanGoal::goal).collect(),
@@ -291,6 +298,15 @@ impl PlanFile {
                 existing.name = habit.name.clone();
             } else {
                 next.habits.push(habit.clone());
+            }
+        }
+        // Blocks are pure config: the file's version of a band replaces the local
+        // one, and bands the file does not mention are left alone.
+        for block in &self.blocks {
+            if let Some(existing) = next.blocks.iter_mut().find(|b| b.id == block.id) {
+                *existing = block.clone();
+            } else {
+                next.blocks.push(block.clone());
             }
         }
         for plan_template in &self.templates {
@@ -474,6 +490,9 @@ impl PlanFile {
             for id in &removed_templates {
                 next.delete_template(id);
             }
+            let planned_blocks: HashSet<&str> = self.blocks.iter().map(|b| b.id.as_str()).collect();
+            next.blocks
+                .retain(|b| planned_blocks.contains(b.id.as_str()));
         }
         next.validate()?;
         *data = next;
@@ -525,8 +544,9 @@ impl AppData {
             .collect();
         PlanFile {
             format: "tomato-todo-plan".into(),
-            version: 4,
+            version: 5,
             replace: false,
+            blocks: self.blocks.clone(),
             templates: self.templates.clone(),
             prints: self.prints.clone(),
             goals: self

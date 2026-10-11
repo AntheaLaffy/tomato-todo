@@ -27,10 +27,11 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 习惯分组与周期印刷 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 habitsTab | templates.rs 的 materialize_templates、src/types.ts、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Vision、src/main.ts 的 visionsTab | src/types.ts、docs/BACKUP_FORMAT.md |
 | 模板、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 templateDialog/printDialog | crates/core/src/plan.rs、src/types.ts、docs/CODEMAP.md |
+| 课表阻塞时段与课内并行 | 业务核心 / 界面 / 智能体 | crates/core/src/blocks.rs、src/main.ts 的 schedulePage/blocksCard/blockDialog | crates/core/src/diagnostics.rs、plan.rs、crates/agent/src/{tools.rs,lib.rs}、docs/PLAN_FORMAT.md、agent/skills/study-planning |
 | 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
 | 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
 | 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
-| 学习助手、异常诊断与联网 | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
+| 学习助手、异常诊断、联网与 MCP | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | agent/mcp-config.mjs 与 agent/session.mjs 的 MCP 加载、docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、src-tauri/src/main.rs | tests/native.mjs、src 的 guardPage |
 | 启动/打包/测试 | 构建 | README.md、package.json | src-tauri/tauri.conf.json、scripts/ |

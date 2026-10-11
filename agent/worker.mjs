@@ -4,7 +4,8 @@ import { readFile, writeFile, rename, mkdir, chmod } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { createStudySession } from "./session.mjs";
+import { closeStudySession, createStudySession, mcpStatus } from "./session.mjs";
+import { mcpCommand } from "./mcp-config.mjs";
 import { networkTool } from "./web.mjs";
 
 process.umask(0o077);
@@ -14,6 +15,7 @@ const emit = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
 let session, authAbort, loginReply;
 const pending = new Map();
 let job = false;
+let cancelRequested = false;
 let credentialsQueue = Promise.resolve();
 async function credentialData() {
   try {
@@ -159,7 +161,9 @@ function toolRequest(name, args, signal, jobId) {
   });
 }
 async function runPrompt(command) {
-  if (session) session.dispose();
+  // Replacing the session must shut it down: that is what stops the MCP servers it
+  // started, so the next request does not stack another copy.
+  await closeStudySession(session);
   const managerAndSession = await createStudySession({
     runtime: await initialized,
     dir,
@@ -171,7 +175,7 @@ async function runPrompt(command) {
   session = managerAndSession.session;
   const manager = managerAndSession.manager;
   emit({ type: "session", path: manager.getSessionFile() });
-  let turns = 0;
+  cancelRequested = false;
   const unsubscribe = session.subscribe((event) => {
     if (
       event.type === "message_update" &&
@@ -180,28 +184,28 @@ async function runPrompt(command) {
       emit({ type: "text", text: event.assistantMessageEvent.delta });
     if (event.type === "tool_execution_start")
       emit({ type: "tool_start", name: event.toolName });
-    if (event.type === "turn_end" && ++turns > 20) void session.abort();
   });
-  const deadline = setTimeout(() => void session?.abort(), 240000);
   try {
     await session.prompt(command.text,{images:command.images||[]});
     emit({ type: "session", path: manager.getSessionFile() });
     const last = [...session.messages]
       .reverse()
       .find((m) => m.role === "assistant");
-    if (last?.stopReason === "error")
+    // The SDK reports a cancel that lands during a tool call as stopReason "error"
+    // plus an abort message, so count the user's own stop as a stop, not a fault.
+    const interrupted = cancelRequested || last?.stopReason === "aborted";
+    if (last?.stopReason === "error" && !interrupted)
       throw new Error(last.errorMessage || "模型请求失败");
     emit({
       type: "done",
       text:
         session.getLastAssistantText() ||
-        (last?.stopReason === "aborted"
+        (interrupted
           ? "分析已停止；已生成的文件仍可审阅。"
           : ""),
     });
   } finally {
     emit({ type: "session", path: manager.getSessionFile() });
-    clearTimeout(deadline);
     unsubscribe();
   }
 }
@@ -259,6 +263,13 @@ async function authentication(command) {
 async function handle(command) {
   if(command.op==="usage") {try{emit({type:"network_result",id:command.id,result:await usageReport(command.provider)});}catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
   if(command.op==="network") {try{const result=await networkTool(command.name,command.arguments,{runtime:await initialized,credentials,preferences:command.preferences},AbortSignal.timeout(20000));emit({type:"network_result",id:command.id,result});}catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
+  // Codex-style MCP server management, over the app's own mcp.json.
+  if(command.op==="mcp") {try{
+    const result=await mcpCommand({agentDir:dir,cwd:join(dir,"workspace/coding"),action:command.action,server:command.server});
+    // Connection failures never reach a file, so they ride along with the list.
+    if(command.action==="list")result.runtimeErrors=[...mcpStatus.errors];
+    emit({type:"network_result",id:command.id,result});
+  }catch(error){emit({type:"network_result",id:command.id,error:String(error.message)});}return;}
   if (command.op === "tool_result") {
     const request = pending.get(command.id);
     pending.delete(command.id);
@@ -267,6 +278,7 @@ async function handle(command) {
     return;
   }
   if (command.op === "cancel") {
+    cancelRequested = true;
     authAbort?.abort();
     await session?.abort();
     return;
@@ -310,8 +322,10 @@ input.on("line", (line) => {
 });
 input.on("close", () => {
   authAbort?.abort();
-  void session?.abort();
-  setTimeout(() => process.exit(0), 200).unref();
+  // Quitting must take the MCP servers with it, so they are not orphaned.
+  void closeStudySession(session, "quit").finally(() =>
+    setTimeout(() => process.exit(0), 200).unref(),
+  );
 });
 await authStatus().catch((error) =>
   emit({ type: "error", message: String(error.message) }),

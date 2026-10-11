@@ -92,6 +92,7 @@ import type {
   MainlineNode,
   BlockRule,
   Habit,
+  Block,
   Mode,
   Vision,
   Project,
@@ -683,6 +684,24 @@ function schedulePage() {
       .filter((t) => t.dueDate === isoDate(d))
       .sort((a, b) => toMin(a.reminderTime) - toMin(b.reminderTime)),
   );
+  // Bands are weekly, so each column shows the ones starting that weekday. A
+  // cross-midnight band is clipped at the bottom edge of its day.
+  const bands = days.map((_, i) =>
+    state.data.blocks
+      .filter((b) => b.days.includes(i + 1))
+      .sort((a, b) => toMin(a.start) - toMin(b.start)),
+  );
+  const bandMarkup = (b: Block) => {
+    const top = Math.max(0, pct(toMin(b.start)));
+    const rawEnd = toMin(b.end);
+    const end = rawEnd <= toMin(b.start) ? 1440 : rawEnd;
+    const height = Math.max(
+      1,
+      Math.min(100 - top, ((end - toMin(b.start)) / span) * 100),
+    );
+    const light = b.attention === "light";
+    return `<span class="calendar-band ${light ? "light" : "required"}" style="top:${top}%;height:${height}%" title="${escape(`${b.title} ${b.start}–${b.end}`)}"><b>${escape(b.title)}</b></span>`;
+  };
   const total = lists.reduce(
     (n, ts) => n + ts.reduce((m, t) => m + t.estimate, 0),
     0,
@@ -704,7 +723,7 @@ function schedulePage() {
       ${days
         .map(
           (_, i) =>
-            `<div class="calendar-col">${hours.map((h) => `<i class="hour-line" style="top:${pct(h * 60)}%"></i>`).join("")}${lists[
+            `<div class="calendar-col">${hours.map((h) => `<i class="hour-line" style="top:${pct(h * 60)}%"></i>`).join("")}${bands[i].map(bandMarkup).join("")}${lists[
               i
             ]
               .map((t) => {
@@ -724,7 +743,60 @@ function schedulePage() {
         )
         .join("")}
     </div>
-  </section>`;
+  </section>
+  ${blocksCard()}`;
+}
+function blockRows(): string {
+  if (!state.data.blocks.length)
+    return '<p class="small-empty">还没有固定占用。把每周的课加进来，标成「水课」的时段就能用来写作业。</p>';
+  const order = [...state.data.blocks].sort(
+    (a, b) =>
+      a.days[0] - b.days[0] ||
+      a.start.localeCompare(b.start) ||
+      a.title.localeCompare(b.title),
+  );
+  return order
+    .map((b) => {
+      const light = b.attention === "light";
+      return `<article class="block-row ${light ? "light" : "required"}" data-block-id="${escape(b.id)}"><div><strong>${escape(b.title)}</strong><span class="badge">${light ? "水课" : "需专心"}</span><h3>${b.start} — ${b.end <= b.start ? "次日 " : ""}${b.end}</h3><p class="subtle small">${daysLabel(b.days)}${b.notes ? ` · ${escape(b.notes)}` : ""}</p></div><div class="button-row"><button class="icon-btn" data-edit-block="${escape(b.id)}" aria-label="编辑 ${escape(b.title)}">${icon("pencil")}</button><button class="icon-btn" data-delete-block="${escape(b.id)}" aria-label="删除 ${escape(b.title)}">${icon("trash-2")}</button></div></article>`;
+    })
+    .join("");
+}
+function blocksCard(): string {
+  return `<section class="card blocks-card"><div class="card-heading"><h2>课表与固定占用</h2><button class="button secondary" data-action="new-block">${icon("plus")} 添加时段</button></div><p class="subtle small">每周重复的课程、实验等占用。标成「需专心」的时段里排专注任务会提示冲突；标成「水课」的时段可以并行写作业。这部分也会随学习计划导出，编辑后再导入。</p><div class="block-list">${blockRows()}</div></section>`;
+}
+function blockDialog(id?: string) {
+  const b = state.data.blocks.find((x) => x.id === id);
+  modal(
+    `${modalHeader(b ? "编辑固定占用" : "添加固定占用")}<form id="block-form"><label class="form-field"><span>名称</span><input name="title" maxlength="40" required value="${escape(b?.title || "")}" placeholder="例如 大学英语Ⅰ"></label><div class="form-grid"><label class="form-field"><span>开始时间</span><input name="start" type="time" value="${b?.start || "09:55"}" required></label><label class="form-field"><span>结束时间（早于开始则跨午夜）</span><input name="end" type="time" value="${b?.end || "11:20"}" required></label></div><div class="lock-days">${["一", "二", "三", "四", "五", "六", "日"].map((d, i) => `<label><input type="checkbox" name="days" value="${i + 1}" ${!b || b.days.includes(i + 1) ? "checked" : ""}>周${d}</label>`).join("")}</div><label class="form-field"><span>上课状态</span><select name="attention"><option value="required" ${!b || b.attention === "required" ? "selected" : ""}>需专心（课上排任务会提示冲突）</option><option value="light" ${b?.attention === "light" ? "selected" : ""}>水课（可并行写作业）</option></select></label><label class="form-field"><span>备注（可选）</span><input name="notes" maxlength="2000" value="${escape(b?.notes || "")}" placeholder="例如 5B402 · 要签到"></label><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">取消</button><button class="button primary" type="submit">保存时段</button></div></form>`,
+  );
+  $("#block-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    const days = f.getAll("days").map(Number);
+    if (!days.length) {
+      toast("请至少选择一天");
+      return;
+    }
+    if (f.get("start") === f.get("end")) {
+      toast("开始和结束时间不能相同");
+      return;
+    }
+    closeModal();
+    await act(
+      {
+        type: "saveBlock",
+        id: b?.id ?? null,
+        title: String(f.get("title")).trim(),
+        days,
+        start: String(f.get("start")),
+        end: String(f.get("end")),
+        attention: String(f.get("attention")),
+        notes: String(f.get("notes")).trim(),
+      },
+      "固定占用已保存",
+    );
+  });
 }
 function tasksPage() {
   const project = page.startsWith("project:")
@@ -1177,7 +1249,7 @@ function soundPreviewControls() {
 }
 function settingsPage() {
   const s = state.data.settings;
-  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><div><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><section class="card settings-card data-settings" data-ponder="plan-file"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务与步骤，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用数据与备份。</div></section><section class="settings-tip">${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>外观主题</strong><small>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings" data-ponder="backup"><h2>${icon("download")} 数据与备份</h2><p>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note">${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section></div></div><div class="settings-save"><span id="settings-status" role="status" aria-live="polite">离开偏好页时自动保存</span><button type="submit" class="button primary">${icon("check")} 保存配置</button></div></form>`;
+  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><div><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><section class="card settings-card data-settings" data-ponder="plan-file"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务、步骤与课表阻塞时段，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用数据与备份。</div></section><section class="settings-tip">${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>外观主题</strong><small>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings" data-ponder="backup"><h2>${icon("download")} 数据与备份</h2><p>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note">${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section></div></div><div class="settings-save"><span id="settings-status" role="status" aria-live="polite">离开偏好页时自动保存</span><button type="submit" class="button primary">${icon("check")} 保存配置</button></div></form>`;
 }
 function desktopSettingsCard() {
   if (!desktop || !nativeStatus) return "";
@@ -2436,22 +2508,23 @@ async function importPlan() {
     if (!plan) return;
     if (
       plan.format !== "tomato-todo-plan" ||
-      ![1, 2, 3, 4].includes(plan.version) ||
+      ![1, 2, 3, 4, 5].includes(plan.version) ||
       !Array.isArray(plan.tasks) ||
       !Array.isArray(plan.projects)
     ) {
       throw new Error(
-        "请选择 tomato-todo-plan v1/v2/v3/v4 计划文件；完整备份请使用“导入备份”。",
+        "请选择 tomato-todo-plan v1–v5 计划文件；完整备份请使用“导入备份”。",
       );
     }
     const existing = new Set(state.data.tasks.map((t) => t.id));
     const added = plan.tasks.filter((t) => !existing.has(t.id)).length;
+    const blocks = plan.blocks?.length ?? 0;
     const whitelisted = plan.projects.filter((p) =>
       Array.isArray(p.appWhitelist),
     ).length;
     confirmDialog(
       "合并学习计划？",
-      `文件含 ${plan.tasks.length} 个任务，预计新增 ${added} 个。同 ID 的已有任务和进度保留；新任务从未完成开始。指定单次时长的任务保持其安排，其余预计番茄数按当前 ${state.data.settings.focusMinutes} 分钟向上折算，设置和专注记录保留。${whitelisted ? `文件里 ${whitelisted} 个项目的应用白名单会覆盖本机同名项目。` : ""}`,
+      `文件含 ${plan.tasks.length} 个任务，预计新增 ${added} 个${blocks ? `；另有 ${blocks} 个课表阻塞时段` : ""}。同 ID 的已有任务和进度保留；新任务从未完成开始。指定单次时长的任务保持其安排，其余预计番茄数按当前 ${state.data.settings.focusMinutes} 分钟向上折算，设置和专注记录保留。${whitelisted ? `文件里 ${whitelisted} 个项目的应用白名单会覆盖本机同名项目。` : ""}`,
       "导入计划",
       async () => {
         await act({ type: "importPlan", plan }, "学习计划已合并");
@@ -2708,6 +2781,22 @@ document.addEventListener("click", async (e) => {
     lockDialog(d.editLock);
     return;
   }
+  if (d.editBlock) {
+    blockDialog(d.editBlock);
+    return;
+  }
+  if (d.deleteBlock) {
+    confirmDialog(
+      "删除这个固定占用？",
+      "只删除课表占用，不影响任何任务与进度。",
+      "删除占用",
+      async () => {
+        await act({ type: "deleteBlock", id: d.deleteBlock }, "占用已删除");
+      },
+      true,
+    );
+    return;
+  }
   if (d.toggleLock) {
     const schedule = state.data.lock.schedules.find(
       (s) => s.id === d.toggleLock,
@@ -2919,6 +3008,9 @@ document.addEventListener("click", async (e) => {
       break;
     case "new-lock":
       lockDialog();
+      break;
+    case "new-block":
+      blockDialog();
       break;
     case "undo": {
       const cb = undo;

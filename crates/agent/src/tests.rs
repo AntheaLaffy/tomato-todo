@@ -100,8 +100,35 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
             wakes.fetch_add(1, Ordering::SeqCst);
         }),
         workspace_lock: Mutex::new(()),
-        network_pending: Mutex::new(std::collections::HashMap::new()),
+        worker_pending: Mutex::new(std::collections::HashMap::new()),
     })
+}
+#[test]
+fn only_a_user_request_may_edit_mcp_servers_and_course_blocks() {
+    let names = |agent: bool| {
+        crate::tools::definitions(agent)
+            .iter()
+            .map(|tool| tool["name"].as_str().unwrap_or_default().to_string())
+            .collect::<Vec<_>>()
+    };
+    let (wake, user) = (names(true), names(false));
+    // Reading what is configured is fine on a wake; editing it is not.
+    assert!(wake.contains(&"list_mcp_servers".to_string()));
+    for tool in [
+        "add_mcp_server",
+        "remove_mcp_server",
+        "save_block",
+        "delete_block",
+    ] {
+        assert!(
+            user.contains(&tool.to_string()),
+            "{tool} missing for user turns"
+        );
+        assert!(
+            !wake.contains(&tool.to_string()),
+            "{tool} leaked into a wake"
+        );
+    }
 }
 #[test]
 fn agent_cannot_apply_or_dispatch_and_memories_need_confirmation() {

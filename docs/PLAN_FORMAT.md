@@ -1,10 +1,20 @@
-# 学习计划文件 v4
+# 学习计划文件 v5
 
-入口：**偏好设置 → 学习计划 → 导入计划 / 导出计划**。UTF-8 JSON，上限 20 MiB；机器定义见 [plan.schema.json](plan.schema.json)，通用示例见 [plan.example.json](plan.example.json)。计划交换模板、印刷规则、印刷记录、未完成实例及容器，不交换完成进度、专注历史、计时器或本机设置。
+入口：**偏好设置 → 学习计划 → 导入计划 / 导出计划**。UTF-8 JSON，上限 20 MiB；机器定义见 [plan.schema.json](plan.schema.json)，通用示例见 [plan.example.json](plan.example.json)。计划交换模板、印刷规则、印刷记录、未完成实例、容器与课表阻塞时段，不交换完成进度、专注历史、计时器或本机设置。
 
 ## 模板 → 印刷 → 实例
 
-顶层字段：`format: "tomato-todo-plan"`、`version: 4`、`pomodoroMinutes`（1–180）、`projects`、`tasks`，以及 `templates`、`prints`、`goals`、`habits`（省略数组时为空），和可选的 `replace`（默认 false）。
+顶层字段：`format: "tomato-todo-plan"`、`version: 5`、`pomodoroMinutes`（1–180）、`projects`、`tasks`，以及 `blocks`、`templates`、`prints`、`goals`、`habits`（省略数组时为空），和可选的 `replace`（默认 false）。
+
+## 课表阻塞时段
+
+`blocks` 描述计划之外已经占用的固定时段（课程、实验等），是纯配置：不携带进度、不参与配对、不锁机。每项为 `{ id, title, days, start, end, attention, notes }`：
+
+- `days` 是 1–7（周一为 1）的星期集合，最多 7 个不重复值；`start/end` 为本机 `HH:MM`，`end` 不晚于 `start` 表示跨午夜。同一时段每周重复。
+- `attention` 为 `required`（需专心）或 `light`（水课），默认 `required`。`required` 时段里安排专注任务会被本地诊断当作真实冲突；`light` 时段表示签到即可并行写作业，冲突检测不再报警，也适合把作业排进去。
+- `notes` 可选，用于记场地、签到要求等。最多 60 项。
+
+`blocks` 需要计划 **v5**；v1–v4 文件不允许携带。导入按 ID 更新配置、新增未知项；`replace: true` 时移除文件未提及的时段。完整备份 v3 也保存这部分（见 [备份格式](BACKUP_FORMAT.md)）。
 
 - **模板**：`{ id, shape, printing, automatic, printAheadDays }`。`shape` 保存标题、备注、项目/目标/习惯组引用、单次时长、预计番茄数、标签、默认优先级、普通组重修窗口和子任务文本。没有完成、日期或统计；没有手填的任务类型。
 - **印刷规则**：简单单次 `{ kind: "once", date: null, time: null }`；非重复日程表 `{ kind: "calendar", slots: [{ time: "09:00", dates: ["2026-10-12", "2026-10-14"] }, { time: "15:00", dates: ["2026-10-12"] }] }`；重复周期 `{ kind: "weekly", slots: [{ time: "09:00", days: [1,2,3,4,5] }, { time: "15:00", days: [2,4] }] }`。一份形状在多个开始时间复用；每个开始时间对应多个日程日期或周期单元。日程表最多 49 个时段、总计 366 项；同一开始时间的日期合并到一个时段，不重复。默认周期是一周（周一至周日）。星期 1–7；同一天可安排多个不同时间，最多 49 个时段，同一星期和时刻不能重复。全部时段不填时间时属于普通组；定时与不定时不能混在同一模板。
@@ -72,6 +82,7 @@
 - **任务**：标题、备注、项目、管辖、日期、提醒、时长、重修窗口、优先级、预计番茄、标签、子步骤文本、模板引用以文件为准；`completed/completedAt/createdAt`、专注历史与已裁定的配对保留。管辖或时间变动会重新配对，已裁定节点下的实例不改写。
 - **目标**：按节点 ID 合并。未裁定的节点更新规则，新节点加入；已有信号或裁定的节点只改名；文件里删掉的节点保留其历史。
 - **模板 / 项目 / 习惯组**：相同 ID 更新配置；`appWhitelist` 省略时保留本机值。
+- **阻塞时段**：相同 ID 覆盖配置，新 ID 追加；`replace: true` 时移除文件未提及的时段。
 - **默认不做隐含删除**：文件里没有的本机任务、模板、目标或习惯组保持不动；部分计划因此不会误删本机数据。
 - **`replace: true` 时改为整份同步**：文件没有提到的**未完成任务、目标、模板和习惯组会被移除**，用于「导出 → 编辑 → 导入」的完整增改删流程。已完成实例、已裁定节点及其信号、专注历史与 ID 历史一律保留，导入前会先自动备份。带模板的自动印刷实例若在导出之后新生成，也会被当作“文件未提及”而删除，因此用 `replace` 时以导出后的文件为准，不要在中途让模板继续印刷。
 
@@ -87,4 +98,4 @@
 
 Schema 检查结构；Rust 还检查有效日期、引用、ID 唯一性、星期/时刻重复、UTF-8 长度、管辖约束和合并后总量。未知计划字段和版本拒绝导入。
 
-预览服务：`GET /api/plan` 导出，`POST /api/action` 接受 `importPlan`、`saveTemplate`（可含 `printDates`，保存和印刷原子执行）、`printTemplate`（`id/dates`）、`syncTemplate`、`deleteTemplate`、`printInstances`（`shape/printing`，一次印完非重复日程，不保留模板）、`saveHabitGroup`（`id/name`，多个不同形状可共享分组）、`saveGoal`（`id/name/nodes`，配置稳定主线）、`confirmNode`（`goalId/nodeId/confirmed`，保存未裁定节点的人工确认）。桌面使用同一核心 Action；文件对话框仍走 `export_data/read_import` 的 `plan: true`。通用示例不会自动装入默认数据。
+预览服务：`GET /api/plan` 导出，`POST /api/action` 接受 `importPlan`、`saveTemplate`（可含 `printDates`，保存和印刷原子执行）、`printTemplate`（`id/dates`）、`syncTemplate`、`deleteTemplate`、`printInstances`（`shape/printing`，一次印完非重复日程，不保留模板）、`saveHabitGroup`（`id/name`，多个不同形状可共享分组）、`saveGoal`（`id/name/nodes`，配置稳定主线）、`confirmNode`（`goalId/nodeId/confirmed`，保存未裁定节点的人工确认）、`saveBlock`（`id/title/days/start/end/attention/notes`，`id` 为空即新建）、`deleteBlock`（`id`）。桌面使用同一核心 Action；文件对话框仍走 `export_data/read_import` 的 `plan: true`。通用示例不会自动装入默认数据。

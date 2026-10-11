@@ -54,7 +54,7 @@ pub struct Agent {
     apply: Apply,
     wake: Arc<dyn Fn() + Send + Sync>,
     workspace_lock: Mutex<()>,
-    network_pending:
+    worker_pending:
         Mutex<std::collections::HashMap<String, std::sync::mpsc::Sender<AppResult<Value>>>>,
 }
 impl Agent {
@@ -87,7 +87,7 @@ impl Agent {
             apply,
             wake,
             workspace_lock: Mutex::new(()),
-            network_pending: Mutex::new(std::collections::HashMap::new()),
+            worker_pending: Mutex::new(std::collections::HashMap::new()),
         });
         bridge::start(&service)?;
         if let Err(error) = service.ensure_worker() {
@@ -119,12 +119,32 @@ impl Agent {
             &value,
         )
     }
+    /// Ask the packaged runtime something and wait for its `network_result` reply.
+    /// Used for provider quota, network tools and MCP configuration, which all live
+    /// on the Node side rather than in this process.
+    fn ask_worker(self: &Arc<Self>, mut value: Value, seconds: u64) -> AppResult<Value> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.worker_pending
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(id.clone(), tx);
+        value["id"] = json!(id);
+        let result = self.send(value).and_then(|_| {
+            rx.recv_timeout(std::time::Duration::from_secs(seconds))
+                .map_err(|_| "Agent 运行包响应超时".to_string())?
+        });
+        self.worker_pending
+            .lock()
+            .map_err(|e| e.to_string())?
+            .remove(&id);
+        result
+    }
     pub fn request(self: &Arc<Self>, args: Value) -> AppResult<Value> {
         let op = args["op"].as_str().ok_or("缺少 Agent 操作")?;
         match op {
             "status" => self.status(),
             "usage" => {
-                let id = uuid::Uuid::new_v4().to_string();
                 let provider = self
                     .inner
                     .lock()
@@ -133,23 +153,19 @@ impl Agent {
                     .preferences
                     .provider
                     .clone();
-                let (tx, rx) = std::sync::mpsc::channel();
-                self.network_pending
-                    .lock()
-                    .map_err(|e| e.to_string())?
-                    .insert(id.clone(), tx);
-                let result = self
-                    .send(json!({"op":"usage","id":id,"provider":provider}))
-                    .and_then(|_| {
-                        rx.recv_timeout(std::time::Duration::from_secs(20))
-                            .map_err(|_| "获取用量超时".to_string())?
-                    });
-                self.network_pending
-                    .lock()
-                    .map_err(|e| e.to_string())?
-                    .remove(&id);
-                result
+                self.ask_worker(json!({"op":"usage","provider":provider}), 20)
             }
+            // Codex-style MCP server management, answered by the packaged runtime
+            // so the SDK's own config validation is the single source of truth.
+            "mcp_list" => self.ask_worker(json!({"op":"mcp","action":"list"}), 20),
+            "mcp_add" => self.ask_worker(
+                json!({"op":"mcp","action":"add","server":args["server"].clone()}),
+                20,
+            ),
+            "mcp_remove" => self.ask_worker(
+                json!({"op":"mcp","action":"remove","server":args["server"].clone()}),
+                20,
+            ),
             "download_file" => {
                 let _lock = self.workspace_lock.lock().map_err(|e| e.to_string())?;
                 files::download(&self.dir.join("workspace"), &args)
@@ -603,12 +619,6 @@ impl Agent {
         };
         match name {
             "web_search" | "web_fetch" => {
-                let id = uuid::Uuid::new_v4().to_string();
-                let (tx, rx) = std::sync::mpsc::channel();
-                self.network_pending
-                    .lock()
-                    .map_err(|e| e.to_string())?
-                    .insert(id.clone(), tx);
                 let preferences = self
                     .inner
                     .lock()
@@ -616,16 +626,21 @@ impl Agent {
                     .store
                     .preferences
                     .clone();
-                let result=self.send(json!({"op":"network","id":id,"name":name,"arguments":args,"preferences":preferences})).and_then(|_|rx.recv_timeout(std::time::Duration::from_secs(25)).map_err(|_|"联网工具超时，请重试".to_string())?);
-                self.network_pending
-                    .lock()
-                    .map_err(|e| e.to_string())?
-                    .remove(&id);
-                result
+                self.ask_worker(
+                    json!({"op":"network","name":name,"arguments":args,"preferences":preferences}),
+                    25,
+                )
             }
             "get_memories" => Ok(json!(
                 self.inner.lock().map_err(|e| e.to_string())?.store.memories
             )),
+            // MCP servers live in the app's own mcp.json (Codex-style add/list/remove).
+            // Reading is fine on a wake; editing another program's launch config is not.
+            "list_mcp_servers" => self.request(json!({"op":"mcp_list"})),
+            "add_mcp_server" | "remove_mcp_server" => self.request(json!({
+                "op": if name == "add_mcp_server" { "mcp_add" } else { "mcp_remove" },
+                "server": args.clone(),
+            })),
             "remember" => {
                 let kind = nonempty_text(args, "kind", 30)?;
                 if ![
@@ -919,7 +934,7 @@ impl Agent {
                         let skills = self.available_skills();
                         let inner = self.inner.lock().map_err(|e| e.to_string())?;
                         Ok(
-                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":skills,"permission":"用户主动发起时可直接执行允许的操作；自动唤醒仅分析、提问与准备文件。保护规则不可绕开。"}),
+                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"blocks":s.data.blocks,"todayBlocks":tomato_core::blocks::on_date(&s.data.blocks,&s.today),"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":skills,"permission":"用户主动发起时可直接执行允许的操作；自动唤醒仅分析、提问与准备文件。保护规则不可绕开。"}),
                         )
                     }
                     _ => Err("未知工具".into()),

@@ -23,7 +23,6 @@ async function bridge(body) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
   });
   if (!response.ok) throw new Error(await response.text());
   return response.json();
@@ -35,7 +34,12 @@ async function handle(message) {
     switch (message.method) {
       case "initialize":
         result = {
-          protocolVersion: "2025-11-25",
+          // Echo the client's version when it asks for one, the way other MCP
+          // servers negotiate; fall back to the revision this bridge implements.
+          protocolVersion:
+            typeof message.params?.protocolVersion === "string"
+              ? message.params.protocolVersion
+              : "2025-11-25",
           capabilities: { tools: {} },
           serverInfo: { name: "tomato-study", version: "0.1.0" },
           instructions:

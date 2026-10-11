@@ -10,6 +10,64 @@ import { join, relative, isAbsolute } from "node:path";
 import { codingTools } from "./coding.mjs";
 import { networkTool, withHostedSearch } from "./web.mjs";
 
+// The MCP surface ships with the packaged runtime; load it by path so the app
+// talks to exactly the version it bundles.
+import { loadAppMcpConfig, mcpServersView } from "./mcp-config.mjs";
+const { emitSessionShutdownEvent } = await import(
+  new URL("./core/extensions/runner.js", import.meta.resolve("@earendil-works/pi-coding-agent"))
+);
+
+/**
+ * Tear a session down the way the SDK runtime does. Extensions stop their MCP
+ * child processes on `session_shutdown`, which plain `dispose()` never emits —
+ * without this every new request leaks the servers it spawned.
+ */
+export async function closeStudySession(session, reason = "new") {
+  if (!session) return;
+  try {
+    await emitSessionShutdownEvent(session.extensionRunner, {
+      type: "session_shutdown",
+      reason,
+    });
+  } finally {
+    session.dispose();
+  }
+}
+
+/**
+ * What the MCP layer is doing, for the app's `list_mcp_servers` tool. The bundled
+ * extension connects on `session_start` and reports what needs attention through
+ * `ctx.ui.notify`, which is a no-op in this headless worker — so the app captures
+ * those notices instead of letting them vanish.
+ */
+export const mcpStatus = { servers: [], errors: [] };
+const noOp = () => {};
+const mcpUIContext = {
+  select: async () => undefined,
+  confirm: async () => false,
+  input: async () => undefined,
+  editor: async () => undefined,
+  custom: async () => undefined,
+  getEditorText: () => "",
+  getEditorComponent: () => undefined,
+  onTerminalInput: () => noOp,
+  notify: (message, type) =>
+    mcpStatus.errors.push(type === "error" ? message : `${type ?? "info"}: ${message}`),
+  setStatus: noOp,
+  setWorkingMessage: noOp,
+  setWorkingVisible: noOp,
+  setWorkingIndicator: noOp,
+  setHiddenThinkingLabel: noOp,
+  setWidget: noOp,
+  setFooter: noOp,
+  setHeader: noOp,
+  setTitle: noOp,
+  pasteToEditor: noOp,
+  setEditorText: noOp,
+  addAutocompleteProvider: noOp,
+  setEditorComponent: noOp,
+};
+
 export async function createStudySession({
   runtime,
   dir,
@@ -57,6 +115,20 @@ export async function createStudySession({
     extensionFactories: [
       (await import(new URL("./extensions/codemode/index.js",import.meta.resolve("@earendil-works/pi-coding-agent")))).createCodemodeExtension({models:false,mode:"on",inlineBudget:1500}),
       (await import(new URL("./extensions/tool-search/index.js",import.meta.resolve("@earendil-works/pi-coding-agent")))).createToolSearchExtension(),
+      // MCP servers the user configured in the app's own mcp.json (the shared
+      // `mcpServers` shape Codex uses too), exposed as mcp__<server>__<tool>.
+      // Only the app's file counts: the model-writable workspace is never a
+      // source of servers. Automatic wakes get none — those servers can order,
+      // sign in or cancel on the user's behalf.
+      (await import(new URL("./extensions/mcp/index.js",import.meta.resolve("@earendil-works/pi-coding-agent")))).createMcpExtension({
+        loadConfig: command.automatic
+          ? () => ({ servers: [], errors: [] })
+          : (ctx) => {
+              const loaded = loadAppMcpConfig({ agentDir: dir, cwd: ctx.cwd });
+              Object.assign(mcpStatus, mcpServersView(loaded));
+              return loaded;
+            },
+      }),
       (pi)=>{pi.on("before_provider_request",(event)=>model.provider==="openai-codex"?withHostedSearch(event.payload,command.preferences?.webSearch??"cached"):undefined);},
     ],
     systemPrompt:
@@ -79,9 +151,9 @@ export async function createStudySession({
     "review_file",
     "list_files",
     "stage_file","web_search","web_fetch","request_user_input","update_plan",
-    "dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision",
+    "dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision","save_block","delete_block",
   ]);
-  if(command.automatic)for(const name of ["dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision"])allowed.delete(name);
+  if(command.automatic)for(const name of ["dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision","save_block","delete_block"])allowed.delete(name);
   const definitions = command.tools.filter((t) => allowed.has(t.name));
   const customTools = definitions.map((tool) => ({
     name: tool.name,
@@ -113,5 +185,12 @@ export async function createStudySession({
   });
   // Keep restored session settings from widening the allowlist.
   session.setActiveToolsByName(toolNames);
+  // Extensions connect on `session_start`, which binding emits: without this the
+  // bundled MCP extension never starts, so mcp.json would look installed but dead.
+  await session.bindExtensions({
+    mode: "print",
+    uiContext: mcpUIContext,
+    onError: (error) => mcpStatus.errors.push(`${error.extensionPath}: ${error.error}`),
+  });
   return { session, manager };
 }

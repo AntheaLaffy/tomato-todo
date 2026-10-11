@@ -114,6 +114,17 @@ export interface Habit {
   id: string;
   name: string;
 }
+export type Attention = "required" | "light";
+/** A fixed weekly commitment outside the plan (class, lab). Descriptive only. */
+export interface Block {
+  id: string;
+  title: string;
+  days: number[];
+  start: string;
+  end: string;
+  attention: Attention;
+  notes: string;
+}
 export interface Vision {
   id: string;
   name: string;
@@ -251,6 +262,7 @@ export interface AppData {
   signalEvents: SignalEvent[];
   version: number;
   tasks: Task[];
+  blocks: Block[];
   templates: Template[];
   prints: PrintRecord[];
   projects: Project[];
@@ -264,7 +276,8 @@ export interface AppData {
 }
 export interface PlanFile {
   format: "tomato-todo-plan";
-  version: 1 | 2 | 3 | 4;
+  version: 1 | 2 | 3 | 4 | 5;
+  blocks?: Block[];
   templates?: Template[];
   prints?: PrintRecord[];
   goals?: { id: string; name: string; nodes: NodeSpec[] }[];

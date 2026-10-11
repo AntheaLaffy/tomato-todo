@@ -27,6 +27,13 @@
         "$ref": "#/$defs/habit"
       }
     },
+    "blocks": {
+      "type": "array",
+      "maxItems": 60,
+      "items": {
+        "$ref": "#/$defs/block"
+      }
+    },
     "visions": {
       "type": "array",
       "items": {
@@ -166,6 +173,59 @@
           "minLength": 1,
           "maxLength": 40,
           "pattern": "\\S"
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "days",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "\\S"
+        },
+        "days": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          }
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "attention": {
+          "enum": [
+            "required",
+            "light"
+          ],
+          "default": "required"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000
         }
       }
     },

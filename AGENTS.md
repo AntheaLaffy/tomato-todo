@@ -11,3 +11,13 @@ Mode: maintenance. 从 [CODEMAP.md](CODEMAP.md) 开始导航。
 - 不把私人课表、备考资料或测试数据库写入默认种子和安装包。
 - 个人学习计划、课表与作息在 `/home/fuurin/study/考研时间规划/`（不入库）；规划学习任务前先读该目录的 `我的情况-给智能体.md` 与 `课表补充-时间说明.md`。
 - **允许破坏性变更**：本项目以更好的设计迭代为先，不为兼容旧数据、旧接口或旧文件格式牺牲设计。改数据模型、文件格式或语义时，同步更新文档、schema、示例、测试与 `CHANGELOG`；旧版本按需要提供一次性转换或明确拒绝。
+
+## Agent 与学习助手实现规范
+
+助手运行时就是随包的 Pi SDK（上游源码在 `agent/node_modules/@earendil-works/pi-coding-agent/dist`，`agent/*.mjs` 是应用侧的薄封装）。这里的规矩是**照抄成熟实现，不自作聪明**：要加行为先看 Pi（`runPrintMode`、`agent-session`）和 Codex 怎么做，跟着它们的语义走，别发明自己的调度层、保险丝或重试策略。
+
+- **不给长任务设人为上限**：一轮请求跑到完成，只有用户停止、供应商报错或 SDK 自身策略才结束。不要加 wall-clock 截止、轮次上限这类"保险"——它们分辨不出"正常的长任务"和"跑飞"，只会把前者掐断。沙箱终端同样保持 Pi 的语义：默认不超时，只有模型显式传 `timeout` 才限时；输出过多只截断呈现，不杀命令。
+- **停止是停止，不是故障**：SDK 会把落在工具执行中的 cancel 报成 `stopReason: error` + abort 文案（见 `agent/worker.mjs` 的 `cancelRequested`），界面要按「已停止」呈现，不要把用户自己按的停止显示成操作失败。
+- **按上游的方式报告结果**：单次运行照 Pi 的 `runPrintMode`——`error`/`aborted` 才算失败，其余按 `getLastAssistantText()` 汇报。
+- **改动小而对齐**：`agent/*.mjs` 不在 `pnpm format` 范围内（保持既有紧凑风格），改哪一行就只动哪一行，不要顺手格式化整文件、也不要为了"顺手"重构。
+- **验证走本地**：`node --test tests/agent.mjs` 用本机 mock 模型覆盖真实 SDK 的流式工具调用与会话恢复，不花用户额度；真实账号、联网与桌面行为由用户自测，写清怎么复现。

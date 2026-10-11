@@ -1508,7 +1508,7 @@ fn v2_plan_preserves_schedule_and_duration_old_backups_remain_flexible() {
         .dispatch(Action::SaveTask { task: d }, friday(8, 0))
         .unwrap();
     let mut plan = s.data.export_plan();
-    assert_eq!(plan.version, 4);
+    assert_eq!(plan.version, 5);
     let imported = engine()
         .dispatch(Action::ImportPlan { plan: plan.clone() }, friday(8, 0))
         .unwrap();
@@ -1583,4 +1583,60 @@ fn imported_partial_timer_keeps_remaining_time_and_defers_reminders() {
     let s = e.dispatch(Action::StartTimer, friday(9, 0)).unwrap();
     assert_eq!(s.remaining_secs, 6);
     assert!(!e.snapshot(friday(9, 0) + 6).unwrap().data.timer.running);
+}
+
+#[test]
+fn course_blocks_round_trip_through_plan_v5() {
+    let mut e = engine();
+    e.dispatch(
+        Action::SaveBlock {
+            id: None,
+            title: "图像大数据分析".into(),
+            days: vec![3],
+            start: "16:25".into(),
+            end: "18:35".into(),
+            attention: blocks::Attention::Required,
+            notes: "不能玩手机".into(),
+        },
+        1000,
+    )
+    .unwrap();
+    let exported = e.snapshot(1000).unwrap().data.export_plan();
+    assert_eq!(exported.version, 5);
+    assert_eq!(exported.blocks.len(), 1);
+    exported.validate().unwrap();
+
+    // Bands are a v5 idea: a v4 file may not smuggle them in.
+    let mut legacy = serde_json::to_value(&exported).unwrap();
+    legacy["version"] = serde_json::json!(4);
+    let legacy: plan::PlanFile = serde_json::from_value(legacy).unwrap();
+    assert!(legacy.validate().is_err());
+
+    let mut fresh = engine();
+    fresh
+        .dispatch(
+            Action::ImportPlan {
+                plan: exported.clone(),
+            },
+            1010,
+        )
+        .unwrap();
+    let stored = fresh.snapshot(1010).unwrap().data;
+    assert_eq!(stored.blocks.len(), 1);
+    assert_eq!(stored.blocks[0].days, vec![3]);
+    assert_eq!(stored.blocks[0].attention, blocks::Attention::Required);
+
+    // replace: true makes the file the whole plan, so dropped bands go away.
+    let mut emptied = exported;
+    emptied.blocks.clear();
+    emptied.replace = true;
+    fresh
+        .dispatch(Action::ImportPlan { plan: emptied }, 1020)
+        .unwrap();
+    assert!(fresh.snapshot(1020).unwrap().data.blocks.is_empty());
+
+    // Deleting a band retires its ID like any other entity: the ledger keeps the
+    // name from being silently reused for a different band later.
+    let retired = fresh.snapshot(1020).unwrap().data.identities;
+    assert!(retired.iter().any(|r| r.kind == "block" && r.retired));
 }

@@ -34,6 +34,9 @@ fn active(data: &AppData) -> AppResult<HashMap<String, String>> {
     for x in &data.visions {
         add(&x.id, "vision")?;
     }
+    for x in &data.blocks {
+        add(&x.id, "block")?;
+    }
     for x in &data.tasks {
         add(&x.id, "task")?;
     }
@@ -156,7 +159,7 @@ pub(crate) fn validate(data: &AppData) -> AppResult<()> {
             || seen.insert(&record.id, ()).is_some()
             || ![
                 "project", "goal", "node", "habit", "vision", "task", "template", "session",
-                "signal",
+                "signal", "block",
             ]
             .contains(&record.kind.as_str())
         {

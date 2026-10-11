@@ -442,7 +442,7 @@ fn backup_preserves_decisions_but_plan_exchanges_configuration_and_preserves_loc
     assert_eq!(fresh.data.signal_events.len(), 1);
     let plan = e.data.export_plan();
     plan.validate().unwrap();
-    assert_eq!(plan.version, 4);
+    assert_eq!(plan.version, 5);
     let json = serde_json::to_value(&plan).unwrap();
     assert!(json["goals"][0]["nodes"][0].get("result").is_none());
     assert!(json.get("signalEvents").is_none());

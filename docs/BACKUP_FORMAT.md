@@ -1,6 +1,6 @@
 # 完整备份文件 v3
 
-入口：**偏好设置 → 数据与备份 → 导出备份 / 导入备份**。文件采用 UTF-8 JSON，建议文件名 `tomato-todo-backup.json`，上限 20 MiB。备份覆盖项目、任务完成进度、计时状态、专注历史、设置和定时锁机规则。只交换待办安排时应使用 [学习计划文件](PLAN_FORMAT.md)，避免替换现有数据。
+入口：**偏好设置 → 数据与备份 → 导出备份 / 导入备份**。文件采用 UTF-8 JSON，建议文件名 `tomato-todo-backup.json`，上限 20 MiB。备份覆盖项目、任务完成进度、计时状态、专注历史、设置、课表阻塞时段和定时锁机规则。只交换待办安排时应使用 [学习计划文件](PLAN_FORMAT.md)，避免替换现有数据。
 
 机器定义见 [backup.schema.json](backup.schema.json)，通用示例见 [backup.example.json](backup.example.json)。Schema 校验结构，Rust 核心检查引用、日期、时间和跨字段约束。当前数据/备份版本为 `3`；模型采用破坏性升级，不自动迁移旧本机数据库或备份。旧学习计划 v1/v2 仍可转换导入。
 
@@ -15,6 +15,7 @@
 | `signalEvents` | 信号及裁定依据             | 最多 200000 项，保留来源、方向、内容、接收顺序及阻断时的规则和完成情况                                                        |
 | `identities`   | 永久 ID 登记               | 最多 1000000 项；`id/kind/retired/restoreTask`；历史 ID 不能用于新实体                                                        |
 | `habits`       | 习惯组数组                 | 最多 500 项，只保存 `id/name`；形状和安排由模板管理                                                                           |
+| `blocks`       | 课表阻塞时段               | 最多 60 项；`id/title/days/start/end/attention/notes`，每周重复的固定占用（课程、实验）；旧文件省略时为空                      |
 | `templates`    | 模板与印刷规则             | 最多 5000 项，结构同计划 v4；不含完成和统计                                                                                   |
 | `prints`       | 已印日期记录               | 最多 200000 项，删除实例后仍保留，恢复后防止重新生成                                                                          |
 | `visions`      | 愿景数组                   | 最多 500 项；含 `name`、可选 `notes`，可归 `projectId` 或 `goalId`（至多一个，都为 null 即顶层总愿景）；旧文件省略时为空      |

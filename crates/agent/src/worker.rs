@@ -58,7 +58,7 @@ pub fn start(agent: &Arc<Agent>) -> AppResult<Process> {
                     }
                 }
             } else if event["type"] == "network_result" {
-                if let Ok(mut pending) = agent.network_pending.lock() {
+                if let Ok(mut pending) = agent.worker_pending.lock() {
                     if let Some(tx) = event["id"].as_str().and_then(|id| pending.remove(id)) {
                         let _ = tx.send(if let Some(error) = event["error"].as_str() {
                             Err(error.into())

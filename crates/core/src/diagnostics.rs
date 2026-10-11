@@ -95,15 +95,17 @@ pub fn diagnose(snapshot: &Snapshot, capacity_minutes: Option<u32>) -> Vec<Anoma
                 ) * u64::from(t.focus_minutes.unwrap_or(data.settings.focus_minutes))
             })
             .sum();
+        let day = NaiveDate::parse_from_str(&date, "%Y-%m-%d").ok();
+        let blocked_minutes = crate::blocks::required_minutes(&data.blocks, &date);
         if capacity > 0 && minutes * 100 > capacity * 130 {
             result.push(signal(format!("overload/{date}"), "overload", "计划用时高于当前预算", "warning",
-                json!({"date":date,"remainingPlannedMinutes":minutes,"budgetMinutes":capacity,"budgetSource":capacity_source,"taskIds":tasks.iter().take(30).map(|t| &t.id).collect::<Vec<_>>() }),
+                json!({"date":date,"remainingPlannedMinutes":minutes,"budgetMinutes":capacity,"budgetSource":capacity_source,"blockedMinutes":blocked_minutes,"taskIds":tasks.iter().take(30).map(|t| &t.id).collect::<Vec<_>>() }),
                 "这些任务的预计用时是否准确？这一天有额外可用时间，还是需要减量或挪动？"));
         }
         if offset == 1 && historical.is_some() && !tasks.is_empty() && minutes * 100 < capacity * 30
         {
             result.push(signal(format!("underload/{date}"), "underload", "明日安排明显低于近期投入", "notice",
-                json!({"date":date,"plannedMinutes":minutes,"baselineMinutes":capacity,"baselineSource":capacity_source}),
+                json!({"date":date,"plannedMinutes":minutes,"baselineMinutes":capacity,"baselineSource":capacity_source,"blockedMinutes":blocked_minutes}),
                 "明天是有意休息、课程占用，还是计划尚未补齐？不要仅凭空闲推断应该加任务。"));
         }
         let mut timed: Vec<_> = tasks
@@ -111,6 +113,25 @@ pub fn diagnose(snapshot: &Snapshot, capacity_minutes: Option<u32>) -> Vec<Anoma
             .filter_map(|t| Some((minute(t.reminder_time.as_deref()?)?, *t)))
             .collect();
         timed.sort_by_key(|(start, t)| (*start, &t.id));
+        // A band that demands attention makes a scheduled block a real conflict;
+        // a "水课" band is exactly the place parallel work belongs, so it stays quiet.
+        if let Some(day) = day {
+            let required: Vec<_> = crate::blocks::on_date(&data.blocks, &date)
+                .into_iter()
+                .filter(|b| b.attention == crate::blocks::Attention::Required)
+                .collect();
+            for (start, task) in &timed {
+                let end = (*start + reminders::window_minutes(task, &data.settings)) as u32;
+                for band in &required {
+                    let overlap = band.overlap_minutes(day, *start as u32, end);
+                    if overlap > 0 {
+                        result.push(signal(format!("block/{date}/{}/{}",task.id,band.id), "blockConflict", "计划时段落在需专心的课程内", "warning",
+                            json!({"date":date,"taskId":task.id,"taskTitle":task.title,"blockId":band.id,"blockTitle":band.title,"blockStart":band.start,"blockEnd":band.end,"overlapMinutes":overlap}),
+                            "这段安排和要专心听的课重叠：能挪到水课时段或课后吗？如果确实要课上做，说明后我不会再把它当冲突。"));
+                    }
+                }
+            }
+        }
         // Track the interval reaching furthest right; adjacent-only comparison misses
         // a long lecture overlapping several short assignments.
         let mut previous: Option<(i64, &crate::Task)> = None;
@@ -120,8 +141,20 @@ pub fn diagnose(snapshot: &Snapshot, capacity_minutes: Option<u32>) -> Vec<Anoma
                 if start < previous_end {
                     let mut ids = [other.id.as_str(), task.id.as_str()];
                     ids.sort();
+                    // Naming the class turns "两个计划时段重叠" into a fact the user can
+                    // confirm instead of a guess about why parallel work was planned.
+                    let band = day.and_then(|day| {
+                        data.blocks.iter().find(|b| {
+                            b.attention == crate::blocks::Attention::Light
+                                && b.overlap_minutes(
+                                    day,
+                                    start as u32,
+                                    previous_end.min(end) as u32,
+                                ) > 0
+                        })
+                    });
                     result.push(signal(format!("collision/{date}/{}/{}",ids[0],ids[1]), "collision", "两个计划时段重叠", "warning",
-                        json!({"date":date,"taskIds":ids,"titles":[other.title,task.title],"overlapMinutes":previous_end.min(end)-start,"includesBreaks":true}),
+                        json!({"date":date,"taskIds":ids,"titles":[other.title,task.title],"overlapMinutes":previous_end.min(end)-start,"includesBreaks":true,"blockTitle":band.map(|b| b.title.clone())}),
                         "这两个安排能否同时完成？如果是在同一课程内做作业，请说明，避免把允许的并行误判为冲突。"));
                 }
                 if end <= previous_end {
@@ -252,6 +285,32 @@ mod tests {
     fn task(e: &mut Engine, title: &str, time: &str, minutes: u32) {
         let action: Action = serde_json::from_value(json!({"type":"saveTask","task":{"id":null,"title":title,"dueDate":"2026-10-12","reminderTime":time,"focusMinutes":minutes,"estimate":1}})).unwrap();
         e.dispatch(action, monday()).unwrap();
+    }
+    fn block(e: &mut Engine, start: &str, end: &str, attention: &str) {
+        let action: Action = serde_json::from_value(json!({"type":"saveBlock","title":"大学英语Ⅰ","days":[1],"start":start,"end":end,"attention":attention})).unwrap();
+        e.dispatch(action, monday()).unwrap();
+    }
+    #[test]
+    fn required_block_turns_an_overlap_into_a_real_conflict() {
+        let mut e = test_engine();
+        block(&mut e, "09:55", "11:20", "required");
+        task(&mut e, "英语作业", "10:00", 25);
+        let signals = diagnose(&e.snapshot(monday()).unwrap(), Some(300));
+        let conflicts: Vec<_> = signals
+            .iter()
+            .filter(|s| s.kind == "blockConflict")
+            .collect();
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].evidence["blockTitle"], "大学英语Ⅰ");
+        assert_eq!(conflicts[0].evidence["overlapMinutes"], 25);
+    }
+    #[test]
+    fn light_block_is_the_place_parallel_work_belongs() {
+        let mut e = test_engine();
+        block(&mut e, "09:55", "11:20", "light");
+        task(&mut e, "英语作业", "10:00", 25);
+        let signals = diagnose(&e.snapshot(monday()).unwrap(), Some(300));
+        assert!(!signals.iter().any(|s| s.kind == "blockConflict"));
     }
     #[test]
     fn empty_data_is_quiet_and_conflicts_include_rest_gaps() {
