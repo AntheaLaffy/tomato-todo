@@ -115,12 +115,18 @@ fn what_the_assistant_changed_becomes_a_deed_batch_for_the_ui() {
             false,
         )
         .unwrap();
-    let block_id = saved["data"]["blocks"][0]["id"].as_str().unwrap().to_string();
+    let block_id = saved["data"]["blocks"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     // 轮末（界面看到的 "done"）才打包成一批，带自增 serial。
     agent.event(json!({"type":"done","text":"加好了"}));
     let status = agent.status().unwrap();
     assert_eq!(status["deeds"]["serial"], json!(1));
-    assert_eq!(status["deeds"]["items"][0]["text"], json!("课表里记下了「模式识别与机器学习」"));
+    assert_eq!(
+        status["deeds"]["items"][0]["text"],
+        json!("课表里记下了「模式识别与机器学习」")
+    );
     assert_eq!(
         status["deeds"]["items"][0]["selector"],
         json!(format!("[data-block-id=\"{block_id}\"]"))
@@ -139,7 +145,10 @@ fn what_the_assistant_changed_becomes_a_deed_batch_for_the_ui() {
     agent.event(json!({"type":"done","text":""}));
     let status = agent.status().unwrap();
     assert_eq!(status["deeds"]["serial"], json!(2));
-    assert_eq!(status["deeds"]["items"][0]["text"], json!("删掉了一个课表时段"));
+    assert_eq!(
+        status["deeds"]["items"][0]["text"],
+        json!("删掉了一个课表时段")
+    );
 }
 #[test]
 fn show_me_stores_a_bounded_script_and_bumps_its_serial() {

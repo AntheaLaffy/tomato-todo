@@ -532,7 +532,8 @@ function playHand() {
  */
 function playDeeds() {
   const deeds = status?.deeds;
-  if (!deeds || deeds.serial <= deedsSerial || !deeds.items.length) return;
+  if (!deeds) return;
+  if (deeds.serial <= deedsSerial || !deeds.items.length) return;
   deedsSerial = deeds.serial;
   if (Date.now() / 1000 - deeds.at > 120) return;
   const first = deeds.items.find((item) => item.selector);
