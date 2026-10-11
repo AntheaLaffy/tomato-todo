@@ -182,7 +182,7 @@ export function agentPage(): string {
   const files = status?.files.length ?? 0;
   const signals = status?.anomalies.length ?? 0;
   const badge = (count: number) => (count ? `<b>${count}</b>` : "");
-  return `<div id="agent-root"><div class="page-heading"><div><h1>学习助手</h1></div><div class="agent-topbar">
+  return `<div id="agent-root"><div class="page-heading agent-page-heading"><div><h1>学习助手</h1></div><div class="agent-topbar">
     <button class="button small" data-agent="plans">方案${badge(files)}</button>
     <button class="button small" data-agent="memory">记忆</button>
     <button class="button small" data-agent="signals">信号${badge(signals)}</button>
@@ -191,6 +191,7 @@ export function agentPage(): string {
     <button class="button small" data-agent="new">新对话</button>
   </div></div>
   <div id="agent-panel" class="agent-layout">
+    <aside id="agent-sessions" class="agent-sessions" hidden></aside>
     <section class="card agent-conversation">
       <div id="agent-run-status" role="status"></div>
       <div id="agent-messages" class="agent-messages" aria-live="polite"></div>
@@ -271,6 +272,31 @@ function renderChat() {
  * card (approve / discuss), `multiSelect` toggles instead of answering at once,
  * and every question accepts free text — the shape deepseek-harness uses.
  */
+/**
+ * 会话侧栏（照 dsh 的形状）：一个固定宽度的面板，点顶栏「会话」拉开，顶部是
+ * 「新对话」，下面是历史列表；当前会话高亮，每条可以删。它只在需要时占地方，
+ * 关掉就把横向空间还给对话。
+ */
+function renderSessions() {
+  const aside = document.getElementById("agent-sessions");
+  if (!aside) return;
+  aside.hidden = !sessionsOpen;
+  if (!sessionsOpen) {
+    aside.innerHTML = "";
+    return;
+  }
+  const list = status?.conversations ?? [];
+  const html = `<div class="agent-sessions-head"><span>历史会话</span><button class="icon-btn tiny" type="button" data-agent="toggle-sessions" aria-label="收起会话列表">✕</button></div><button class="button small agent-sessions-new" type="button" data-agent="new">＋ 新对话</button><div class="agent-sessions-list">${
+    list
+      .map(
+        (c) =>
+          `<div class="agent-conversation-row ${c.active ? "active" : ""}"><button class="agent-conversation-open" type="button" data-agent="switch-conversation" data-id="${esc(c.id)}"><b>${esc(c.title)}</b><small>${new Date(c.updatedAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${c.messageCount} 条</small></button><button class="icon-btn tiny" type="button" data-agent="delete-conversation" data-id="${esc(c.id)}" aria-label="删除会话">✕</button></div>`,
+      )
+      .join("") || `<p class="agent-empty">还没有会话。</p>`
+  }</div>`;
+  if (aside.innerHTML !== html) aside.innerHTML = html;
+}
+let sessionsOpen = false;
 function questionHtml(): string {
   const questions = status?.questions ?? [];
   const signature = JSON.stringify(questions);
@@ -554,6 +580,7 @@ function playDeeds() {
 function update() {
   if (!hooks?.active() || !status) return;
   renderChat();
+  renderSessions();
   playHand();
   playDeeds();
   const active = document.activeElement;
@@ -714,8 +741,18 @@ async function action(button: HTMLButtonElement) {
     case "memory":
     case "plans":
     case "signals":
-    case "conversations":
       openSheet(button.dataset.agent as NonNullable<typeof sheet>);
+      break;
+    // 会话列表是侧栏，不是浮层：再点一次收起来。
+    case "conversations":
+    case "toggle-sessions":
+      sessionsOpen =
+        button.dataset.agent === "conversations" ? !sessionsOpen : false;
+      if (sessionsOpen) {
+        sheet = null;
+        renderSheet();
+      }
+      renderSessions();
       break;
     case "switch-conversation":
       await call({ op: "switch_conversation", id: button.dataset.id });

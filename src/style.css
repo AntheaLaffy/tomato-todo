@@ -3720,6 +3720,51 @@ main {
 }
 .agent-layout {
   position: relative;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.agent-page-heading {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  padding-bottom: 6px;
+  background: var(--bg);
+}
+/* 会话侧栏：固定宽度的一列，关掉就把空间还给对话。 */
+.agent-sessions {
+  flex: 0 0 254px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+}
+.agent-sessions[hidden] {
+  display: none;
+}
+.agent-sessions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+.agent-sessions-new {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.agent-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.agent-sessions .agent-conversation-row {
+  margin: 0;
 }
 .agent-topbar {
   display: flex;
@@ -3733,7 +3778,11 @@ main {
 .agent-conversation {
   display: flex;
   flex-direction: column;
-  min-height: 62vh;
+  /* 卡片自己吃满屏高、内部滚动：对话再长，顶部的工作状态和底部输入框都留在原地。 */
+  flex: 1;
+  min-width: 0;
+  height: calc(100vh - 190px);
+  min-height: 420px;
   padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: 18px;

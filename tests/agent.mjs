@@ -664,6 +664,16 @@ test(
         { timeout: 8000 },
       );
       await asked.evaluate(() => window.tomatoHand.hide());
+      // 会话列表是侧栏（照 dsh 的形状），点顶栏拉开、再点收起；长对话里状态栏
+      // 和输入框都留在原处（卡片自己滚动）。
+      await asked.locator('[data-agent="conversations"]').click();
+      await expect(asked.locator("#agent-sessions")).toBeVisible();
+      await expect(
+        asked.locator("#agent-sessions .agent-sessions-new"),
+      ).toBeVisible();
+      await asked.locator('[data-agent="toggle-sessions"]').click();
+      await expect(asked.locator("#agent-sessions")).toBeHidden();
+      await expect(asked.locator("#agent-run-status")).toBeInViewport();
       await asked.close();
       assert.deepEqual(errors, []);
       // No key is echoed in status or copied to the app backup.
