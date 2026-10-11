@@ -592,6 +592,28 @@ function reminderBanner() {
   if (!t) return "";
   return `<section class="reminder-banner" role="region" aria-label="任务时间提醒"><div><small>${escape(t.reminderTime)} · ${t.focusMinutes || state.data.settings.focusMinutes} 分钟专注</small><h2>${escape(t.title)}</h2><p>到计划时间了，准备好就开始吧。</p></div><div class="reminder-actions"><button class="button primary" data-start-reminder="${escape(t.id)}">${icon("play")} 一键开始</button></div></section>`;
 }
+/**
+ * 第一次打开：这个软件只有两件事需要你操心——当下和 AI。其余的（目标、愿景、
+ * 计划、模板）是给助手落笔的抽象配置，不该变成用户的日常负担。看过一次就不再出现，
+ * 顶栏灯泡里随时能再看（思索的「设计理念」）。
+ */
+function welcomeCard(): string {
+  if (welcomed) return "";
+  return `<section class="card welcome-card" role="region" aria-label="怎么用番茄 Todo">
+    <h2>这里只有两件事值得你操心</h2>
+    <p class="subtle small">不靠意志力，靠环境——而环境由你和助手一起搭。规划半天不动手，是最常见的失败方式；所以先把注意力放在下面这两件事上。</p>
+    <div class="welcome-pair">
+      <div><span class="welcome-index">1</span><b>当下：今天做什么</b><p>这一页就是全部：选一件最重要的事，开一个番茄。待办、待补都在这里。</p><button class="button secondary small" data-action="welcome-tasks">看看待办</button></div>
+      <div><span class="welcome-index">2</span><b>AI：让它替你维护</b><p>目标、愿景、习惯、课表、模板都只是「任务的容器」，是给助手落笔用的。要改直接说一句「帮我把这学期课排进课表」。</p><button class="button secondary small" data-action="welcome-guide">跟助手说一声</button></div>
+    </div>
+    <p class="subtle small">其余页面（目标·习惯·愿景、统计、模板、锁机…）绝大多数时间不用你去：它们是抽象配置，助手会维护；统计是回看用的，不是绩效评估。想看某一页为什么这么设计，把鼠标停在那一页上按住 <kbd>G</kbd>。</p>
+    <div class="welcome-actions"><button class="button primary" data-action="welcome-done">知道了，开始今天</button><button class="text-button" data-action="welcome-go">先跟助手聊聊</button></div>
+  </section>`;
+}
+let welcomed = false;
+try {
+  welcomed = localStorage.getItem("tomato.welcomed") === "1";
+} catch {}
 function focusPage() {
   const s = state.stats;
   const weekday = new Date(`${state.today}T12:00:00`).toLocaleDateString(
@@ -605,6 +627,7 @@ function focusPage() {
   const catchUpTasks = todayTasks.filter(isCatchUp);
   const regularTasks = todayTasks.filter((t) => !isCatchUp(t));
   return `${heading("今天，也要慢慢向前。", `${weekday} <span class="dot-separator">·</span> 专注当下，让每一小步都有回响。`)}
+    ${welcomeCard()}
     <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办，按自己的节奏来`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
     <div class="focus-grid"><section class="card focus-card"><div class="card-heading"><h2>${icon("timer")} 我的番茄钟</h2><button class="icon-btn" data-action="immersive" aria-label="进入沉浸模式">${icon("maximize-2")}</button></div>${timerContent()}
     <div class="sound-bar"><button class="sound-button ${noiseKind !== "off" ? "on" : ""}" data-action="sound">${icon("headphones")}<span>${noiseKind === "off" ? "来一点背景音？" : noiseKind === "rain" ? "雨声 · 正在播放" : "棕噪音 · 正在播放"}</span>${icon("chevron-right")}</button><button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
@@ -3022,6 +3045,26 @@ document.addEventListener("click", async (e) => {
       break;
     case "new-block":
       blockDialog();
+      break;
+    case "welcome-tasks":
+      await navigate("tasks");
+      break;
+    case "welcome-guide":
+      await navigate("agent");
+      break;
+    case "welcome-done":
+      welcomed = true;
+      try {
+        localStorage.setItem("tomato.welcomed", "1");
+      } catch {}
+      render();
+      break;
+    case "welcome-go":
+      welcomed = true;
+      try {
+        localStorage.setItem("tomato.welcomed", "1");
+      } catch {}
+      await navigate("agent");
       break;
     // Hand the timetable to the assistant instead of typing it in by hand.
     case "ask-agent-blocks":

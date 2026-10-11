@@ -34,6 +34,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['main[data-ponder="focus"]'],
     sections: [
       {
+        heading: "设计理念",
+        text: "这一页就是全部：目标是抽象，任务是当下。不必先想清楚整学期，选一件最重要的事开一个番茄就算开始。",
+      },
+      {
         text: "这里只放今天该做的事，以及一个可以随时开始的番茄钟。不选任务也能「自由专注」。",
       },
       {
@@ -54,6 +58,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: [".focus-card", ".timer-center", ".timer-controls"],
     sections: [
       {
+        heading: "设计理念",
+        text: "番茄不是 KPI：它只把「开始」变得更容易——先开始一段，再谈效率。",
+      },
+      {
         text: "专注、短休息、长休息的时长在偏好设置里调整；一轮结束后可以自动进入休息或下一轮。",
       },
       {
@@ -73,6 +81,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: "专注",
     selectors: ['[data-ponder="catch-up"]', ".catch-up-chip"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "待补是给「还想做」留的位置，不是欠债清单：补不补由你决定，没做也不算失败。",
+      },
       {
         text: "计划块结束了但还没做完时，普通组若仍在「重修窗口」内，就会进入待补队列，重新出现在今日专注里。",
       },
@@ -95,6 +107,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['main[data-ponder="tasks"]', ".task-toolbar", ".quick-add"],
     sections: [
       {
+        heading: "设计理念",
+        text: "全部任务只是清单：分类（目标/习惯/普通）由管辖与时间推导，不用手填。事情都丢这儿，今天做哪件由你决定。",
+      },
+      {
         text: "任务有优先级、截止日期、标签、备注和子步骤；点任务正文进编辑弹窗。",
       },
       {
@@ -116,6 +132,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['main[data-ponder="project"]'],
     sections: [
       {
+        heading: "设计理念",
+        text: "项目回答「在什么环境里做」：同一件事在图书馆和在家，需要挡开的东西不一样。它只管环境，不管漏了怎么办。",
+      },
+      {
         text: "项目回答的是「做这件事时该处在什么环境里」：专属应用白名单挂在项目上，专注该项目的任务时替代通用白名单。",
       },
       {
@@ -136,6 +156,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: [".editor-details", ".editor-hint"],
     sections: [
       {
+        heading: "设计理念",
+        text: "重复是给规律的事用的；没有规律就别硬套周期，临时任务更适合。",
+      },
+      {
         text: "重复任务按每周周期单元印刷实例。一个开始时间可以对应多个日期或周期单元，也可以在一份模板里放多个开始时间。",
       },
       {
@@ -152,6 +176,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     page: true,
     selectors: ['main[data-ponder="goals"]'],
     sections: [
+      {
+        heading: "设计理念",
+        text: "目标是「任务的容器」，回答「漏了怎么办、往哪个方向走」，不是每天的功课。日常别来这里打理，让助手改；只在想看方向时来。",
+      },
       {
         text: "目标把长期的事（例如一门课）收在一起，组内的听课、练习、实验等任务按「数量」或「时长」累计进度。",
       },
@@ -172,6 +200,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: CONTAINER,
     selectors: [".mainline-card", ".goal-section", ".cross-section"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "主线是目标的时间骨架：只回答「这一阶段算不算过去」，不衡量你每天的努力。",
+      },
       {
         text: "主线是目标组内按时间排列、互不重叠的节点。默认要求至少配对一条任务，且配对任务全部完成；没有实例不算完成。",
       },
@@ -197,6 +229,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['main[data-ponder="goals"] .list-tabs'],
     sections: [
       {
+        heading: "设计理念",
+        text: "习惯关心「有没有发生」，漏了记一次缺席、不重修——它照见节奏，不追债。",
+      },
+      {
         text: "习惯是可以为不同星期设置不同时段的日常事（例如午饭随当天课表变化）。程序按预印范围生成各天的实例。",
       },
       {
@@ -212,6 +248,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: CONTAINER,
     selectors: [".vision-card", ".vision-row", ".vision-head"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "愿景是方向锚：不排期、不计分，迷路时看一眼就够，不必每天维护。",
+      },
       {
         text: "愿景是纯标记：不排期、不计进度、不计缺勤、不判成败。它只回答「以后想成为什么样的人」。",
       },
@@ -229,6 +269,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     page: true,
     selectors: ['main[data-ponder="schedule"]', ".week-card", ".blocks-card"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "周历是给自己看的全景：横轴星期、纵轴时间，任务和课表占用一起画。看安排用，改安排让助手或任务弹窗去做。",
+      },
       {
         text: "二维周历：横轴周一到周日，纵轴按提醒时间定位任务块。块高按预计专注时长加休息估算，不吸附整点。",
       },
@@ -249,6 +293,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: "日程",
     selectors: ['[data-ponder="blocks"]', ".blocks-card", ".block-row"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "课表是事实，不是任务：软件只需要知道哪些时间已经被占掉、哪些课能并行写作业。",
+      },
       {
         text: "课程、实验这类每周重复的固定占用登记在这里。它不是任务：不产生完成、不参与进度和缺勤统计，只告诉软件这段时间已经被占掉。",
       },
@@ -274,6 +322,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: [".reminded", ".reminder-banner", ".timer-hint"],
     sections: [
       {
+        heading: "设计理念",
+        text: "提醒只是到点的一声招呼；错过就作废、不跨日补，免得一天的失败感堆起来。",
+      },
+      {
         text: "提醒只在计划块内有效：番茄数 × 单次时长，加上番茄之间的休息。超时未开始即作废，不挂一整天，也不跨日补。",
       },
       {
@@ -290,6 +342,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     page: true,
     selectors: ['main[data-ponder="stats"]', ".stats-grid", ".history-card"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "统计是回看用的，不是绩效评估：提前结束也保留实际用时，成功因为要求全线通过而少见。它记录发生过什么，不给你打分。",
+      },
       {
         text: "当天专注时间、完成番茄、连续天数、近七天趋势、项目分布与专注历史。提前结束也保留实际用时。",
       },
@@ -310,6 +366,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: "安排",
     selectors: [".templates-card"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "模板只在「同一件事会重复」时才值得建；只做一次就用临时任务。",
+      },
       {
         text: "新建入口默认是「只做这一次」的临时任务，也可以保留为手动模板或自动模板。模板保存标题、备注、步骤、项目、单次时长、标签与默认优先级。",
       },
@@ -332,6 +392,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['main[data-ponder="guard"]', ".guard-card"],
     sections: [
       {
+        heading: "设计理念",
+        text: "保护是拿环境换意志力：专注时把不在白名单的应用挡回去。它不是惩罚，提前设好就不必每次硬扛。",
+      },
+      {
         text: "在 niri / Wayland 上，保护会把不在白名单里的前台应用切回番茄 Todo。白名单按精确 app_id 匹配，可以直接添加当前打开的应用。",
       },
       {
@@ -352,6 +416,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: [".whitelist-card"],
     sections: [
       {
+        heading: "设计理念",
+        text: "白名单把「要不要分心」提前决定掉：专注时不必再跟诱惑谈判。",
+      },
+      {
         text: "通用白名单在「专注保护」页管理；每个项目还可以配一份专属白名单，专注该项目的任务时替代通用白名单。",
       },
       {
@@ -367,6 +435,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: PROTECT,
     selectors: [".guard-strict-card", ".lock-strict-setting"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "严格模式是给未来的自己的一份承诺：开了就不能临时反悔，所以只在真需要时开。",
+      },
       {
         text: "开启后，计时中不能暂停、提前结束或关闭保护，结束时自动解除。请在开始前确认所需应用都已加入白名单。",
       },
@@ -384,6 +456,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     page: true,
     selectors: ['main[data-ponder="lock"]', ".lock-intro", ".lock-schedule"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "锁机是给休息和睡眠留位：到点全屏，睡眠不计入学习时长。规则默认为空，需要时再建。",
+      },
       {
         text: "独立的小憩 / 定时锁机页：1–720 分钟快速锁机，或跨午夜的每周重复时段。到点从托盘唤回全屏休息界面。",
       },
@@ -405,6 +481,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['[data-ponder="plan-file"]', '[data-action="export-plan"]'],
     sections: [
       {
+        heading: "设计理念",
+        text: "计划文件让助手和外部编辑器能改你的安排：配置可交换，进度与裁定留在本机。",
+      },
+      {
         text: "导出未完成实例、模板、主线、项目与课表阻塞时段，方便编辑或交给 AI 维护。",
       },
       {
@@ -424,6 +504,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: FILES,
     selectors: ['[data-ponder="backup"]', '[data-action="export"]'],
     sections: [
+      {
+        heading: "设计理念",
+        text: "完整备份是搬家与后悔用的：历史、状态、裁定都在里面，日常不用管它。",
+      },
       {
         text: "包含任务、设置、专注记录、模板、印刷记录、节点裁定、配对与永久 ID 历史，以及严格模式与锁机字段。",
       },
@@ -445,6 +529,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['[data-action="toggle-chime"]', '[data-action="test-sound"]'],
     sections: [
       {
+        heading: "设计理念",
+        text: "音效只在节点上响一下：提示状态切换，不造背景噪音，也不逼你盯着屏幕。",
+      },
+      {
         text: "开始/继续/暂停、提前结束、专注/休息切换、任务完成、到点提醒、锁机开始/结束时会播放一声简短提示；专注期间不循环打扰。",
       },
       {
@@ -462,6 +550,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['main[data-ponder="settings"]'],
     sections: [
       {
+        heading: "设计理念",
+        text: "偏好设置是设备级的东西（时长、音效、主题、备份与计划文件）：改一次就够，不参与日常。",
+      },
+      {
         text: "专注与休息时长、每日目标、主题、音效、通知、桌面集成、学习计划与备份都在这里。",
       },
       {
@@ -478,6 +570,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     page: true,
     selectors: ['main[data-ponder="agent"]'],
     sections: [
+      {
+        heading: "设计理念",
+        text: "助手是唯一需要你常打交道的「配置入口」：目标、课表、模板、白名单都由它改。你只说想要什么，配置的事交给它。",
+      },
       {
         text: "默认用 DeepSeek API，也可以登录 Codex 账号。运行框架随应用打包，不需要另装 Node/Pi，也不读取你全局 Pi 的认证文件。",
       },
@@ -499,6 +595,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ["#agent-memories", '[id="agent-memory-add"]'],
     sections: [
       {
+        heading: "设计理念",
+        text: "记忆分「已确认」与「待确认」：只有你认过的才算事实，模型猜的要标明来源。",
+      },
+      {
         text: "模型写入的记忆默认是「待确认」，你可以改写、确认、删除，也可以自己补充已确认的背景。",
       },
       {
@@ -514,6 +614,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: "智能体",
     selectors: ["#agent-review", '[data-agent="review"]', "#agent-files"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "改动先审阅再应用：差异、影响与来源指纹都摆出来，点下去才生效。",
+      },
       {
         text: "批量修改走文件流程：导出 → 分段读取 → JSON Patch → 审阅 → 你确认后应用。",
       },
@@ -535,6 +639,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ['#agent-config-form label:has(input[name="exaKey"])'],
     sections: [
       {
+        heading: "设计理念",
+        text: "联网只读公开页面，并拦掉本机与内网地址：可以查资料，但不把本机暴露出去。",
+      },
+      {
         text: "搜索默认用免 Key 的 Exa；填自己的 Exa API Key 可以提升额度。Codex 后端使用账号服务端搜索。",
       },
       {
@@ -550,6 +658,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: "智能体",
     selectors: ["#agent-config-form"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "连接、密钥、方案文件与学情信号都收在这里：配置和对话分开，页面才清爽。",
+      },
       {
         text: "先选后端并填好连接信息，再勾选「启用」。启用后助手才能应答；「异常时自动唤醒」允许它在空闲时主动分析。",
       },
@@ -570,6 +682,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     ],
     sections: [
       {
+        heading: "设计理念",
+        text: "模型选谁是设备级偏好：换后端不丢会话，也不会把密钥写进任务备份。",
+      },
+      {
         text: "DeepSeek 适合已有 API Key 的人；Codex 适合已有 ChatGPT Plus/Pro 订阅的人。切换后端后要重新保存。",
       },
       {
@@ -585,6 +701,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: "智能体",
     selectors: ['#agent-config-form label:has(input[name="apiKey"])'],
     sections: [
+      {
+        heading: "设计理念",
+        text: "密钥只存在本机凭证文件（0600），不进状态接口、日志和备份。",
+      },
       {
         text: "DeepSeek 的 Key 只保存在本机 agent/auth.json（权限 600），不会出现在状态接口、日志或任务备份里。",
       },
@@ -606,6 +726,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     ],
     sections: [
       {
+        heading: "设计理念",
+        text: "自动唤醒有冷却、每日上限和安静时段，只在真正空闲时开口：助手不该变成打扰源。",
+      },
+      {
         text: "本地检测异常信号，只在启用、已连接且处于空闲时才唤醒助手；受每日上限、同一异常冷却与安静时段约束。",
       },
       {
@@ -622,6 +746,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     selectors: ["#agent-auth", '[data-agent="login"]'],
     sections: [
       {
+        heading: "设计理念",
+        text: "登录走官方页面、令牌存在本机；不想联网时，本地功能一个都不少。",
+      },
+      {
         text: "点「登录 Codex」会在系统浏览器打开官方登录页，完成后自动回来；登录凭据独立保存在本机。",
       },
       {
@@ -637,6 +765,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     category: "智能体",
     selectors: ["#agent-mcp"],
     sections: [
+      {
+        heading: "设计理念",
+        text: "MCP 是助手接外部系统的口子（座位、图书馆这类）：工具就是工具，用不用看当下的需要。",
+      },
       {
         text: "把连接 JSON 复制到 MCP 客户端，它连接正在运行的实例、共享同一个 Engine，不启动第二份数据库。",
       },

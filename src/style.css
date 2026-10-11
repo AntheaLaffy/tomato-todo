@@ -4843,3 +4843,56 @@ body.ponder-open #toast {
 .agent-conversation-row .icon-btn {
   margin-right: 8px;
 }
+
+/* 首次打开：先说清「只有两件事」，其余交给助手。 */
+.welcome-card {
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  border: 1px solid var(--accent-soft);
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface) 62%);
+}
+.welcome-card h2 {
+  margin: 0 0 4px;
+}
+.welcome-card > p {
+  margin: 0 0 12px;
+  max-width: 70ch;
+}
+.welcome-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.welcome-pair > div {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.welcome-pair b {
+  display: block;
+  margin: 6px 0 4px;
+  font-size: 15px;
+}
+.welcome-pair p {
+  margin: 0 0 10px;
+  color: var(--secondary);
+  font-size: 13px;
+}
+.welcome-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+}
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

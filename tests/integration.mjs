@@ -57,6 +57,18 @@ test(
       await expect(
         page.getByRole("heading", { name: "今天，也要慢慢向前。" }),
       ).toBeVisible();
+      // 首次打开先说清「只有两件事」，点过之后不再出现。
+      await expect(page.locator(".welcome-card")).toContainText(
+        "这里只有两件事值得你操心",
+      );
+      await expect(page.locator(".welcome-card")).toContainText("任务的容器");
+      await page.locator('[data-action="welcome-done"]').click();
+      await expect(page.locator(".welcome-card")).toHaveCount(0);
+      await page.reload();
+      await expect(
+        page.getByRole("heading", { name: "今天，也要慢慢向前。" }),
+      ).toBeVisible();
+      await expect(page.locator(".welcome-card")).toHaveCount(0);
       await page
         .getByRole("button", { name: "新建任务 N", exact: true })
         .click();
