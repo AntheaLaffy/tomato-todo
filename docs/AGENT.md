@@ -112,12 +112,28 @@ MCP 使用标准换行 JSON-RPC stdio，不启动第二份数据库。它连接�
 }
 ```
 
+座位这个例子的完整实现与逆向记录见 `LIBSEAT_MCP.md`（华南农业大学图书馆座位预约：接口还原、验证码与会话的绑定规则、读图命中率实测 3/10 与重试数学、自定义求解器的接入契约）。
+
 - 传输由随包运行时自带的 MCP 客户端处理：`command`（stdio）或 `url`（streamable HTTP，支持 `${ENV}` 头与 OAuth 登录）；`enabled: false` 单独停用。配置坏了不会静默：`list_mcp_servers` 会连校验错误一起报出来，服务器自己的 `notifications/message` 追加到同目录的 `mcp.log`。
 - 工具名为 `mcp__<server>__<tool>`，资源用 Codex 同款的 `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource` 读取。
 - **暴露方式**：`codemode`（默认）只在代码里调用，`deferred` 由 `tool_search` 按需加载，`direct` 需要把工具名显式写进工具清单。应用用的是策展过的工具清单，所以默认走 `codemode`/`deferred`：既不撑大工具的声明，也保证只读轮次不会凭空多出一堆外部能力；配成 `direct` 的服务器在这里不会被声明。
 - **只在用户主动发起的对话里连接**：异常自动唤醒不加载任何 MCP 服务器（座位、下单这类服务器不该在无人确认时被唤醒），也没有 `add_mcp_server` / `remove_mcp_server`。这两个工具等价于 `codex mcp add` / `remove`，写的就是上面的 `mcp.json`。
 - **服务器不在编程沙箱里**：它是你配置的那个程序，以你的身份、在沙箱之外运行；`add_mcp_server` 因此只在用户明确要求时使用。
 - 每次请求都会新建会话，MCP 服务器随之连接；会话结束（含应用退出）时一起关闭，不残留后台进程。
+
+## 助手的「手」
+
+让助手在界面上「做给人看」：一句话脚本演成一段动画，人手、键盘、讲稿一起动。形状照两件现成实现来——matinee（可编程幽灵光标：`moveTo/click/type/say`，覆盖层 `pointer-events: none`、`aria-hidden`、尊重 `prefers-reduced-motion`）与 demowright（可见光标 + 按键 HUD + 字幕 + 音效）。实现是 `src/hand.ts`（无 React，一层挂在 `body` 上的覆盖层）。
+
+脚本是一串步骤，`:kind` 取 `move / click / type / highlight / say / keyboard / wait / hide`：
+
+- 位移动画沿一条带轻微过冲的贝塞尔路径走，落点前收一下，看起来像手而不是补间；目标不在视野里会先滚进来。
+- `click` 会在落点画涟漪、把手按下去，`real: true`（默认）时**真的**把 `click` 派发给目标元素，所以演示里的按钮真的会被按到。
+- `type` 会浮出一块小键盘，逐键高亮（中文走「输入」键帽），并逐字符写进真实输入框——因为应用每次输入都会重绘，手每敲一个字符**重新取一次目标元素**，否则后面的字会写进已经脱离文档的旧节点。
+- `say` 是手边浮出的讲稿，一行一行读出来（字数多则读得慢），`hold: true` 让最后一行留在屏幕上，后面的动作在它旁边发生。文字内容完全由脚本给，也就是由模型给。
+- 音效只有四种（移动的气声、点击的轻扣、按键的脆响、翻行的轻铃），自己拿一个 `AudioContext`，不去打断应用那套关键节点音效；开关与音量跟随「关键节点音效」设置。
+
+驱动方式：`window.tomatoHand.run(script)` / `.step(step)` / `.hide()`；`?hand=demo` 直接演一段课表阻塞时段的示范（`src/hand-demo.ts` 的 `blocksTour`），用来校节奏，也是「助手演示一遍怎么做」的样板。下一步是给助手一个工具（例如 `show_me`），让它一边讲一边演自己的动作，而不是只在文字里描述。
 
 ## 验证
 

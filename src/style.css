@@ -3048,6 +3048,185 @@ main {
 .blocks-empty .button-row {
   margin: 12px 0 6px;
 }
+
+/* 助手的「手」：一层永远不吃点击的覆盖层，纯展示。 */
+#hand-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  --hand-accent: var(--accent);
+  font-family: inherit;
+}
+.hand-actor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 26px;
+  height: 30px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  will-change: transform;
+}
+.hand-actor.on {
+  opacity: 1;
+}
+.hand-svg {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 6px 10px #00000038);
+}
+.hand-fill {
+  fill: #fffdf8;
+  stroke: var(--hand-accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.hand-shadow {
+  fill: #00000018;
+  transform: translate(1px, 1.5px);
+}
+.hand-label {
+  position: absolute;
+  left: 16px;
+  top: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--hand-accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px #00000026;
+}
+.hand-ripple {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border: 2px solid var(--hand-accent);
+  border-radius: 50%;
+  opacity: 0;
+}
+.hand-ripple.on {
+  animation: hand-ripple 0.5s ease-out;
+}
+@keyframes hand-ripple {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+.hand-caption {
+  position: absolute;
+  max-width: min(360px, 46vw);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px #0000001f;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.hand-caption.on {
+  opacity: 1;
+}
+.hand-caption p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.hand-caret {
+  display: inline-block;
+  width: 2px;
+  height: 15px;
+  margin-left: 2px;
+  background: var(--hand-accent);
+  vertical-align: -2px;
+  animation: hand-caret 1s steps(2, start) infinite;
+}
+@keyframes hand-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.hand-caption-step {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.hand-keyboard {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%) translateY(12px);
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 34px #00000024;
+  opacity: 0;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+.hand-keyboard.on {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.hand-keyboard-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.hand-keyboard-row:last-child {
+  margin-bottom: 0;
+}
+.hand-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.hand-key.wide {
+  min-width: 96px;
+}
+.hand-key.down {
+  transform: translateY(1px);
+  border-color: var(--hand-accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+/* 讲到某个元素时，用手同色的描边把它框出来。 */
+.hand-spotlight {
+  position: relative;
+  z-index: 9501;
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 10px;
+  transition: outline-color 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hand-ripple.on,
+  .hand-caret {
+    animation: none;
+  }
+}
 .strict-status {
   margin-top: 28px;
   color: var(--muted);

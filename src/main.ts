@@ -58,6 +58,8 @@ import {
 } from "lucide";
 import { listen } from "@tauri-apps/api/event";
 import { initPonder, openPonderList } from "./ponder";
+import { handStep, hideHand, runHandScript, showHand } from "./hand";
+import { blocksTour } from "./hand-demo";
 import { createNodeGraph } from "./nodegraph";
 import {
   desktop,
@@ -3221,8 +3223,29 @@ document.addEventListener("dragend", () => dragProject(null));
 document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
 
+/**
+ * 助手的「手」：脚本化动画层。音效跟随「关键节点音效」设置；`?hand=demo` 直接
+ * 演一段示范，`window.tomatoHand` 留给助手与测试按需驱动（run / step / hide）。
+ */
+function installHand() {
+  const sound = () => ({
+    enabled: state?.data.settings.sound ?? false,
+    volume: state?.data.settings.soundVolume ?? 0,
+  });
+  (window as unknown as Record<string, unknown>).tomatoHand = {
+    sound,
+    show: (label?: string) => showHand(label),
+    hide: () => hideHand(),
+    run: (script: Parameters<typeof runHandScript>[0]) =>
+      runHandScript(script, { sound }),
+    step: (step: Parameters<typeof handStep>[0]) => handStep(step, { sound }),
+  };
+  if (new URLSearchParams(location.search).get("hand") === "demo")
+    void runHandScript(blocksTour(), { sound });
+}
 async function boot() {
   initPonder();
+  installHand();
   try {
     if (desktop) nativeStatus = await getDesktopStatus();
     accept(await getSnapshot());

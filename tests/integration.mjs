@@ -1448,6 +1448,27 @@ test(
       await page.keyboard.up("g");
       await page.keyboard.press("Escape");
       await expect(page.locator("#ponder-layer")).toBeHidden();
+      // The assistant's hand: a script drives a pointer, a caption and a keyboard
+      // HUD, and typing goes into the real field.
+      await page.locator('[data-agent="close-sheet"]').click();
+      await page.locator('[data-page="tasks"]').click();
+      // Do not await the performance: assert while it is still on screen.
+      await page.evaluate(() => {
+        window.__hand = window.tomatoHand.run({
+          steps: [
+            { kind: "say", lines: ["看得见的手"], hold: true },
+            { kind: "type", target: "#task-search", text: "考研英语", cps: 8 },
+          ],
+        });
+      });
+      await expect(page.locator(".hand-actor.on")).toBeVisible();
+      await expect(page.locator(".hand-caption")).toContainText("看得见的手");
+      await expect(page.locator(".hand-keyboard.on")).toBeVisible();
+      await expect(page.locator("#task-search")).toHaveValue("考研英语", {
+        timeout: 15000,
+      });
+      await page.evaluate(() => window.tomatoHand.hide());
+      await expect(page.locator(".hand-actor.on")).toBeHidden();
       assert.deepEqual(errors, []);
       console.log(`ponder artifacts: ${dir}`);
     } finally {

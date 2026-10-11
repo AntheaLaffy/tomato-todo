@@ -6,6 +6,8 @@
 
 ### 新增
 
+- 助手的「手」：一层不吃点击的覆盖层，把 `move / click / type / highlight / say / keyboard / wait / hide` 演成人看得懂的动画——贝塞尔位移（带过冲，先滚进视野再走）、按压与涟漪（`real: true` 时真的派发点击）、打字时浮出小键盘并逐键高亮（中文走「输入」键帽，逐字符写进真实输入框）、手边浮出讲稿一行行读（内容由脚本即模型给）。四种音效跟随「关键节点音效」开关；尊重 `prefers-reduced-motion`。形状参照 matinee 与 demowright；`?hand=demo` 可看一段课表阻塞时段的示范，`window.tomatoHand.run/step/hide` 供助手与测试驱动。
+- 新增实验记录 `docs/LIBSEAT_MCP.md`：华南农业大学图书馆座位预约（libseat）的接口还原、登录链路与「会话 + 验证码」绑定规则、人工/模型读图命中率实测（首次 3/10，配 5 次重试约 83%）与可插拔求解器契约，以及去干扰线 + 扭曲文字 OCR 的扩展方向。对应的样例 MCP 服务器在 gitignore 的 `mcp/libseat/`（运行时安装，账号密码只留在本机 `.env`）。
 - 学习助手可以接入 MCP 服务器：把各家客户端通用的 `mcpServers` 配置（Codex 同款形状）放进软件自己的 `mcp.json` 即可，工具按 `mcp__<服务器>__<工具>` 命名，资源走 `list_mcp_resources` / `read_mcp_resource`。默认 `codemode` 暴露（代码里调用，不撑大工具声明），`deferred` 由 `tool_search` 按需加载；异常自动唤醒不加载任何服务器。
 - 助手侧新增 MCP 管理工具：`list_mcp_servers`（名称、启用状态、暴露方式、启动命令或 URL、来源，附配置与连接错误）、`add_mcp_server` / `remove_mcp_server`（等价于 `codex mcp add` / `remove`，写入同一份 `mcp.json`，用 SDK 自带校验器挡下无效配置）。读写之外的编辑只在用户主动发起的对话里可用。
 - 课表阻塞时段：把每周重复的课程、实验等固定占用登记成「阻塞时段」，在本周日程页以半透明色带显示在网格背景里，可增删改。每个时段标成**需专心**或**水课**：需专心的时段里排专注任务会被本地诊断提示真实冲突（`blockConflict`，含课程名与重叠分钟），水课时段表示签到即可并行写作业，冲突检测不再报警；超量与过松信号也会带上当天被占用的分钟数。
