@@ -147,6 +147,10 @@ MCP 使用标准换行 JSON-RPC stdio，不启动第二份数据库。它连接�
 
 工具：`save_schedule`（不传 id 新建，传 id 更新并保留已触发记录）、`delete_schedule`、`list_schedules`（只读，唤醒轮次也能看）。状态接口返回 `schedules`。怎么排才靠谱（挑有网时段、预约后必须建按时签到的任务、提前提醒、必要时提前锁机）写在 `tomato-guide` 技能里，平台不规定流程。
 
+界面：顶栏「定时」浮层列出所有定时任务（时间、周期、提前提醒/锁机、是否已触发），可启用/停用、删除，也能手动新建。字段里 `lockBeforeMinutes` 由平台执行：到点前那段时间起一个 **strict** 快速锁机（锁到点），只在该条安排显式设了分钟数、且当前没有锁机时才做，并且当天锁过一次不再重复。
+
+助手也能写自己的技能：`save_skill {name, description, body}` 写进 `agentDir/skills/<name>/SKILL.md`（带 front-matter），`delete_skill` 删除；`available_skills` 会把这份目录和随包技能一起列出，所以下一轮 `get_context` 就能看到。名字只允许小写字母、数字与连字符，正文 ≤20000 字，且只动这个私有目录（内置技能与用户手写技能删不到）。
+
 ## 验证
 
 `cargo test -p tomato-core -p tomato-agent` 覆盖诊断、权限、记忆确认、补丁原子性、差异审阅、来源冲突、空闲排队和重启冷却。`node --test tests/agent.mjs` 通过本机模拟模型验证真实 Pi SDK 的流式工具调用与恢复会话，并通过真实 Rust、MCP stdio、Chromium 验证界面和文件应用；不调用付费模型，不启用用户桌面保护。真实账号登录与服务端模型可用性由用户自己的凭据完成验证。

@@ -440,6 +440,10 @@ impl Agent {
         }
         roots
     }
+    /// 测试与内部使用：当前可读到的技能名。
+    pub fn available_skill_names(&self) -> Vec<String> {
+        self.available_skills()
+    }
     fn available_skills(&self) -> Vec<String> {
         let mut names: Vec<String> = Vec::new();
         for root in self.skill_roots() {
@@ -590,6 +594,54 @@ impl Agent {
                 _ => None,
             }
         };
+        // 到点前的「防拖沓」：用户给这条安排开了提前锁机就起一个严格锁，锁到点。
+        if let Some(now) = Local.timestamp_opt(at, 0).single().map(|t| t.naive_local()) {
+            let lock = {
+                let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                let hit = inner
+                    .store
+                    .schedules
+                    .iter()
+                    .find(|s| s.lock_window(now).is_some())
+                    .map(|s| {
+                        (
+                            s.id.clone(),
+                            s.lock_window(now).unwrap_or(0),
+                            s.name.clone(),
+                        )
+                    });
+                if let Some((id, minutes, name)) = hit.clone() {
+                    for s in &mut inner.store.schedules {
+                        if s.id == id {
+                            s.locked_at = Some(at);
+                        }
+                    }
+                    inner.store.save(&self.dir)?;
+                    Some((minutes, name))
+                } else {
+                    None
+                }
+            };
+            if let Some((minutes, name)) = lock {
+                if snapshot.data.lock.active.is_none() {
+                    let _ = (self.apply)(
+                        Action::StartQuickLock {
+                            minutes,
+                            strict: true,
+                        },
+                        None,
+                    );
+                    let _ = self.inner.lock().map(|mut inner| {
+                        inner.store.message(
+                            "assistant",
+                            format!("距「{name}」还有 {minutes} 分钟，按你的安排先严格锁机到点。"),
+                            crate::now(),
+                            true,
+                        );
+                    });
+                }
+            }
+        }
         if let Some((_id, name, instruction, remind)) = due {
             let remind_note = if remind > 0 {
                 format!("（用户希望在到点前 {remind} 分钟被提醒：需要的话建一条带提醒的任务。）")
@@ -906,6 +958,37 @@ impl Agent {
                 }
                 inner.store.save(&self.dir)?;
                 Ok(json!({"saved":schedule.id,"schedules":inner.store.schedules}))
+            }
+            // 助手自己写技能：把「这类事怎么办」沉淀成文件，下次同类任务开场就读到。
+            "save_skill" | "delete_skill" => {
+                let skill = nonempty_text(args, "name", 40)?;
+                if !skill
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                    || skill.starts_with('-')
+                    || skill.ends_with('-')
+                {
+                    return Err("技能名只能用小写字母、数字和连字符".into());
+                }
+                let dir = self.dir.join("skills").join(&skill);
+                if name == "delete_skill" {
+                    if !dir.is_dir() {
+                        return Err("没有这个技能".into());
+                    }
+                    fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+                    return Ok(json!({"deleted":skill}));
+                }
+                let description = nonempty_text(args, "description", 400)?;
+                let body = args["body"].as_str().unwrap_or("").trim().to_string();
+                if body.is_empty() || body.chars().count() > 20_000 {
+                    return Err("技能正文需为 1–20000 字".into());
+                }
+                fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                let file = dir.join("SKILL.md");
+                let text =
+                    format!("---\nname: {skill}\ndescription: {description}\n---\n\n{body}\n");
+                fs::write(&file, text).map_err(|e| e.to_string())?;
+                Ok(json!({"saved":skill,"path":file.to_string_lossy()}))
             }
             "request_user_input" => {
                 let questions = args["questions"].as_array().cloned().unwrap_or_default();

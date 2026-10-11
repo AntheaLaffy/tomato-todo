@@ -4896,3 +4896,41 @@ body.ponder-open #toast {
   align-items: center;
   gap: 12px;
 }
+
+/* 定时任务：一条一行，停用的淡出；表单在列表下面。 */
+.agent-schedule {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 0 12px 12px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+}
+.agent-schedule.off {
+  opacity: 0.55;
+  border-left-color: var(--line);
+}
+.agent-schedule p {
+  margin: 4px 0 0;
+  color: var(--secondary);
+  font-size: 13px;
+}
+#agent-schedule-new {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+#agent-schedule-new h3 {
+  margin: 0;
+  font-size: 15px;
+}
+#agent-schedule-new label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}

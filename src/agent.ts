@@ -94,6 +94,18 @@ export type AgentStatus = {
     label?: string;
     steps: HandStep[];
   } | null;
+  /** 用户排定的定时任务：到点让助手去做。 */
+  schedules: {
+    id: string;
+    name: string;
+    at: string;
+    repeat: string;
+    instruction: string;
+    remindMinutes: number;
+    lockBeforeMinutes: number;
+    enabled: boolean;
+    firedAt: number | null;
+  }[];
   /** 助手这一轮改了什么；界面按 serial 演一遍，让用户看见改动落在哪儿。 */
   deeds: {
     serial: number;
@@ -131,7 +143,13 @@ const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
 let sheet:
-  "settings" | "memory" | "plans" | "signals" | "conversations" | null = null;
+  | "settings"
+  | "memory"
+  | "plans"
+  | "signals"
+  | "schedules"
+  | "conversations"
+  | null = null;
 let openedAuthUrl = "";
 type Usage = {
   deepseek?: {
@@ -185,6 +203,7 @@ export function agentPage(): string {
   return `<div id="agent-root"><div class="page-heading agent-page-heading"><div><h1>学习助手</h1></div><div class="agent-topbar">
     <button class="button small" data-agent="plans">方案${badge(files)}</button>
     <button class="button small" data-agent="memory">记忆</button>
+    <button class="button small" data-agent="schedules">定时${badge(status?.schedules?.length ?? 0)}</button>
     <button class="button small" data-agent="signals">信号${badge(signals)}</button>
     <button class="button small" data-agent="conversations">会话</button>
     <button class="button small" data-agent="settings">设置</button>
@@ -487,6 +506,18 @@ function sheetHtml(): string {
           )
           .join("") || `<p class="agent-empty">还没有会话。</p>`
       }</div>`;
+    if (currentSheet === "schedules") {
+      const list = s.schedules ?? [];
+      return `<p class="subtle small">到点后助手拿到完整工具（含 MCP）直接办事，不受自动唤醒的开关、上限、冷却与安静时段限制；晚到 30 分钟以上不补做。</p><div id="agent-schedules">${
+        list
+          .map(
+            (x) =>
+              `<div class="agent-schedule ${x.enabled ? "" : "off"}"><div><b>${esc(x.name)}</b><small>${esc(x.at)}${x.repeat === "daily" ? " · 每天" : x.repeat === "weekdays" ? " · 工作日" : ""}${x.remindMinutes ? ` · 提前 ${x.remindMinutes} 分钟提醒` : ""}${x.lockBeforeMinutes ? ` · 提前 ${x.lockBeforeMinutes} 分钟严格锁机` : ""}${x.firedAt ? " · 已触发过" : ""}</small><p>${esc(x.instruction)}</p></div><div class="button-row"><button class="button small" data-agent="toggle-schedule" data-id="${esc(x.id)}">${x.enabled ? "停用" : "启用"}</button><button class="button small" data-agent="delete-schedule" data-id="${esc(x.id)}">删除</button></div></div>`,
+          )
+          .join("") ||
+        '<p class="agent-empty">还没有定时任务。让助手排一个，例如「每晚 21:50 用 seat MCP 约明天的座位，并建一条按时签到的任务」。</p>'
+      }</div><form id="agent-schedule-new"><h3>新建定时任务</h3><label>名称<input name="name" maxlength="40" required placeholder="抢图书馆座位"></label><label>时间<input name="at" required placeholder="21:50 或 2026-10-12T21:50"></label><label>周期<select name="repeat"><option value="daily">每天</option><option value="weekdays">工作日</option><option value="once">只这一次（时间写全日期）</option></select></label><div class="form-grid"><label>提前提醒（分钟）<input name="remindMinutes" type="number" min="0" max="240" value="15"></label><label>提前锁机（分钟，0=不锁）<input name="lockBeforeMinutes" type="number" min="0" max="120" value="0"></label></div><label>要助手做什么<textarea name="instruction" rows="3" maxlength="2000" required placeholder="用 seat MCP 预约明天的座位，约到后建一条按时签到的任务并提醒我"></textarea></label><label class="setting-row"><span><strong>启用</strong><small>到点按上面的时间触发</small></span><input class="switch" name="enabled" type="checkbox" checked></label><div class="agent-actions"><button class="button primary small" type="submit">保存定时任务</button></div></form>`;
+    }
     if (currentSheet === "memory")
       return `<div id="agent-memories">${
         s.memories
@@ -721,6 +752,19 @@ async function submit(form: HTMLFormElement) {
       : text;
     await call({ op: "send", text: text_ });
     form.reset();
+  } else if (form.id === "agent-schedule-new") {
+    await tool("save_schedule", {
+      name: String(data.get("name") ?? "").trim(),
+      at: String(data.get("at") ?? "").trim(),
+      repeat: String(data.get("repeat") ?? "daily"),
+      instruction: String(data.get("instruction") ?? "").trim(),
+      remindMinutes: Number(data.get("remindMinutes") ?? 0),
+      lockBeforeMinutes: Number(data.get("lockBeforeMinutes") ?? 0),
+      enabled: data.has("enabled"),
+    });
+    form.reset();
+    hooks.toast("定时任务已保存");
+    await refreshAgent();
   } else if (form.id === "agent-memory-add") {
     await call({ op: "memory_save", text });
     memoryDraft = "";
@@ -740,6 +784,7 @@ async function action(button: HTMLButtonElement) {
     case "settings":
     case "memory":
     case "plans":
+    case "schedules":
     case "signals":
       openSheet(button.dataset.agent as NonNullable<typeof sheet>);
       break;
@@ -849,6 +894,17 @@ async function action(button: HTMLButtonElement) {
     }
     case "clear-plan":
       await call({ op: "clear_plan" });
+      break;
+    case "toggle-schedule": {
+      const item = status?.schedules.find((x) => x.id === button.dataset.id);
+      if (!item) break;
+      await tool("save_schedule", { ...item, enabled: !item.enabled });
+      await refreshAgent();
+      break;
+    }
+    case "delete-schedule":
+      await tool("delete_schedule", { id: button.dataset.id });
+      await refreshAgent();
       break;
     case "delete-memory":
       await call({ op: "memory_delete", id: button.dataset.id });

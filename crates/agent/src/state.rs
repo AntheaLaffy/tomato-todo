@@ -141,9 +141,15 @@ pub struct Schedule {
     pub remind_minutes: u32,
     #[serde(default = "yes")]
     pub enabled: bool,
+    /// 到点前多少分钟开始严格锁机（0 = 不锁）。防拖沓用：用户明确要求才设。
+    #[serde(default)]
+    pub lock_before_minutes: u32,
     /// 上次触发时间；一次性的任务用它防重，周期性的用它按天去重。
     #[serde(default)]
     pub fired_at: Option<i64>,
+    /// 上次为它锁机的时间，避免一轮里反复锁。
+    #[serde(default)]
+    pub locked_at: Option<i64>,
 }
 fn default_repeat() -> String {
     "once".into()
@@ -165,6 +171,9 @@ impl Schedule {
         if self.remind_minutes > 240 {
             return Err("提前提醒最多 240 分钟".into());
         }
+        if self.lock_before_minutes > 120 {
+            return Err("提前锁机最多 120 分钟".into());
+        }
         let parsed = if self.repeat == "once" {
             chrono::NaiveDateTime::parse_from_str(&self.at, "%Y-%m-%dT%H:%M").is_ok()
         } else {
@@ -174,6 +183,46 @@ impl Schedule {
             return Err("定时任务时间格式不对".into());
         }
         Ok(())
+    }
+    /// 到点前该不该开始锁机？返回剩余到点分钟数（锁到那时候）。
+    pub fn lock_window(&self, now: chrono::NaiveDateTime) -> Option<u32> {
+        if !self.enabled || self.lock_before_minutes == 0 {
+            return None;
+        }
+        let target = self.target_time(now)?;
+        let until = now.signed_duration_since(target).num_minutes();
+        if until > 0 || -until > i64::from(self.lock_before_minutes) {
+            return None;
+        }
+        use chrono::{Datelike, TimeZone};
+        let locked_today = self.locked_at.is_some_and(|at| {
+            chrono::Local
+                .timestamp_opt(at, 0)
+                .single()
+                .is_some_and(|t| {
+                    (t.year(), t.month(), t.day()) == (now.year(), now.month(), now.day())
+                })
+        });
+        if locked_today {
+            return None;
+        }
+        Some((-until).clamp(1, 720) as u32)
+    }
+    /// 这条安排相对 `now` 所在日期的目标时刻。
+    pub fn target_time(&self, now: chrono::NaiveDateTime) -> Option<chrono::NaiveDateTime> {
+        use chrono::{Datelike, TimeZone};
+        if self.repeat == "once" {
+            return chrono::NaiveDateTime::parse_from_str(&self.at, "%Y-%m-%dT%H:%M").ok();
+        }
+        let time = chrono::NaiveTime::parse_from_str(&self.at, "%H:%M").ok()?;
+        let today = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), now.day())?;
+        if self.repeat == "weekdays" && today.weekday().number_from_monday() > 5 {
+            return None;
+        }
+        Some(
+            chrono::NaiveDate::from_ymd_opt(today.year(), today.month(), today.day())?
+                .and_time(time),
+        )
     }
     /// 这个时刻该不该触发？`now` 是本机时间。
     pub fn due(&self, now: chrono::NaiveDateTime) -> bool {

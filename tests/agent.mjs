@@ -508,6 +508,8 @@ test(
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(url);
+      // 首次打开会先看到引导卡；等首屏稳定再点侧栏（否则可能点在重绘中的节点上）。
+      await expect(page.locator(".welcome-card")).toBeVisible();
       await page.locator('[data-page="agent"]').click();
       await expect(page.locator("h1")).toContainText("学习助手");
       // Memory and files live in on-demand sheets, not on the conversation page.
@@ -663,6 +665,16 @@ test(
         "课表里记下了「英语」",
         { timeout: 8000 },
       );
+      // 定时任务：列表 + 新建表单（含提前锁机字段）都在「定时」浮层里。
+      await asked.locator('[data-agent="schedules"]').click();
+      await expect(asked.locator("#agent-schedule-new")).toBeVisible();
+      await expect(asked.locator("#agent-schedules")).toContainText(
+        "还没有定时任务",
+      );
+      await expect(
+        asked.locator('#agent-schedule-new [name="lockBeforeMinutes"]'),
+      ).toBeVisible();
+      await asked.locator('[data-agent="close-sheet"]').click();
       await asked.evaluate(() => window.tomatoHand.hide());
       // 会话列表是侧栏（照 dsh 的形状），点顶栏拉开、再点收起；长对话里状态栏
       // 和输入框都留在原处（卡片自己滚动）。

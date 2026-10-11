@@ -134,6 +134,20 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             false,
         ));
         list.push(tool(
+            "save_skill",
+            "把「这类事怎么办」写成你自己的技能，下次同类任务开场就能读到：写在软件自己的技能目录（不是工作区沙箱），名字只允许小写字母、数字与连字符。适合沉淀反复出现的流程与边界（例如定时抢座位的判断），别抄用户隐私。",
+            json!({"name":{"type":"string","maxLength":40},"description":{"type":"string","maxLength":400},"body":{"type":"string","maxLength":20000}}),
+            &["name", "description", "body"],
+            false,
+        ));
+        list.push(tool(
+            "delete_skill",
+            "删掉你自己写的技能（按名字）；内置技能与用户手写的技能不在这里，删不到。",
+            json!({"name":{"type":"string","maxLength":40}}),
+            &["name"],
+            false,
+        ));
+        list.push(tool(
             "show_me",
             "在界面上演一遍给用户看：助手的手会移动、点击、打字，手边浮出你写的讲稿。steps 是一串动作，`kind` 取 move（target 选择器）/ click（target，默认真的点下去）/ type（target+text，浮出小键盘逐键敲进真实输入框）/ highlight（临时框出目标）/ say（lines，1–4 行讲稿，每行 ≤300 字，文字由你写）/ keyboard（on）/ wait（ms ≤8000）/ hide。演示要短：3–12 步、讲一两个点就够，看完用户是要自己动手的。",
             json!({"label":{"type":"string","maxLength":12,"description":"手名牌上的名字，默认「助手」"},"steps":{"type":"array","minItems":1,"maxItems":12,"items":{"type":"object","properties":{"kind":{"type":"string","enum":["move","click","type","highlight","say","keyboard","wait","hide"]},"target":{"type":"string","maxLength":200},"text":{"type":"string","maxLength":200},"lines":{"type":["string","array"],"items":{"type":"string","maxLength":300}},"ms":{"type":"integer","minimum":0,"maximum":8000},"on":{"type":"boolean"},"real":{"type":"boolean"},"hold":{"type":"boolean"}},"required":["kind"],"additionalProperties":false}}}),

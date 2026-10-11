@@ -104,6 +104,76 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
     })
 }
 #[test]
+fn a_schedule_can_lock_the_machine_before_it_and_skills_can_be_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    // 提前 10 分钟严格锁机：只在到点前那 10 分钟里要锁，锁过就不再锁。
+    let saved = agent
+        .call(
+            "save_schedule",
+            &json!({"name":"抢座位","at":"21:50","repeat":"daily","instruction":"用 seat MCP 约明天的座位","lockBeforeMinutes":10,"remindMinutes":15}),
+            false,
+        )
+        .unwrap();
+    assert!(saved["saved"].as_str().is_some());
+    let schedule: crate::state::Schedule =
+        serde_json::from_value(agent.status().unwrap()["schedules"][0].clone()).unwrap();
+    let date = chrono::NaiveDate::from_ymd_opt(2026, 10, 12).unwrap();
+    assert_eq!(
+        schedule.lock_window(date.and_hms_opt(21, 45, 0).unwrap()),
+        Some(5)
+    );
+    assert_eq!(
+        schedule.lock_window(date.and_hms_opt(21, 30, 0).unwrap()),
+        None
+    );
+    let mut locked = schedule.clone();
+    locked.locked_at = Some(
+        chrono::Local
+            .with_ymd_and_hms(2026, 10, 12, 21, 45, 0)
+            .unwrap()
+            .timestamp(),
+    );
+    assert_eq!(
+        locked.lock_window(date.and_hms_opt(21, 45, 0).unwrap()),
+        None
+    );
+    // 技能：写进去能被读到，删掉就没了；名字不合法直接拒绝。
+    agent
+        .call(
+            "save_skill",
+            &json!({"name":"seat-rush","description":"定时抢图书馆座位的判断与边界","body":"# 抢座位\n\n先看有没有网……"}),
+            false,
+        )
+        .unwrap();
+    let file = dir.path().join("skills/seat-rush/SKILL.md");
+    assert!(file.is_file());
+    assert!(std::fs::read_to_string(&file)
+        .unwrap()
+        .contains("description: 定时抢图书馆座位的判断与边界"));
+    assert!(agent
+        .available_skill_names()
+        .contains(&"seat-rush".to_string()));
+    assert!(agent
+        .call(
+            "save_skill",
+            &json!({"name":"../evil","description":"x","body":"y"}),
+            false
+        )
+        .is_err());
+    assert!(agent
+        .call(
+            "save_skill",
+            &json!({"name":"ok","description":"x","body":""}),
+            false
+        )
+        .is_err());
+    agent
+        .call("delete_skill", &json!({"name":"seat-rush"}), false)
+        .unwrap();
+    assert!(!file.exists());
+}
+#[test]
 fn schedules_are_saved_validated_and_only_fire_once_a_day() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
