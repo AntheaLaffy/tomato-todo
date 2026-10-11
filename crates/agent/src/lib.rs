@@ -40,6 +40,9 @@ struct Live {
     job_id: String,
     questions: Value,
     plan: Value,
+    /// 助手的「手」：一段待演的动作脚本，界面按 serial 演一次。
+    hand: Value,
+    hand_serial: u64,
 }
 struct Inner {
     store: Store,
@@ -511,7 +514,7 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -705,6 +708,77 @@ impl Agent {
                 }
                 self.inner.lock().map_err(|e| e.to_string())?.live.plan = json!(plan);
                 Ok(json!({"updated":true}))
+            }
+            // 让界面「演一遍」：脚本存在这里，界面按 serial 演一次（和 questions/plan 同一条通道）。
+            "show_me" => {
+                let steps = args["steps"].as_array().cloned().unwrap_or_default();
+                if steps.is_empty() || steps.len() > 12 {
+                    return Err("演示脚本需要 1–12 个步骤".into());
+                }
+                for step in &steps {
+                    let kind = step["kind"].as_str().unwrap_or_default();
+                    if ![
+                        "move",
+                        "click",
+                        "type",
+                        "highlight",
+                        "say",
+                        "keyboard",
+                        "wait",
+                        "hide",
+                    ]
+                    .contains(&kind)
+                    {
+                        return Err(format!("不支持的演示步骤：{kind}"));
+                    }
+                    if step["target"]
+                        .as_str()
+                        .is_some_and(|t| t.chars().count() > 200)
+                    {
+                        return Err("演示目标选择器过长".into());
+                    }
+                    if kind == "type" {
+                        if step["target"].as_str().unwrap_or("").is_empty() {
+                            return Err("打字步骤需要 target".into());
+                        }
+                        if step["text"].as_str().unwrap_or("").chars().count() > 200 {
+                            return Err("演示里一次最多输入 200 个字符".into());
+                        }
+                    }
+                    if kind == "say" {
+                        let lines: Vec<String> = match &step["lines"] {
+                            Value::String(line) => vec![line.clone()],
+                            Value::Array(list) => list
+                                .iter()
+                                .filter_map(|line| line.as_str().map(String::from))
+                                .collect(),
+                            _ => Vec::new(),
+                        };
+                        if lines.is_empty() || lines.len() > 4 {
+                            return Err("讲稿需要 1–4 行".into());
+                        }
+                        if lines.iter().any(|line| line.chars().count() > 300) {
+                            return Err("讲稿每行最多 300 字".into());
+                        }
+                    }
+                    if kind == "wait" && step["ms"].as_u64().unwrap_or(0) > 8_000 {
+                        return Err("演示里的一次等待最多 8 秒".into());
+                    }
+                }
+                let serial = {
+                    let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                    inner.live.hand_serial += 1;
+                    inner.live.hand = json!({
+                        "serial":inner.live.hand_serial,
+                        "at":now(),
+                        "label":args["label"].as_str().unwrap_or("助手"),
+                        "steps":steps,
+                    });
+                    inner.live.hand_serial
+                };
+                Ok(
+                    json!({"playing":true,"serial":serial,"note":"脚本交给界面播放；讲稿内容由你写，界面只负责演。"}),
+                )
             }
             "request_user_input" => {
                 let questions = args["questions"].as_array().cloned().unwrap_or_default();

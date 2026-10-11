@@ -58,7 +58,13 @@ import {
 } from "lucide";
 import { listen } from "@tauri-apps/api/event";
 import { initPonder, openPonderList } from "./ponder";
-import { handStep, hideHand, runHandScript, showHand } from "./hand";
+import {
+  handOptions,
+  handStep,
+  hideHand,
+  runHandScript,
+  showHand,
+} from "./hand";
 import { blocksTour } from "./hand-demo";
 import { createNodeGraph } from "./nodegraph";
 import {
@@ -3232,6 +3238,7 @@ function installHand() {
     enabled: state?.data.settings.sound ?? false,
     volume: state?.data.settings.soundVolume ?? 0,
   });
+  handOptions({ sound });
   (window as unknown as Record<string, unknown>).tomatoHand = {
     sound,
     show: (label?: string) => showHand(label),

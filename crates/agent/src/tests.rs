@@ -104,6 +104,33 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
     })
 }
 #[test]
+fn show_me_stores_a_bounded_script_and_bumps_its_serial() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let play = |steps: Value| agent.call("show_me", &json!({ "steps": steps }), false);
+    let first = play(json!([
+        { "kind": "move", "target": ".blocks-card" },
+        { "kind": "say", "lines": ["色带是课表占用"] }
+    ]))
+    .unwrap();
+    assert_eq!(first["playing"], json!(true));
+    assert_eq!(first["serial"], json!(1));
+    let status = agent.status().unwrap();
+    assert_eq!(status["hand"]["serial"], json!(1));
+    assert_eq!(status["hand"]["steps"][1]["kind"], json!("say"));
+    // 第二次演出的 serial 必须往前走，界面才知道要再演一遍。
+    assert_eq!(
+        play(json!([{ "kind": "say", "lines": ["再来一次"] }])).unwrap()["serial"],
+        json!(2)
+    );
+    assert_eq!(
+        play(json!([{ "kind": "dance" }])).unwrap_err(),
+        "不支持的演示步骤：dance"
+    );
+    assert!(play(json!([{ "kind": "type", "target": "#agent-text" }, { "kind": "type", "target": "#agent-text", "text": "x".repeat(201) }])).is_err());
+    assert!(play(json!([{ "kind": "say", "lines": [] }])).is_err());
+}
+#[test]
 fn questions_take_multi_select_and_a_real_approve_label() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));

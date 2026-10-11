@@ -1,5 +1,7 @@
 import { agentCall, desktop, openAgentLogin, downloadJson } from "./api";
 import type { Snapshot } from "./types";
+import { runHandScript } from "./hand";
+import type { HandStep } from "./hand";
 
 type Preferences = {
   enabled: boolean;
@@ -85,6 +87,13 @@ export type AgentStatus = {
     options: { label: string; description: string }[];
   }[];
   plan: { step: string; status: string }[];
+  /** 助手排的演示脚本；界面按 serial 演一次。 */
+  hand: {
+    serial: number;
+    at: number;
+    label?: string;
+    steps: HandStep[];
+  } | null;
   dataDir: string;
   mcpConfig: unknown;
 };
@@ -110,6 +119,7 @@ const memoryEdits: Record<string, string> = {};
 /** Multi-select drafts, keyed by question id; cleared when the questions change. */
 const answers: Record<string, string[]> = {};
 let questionsSignature = "";
+let handSerial = 0;
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
@@ -498,9 +508,21 @@ function renderSheet() {
   const html = sheetHtml();
   if (element.innerHTML !== html) element.innerHTML = html;
 }
+/**
+ * 演助手排好的演示脚本。只演一次（按 serial），而且只演新鲜的：用户可能过一会儿
+ * 才回到这一页，隔太久再突然动起来反而莫名其妙。
+ */
+function playHand() {
+  const hand = status?.hand;
+  if (!hand || hand.serial <= handSerial) return;
+  handSerial = hand.serial;
+  if (Date.now() / 1000 - hand.at > 120) return;
+  void runHandScript({ steps: hand.steps, label: hand.label });
+}
 function update() {
   if (!hooks?.active() || !status) return;
   renderChat();
+  playHand();
   const active = document.activeElement;
   const typing =
     active instanceof Element &&

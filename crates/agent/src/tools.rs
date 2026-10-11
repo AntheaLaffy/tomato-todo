@@ -119,6 +119,13 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             false,
         ));
         list.push(tool(
+            "show_me",
+            "在界面上演一遍给用户看：助手的手会移动、点击、打字，手边浮出你写的讲稿。steps 是一串动作，`kind` 取 move（target 选择器）/ click（target，默认真的点下去）/ type（target+text，浮出小键盘逐键敲进真实输入框）/ highlight（临时框出目标）/ say（lines，1–4 行讲稿，每行 ≤300 字，文字由你写）/ keyboard（on）/ wait（ms ≤8000）/ hide。演示要短：3–12 步、讲一两个点就够，看完用户是要自己动手的。",
+            json!({"label":{"type":"string","maxLength":12,"description":"手名牌上的名字，默认「助手」"},"steps":{"type":"array","minItems":1,"maxItems":12,"items":{"type":"object","properties":{"kind":{"type":"string","enum":["move","click","type","highlight","say","keyboard","wait","hide"]},"target":{"type":"string","maxLength":200},"text":{"type":"string","maxLength":200},"lines":{"type":["string","array"],"items":{"type":"string","maxLength":300}},"ms":{"type":"integer","minimum":0,"maximum":8000},"on":{"type":"boolean"},"real":{"type":"boolean"},"hold":{"type":"boolean"}},"required":["kind"],"additionalProperties":false}}}),
+            &["steps"],
+            false,
+        ));
+        list.push(tool(
             "apply_file",
             "显式应用已审阅且未变化的文件。完整备份导入会暂停计时并停用锁机；保护中拒绝应用。",
             json!({"name":name,"fileHash":{"type":"string"}}),

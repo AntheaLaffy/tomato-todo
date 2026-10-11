@@ -482,3 +482,7 @@ export function handStep(step: HandStep, optionOverrides: HandOptions = {}) {
 export function handPosition() {
   return { ...at };
 }
+/** 设置默认选项（音效来源等），后续 run/step 自动继承。 */
+export function handOptions(next: HandOptions = {}) {
+  options = { ...options, ...next };
+}

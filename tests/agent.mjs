@@ -575,6 +575,7 @@ test(
       // button, and free text rides along with the picks.
       const asked = await browser.newPage();
       const sent = [];
+      let cannedHand = null;
       let pending = [
         {
           id: "subjects",
@@ -595,6 +596,7 @@ test(
         files: [],
         reviewed: [],
         questions: pending,
+        hand: cannedHand,
       });
       await asked.route("**/api/agent", async (route) => {
         const body = route.request().postDataJSON();
@@ -631,6 +633,22 @@ test(
       ).toBeVisible();
       await asked.locator('.agent-proposal [data-agent="approve"]').click();
       assert.deepEqual(sent, ["确认应用：批准"]);
+      // A script the assistant queued plays on the page: caption, then typing.
+      pending = [];
+      cannedHand = {
+        serial: 1,
+        at: Math.floor(Date.now() / 1000),
+        label: "助手",
+        steps: [
+          { kind: "say", lines: ["看得见的手"], hold: true },
+          { kind: "move", target: "#agent-text" },
+        ],
+      };
+      await asked.reload();
+      await asked.locator('[data-page="agent"]').click();
+      await expect(asked.locator(".hand-actor.on")).toBeVisible();
+      await expect(asked.locator(".hand-caption")).toContainText("看得见的手");
+      await asked.evaluate(() => window.tomatoHand.hide());
       await asked.close();
       assert.deepEqual(errors, []);
       // No key is echoed in status or copied to the app backup.
