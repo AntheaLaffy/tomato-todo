@@ -143,11 +143,12 @@ POST /api/web/user/login      ->  {userName, password, captcha}    ← 必须带
 
 ## 实现落点
 
-工作区 `mcp/libseat/`（整个 `/mcp/` 已 gitignore，运行时安装，不入库）：
+正式源码在相邻仓库 `/home/fuurin/code/scau-libseat-reverse/`；番茄todo
+实际加载的副本在工作区 `mcp/libseat/`（整个 `/mcp/` 已 gitignore，不入库）：
 
 | 文件 | 作用 |
 | --- | --- |
-| `server.mjs` | stdio MCP server，16 个 `libseat_*` 工具 |
+| `server.mjs` | stdio MCP server，37 个 `libseat_*` 工具 |
 | `session.mjs` | 会话状态机：换图重试、401 自动重登、人工读图的两步握手 |
 | `http.mjs` | 内存 cookie jar + 请求层（含 `/op/*` 的 `Idempotent-Token`） |
 | `captcha.mjs` | 抓图、落盘、manifest、可插拔求解（command / http / manual / none） |
@@ -162,12 +163,38 @@ POST /api/web/user/login      ->  {userName, password, captcha}    ← 必须带
 写成 `captcha-samples/<时间戳>-<sha256前8位>.jpg` 与 `manifest.jsonl`，
 求解器可以离线回放、调参、算准确率。
 
-安装与生效：
+番茄todo的 `agent/mcp.json`（与 `state.json` 同目录）需把 `seat` 指向副本：
+
+```json
+{
+  "mcpServers": {
+    "seat": {
+      "command": "/path/to/node",
+      "args": ["/path/to/todo/mcp/libseat/server.mjs"],
+      "env": { "LIBSEAT_ENV_FILE": "/path/to/todo/mcp/libseat/.env" },
+      "exposure": "codemode"
+    }
+  }
+}
+```
+
+更新副本时保留本机 `.env` 与 `node_modules`；不要同步上游 `rust/target`：
 
 ```bash
-bash mcp/libseat/install.sh          # 装依赖 + 生成 .env + codex mcp add libseat + 自检
-$EDITOR mcp/libseat/.env             # LIBSEAT_USER / LIBSEAT_PASS
-node mcp/libseat/doctor.mjs --login  # 真实登录一次
+rsync -a --exclude .git --exclude node_modules --exclude .env \
+  --exclude captcha-samples --exclude rust/target --exclude scau-libseat-reverse.zip \
+  /home/fuurin/code/scau-libseat-reverse/ mcp/libseat/
+node mcp/libseat/doctor.mjs --login
+```
+
+上游仓库自己的 `install.sh` 注册的是 Codex，不会自动修改番茄todo的
+`mcp.json`。首次安装副本的依赖和凭据：
+
+```bash
+cd mcp/libseat
+pnpm install --frozen-lockfile
+cp .env.example .env
+$EDITOR .env                         # LIBSEAT_USER / LIBSEAT_PASS，默认 CAS 登录
 ```
 
 软件内置助手侧也接同一份配置（与 `state.json` 同目录的 `mcp.json`，形状见 `docs/AGENT.md`），
