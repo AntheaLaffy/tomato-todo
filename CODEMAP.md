@@ -16,6 +16,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | public/、src-tauri/icons/ | Boundary only | 静态二进制资源，引用由配置与视图管理 |
 | src-tauri/capabilities/ | Boundary only | 短 JSON 原生权限清单；命令变更时定向核对 |
 | CODEMAP.md、*.analysis.md | Excluded | 索引产物本身不递归纳入 |
+| .agents/skills/ | Boundary only | 随项目的维护者技能；由 AGENTS.md 与 README 指引，不逐个导航 |
 
 ## 任务指南
 
@@ -35,10 +36,10 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | Codex CLI 登录与第三方模型配置 | 智能体 / 界面 | agent/codex-config.mjs、agent/worker.mjs | agent/session.mjs、agent/web.mjs、src/agent.ts、tests/agent.mjs、docs/AGENT.md、scripts/build-agent.mjs |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、src-tauri/src/main.rs | tests/native.mjs、src 的 guardPage |
-| 启动/打包/测试 | 构建 | README.md、package.json | src-tauri/tauri.conf.json、scripts/ |
+| 启动/打包/测试 | 构建 | README.md、CONTRIBUTING.md、package.json | src-tauri/tauri.conf.json、scripts/ |
 | 安装/自启动/托盘/快捷栏 | 桌面 | src-tauri/src/desktop.rs、scripts/install.py | src/api.ts、src 的桌面设置、tests/native.mjs、tests/install.mjs |
 | 配置 CI/CD、发布版本 | 构建 | .github/CODEMAP.md | package.json、src-tauri/tauri.conf.json、README.md |
-| 维护项目结构 | 维护 | AGENTS.md、各级 CODEMAP.md | 实际新增/删除的文件 |
+| 维护项目结构 | 维护 | AGENTS.md、各级 CODEMAP.md | .agents/skills/README.md、实际新增/删除的文件 |
 
 ## 子目录
 
@@ -51,7 +52,8 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | scripts/ | 构建 | Cargo、npm、Python | 开发服务与 Linux 用户安装 |
 | .github/ | 构建 | GitHub Actions、Ubuntu 22.04 | CI 与标签发布工作流 |
 | tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
-| docs/ | 文件契约 / 领域设计 | Rust core | 学习计划 v4 / 备份 v3 标准、Schema、通用示例及节点语义与实现记录 |
+| docs/ | 文件契约 / 领域设计 | Rust core | 学习计划 v5 / 备份 v3 标准、Schema、通用示例，设计理念与节点语义实现记录 |
+| assets/ | 展示 | — | Boundary only：README 截图，仅由 README 引用，不含代码 |
 | public/ | 资源 | Vite | Internals not indexed：本地图标、字体及字体许可证 |
 
 ## 文件
@@ -59,7 +61,8 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | File | Domain | Function |
 | --- | --- | --- |
 | AGENTS.md | 维护 | 索引导航与隔离测试约束 |
-| README.md | 使用 | 功能边界、运行、构建、验证与数据路径 |
+| README.md | 使用 | 面向安装用户的入口：卖点、界面截图、安装、桌面适配、数据与备份、文档索引 |
+| CONTRIBUTING.md | 维护 | 开发环境、命令、架构、隔离桌面测试约束与提交信息规范 |
 | Cargo.toml | 构建 | Rust workspace 与编译配置 |
 | package.json | 构建 | Node 依赖和开发/测试命令 |
 | tsconfig.json | 构建 | TypeScript 编译约束 |
