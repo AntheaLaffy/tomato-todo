@@ -107,7 +107,7 @@ async fn guard_info() -> Json<tomato_core::guard::GuardInfo> {
 }
 #[tokio::main]
 async fn main() {
-    tomato_agent::mcp_entry();
+    tomato_agent::mcp_entry(None);
     let path =
         std::env::var("TOMATO_DATA_PATH").unwrap_or_else(|_| "artifacts/preview.sqlite3".into());
     let dir = std::path::Path::new(&path)

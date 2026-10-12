@@ -171,7 +171,14 @@ async fn read_import(
 }
 
 fn main() {
-    tomato_agent::mcp_entry();
+    // Resolve the bundled agent the same way the app does before the Tauri
+    // context exists, so the `--mcp` entry works from a system install where
+    // resources live in /usr/lib/<product name> instead of next to the binary.
+    let context = tauri::generate_context!();
+    let resource_dir =
+        tauri::utils::platform::resource_dir(context.package_info(), &tauri::utils::Env::default())
+            .ok();
+    tomato_agent::mcp_entry(resource_dir.as_deref());
     // niri reports the native Wayland window's PID; Xwayland can report the
     // satellite's PID instead, preventing protection from finding this window.
     if std::env::var_os("NIRI_SOCKET").is_some() && std::env::var_os("WAYLAND_DISPLAY").is_some() {
@@ -353,7 +360,7 @@ fn main() {
             desktop::show_main_window,
             desktop::quit_app
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("无法启动番茄 Todo")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {

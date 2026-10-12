@@ -1449,12 +1449,15 @@ pub fn resources(exe: &Path, resource_dir: Option<&Path>) -> PathBuf {
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../agent/bundle")
 }
-pub fn mcp_entry() -> bool {
+pub fn mcp_entry(resource_dir: Option<&Path>) -> bool {
     if !std::env::args().any(|arg| arg == "--mcp") {
         return false;
     }
     let exe = std::env::current_exe().expect("无法定位程序");
-    let dir = resources(&exe, Some(Path::new("/usr/lib/tomato-todo")));
+    // Take the resource dir from the caller: Tauri installs bundled resources
+    // under /usr/lib/<product name> ("Tomato Todo"), which is not where the
+    // binary sits, so a path relative to the executable cannot find them.
+    let dir = resources(&exe, resource_dir);
     let status = std::process::Command::new(dir.join("bin/node"))
         .arg(dir.join("mcp.mjs"))
         .args(std::env::args().skip(1).filter(|a| a != "--mcp"))

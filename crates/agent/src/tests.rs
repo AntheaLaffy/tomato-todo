@@ -550,3 +550,35 @@ fn wake_waits_for_idle_respects_quiet_and_deduplicates_across_restart() {
     ));
     assert!(!quiet(&p, time()));
 }
+
+#[test]
+fn agent_next_to_the_binary_outranks_the_resource_dir() {
+    let root = tempfile::tempdir().unwrap();
+    let exe_dir = root.path().join("lib/tomato-todo");
+    std::fs::create_dir_all(exe_dir.join("agent")).unwrap();
+    std::fs::write(exe_dir.join("agent/worker.mjs"), b"").unwrap();
+    let exe = exe_dir.join("tomato-todo");
+    std::fs::write(&exe, b"").unwrap();
+    let resources_dir = root.path().join("lib/Tomato Todo");
+    std::fs::create_dir_all(resources_dir.join("agent")).unwrap();
+    std::fs::write(resources_dir.join("agent/worker.mjs"), b"").unwrap();
+    assert_eq!(resources(&exe, Some(&resources_dir)), exe_dir.join("agent"));
+}
+
+#[test]
+fn resource_dir_covers_a_system_install_where_the_agent_is_not_beside_the_binary() {
+    let root = tempfile::tempdir().unwrap();
+    let exe_dir = root.path().join("bin");
+    std::fs::create_dir_all(&exe_dir).unwrap();
+    let exe = exe_dir.join("tomato-todo");
+    std::fs::write(&exe, b"").unwrap();
+    // Tauri installs bundled resources under /usr/lib/<product name>; the
+    // executable lives in /usr/bin, so the lookup must fall back to it.
+    let resources_dir = root.path().join("lib/Tomato Todo");
+    std::fs::create_dir_all(resources_dir.join("agent")).unwrap();
+    std::fs::write(resources_dir.join("agent/worker.mjs"), b"").unwrap();
+    assert_eq!(
+        resources(&exe, Some(&resources_dir)),
+        resources_dir.join("agent")
+    );
+}
