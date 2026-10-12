@@ -185,6 +185,7 @@ pnpm run desktop:deb    # 构建生产 .deb
 | [学习计划格式](docs/PLAN_FORMAT.md)               | v5 计划文件标准、Schema 与通用示例                         |
 | [完整备份格式](docs/BACKUP_FORMAT.md)             | v3 备份标准、Schema 与示例                                 |
 | [学习助手与 MCP](docs/AGENT.md)                   | 后端与登录、异常自动唤醒、权限与记忆、MCP 接入             |
+| [自建 MCP 服务器](docs/MCP.md)                    | 给自己写一个 MCP 服务器并挂进助手                          |
 | [CODEMAP.md](CODEMAP.md)                          | 按任务与目录的代码导航地图                                 |
 
 ## 开发与贡献

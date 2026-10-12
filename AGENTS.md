@@ -8,6 +8,7 @@
 | 产品设计取舍：任务/目标/习惯/项目/愿景、模板印刷 | [docs/DESIGN.md](docs/DESIGN.md) |
 | 主线与节点的完整语义 | [docs/NODE_DESIGN.md](docs/NODE_DESIGN.md) |
 | 学习助手的后端、权限、唤醒与 MCP | [docs/AGENT.md](docs/AGENT.md) |
+| 给自己写一个 MCP 服务器 | [docs/MCP.md](docs/MCP.md) |
 | 计划 / 备份文件字段 | [docs/PLAN_FORMAT.md](docs/PLAN_FORMAT.md)、[docs/BACKUP_FORMAT.md](docs/BACKUP_FORMAT.md) |
 
 ## 维护者技能（.agents/skills/）
