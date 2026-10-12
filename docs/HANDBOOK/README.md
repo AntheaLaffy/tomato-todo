@@ -71,6 +71,7 @@
 | [27-预览服务](27-预览服务.md) | 浏览器里的同一份核心：路由、来源校验、桌面能力降级 | `crates/preview/src/main.rs` |
 | [28-声音的实现](28-声音的实现.md) | 音效是代码合成的：音符表、单提示优先、静音与降级 | `src/audio.ts`、`src/sound-events.ts` |
 | [29-CODEMAP与索引维护](29-CODEMAP与索引维护.md) | 导航资产怎么活：唯一归属、双向核对、范围权威在根 | `.agents/skills/codemap/SKILL.md`、`CODEMAP.md` |
+| [31-概念讲解](31-概念讲解.md) | 界面上的「悬停就有解释」怎么登记、怎么命中、怎么保证不失效 | `src/ponder.ts`、`src/main.ts` |
 | [30-存储层](30-存储层.md) | 整个应用状态只有一行 JSON：写即事务、审阅与执行同一条预检路径 | `crates/core/src/lib.rs` 的 `Engine` |
 
 （编号 25 曾计划单独写「音效与音频」，已并入 24；现在的 25 章是前端架构。）
