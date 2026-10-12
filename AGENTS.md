@@ -1,3 +1,31 @@
+## 项目速览与入口
+
+番茄 Todo 是 Rust + Tauri + TypeScript 的 Linux 桌面专注工具，附带随包的 Pi SDK 学习助手。工作从 [CODEMAP.md](CODEMAP.md) 开始：先匹配任务指南的 Target，再沿 Domain 与子目录地图定向读取。
+
+| 需要什么 | 去哪里 |
+| --- | --- |
+| 人用的贡献说明：环境、命令、架构、提交流程 | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 产品设计取舍：任务/目标/习惯/项目/愿景、模板印刷 | [docs/DESIGN.md](docs/DESIGN.md) |
+| 主线与节点的完整语义 | [docs/NODE_DESIGN.md](docs/NODE_DESIGN.md) |
+| 学习助手的后端、权限、唤醒与 MCP | [docs/AGENT.md](docs/AGENT.md) |
+| 计划 / 备份文件字段 | [docs/PLAN_FORMAT.md](docs/PLAN_FORMAT.md)、[docs/BACKUP_FORMAT.md](docs/BACKUP_FORMAT.md) |
+
+## 维护者技能（.agents/skills/）
+
+仓库自带 22 个维护者技能，编码智能体从仓库根自动发现；与应用随包的 `agent/skills/`（给用户桌上的学习助手）无关。按 `description` 自动匹配，或用 `/skill:<name>` 强制加载。与项目协议直接相关的几个：
+
+| 技能 | 什么时候加载 |
+| --- | --- |
+| `codemap` | 定位代码、生成或刷新 CODEMAP.md 之前——导航协议的基础 |
+| `project-maintenance` | 收尾一次改动：同步地图、退役被替代实现、验证当前契约 |
+| `writing-for-readers` | 写提交信息、注释、README 或 PR 描述之前 |
+| `testing` | 写测试、提覆盖率、选测试策略 |
+| `ci-cd` | 改 `.github/workflows`、发布流程、命令入口 |
+
+其余为通用开发技能（debugging、profiling、performance-gradient-optimization、code-review、code-quality-tooling、git-cli、git-data-model、regex、shell-scripting/-conventions/-data-wrangling/-job-control、agent-context-management、agentic-coding、dev-environment、contributing-upstream、versioning-reproducibility），完整清单与许可见 [.agents/skills/README.md](.agents/skills/README.md)。
+
+技能与本文或 [CODEMAP.md](CODEMAP.md) 冲突时，以本文和 CODEMAP 为准。
+
 ## CODEMAP Navigation Protocol
 
 Mode: maintenance. 从 [CODEMAP.md](CODEMAP.md) 开始导航。
