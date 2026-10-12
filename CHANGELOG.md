@@ -2,6 +2,12 @@
 
 记录本项目的版本变更；版本号对应 Git 标签，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.8.2] - 2026-10-12
+
+### 修复
+
+- 系统安装（`.deb` 或任何把资源放进 `/usr/lib/<产品名>` 的安装）下内置 MCP 服务找不到运行时：应用把自己以 `--mcp` 启动时，入口硬编码了 `/usr/lib/tomato-todo`，而 Tauri 实际把资源装在 `/usr/lib/Tomato Todo`。现在 `--mcp` 入口和主程序一样通过 Tauri 的 `resource_dir` 解析资源目录；用户目录安装不受影响。
+
 ## [0.8.1] - 2026-10-12
 
 ### 新增
