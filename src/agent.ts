@@ -369,7 +369,10 @@ function authHtml() {
   const event = s.authEvent;
   const provider = (name: string, label: string, ready: string) =>
     `<span class="agent-dot ${s.providers?.[name]?.configured ? "on" : ""}"></span>${esc(label)} ${s.providers?.[name]?.configured ? ready : "未连接"}`;
-  const extra = Object.keys(s.providers ?? {}).filter((name) => !["deepseek", "openai-codex", "exa"].includes(name)).map((name) => provider(name, name, "已配置")).join(" · ");
+  const extra = Object.keys(s.providers ?? {})
+    .filter((name) => !["deepseek", "openai-codex", "exa"].includes(name))
+    .map((name) => provider(name, name, "已配置"))
+    .join(" · ");
   return `<div class="agent-auth">${provider("deepseek", "DeepSeek", "已配置")} · ${provider("openai-codex", "Codex", "已登录")}${extra ? ` · ${extra}` : ""} · <span class="agent-dot ${s.providers?.exa?.configured ? "on" : ""}"></span>Exa ${s.providers?.exa?.configured ? "已配置 Key" : "免 Key"}</div>
   ${event?.url ? `<p class="muted">已在浏览器打开登录页。${event.instructions ? esc(event.instructions) : ""}</p><button class="button small" type="button" data-agent="open-login">重新打开登录页</button>` : ""}
   ${event?.message && !event.url ? `<p class="muted">${esc(event.message)}</p>` : ""}
@@ -433,7 +436,9 @@ function modelSelectHtml() {
   const providers: [string, string][] = [
     ["deepseek", "DeepSeek"],
     ["openai-codex", "Codex"],
-    ...Object.keys(s.providers).filter((id) => !["deepseek", "openai-codex", "exa"].includes(id)).map((id) => [id, id] as [string, string]),
+    ...Object.keys(s.providers)
+      .filter((id) => !["deepseek", "openai-codex", "exa"].includes(id))
+      .map((id) => [id, id] as [string, string]),
   ];
   const current = `${s.preferences.provider}|${s.preferences.model ?? ""}`;
   const groups = providers
