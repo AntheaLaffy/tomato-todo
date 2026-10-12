@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Maintenance"
+  short_description: "Keep code maps, active code and tests current"
+  default_prompt: "Use $project-maintenance to finish this change by updating code maps, retiring obsolete code and tests, and verifying the current product."

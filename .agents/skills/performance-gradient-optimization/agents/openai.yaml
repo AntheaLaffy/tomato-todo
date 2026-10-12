@@ -1,0 +1,4 @@
+interface:
+  display_name: "Performance Gradient Optimization"
+  short_description: "Optimize performance with controlled experiments"
+  default_prompt: "Use $performance-gradient-optimization to diagnose this performance objective, choose experiments within a budget, and verify the result."
