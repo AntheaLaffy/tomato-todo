@@ -22,17 +22,17 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
-| 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/main.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md |
+| 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/main.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md、docs/HANDBOOK/12-课表与提醒.md |
 | 目标容器与过期补做 | 业务核心 / 界面 | crates/core/src/nodes.rs 的配对/信号与 lib.rs 的 Goal、src/main.ts 的 goalDialog | src/types.ts、docs/BACKUP_FORMAT.md |
-| 主线节点、信号与永久 ID | 业务核心 / 界面 | crates/core/src/nodes.rs、identities.rs、src/nodegraph.ts | docs/NODE_DESIGN.md、src/main.ts 的 goalDialog、node_tests.rs、plan.rs、src/types.ts 与文件契约 |
+| 主线节点、信号与永久 ID | 业务核心 / 界面 | crates/core/src/nodes.rs、identities.rs、src/nodegraph.ts | docs/NODE_DESIGN.md、docs/HANDBOOK/15-目标与主线.md、src/main.ts 的 goalDialog、node_tests.rs、plan.rs、src/types.ts 与文件契约 |
 | 习惯分组与周期印刷 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 habitsTab | templates.rs 的 materialize_templates、src/types.ts、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Vision、src/main.ts 的 visionsTab | src/types.ts、docs/BACKUP_FORMAT.md |
-| 模板、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 templateDialog/printDialog | crates/core/src/plan.rs、src/types.ts、docs/CODEMAP.md |
-| 课表阻塞时段与课内并行 | 业务核心 / 界面 / 智能体 | crates/core/src/blocks.rs、src/main.ts 的 schedulePage/blocksCard/blockDialog | crates/core/src/diagnostics.rs、plan.rs、crates/agent/src/{tools.rs,lib.rs}、docs/PLAN_FORMAT.md、agent/skills/study-planning |
+| 模板、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 templateDialog/printDialog | crates/core/src/plan.rs、docs/HANDBOOK/14-模板与印刷.md、src/types.ts、docs/CODEMAP.md |
+| 课表阻塞时段与课内并行 | 业务核心 / 界面 / 智能体 | crates/core/src/blocks.rs、src/main.ts 的 schedulePage/blocksCard/blockDialog | crates/core/src/diagnostics.rs、docs/HANDBOOK/12-课表与提醒.md、docs/HANDBOOK/17-诊断与统计.md、plan.rs、crates/agent/src/{tools.rs,lib.rs}、docs/PLAN_FORMAT.md |
 | 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
 | 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
-| 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
-| 学习助手、异常诊断、联网与 MCP | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | agent/mcp-config.mjs 与 agent/session.mjs 的 MCP 加载、docs/AGENT.md、docs/LIBSEAT_MCP.md（外部 MCP 实例：座位预约）、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
+| 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、docs/HANDBOOK/24-界面手感与音效.md、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
+| 学习助手、异常诊断、联网与 MCP | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | docs/HANDBOOK/18-助手-权限与唤醒.md、docs/HANDBOOK/19-助手-文件工作区与MCP.md、agent/mcp-config.mjs 与 agent/session.mjs 的 MCP 加载、docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
 | Codex CLI 登录与第三方模型配置 | 智能体 / 界面 | agent/codex-config.mjs、agent/worker.mjs | agent/session.mjs、agent/web.mjs、src/agent.ts、tests/agent.mjs、docs/AGENT.md、scripts/build-agent.mjs |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、src-tauri/src/main.rs | tests/native.mjs、src 的 guardPage |
@@ -41,6 +41,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 配置 CI/CD、发布版本 | 构建 | .github/CODEMAP.md | package.json、src-tauri/tauri.conf.json、README.md |
 | 发布到 AUR | 发布 | scripts/publish-aur.mjs、packaging/aur/ | .github/workflows/release.yml、scripts/build-agent.mjs |
 | 维护项目结构 | 维护 | AGENTS.md、各级 CODEMAP.md | .agents/skills/README.md、实际新增/删除的文件 |
+| 查实现事实 / 读代码前先看说明 | 参考手册 | docs/HANDBOOK/README.md 的覆盖表 | 各章 C/D 段（机制、语义规则与不变量）、附录 docs/HANDBOOK/04-导航对照.md、scripts/check-handbook.py |
 
 ## 子目录
 
@@ -54,7 +55,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | packaging/ | 发布 | AUR | 发行打包模板：AUR PKGBUILD 模板与桌面入口，由 scripts/publish-aur.mjs 渲染 |
 | .github/ | 构建 | GitHub Actions、Ubuntu 22.04 | CI 与标签发布工作流 |
 | tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
-| docs/ | 文件契约 / 领域设计 | Rust core | 学习计划 v5 / 备份 v3 标准、Schema、通用示例，设计理念与节点语义实现记录 |
+| docs/ | 文件契约 / 领域设计 / 实现手册 | Rust core | 学习计划 v5 / 备份 v3 标准、Schema、通用示例，设计理念与节点语义实现记录；docs/HANDBOOK/ 按域记录实现事实与边界 |
 | assets/ | 展示 | — | Boundary only：README 截图，仅由 README 引用，不含代码 |
 | public/ | 资源 | Vite | Internals not indexed：本地图标、字体及字体许可证 |
 

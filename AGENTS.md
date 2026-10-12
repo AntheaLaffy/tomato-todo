@@ -9,6 +9,7 @@
 | 主线与节点的完整语义 | [docs/NODE_DESIGN.md](docs/NODE_DESIGN.md) |
 | 学习助手的后端、权限、唤醒与 MCP | [docs/AGENT.md](docs/AGENT.md) |
 | 给自己写一个 MCP 服务器 | [docs/MCP.md](docs/MCP.md) |
+| 读代码前的参考手册：事实、取舍理由、机制说明、语义规则与不变量、边界 | [docs/HANDBOOK/](docs/HANDBOOK/README.md)（找文件与阅读顺序看附录 [04-导航对照](docs/HANDBOOK/04-导航对照.md) 或 CODEMAP；自查：`pnpm run check:handbook`） |
 | 计划 / 备份文件字段 | [docs/PLAN_FORMAT.md](docs/PLAN_FORMAT.md)、[docs/BACKUP_FORMAT.md](docs/BACKUP_FORMAT.md) |
 
 ## 维护者技能（.agents/skills/）

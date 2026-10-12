@@ -68,6 +68,11 @@ jobs:
           pnpm run check
           pnpm run format:check
 
+      # 只做校验，不跑会重写文件的三条生成器：行数会随每次代码改动变化，
+      # 让它们在 CI 里改文件既没意义也会把无关 PR 变红。
+      - name: Handbook structure check
+        run: python3 scripts/check-handbook.py
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 

@@ -10,3 +10,7 @@
 
 # 外置 MCP（运行时安装，不入库；含 .env 凭据）
 /mcp/
+
+# Python 缓存（scripts/ 下有几个自查/生成脚本）
+__pycache__/
+*.pyc

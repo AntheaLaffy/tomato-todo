@@ -18,7 +18,10 @@
     "check": "pnpm run agent:build && tsc --noEmit && cargo clippy --workspace --all-targets -- -D warnings",
     "desktop:install": "python3 scripts/install.py",
     "test:install": "node --test tests/install.mjs",
-    "agent:build": "node scripts/build-agent.mjs"
+    "agent:build": "node scripts/build-agent.mjs",
+    "check:handbook": "python3 scripts/handbook-paths.py && python3 scripts/handbook-tests.py && python3 scripts/handbook-backlog.py && python3 scripts/handbook-stats.py && python3 scripts/check-handbook.py",
+    "handbook:stats": "python3 scripts/handbook-stats.py",
+    "handbook:paths": "python3 scripts/handbook-paths.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

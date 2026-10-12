@@ -59,6 +59,7 @@ pnpm run desktop:deb    # 构建生产 .deb 安装包
 
 - 学习计划格式：[docs/PLAN_FORMAT.md](docs/PLAN_FORMAT.md)；完整备份：[docs/BACKUP_FORMAT.md](docs/BACKUP_FORMAT.md)。
 - 主线节点语义：[docs/NODE_DESIGN.md](docs/NODE_DESIGN.md)。
+- 读代码前的参考手册：[docs/HANDBOOK/](docs/HANDBOOK/README.md)——按域记录事实、取舍理由、机制与语义规则，**面向人读**；改哪动哪、文件与符号在哪看 [CODEMAP](CODEMAP.md) 与附录 [docs/HANDBOOK/04-导航对照.md](docs/HANDBOOK/04-导航对照.md)。讲稿与镜头不写进这里；改动某章涉及的实现后，同步那一章并跑 `pnpm run check:handbook`（结构、页眉版本、出处、对外措辞与隐私红线）；规模数字、测试索引与待补清单由 `pnpm run check:handbook` 一并重新采集（这三份是生成物，不要手改）；CI 只跑 `scripts/check-handbook.py` 做校验。
 - 用户提供的课表与私人备考分析放在忽略版本管理的 `artifacts/planning/`，**不要**写进默认种子、安装包或示例文件。
 - 维护者技能在 [.agents/skills/](.agents/skills/README.md)：编码智能体从仓库根自动发现，覆盖导航、维护收尾、提交与文档、测试与性能、Git/Shell、智能体上下文与 CI/CD。
 - **发布到 AUR**：`v*` 标签触发 Release 工作流产出 tarball 与 `.deb` 后，用 `node scripts/publish-aur.mjs --push` 生成并推送 `tomato-todo-bin`。校验和由脚本从发行包**动态计算**，模板在 [packaging/aur/](packaging/aur/PKGBUILD.in)；不要把生成的 PKGBUILD 当手写文件改。
