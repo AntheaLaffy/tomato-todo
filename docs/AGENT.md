@@ -114,7 +114,7 @@ MCP 使用标准换行 JSON-RPC stdio，不启动第二份数据库。它连接�
 }
 ```
 
-座位这个例子的完整实现与逆向记录见 `LIBSEAT_MCP.md`（华南农业大学图书馆座位预约：接口还原、验证码与会话的绑定规则、读图命中率实测 3/10 与重试数学、自定义求解器的接入契约）。
+座位这个例子的完整实现与逆向记录见 [LIBSEAT_MCP.md](LIBSEAT_MCP.md)（华南农业大学图书馆座位预约：接口还原、验证码与会话的绑定规则、读图命中率实测 3/10 与重试数学、自定义求解器的接入契约）。
 
 - 传输由随包运行时自带的 MCP 客户端处理：`command`（stdio）或 `url`（streamable HTTP，支持 `${ENV}` 头与 OAuth 登录）；`enabled: false` 单独停用。配置坏了不会静默：`list_mcp_servers` 会连校验错误一起报出来，服务器自己的 `notifications/message` 追加到同目录的 `mcp.log`。
 - 工具名为 `mcp__<server>__<tool>`，资源用 Codex 同款的 `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource` 读取。
