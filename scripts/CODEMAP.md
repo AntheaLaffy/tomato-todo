@@ -3,7 +3,7 @@ mode: maintenance
 generated_at: 2026-10-09
 ---
 
-开发进程启动、停止与 Linux 用户安装。
+开发进程启动、停止、Linux 用户安装与 AUR 发布。
 
 ## 文件
 
@@ -11,4 +11,5 @@ generated_at: 2026-10-09
 | --------------- | ------ | ------------------------------------------------------------------------------ |
 | dev.mjs         | 构建   | 启动 Rust 预览服务及 Vite 并处理退出                                           |
 | install.py      | 安装   | 安装二进制、图标、菜单/自启动入口；备份并更新 DMS 快捷栏                       |
-| build-agent.mjs | 构建   | 打包固定版本 Pi SDK、校验并内置 Node 运行时，生成 agent/bundle（不含私人数据） |
+| build-agent.mjs | 构建   | 打包固定版本 Pi SDK、校验并内置 Node 运行时，生成 agent/bundle（不含私人数据与 npm 绝对路径 .bin 软链） |
+| publish-aur.mjs | 发布   | 下载发行 tarball、动态计算 sha256、由 packaging/aur 模板渲染 PKGBUILD/.SRCINFO；`--push` 时提交并推送到 AUR |

@@ -61,6 +61,7 @@ pnpm run desktop:deb    # 构建生产 .deb 安装包
 - 主线节点语义：[docs/NODE_DESIGN.md](docs/NODE_DESIGN.md)。
 - 用户提供的课表与私人备考分析放在忽略版本管理的 `artifacts/planning/`，**不要**写进默认种子、安装包或示例文件。
 - 维护者技能在 [.agents/skills/](.agents/skills/README.md)：编码智能体从仓库根自动发现，覆盖导航、维护收尾、提交与文档、测试与性能、Git/Shell、智能体上下文与 CI/CD。
+- **发布到 AUR**：`v*` 标签触发 Release 工作流产出 tarball 与 `.deb` 后，用 `node scripts/publish-aur.mjs --push` 生成并推送 `tomato-todo-bin`。校验和由脚本从发行包**动态计算**，模板在 [packaging/aur/](packaging/aur/PKGBUILD.in)；不要把生成的 PKGBUILD 当手写文件改。
 - 字体 DM Sans 随应用打包，许可见 [public/fonts/OFL.txt](public/fonts/OFL.txt)。部分内置技能改编自 MIT《The Missing Semester》，采用 CC BY-NC-SA 4.0，与应用自身的 MIT 不同。
 
 ## 许可

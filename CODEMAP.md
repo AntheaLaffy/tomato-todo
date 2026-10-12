@@ -39,6 +39,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 启动/打包/测试 | 构建 | README.md、CONTRIBUTING.md、package.json | src-tauri/tauri.conf.json、scripts/ |
 | 安装/自启动/托盘/快捷栏 | 桌面 | src-tauri/src/desktop.rs、scripts/install.py | src/api.ts、src 的桌面设置、tests/native.mjs、tests/install.mjs |
 | 配置 CI/CD、发布版本 | 构建 | .github/CODEMAP.md | package.json、src-tauri/tauri.conf.json、README.md |
+| 发布到 AUR | 发布 | scripts/publish-aur.mjs、packaging/aur/ | .github/workflows/release.yml、scripts/build-agent.mjs |
 | 维护项目结构 | 维护 | AGENTS.md、各级 CODEMAP.md | .agents/skills/README.md、实际新增/删除的文件 |
 
 ## 子目录
@@ -49,7 +50,8 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | agent/ | 智能体运行时 | Pi SDK、Node | 随包的 Pi 会话、工具集、技能、MCP 与联网实现 |
 | src-tauri/ | 桌面 | core、Tauri | 原生 IPC、窗口、通知与打包 |
 | src/ | 界面 | Tauri API、Lucide | TypeScript 与 CSS 界面 |
-| scripts/ | 构建 | Cargo、npm、Python | 开发服务与 Linux 用户安装 |
+| scripts/ | 构建 | Cargo、npm、Python | 开发服务、Linux 用户安装与 AUR 发布 |
+| packaging/ | 发布 | AUR | 发行打包模板：AUR PKGBUILD 模板与桌面入口，由 scripts/publish-aur.mjs 渲染 |
 | .github/ | 构建 | GitHub Actions、Ubuntu 22.04 | CI 与标签发布工作流 |
 | tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
 | docs/ | 文件契约 / 领域设计 | Rust core | 学习计划 v5 / 备份 v3 标准、Schema、通用示例，设计理念与节点语义实现记录 |
