@@ -99,6 +99,11 @@ for (const name of [
 ]) {
   await cp(join(source, name), join(bundle, name), { recursive: true });
 }
+// npm writes .bin shims whose targets are absolute build-machine paths, so they
+// dangle wherever the bundle is unpacked. Nothing at runtime invokes them -- the
+// Rust side spawns bundle/bin/node with explicit script paths and the coding
+// sandbox PATH never includes .bin -- so drop the directory entirely.
+await rm(join(bundle, "node_modules/.bin"), { recursive: true, force: true });
 const refs = join(bundle, "skills/tomato-files/references");
 await mkdir(refs, { recursive: true });
 for (const name of [
