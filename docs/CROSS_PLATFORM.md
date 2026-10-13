@@ -4,6 +4,8 @@
 
 当前优先完成 Linux、Windows 与 macOS 桌面端；Android 延后。默认 push/PR CI 仅运行桌面检查，Android job 只有手动触发并勾选 `android` 时才运行。
 
+Windows 目前只覆盖 x64：ARM64 宿主（`windows-11-arm`）上隔离桌面保护回归等在 10 秒内拿不到前台窗口，原因尚未定位。该平台因此与 macOS 安装包一样延后，不进入 CI 与发布矩阵，避免用超时或跳过掩盖未适配的平台。
+
 ## 当前证据
 
 | 范围 | 当前实现与验证 | 尚未证明 |
@@ -11,18 +13,18 @@
 | Linux x64/ARM64 助手运行包 | 固定 Node 22.23.3 与官方 SHA-256，两个架构实际下载并解包；x64 本机运行 Pi SDK、Rust 助手与 MCP/mock 模型集成测试通过 | ARM64 原生执行与整应用安装 |
 | Windows x64/ARM64 助手运行包 | 两个架构实际下载、校验、解包，PE 架构核对；Rust 启动路径使用 `bin/node.exe`；GIO 依赖限定 Linux | Windows 原生执行、桌面层编译和安装 |
 | macOS x64/ARM64 助手运行包 | 两个架构实际下载、校验、解包，Mach-O 架构核对 | macOS 原生执行、桌面层编译和安装 |
-| 桌面 CI | 六个原生 runner 构建助手运行包和桌面整应用，加载真实 Pi SDK，测试核心/助手/桌面与工作区 Clippy | 远端工作流执行结果、各桌面实际安装和行为 |
+| 桌面 CI | 五个原生 runner 构建助手运行包和桌面整应用，加载真实 Pi SDK，测试核心/助手/桌面与工作区 Clippy；Windows x64 另跑隔离桌面保护回归 | 远端工作流执行结果、各桌面实际安装和行为 |
 | Android CI（延后） | 四个 ABI 的核心及完整 Tauri 应用本机编译通过；universal debug APK 四 ABI ELF 与桌面 Node 资源排除已检查；API 33/35 用例保留为手动选项 | 远端工作流执行结果、API 35 设备行为及 ARM 真机安装 |
 | Android 原生应用入口（延后） | 四 ABI debug APK 已构建；独立 API 33 模拟器的真实 IPC、SQLite 保存、计时重启恢复、手机导航、返回键及 SAF 备份/计划往返已输出通过；该轮结束清理随后被用户要求中止，模拟器与测试进程已回收 | 完整测试正常退出记录、刘海/软键盘与其他设备，系统保护、后台提醒/通知权限和 Pi 运行时 |
 | macOS 窗口保护 | 新增 Quartz 窗口枚举、进程完整路径标识与 Accessibility 权限/前台检查；只激活本进程窗口，确认可见前台窗口后才报告回焦成功；无窗口前台应用不会绕过白名单 | 当前实现未编译或运行验证；需原生 macOS 权限、窗口/多显示器/Spaces 与失效处理验收 |
 | 桌面系统集成 | GIO/AppIndicator 仅在 Linux 编译；Windows/macOS 使用原生自启动和托盘、Tauri 配置目录；登录通过 opener；Linux 编译、Clippy、自启动单测及隔离原生回归通过，Windows GNU 目标整应用 `cargo check` 通过 | Windows MSVC/macOS 目标构建与原生执行、通知和自启动行为 |
-| 桌面发布矩阵 | v0.8.4 发行 Linux 两架构 deb/压缩包和 Windows 两架构 NSIS；macOS 安装包延后；全部构建成功后发布；actionlint 通过；本机生产 deb 构建成功，包内二进制、Node、worker 和许可证已核对 | 远端实际构建、签名、安装与升级 |
-| Windows 窗口保护 | Win32 枚举/PID/标题、完整路径、后台线程回焦和输入队列恢复；同名不同目录、长路径、白名单与窗口失效已在独立 Wine/Openbox/Xvfb 上验证；封装应用优先 AUMID，旧 UWP 框架解析应用进程，Wine 回退到普通路径 | 原生 Windows/MSVC 运行、UWP/商店应用身份、真实桌面拒绝激活及整应用行为 |
+| 桌面发布矩阵 | v0.8.4 发行 Linux 两架构 deb/压缩包和 Windows x64 NSIS；Windows ARM64 与 macOS 安装包延后；全部构建成功后发布；actionlint 通过；本机生产 deb 构建成功，包内二进制、Node、worker 和许可证已核对 | 远端实际构建、签名、安装与升级 |
+| Windows 窗口保护 | Win32 枚举/PID/标题、完整路径、后台线程回焦和输入队列恢复；同名不同目录、长路径、白名单与窗口失效已在独立 Wine/Openbox/Xvfb 上验证；Windows x64 原生 runner 的隔离桌面回归通过；封装应用优先 AUMID，旧 UWP 框架解析应用进程，Wine 回退到普通路径 | UWP/商店应用身份、真实桌面拒绝激活及整应用行为；ARM64 未验证，也不在 CI 与发布矩阵内 |
 | Linux 窗口保护 | 保留 niri IPC，新增原生 X11 EWMH；Openbox/Xvfb 的真实核心及 Tauri/WebKit 白名单、回焦、快速锁机、紧急恢复和 WM 失效严格释放测试通过；检测活跃 WM，不将 Xwayland 列表当成完整桌面 | GNOME、KDE Plasma、Xfce、Cinnamon、MATE、LXQt 各实际会话验收，以及其他 Wayland 合成器后端 |
 
 ## 桌面构建与发布
 
-`pnpm run desktop:package` 使用 Tauri 自动合并的平台配置：Linux 默认 deb，Windows 默认 NSIS，macOS 默认 DMG。CI 在六个原生 runner 上构建生产桌面程序；标签发布另外构建安装包并统一上传。实际安装行为与发布工作流结果仍须验收。
+`pnpm run desktop:package` 使用 Tauri 自动合并的平台配置：Linux 默认 deb，Windows 默认 NSIS，macOS 默认 DMG。CI 在五个原生 runner 上构建生产桌面程序；标签发布另外构建 Linux 两架构与 Windows x64 安装包并统一上传。实际安装行为与发布工作流结果仍须验收。
 
 Linux 本机 `pnpm run test:native` 在嵌套 niri/私有 D-Bus 中通过：托盘菜单、后台启动、自启动开关、关闭到托盘计时、单实例、无托盘回退，以及白名单/全屏/紧急释放。Windows GNU 的整应用 `cargo check` 在 Linux 交叉工具链上通过；它不代替 Windows MSVC 原生构建和运行。
 
@@ -40,7 +42,7 @@ Windows 使用 Win32 窗口接口；普通程序以操作系统报告的完整�
 
 后台计时线程创建自己的消息队列，按需要短暂连接前台/UI 输入队列，退出时恢复连接。Windows 拒绝激活或前台窗口不可访问时返回失败，桌面循环解除当前保护并报错。不给用户注入键盘事件，也不结束其他应用。
 
-`pnpm run test:windows` 在 Windows GitHub Actions 独立 runner 上执行原生测试；Linux 本机自动交叉编译并使用新 Wine 前缀和 Xvfb/Openbox。Wine 当前缺少 AppModel API，测试只验证普通程序；商店应用身份和真实 Windows 策略必须在原生环境验收。白名单上限同步为每项 32768 字符，长路径与 Unicode 路径的全局/项目白名单、备份和计划已验证。
+`pnpm run test:windows` 在 Windows GitHub Actions 的 x64 runner 上执行原生测试；Linux 本机自动交叉编译并使用新 Wine 前缀和 Xvfb/Openbox。原生回归只覆盖 x64：ARM64 runner 上同一用例等不到前台窗口而超时，尚未定位；在原因查清之前，ARM64 不进入 CI 与发布矩阵，而不是把这条必检改成跳过。Wine 当前缺少 AppModel API，测试只验证普通程序；商店应用身份和真实 Windows 策略必须在原生环境验收。白名单上限同步为每项 32768 字符，长路径与 Unicode 路径的全局/项目白名单、备份和计划已验证。
 
 ## 构建助手运行包
 

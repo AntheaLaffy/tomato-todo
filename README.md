@@ -124,7 +124,7 @@
 
 - Debian / Ubuntu：下载 `.deb` 安装。
 - 其他 Linux 发行版（含 niri）：按架构解压 `*-x86_64-linux.tar.gz` 或 `*-aarch64-linux.tar.gz`，用其中的 `install.py` 安装到用户目录，无需 root。
-- Windows：按架构下载 `*x64-setup.exe` 或 `*arm64-setup.exe`，运行 NSIS 安装程序。
+- Windows x64：下载 `*x64-setup.exe`，运行 NSIS 安装程序（ARM64 安装包延后）。
 
 ```sh
 tar -xzf tomato-todo-*-x86_64-linux.tar.gz

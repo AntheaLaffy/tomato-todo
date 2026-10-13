@@ -104,7 +104,8 @@ jobs:
           - ubuntu-22.04
           - ubuntu-24.04-arm
           - windows-2022
-          - windows-11-arm
+          # Windows ARM64 暂不支持：ARM64 宿主上隔离桌面保护回归拿不到前台窗口，
+          # 该平台既不出安装包，也不在 CI 里占位（见 docs/CROSS_PLATFORM.md）。
           - macos-15-intel
           - macos-15
     runs-on: ${{ matrix.runner }}

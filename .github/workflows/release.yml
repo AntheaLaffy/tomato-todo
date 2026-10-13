@@ -33,9 +33,7 @@ jobs:
           - runner: windows-2022
             arch: x86_64
             bundles: nsis
-          - runner: windows-11-arm
-            arch: aarch64
-            bundles: nsis
+          # Windows ARM64 安装包延后，与 macOS 一致；原因见 docs/CROSS_PLATFORM.md。
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout

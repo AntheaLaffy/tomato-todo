@@ -10,6 +10,10 @@
 
 - Android 加入 Tauri 库/JNI 入口和维护的 Gradle/Kotlin 工程，复用本地核心与 SQLite；文件导入导出接入 SAF URI，手机导航保留项目操作，原生处理系统栏/刘海/键盘和返回键。CI 加入真实 APK 构建及 API 33/35 WebView 模拟器验证；系统保护、后台提醒与 Pi 运行时仍待接入和验收。
 
+### 变更
+
+- Windows ARM64 移出桌面 CI 与发布矩阵，与 macOS 安装包一致暂不提供：ARM64 宿主上隔离桌面保护回归等不到前台窗口而超时，原因尚未定位，不用跳过或超时掩盖。
+
 ## [0.8.4] - 2026-10-13
 
 ### 新增
@@ -19,7 +23,7 @@
 - Linux 原生 X11 会话加入 EWMH 窗口保护：识别窗口进程、应用类与标题，白名单精确匹配和回焦；检测窗口管理器存活，不把 Xwayland 误报为完整 Wayland 管控。CI 加入隔离 Xvfb/Openbox 的真实核心和 Tauri/WebKit 回归。
 
 - 助手运行包支持 Linux、Windows、macOS 的 x64/ARM64 固定版本 Node 与校验和，支持显式 Rust 目标交叉打包；Windows 启动使用 `node.exe`，GIO 代理依赖仅用于 Linux。
-- CI 加入六个桌面平台/架构的桌面整应用构建与测试，以及 Android 四 ABI 的核心/SQLite 编译；本次发布矩阵产出 Linux 两架构 deb/压缩包和 Windows 两架构 NSIS；macOS/Android 安装包延后。
+- CI 加入五个桌面平台/架构的桌面整应用构建与测试，以及 Android 四 ABI 的核心/SQLite 编译；本次发布矩阵产出 Linux 两架构 deb/压缩包和 Windows x64 NSIS；Windows ARM64 与 macOS/Android 安装包延后。
 - 桌面层隔离 Linux GIO/AppIndicator，Windows/macOS 使用原生托盘、自启动与配置目录；登录链接通过跨平台 opener 打开。
 
 ### 修复
