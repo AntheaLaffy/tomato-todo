@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [{ "label": "main", "title": "番茄 Todo", "visible": true }]
+  },
+  "bundle": {
+    "resources": null,
+    "android": { "minSdkVersion": 24 }
+  }
+}

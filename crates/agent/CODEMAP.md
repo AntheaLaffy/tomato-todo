@@ -24,5 +24,5 @@ generated_at: 2026-10-11
 | files.rs | 文件契约 | 私有工作区的导出/分段读取/补丁/审阅/应用，来源与文件哈希并发校验 |
 | state.rs | 状态 | Preferences（含联网模式与 thinkingLevel 思考强度）、Memory、Store 与原子写入的私有文件 |
 | tools.rs | 契约 | 内嵌与外部的工具定义及允许集合（内嵌无 dispatch/apply_file） |
-| worker.rs | 运行时 | 子进程管理：启动、行协议收发与重启 |
+| worker.rs | 运行时 | 子进程管理：启动（Node 原生代理、环境变量优先与 GIO 系统代理回退）、平台对应 Node 可执行文件与 Windows 无控制台启动、行协议收发与重启 |
 | tests.rs | 验证 | 权限、记忆确认、补丁原子性、来源冲突、空闲排队与重启冷却 |

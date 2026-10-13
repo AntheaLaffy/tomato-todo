@@ -1,4 +1,6 @@
 use crate::Agent;
+#[cfg(target_os = "linux")]
+use gio::prelude::*;
 use serde_json::{json, Value};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -10,12 +12,72 @@ pub struct Process {
     pub child: Child,
     pub stdin: ChildStdin,
 }
+#[cfg(target_os = "linux")]
+fn configure_proxy(command: &mut Command) {
+    // Desktop launchers often lack the shell's exports. Use the desktop resolver
+    // only when no explicit HTTP(S) proxy was supplied, then let Node handle I/O.
+    let resolver = gio::ProxyResolver::default();
+    let mut desktop_proxy = false;
+    for (scheme, variable) in [("http", "HTTP_PROXY"), ("https", "HTTPS_PROXY")] {
+        if [variable.to_string(), variable.to_lowercase()]
+            .iter()
+            .any(|name| std::env::var(name).is_ok_and(|value| !value.is_empty()))
+        {
+            continue;
+        }
+        if let Ok(proxies) = resolver.lookup(
+            &format!("{scheme}://chatgpt.com/"),
+            None::<&gio::Cancellable>,
+        ) {
+            if let Some(proxy) = proxies
+                .first()
+                .filter(|proxy| proxy.starts_with("http://") || proxy.starts_with("https://"))
+            {
+                command.env(variable, proxy.as_str());
+                desktop_proxy = true;
+            }
+        }
+    }
+    if std::env::var_os("NO_PROXY").is_none() && std::env::var_os("no_proxy").is_none() {
+        let mut bypass = vec!["localhost".into(), "127.0.0.1".into(), "::1".into()];
+        if desktop_proxy {
+            if let Some(schema) = gio::SettingsSchemaSource::default()
+                .and_then(|source| source.lookup("org.gnome.system.proxy", true))
+            {
+                let settings =
+                    gio::Settings::new_full(&schema, None::<&gio::SettingsBackend>, None);
+                bypass.extend(
+                    settings
+                        .strv("ignore-hosts")
+                        .iter()
+                        .map(|host| host.to_string()),
+                );
+            }
+        }
+        command.env("NO_PROXY", bypass.join(","));
+    }
+}
+#[cfg(not(target_os = "linux"))]
+fn configure_proxy(command: &mut Command) {
+    if std::env::var_os("NO_PROXY").is_none() && std::env::var_os("no_proxy").is_none() {
+        command.env("NO_PROXY", "localhost,127.0.0.1,::1");
+    }
+}
 pub fn start(agent: &Arc<Agent>) -> AppResult<Process> {
-    let node = agent.resources.join("bin/node");
+    let node = crate::node_executable(&agent.resources);
     if !node.exists() || !agent.resources.join("worker.mjs").exists() {
         return Err("Agent 运行包未构建，请运行 pnpm run agent:build 后重新启动".into());
     }
-    let mut child = Command::new(node)
+    let mut command = Command::new(node);
+    configure_proxy(&mut command);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        // Bundled Node is a console executable; desktop requests need no console window.
+        command.creation_flags(0x0800_0000);
+    }
+    let mut child = command
+        .arg("--use-env-proxy")
         .arg(agent.resources.join("worker.mjs"))
         .arg(&agent.dir)
         .stdin(Stdio::piped())

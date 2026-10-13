@@ -17,14 +17,14 @@ generated_at: 2026-10-10
 | 修改备份流程                     | 桥接      | api.ts                                                                                                                      | main.ts 的 importBackup、Rust Import Action                                                                          |
 | 修改计划文件流程                 | 桥接      | api.ts、types.ts、main.ts 的 importPlan                                                                                     | crates/core/src/plan.rs、docs/CODEMAP.md、桌面/预览适配层                                                            |
 | 修改桌面设置                     | 桥接      | api.ts、main.ts 的 desktopSettingsCard                                                                                      | src-tauri/src/desktop.rs；浏览器隐藏这些设置                                                                         |
-| 项目专属应用白名单               | 界面/桥接 | main.ts 的 projectWhitelistCard/addProjectWhitelist、types.ts 的 PlanProject                                                | crates/core/src/plan.rs、src-tauri/src/main.rs 的保护循环、docs/CODEMAP.md；项目页承载编辑，专注保护页只管通用白名单 |
-| 目标容器与待补                   | 界面      | main.ts 的 goalDialog/focusPage/isCatchUp/taskList、types.ts 的 Goal                                                        | crates/core/src/lib.rs 的 Goal 与 nodes.rs、docs/BACKUP_FORMAT.md                                                    |
+| 项目专属应用白名单               | 界面/桥接 | main.ts 的 projectWhitelistCard/addProjectWhitelist、types.ts 的 PlanProject                                                | crates/core/src/plan.rs、src-tauri/src/desktop_app.rs 的保护循环、docs/CODEMAP.md；项目页承载编辑，专注保护页只管通用白名单 |
+| 目标容器与待补                   | 界面      | main.ts 的 goalDialog/focusPage/todayTaskGroup/isCatchUp/taskList、types.ts 的 Goal                                                        | crates/core/src/lib.rs 的 Goal 与 nodes.rs、docs/BACKUP_FORMAT.md                                                    |
 | 习惯分组与周期印刷               | 界面      | main.ts 的 goalsPage/habitsTab/templateDialog、types.ts 的 Habit                                                            | crates/core/src/templates.rs、lib.rs 的 TaskKind 与 Snapshot.taskKinds、docs/BACKUP_FORMAT.md                        |
 | 愿景标记                         | 界面      | main.ts 的 visionsTab/visionDialog/projectVisionCard、types.ts 的 Vision                                                    | crates/core/src/lib.rs 的 Vision、docs/BACKUP_FORMAT.md                                                              |
 | 定时锁机/严格模式界面            | 界面      | main.ts 的 lockPage/lockDialog/bindForms/guardPage/renderImmersive/tomorrowScheduleDialog（时段严格开关与锁机只读明日日程） | types.ts、crates/core/src/lock.rs、桌面桥接                                                                          |
 | 数据统计与纵切面                 | 界面      | main.ts 的 statsPage/goalStatsCard/crossSectionCard、types.ts 的 GoalStat/NodeStat/LineOutcome                              | crates/core/src/lib.rs 的 stats/GoalStat/NodeStat/DayStat、docs/BACKUP_FORMAT.md                                     |
 | 本周日程表与课表阻塞时段         | 界面      | main.ts 的 schedulePage/weekOffset/blocksCard/blockDialog、style.css 的 schedule-grid 与 calendar-band                       | types.ts 的 Task、Block（dueDate/reminderTime/attention）、crates/core/src/blocks.rs、docs/PLAN_FORMAT.md             |
-| 写作业 BGM 导入与播放 | 声音 | bgm.ts、main.ts 的 soundDialog | tests/audio.mjs、tests/integration.mjs；至少 3600 秒，本机 IndexedDB 保存，不随备份导出 |
+| 写作业 BGM 导入与播放 | 声音 | bgm.ts、main.ts 的 backgroundSoundButton/soundDialog/renderImmersive | tests/audio.mjs、tests/integration.mjs；至少 3600 秒，本机 IndexedDB 保存，不随备份导出 |
 | 关键节点音效与音量               | 声音/契约 | audio.ts、sound-events.ts、main.ts 的 accept/soundPreviewControls                                                           | types.ts、Rust Settings、备份契约、tests/audio.mjs                                                                   |
 | 侧栏项目排序与右键菜单           | 界面      | main.ts 的 showContextMenu/hideContextMenu/sortProjects 与捕获阶段的外部点击关闭                                            | tests/integration.mjs 的打开/排序/保存/关闭回归                                                                      |
 | 学习助手界面                     | 界面/桥接 | agent.ts 的 agentPage/mountAgent/setupAgent/refreshAgent/thinkingSelectHtml/questionHtml/reviewHtml/renderSessions（会话侧栏）                                            | api.ts 的 agentCall、main.ts 的 revealAgent/轮询、style.css 的 agent-proposal/agent-option、docs/AGENT.md、tests/agent.mjs |
@@ -37,7 +37,7 @@ generated_at: 2026-10-10
 | --------------- | ------ | ----------------------------------------------------------------------------------- |
 | main.ts         | 界面   | 页面、弹窗、事件与刷新；见 main.ts.analysis.md                                      |
 | style.css       | 视觉   | 设计变量、页面布局、明暗主题与响应式；见 style.css.analysis.md                      |
-| api.ts          | 桥接   | 选择 Tauri IPC 或本地 HTTP，处理计划/备份文件及桌面独有命令                         |
+| api.ts          | 桥接   | 原生入口报告桌面/Android 身份，选择 Tauri IPC 或本地 HTTP；计划/备份文件与桌面独有命令 |
 | types.ts        | 契约   | 实例、Template/Printing/PrintRecord、计划 v4 与备份 v3 的 Rust serde camelCase 类型 |
 | bgm.ts          | 声音   | 本地长音频元数据校验、IndexedDB 持久化、循环播放/暂停与背景音量 |
 | audio.ts        | 声音   | 本地背景噪音、11 种关键节点短音效、音量与安全音频激活                               |

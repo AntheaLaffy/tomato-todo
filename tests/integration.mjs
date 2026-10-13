@@ -6,6 +6,183 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, expect } from "@playwright/test";
 
+test("today task groups: fixed order, full catch-up queue and undated collapse", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tomato-today-"));
+  const url = "http://127.0.0.1:4325";
+  const server = spawn("target/debug/tomato-preview", [], {
+    env: {
+      ...process.env,
+      TOMATO_PORT: "4325",
+      TOMATO_DATA_PATH: join(dir, "test.sqlite3"),
+    },
+    stdio: "pipe",
+  });
+  let browser;
+  let output = "";
+  server.stderr.on("data", (data) => (output += data));
+  try {
+    let snapshot;
+    for (let i = 0; i < 100; i++) {
+      try {
+        const response = await fetch(`${url}/api/snapshot`);
+        if (response.ok) {
+          snapshot = await response.json();
+          break;
+        }
+      } catch {}
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.ok(snapshot, `Rust server did not start: ${output}`);
+    // Fix the clock to exercise both upcoming and missed blocks at any hour.
+    snapshot.serverTime =
+      new Date(`${snapshot.today}T12:00:00`).getTime() / 1000;
+    const task = (id, fields = {}) => ({
+      id,
+      title: id,
+      notes: "",
+      nodeId: null,
+      templateId: null,
+      recurring: false,
+      scrapMinutes: 1440,
+      projectId: null,
+      goalId: null,
+      habitId: null,
+      dueDate: snapshot.today,
+      reminderTime: null,
+      focusMinutes: 25,
+      reminderFired: false,
+      reminderPending: false,
+      reminderExpired: false,
+      priority: 0,
+      estimate: 1,
+      completed: false,
+      completedAt: null,
+      createdAt: 1,
+      tags: [],
+      subtasks: [],
+      ...fields,
+    });
+    snapshot.data.tasks = [
+      task("undated-low", { dueDate: null }),
+      task("untimed-low"),
+      task("timed-late", { reminderTime: "18:00" }),
+      task("catch-4", { reminderTime: "10:00" }),
+      task("catch-2", { reminderTime: "08:00" }),
+      task("catch-1", { reminderTime: "07:00" }),
+      task("catch-3", { reminderTime: "09:00" }),
+      task("timed-early", { reminderTime: "13:00", createdAt: 2 }),
+      task("untimed-high-new", { priority: 3, createdAt: 3 }),
+      task("untimed-high-old", { priority: 3, createdAt: 2 }),
+      task("undated-high", { dueDate: null, priority: 3 }),
+      task("future", { dueDate: "9999-12-31" }),
+      task("voided", { reminderTime: "06:00", reminderExpired: true }),
+      task("completed", { completed: true, completedAt: snapshot.serverTime }),
+    ];
+    browser = await chromium.launch({
+      executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+      headless: true,
+      args: ["--no-sandbox"],
+    });
+    const page = await browser.newPage({
+      viewport: { width: 1440, height: 1050 },
+    });
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.route("**/api/snapshot", (route) =>
+      route.fulfill({ json: snapshot }),
+    );
+    await page.goto(url);
+    const ids = (selector) =>
+      page
+        .locator(selector)
+        .evaluateAll((rows) => rows.map((row) => row.dataset.taskId));
+    const list = ".today-list";
+    await expect(page.locator(`${list} .group-title`)).toHaveText([
+      "今日定时2",
+      "待补队列4",
+      "今日未定时3",
+      "无日期任务2",
+    ]);
+    const initialIds = [
+      "timed-early",
+      "timed-late",
+      "catch-1",
+      "catch-2",
+      "catch-3",
+      "catch-4",
+      "untimed-high-old",
+      "untimed-high-new",
+      "untimed-low",
+    ];
+    assert.deepEqual(await ids(`${list} .task-row`), initialIds);
+    await expect(
+      page.locator('.today-card [data-filter="active"]'),
+    ).toContainText("11");
+    await expect(
+      page.locator('[data-action="toggle-undated"]'),
+    ).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator('[data-action="toggle-catch-up"]')).toHaveCount(
+      0,
+    );
+    assert.deepEqual(await ids("#today-catch-up-tasks .task-row"), [
+      "catch-1",
+      "catch-2",
+      "catch-3",
+      "catch-4",
+    ]);
+    await page.locator('[data-action="toggle-undated"]').click();
+    assert.deepEqual(await ids("#today-undated-tasks .task-row"), [
+      "undated-high",
+      "undated-low",
+    ]);
+    // A real snapshot refresh must preserve the user's expanded groups.
+    snapshot.data.tasks[0].notes = "refreshed";
+    await page.waitForResponse("**/api/snapshot");
+    await expect(
+      page.locator('[data-action="toggle-undated"]'),
+    ).toHaveAttribute("aria-expanded", "true");
+    await page.locator('.today-card [data-filter="completed"]').click();
+    assert.deepEqual(await ids(`${list} .task-row`), ["completed"]);
+    await page.locator('.today-card [data-filter="active"]').click();
+    await expect(page.locator("#today-undated-tasks .task-row")).toHaveCount(2);
+    await page.locator('[data-action="toggle-undated"]').click();
+    for (const order of ["created", "priority", "time"]) {
+      await page.locator('nav [data-page="tasks"]').click();
+      await page.locator("#task-sort").selectOption(order);
+      await expect(page.locator("#task-sort")).toHaveValue(order);
+      await page.locator('nav [data-page="focus"]').click();
+      assert.deepEqual(await ids(`${list} .task-row`), initialIds);
+    }
+    for (const width of [360, 700, 1440]) {
+      await page.setViewportSize({ width, height: 1050 });
+      assert.ok(
+        await page
+          .locator(list)
+          .evaluate((el) => el.scrollWidth <= el.clientWidth),
+      );
+    }
+    await page.setViewportSize({ width: 1440, height: 1050 });
+    await page.screenshot({
+      path: join(dir, "today-groups.png"),
+      fullPage: true,
+    });
+    snapshot.data.tasks = [task("only-undated", { dueDate: null })];
+    await page.reload();
+    await expect(page.locator(`${list} .group-title`)).toHaveText([
+      "无日期任务1",
+    ]);
+    await expect(page.locator(`${list} .empty-state`)).toHaveCount(0);
+    snapshot.data.tasks = [];
+    await page.reload();
+    await expect(page.locator(`${list} .empty-state`)).toBeVisible();
+    assert.deepEqual(errors, []);
+    console.log(`today task artifacts: ${dir}`);
+  } finally {
+    await browser?.close();
+    server.kill("SIGTERM");
+  }
+});
+
 test(
   "real Rust API and UI: tasks, recurrence, search, timer, settings, backups and reload",
   { timeout: 100_000 },
@@ -112,6 +289,50 @@ test(
       await expect(page.getByRole("dialog")).toContainText(
         "homework.wav · 60 分钟",
       );
+      await page.locator('[data-action="close-modal"]').click();
+      await page.locator('[data-action="immersive"]').click();
+      await page.locator('.immersive [data-action="sound"]').click();
+      await page.locator("#bgm-play").click();
+      await expect(page.locator("#bgm-play")).toContainText("暂停");
+      await page.locator('[data-action="close-modal"]').click();
+      await expect(page.locator(".immersive-sound")).toContainText("正在播放");
+      await page.locator('[data-action="immersive"]').click();
+      const protectedPreview = await (
+        await fetch(`${url}/api/snapshot`)
+      ).json();
+      protectedPreview.data.timer.running = true;
+      protectedPreview.data.timer.mode = "focus";
+      protectedPreview.data.settings.protection.mode = "whitelist";
+      await page.route("**/api/snapshot", (route) =>
+        route.fulfill({ json: protectedPreview }),
+      );
+      for (const strict of [false, true]) {
+        protectedPreview.data.settings.protection.strict = strict;
+        await page.reload();
+        await expect(page.locator(".immersive.protected")).toBeVisible();
+        await expect(page.locator('[data-action="emergency"]')).toHaveCount(
+          strict ? 0 : 1,
+        );
+        await page.locator('.immersive [data-action="sound"]').click();
+        await expect(page.getByRole("dialog")).toContainText("homework.wav");
+        await page.locator("#bgm-play").click();
+        await expect(page.locator("#bgm-play")).toContainText("暂停");
+        await page.locator('[data-noise="brown"]').click();
+        await expect(page.locator("#bgm-play")).toContainText("播放");
+        await page.locator("#noise-volume").fill("0.4");
+        await page.locator('[data-action="close-modal"]').click();
+        await expect(page.locator(".immersive-sound")).toContainText("棕噪音");
+        await page.locator('.immersive [data-action="sound"]').click();
+        await expect(page.locator("#noise-volume")).toHaveValue("0.4");
+        await page.locator('[data-noise="off"]').click();
+        await page.locator('[data-action="close-modal"]').click();
+        await expect(page.locator(".immersive-sound")).toContainText(
+          "选择背景音",
+        );
+      }
+      await page.unroute("**/api/snapshot");
+      await page.reload();
+      await page.locator('[data-action="sound"]').click();
       await page.locator("#bgm-remove").click();
       await expect(page.locator("#bgm-play")).toHaveCount(0);
       await page.locator('[data-action="close-modal"]').click();

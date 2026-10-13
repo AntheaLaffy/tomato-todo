@@ -1,3 +1,4 @@
+#[cfg(target_os = "linux")]
 use gio::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -12,9 +13,13 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Manager,
 };
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+use tauri_plugin_autostart::ManagerExt;
 use tomato_core::{now, Action, AppResult, Mode, Snapshot};
 
+#[cfg(target_os = "linux")]
 const ENTRY: &str = "studio.tomato.todo.desktop";
+#[cfg(target_os = "linux")]
 const MANAGED: &str = "X-Tomato-Todo-Managed=true";
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -45,11 +50,13 @@ struct TrayItems {
 pub struct DesktopState {
     preferences: Mutex<Preferences>,
     preferences_path: PathBuf,
+    #[cfg(target_os = "linux")]
     autostart_path: PathBuf,
     tray_created: AtomicBool,
     items: Mutex<Option<TrayItems>>,
 }
 
+#[cfg(target_os = "linux")]
 fn config_home() -> AppResult<PathBuf> {
     if let Some(path) = std::env::var_os("XDG_CONFIG_HOME").filter(|p| !p.is_empty()) {
         let path = PathBuf::from(path);
@@ -67,6 +74,7 @@ fn atomic_write(path: &Path, content: &[u8]) -> AppResult<()> {
     std::fs::write(&temporary, content).map_err(|e| e.to_string())?;
     std::fs::rename(&temporary, path).map_err(|e| e.to_string())
 }
+#[cfg(target_os = "linux")]
 fn quote_exec(path: &Path) -> AppResult<String> {
     let raw = path.to_str().ok_or("程序路径必须是 UTF-8")?;
     if raw.contains(['\n', '\r', '\0']) {
@@ -82,9 +90,11 @@ fn quote_exec(path: &Path) -> AppResult<String> {
             .replace('%', "%%")
     ))
 }
+#[cfg(target_os = "linux")]
 fn autostart_entry(executable: &Path) -> AppResult<String> {
     Ok(format!("[Desktop Entry]\nType=Application\nName=番茄 Todo\nExec={} --background\nIcon=tomato-todo\nTerminal=false\nStartupNotify=false\n{}\n", quote_exec(executable)?, MANAGED))
 }
+#[cfg(target_os = "linux")]
 fn set_autostart(path: &Path, enabled: bool, executable: &Path) -> AppResult<()> {
     if path.exists() {
         let existing = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
@@ -101,6 +111,7 @@ fn set_autostart(path: &Path, enabled: bool, executable: &Path) -> AppResult<()>
     }
 }
 
+#[cfg(target_os = "linux")]
 fn tray_host_available() -> bool {
     // A successfully created icon can still have no panel host. Never hide the
     // only window in that case, including when autostart precedes the shell.
@@ -117,6 +128,44 @@ fn tray_host_available() -> bool {
     .and_then(|p| p.cached_property("IsStatusNotifierHostRegistered"))
     .and_then(|v| v.get::<bool>())
     .unwrap_or(false)
+}
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn tray_host_available() -> bool {
+    // Unlike Linux, the OS supplies the tray/status-item host.
+    true
+}
+
+fn autostart_enabled(app: &tauri::AppHandle) -> AppResult<bool> {
+    #[cfg(target_os = "linux")]
+    {
+        let native = app.state::<DesktopState>();
+        let raw = std::fs::read_to_string(&native.autostart_path).unwrap_or_default();
+        Ok(raw.lines().any(|l| l == MANAGED) && !raw.lines().any(|l| l == "Hidden=true"))
+    }
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    {
+        app.autolaunch().is_enabled().map_err(|e| e.to_string())
+    }
+}
+fn configure_autostart(app: &tauri::AppHandle, enabled: bool) -> AppResult<()> {
+    #[cfg(target_os = "linux")]
+    {
+        set_autostart(
+            &app.state::<DesktopState>().autostart_path,
+            enabled,
+            &std::env::current_exe().map_err(|e| e.to_string())?,
+        )
+    }
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    {
+        let manager = app.autolaunch();
+        if enabled {
+            manager.enable()
+        } else {
+            manager.disable()
+        }
+        .map_err(|e| e.to_string())
+    }
 }
 pub fn tray_available(app: &tauri::AppHandle) -> bool {
     app.state::<DesktopState>()
@@ -154,9 +203,8 @@ pub fn desktop_status(app: tauri::AppHandle) -> AppResult<Status> {
         .lock()
         .map_err(|e| e.to_string())?
         .close_to_tray;
-    let raw = std::fs::read_to_string(&native.autostart_path).unwrap_or_default();
     Ok(Status {
-        autostart: raw.lines().any(|l| l == MANAGED) && !raw.lines().any(|l| l == "Hidden=true"),
+        autostart: autostart_enabled(&app)?,
         close_to_tray,
         tray_available: tray_available(&app),
     })
@@ -171,7 +219,6 @@ pub fn save_desktop_settings(
         return Err("专注保护中，暂时不能修改桌面设置".into());
     }
     let native = app.state::<DesktopState>();
-    let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut preferences = native.preferences.lock().map_err(|e| e.to_string())?;
     let old = serde_json::to_vec(&*preferences).map_err(|e| e.to_string())?;
     let next = Preferences { close_to_tray };
@@ -179,7 +226,7 @@ pub fn save_desktop_settings(
         &native.preferences_path,
         &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
     )?;
-    if let Err(error) = set_autostart(&native.autostart_path, autostart, &executable) {
+    if let Err(error) = configure_autostart(&app, autostart) {
         let _ = atomic_write(&native.preferences_path, &old);
         return Err(error);
     }
@@ -235,7 +282,7 @@ fn menu_action(app: &tauri::AppHandle, id: &str) -> AppResult<()> {
                 .data
                 .timer
                 .running;
-            crate::apply_action(
+            crate::desktop_app::apply_action(
                 app,
                 &engine,
                 if running {
@@ -281,8 +328,16 @@ pub fn update_tray(app: &tauri::AppHandle, snapshot: &Snapshot) {
     let _ = items.quit.set_enabled(enabled);
 }
 pub fn setup(app: &tauri::AppHandle, background: bool) -> AppResult<()> {
+    #[cfg(target_os = "linux")]
     let config = config_home()?;
+    #[cfg(target_os = "linux")]
     let preferences_path = config.join("studio.tomato.todo/desktop.json");
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    let preferences_path = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("desktop.json");
     let preferences = std::fs::read_to_string(&preferences_path)
         .ok()
         .and_then(|raw| serde_json::from_str(&raw).ok())
@@ -290,6 +345,7 @@ pub fn setup(app: &tauri::AppHandle, background: bool) -> AppResult<()> {
     app.manage(DesktopState {
         preferences: Mutex::new(preferences),
         preferences_path,
+        #[cfg(target_os = "linux")]
         autostart_path: config.join("autostart").join(ENTRY),
         tray_created: AtomicBool::new(false),
         items: Mutex::new(None),
@@ -327,9 +383,12 @@ pub fn setup(app: &tauri::AppHandle, background: bool) -> AppResult<()> {
     };
     // The upstream indicator binding panics when its dynamically loaded Linux
     // library is absent; check before entering it so the main window still works.
+    #[cfg(target_os = "linux")]
     let indicator_available = ["libayatana-appindicator3.so.1", "libappindicator3.so.1"]
         .iter()
         .any(|name| unsafe { libloading::Library::new(name) }.is_ok());
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    let indicator_available = true;
     if !indicator_available {
         eprintln!("未安装 AppIndicator 运行库，保留主窗口");
     } else if let Err(error) = create_tray() {
@@ -352,7 +411,7 @@ pub fn setup(app: &tauri::AppHandle, background: bool) -> AppResult<()> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     #[test]

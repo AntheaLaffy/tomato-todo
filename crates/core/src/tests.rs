@@ -627,6 +627,87 @@ fn effective_whitelist_prefers_project_list_over_global() {
 }
 
 #[test]
+fn long_windows_paths_round_trip_in_global_and_project_whitelists() {
+    let mut e = engine();
+    let path = format!("C:\\{}Editor.exe", "工具目录\\".repeat(80));
+    assert!(path.len() > 200);
+    let mut settings = Settings::default();
+    settings.protection.whitelist = vec![path.clone()];
+    e.dispatch(Action::SaveSettings { settings }, 1000).unwrap();
+    let project = e
+        .dispatch(
+            Action::SaveProject {
+                id: None,
+                name: "Portable".into(),
+                color: "#849b7d".into(),
+            },
+            1000,
+        )
+        .unwrap()
+        .data
+        .projects
+        .last()
+        .unwrap()
+        .id
+        .clone();
+    e.dispatch(
+        Action::SetProjectWhitelist {
+            id: project.clone(),
+            whitelist: Some(vec![path.clone()]),
+        },
+        1000,
+    )
+    .unwrap();
+    e.dispatch(
+        Action::SaveTask {
+            task: TaskDraft {
+                project_id: Some(project.clone()),
+                ..draft()
+            },
+        },
+        1000,
+    )
+    .unwrap();
+    let raw = e.export(1000).unwrap();
+    let mut restored = engine();
+    let data = serde_json::from_str(&raw).unwrap();
+    let snapshot = restored.dispatch(Action::Import { data }, 1000).unwrap();
+    assert_eq!(
+        snapshot.data.settings.protection.whitelist,
+        vec![path.clone()]
+    );
+    assert_eq!(
+        snapshot
+            .data
+            .projects
+            .iter()
+            .find(|p| p.id == project)
+            .unwrap()
+            .app_whitelist
+            .as_ref()
+            .unwrap(),
+        &vec![path.clone()]
+    );
+    let plan = snapshot.data.export_plan();
+    plan.validate().unwrap();
+    assert_eq!(
+        plan.projects
+            .iter()
+            .find(|p| p.id == project)
+            .unwrap()
+            .app_whitelist
+            .as_ref()
+            .unwrap(),
+        &vec![path]
+    );
+    let mut invalid = snapshot.data.settings.clone();
+    invalid.protection.whitelist = vec!["x".repeat(32769)];
+    assert!(restored
+        .dispatch(Action::SaveSettings { settings: invalid }, 1000)
+        .is_err());
+}
+
+#[test]
 fn expired_routines_count_as_misses_but_goal_work_does_not() {
     let mut e = engine();
     let mut routine = draft();

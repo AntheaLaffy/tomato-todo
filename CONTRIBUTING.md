@@ -14,17 +14,28 @@ pnpm install
 
 ```sh
 pnpm run desktop        # Tauri 桌面开发
+pnpm run android:dev    # Android 原生开发（需 SDK、NDK 与 Java）
+pnpm run android:build  # Android APK/AAB 构建
 pnpm run dev            # Rust 服务 + Vite 浏览器预览
 pnpm run check          # TypeScript 类型检查 + Rust Clippy（-D warnings）
 pnpm run format:check   # rustfmt + Prettier 格式检查
 pnpm run format         # 自动格式化（Rust + 前端）
 pnpm test               # Rust 单元测试 + 构建 + 浏览器端到端测试
 pnpm run test:native    # niri 独立嵌套桌面上的原生保护测试
+pnpm run test:windows   # Windows 独立 CI runner / Linux 独立 Wine+Xvfb 的原生保护测试
+pnpm run test:android   # 新建临时 API 33 AVD，验证已构建的 debug APK
+pnpm run test:x11       # 独立 Xvfb/Openbox 的核心 EWMH 保护测试
+pnpm run test:x11:app   # 同一独立 X11 会话中的 Tauri/WebKit 整应用保护测试
 pnpm run test:install   # 安装脚本验证
 pnpm run desktop:deb    # 构建生产 .deb 安装包
+pnpm run desktop:package # 按宿主平台构建 deb / NSIS / DMG
 ```
 
 浏览器预览访问 `http://127.0.0.1:1420`，Rust 服务仅监听 `127.0.0.1:4319`。端到端测试使用独立临时数据库、4321 端口和 Chromium；可用 `CHROMIUM_PATH` 指定浏览器可执行文件。生产程序加载内置界面，无需 Vite 服务。
+
+跨平台适配的当前证据、助手交叉打包命令与完整验收缺口见 [跨平台适配记录](docs/CROSS_PLATFORM.md)。当前优先桌面端，默认 CI 检查六个桌面目标；Android 四 ABI 和 API 33/35 APK/WebView 用例延后，只有手动触发工作流并勾选 `android` 才运行。远端执行与实际安装行为仍须验收。
+
+Android 使用 Java 17、Android SDK（工程中的 compileSdk）与 NDK 28.2.13676358，设置 `ANDROID_HOME`、`ANDROID_NDK_HOME` 和 `JAVA_HOME`。维护的工程在 `src-tauri/gen/android/`；日常构建无需重新 init。通用调试 APK 使用 `pnpm exec tauri android build --debug --target aarch64 armv7 i686 x86_64 --apk --ci` 构建。`pnpm run test:android` 需要安装 `system-images;android-33;google_apis;x86_64`，并先运行 `pnpm exec playwright install android` 安装原生控件驱动；入口会创建并清理独立 3 GB AVD。可通过 `ANDROID_TEST_GPU=host` 使用本机图形驱动，默认使用软件渲染。内部 `tests/android-app.mjs` 校验通用 APK 的四个 ABI，然后卸载并重装测试应用，只能在这个独立模拟器或 CI 中运行，不得指向个人设备。
 
 ## 架构
 
@@ -42,6 +53,10 @@ pnpm run desktop:deb    # 构建生产 .deb 安装包
 `pnpm test` 覆盖 Rust 状态机、计划往返导入、模板预印与印刷防重、严格执行、跨午夜锁机，以及真实浏览器端到端。
 
 原生保护测试（`pnpm run test:native`）需要 niri、Xvfb、tauri-driver、WebKitWebDriver 和 Python GObject/GTK。它会构建内置界面的独立测试程序，用私有 D-Bus、临时 XDG 配置和 StatusNotifier 测试宿主，验证白名单放行、非白名单回焦、拒绝关闭与暂停、全屏锁定、紧急恢复、真实托盘菜单、隐藏后计时、自启动开关、单实例恢复、无托盘回退。
+
+X11 测试由 `tests/x11.mjs` 使用 `Xvfb -displayfd` 自动分配独立显示，清除 niri/Wayland 环境；整应用测试另开私有 D-Bus、配置与数据目录。核心测试需要 Xvfb/Openbox，整应用测试额外需要 tauri-driver、WebKitWebDriver、xdotool/xprop 与 Python GObject/GTK；CI 在 Linux 上运行整应用测试。
+
+Windows 保护测试在独立 GitHub runner 上执行；Linux 本机需要 Windows GNU Rust target、MinGW、Wine、Xvfb 与 Openbox。`tests/windows.mjs` 自动使用新显示与独立 Wine 前缀；不会复用用户的 Wine 配置或显示。Wine 只能验证其实现的 Win32 API；封装应用身份与原生 Windows 行为仍需独立 Windows 验收。
 
 > **必须在独立的嵌套桌面里跑，不得在用户当前桌面自动启用保护。** 安装脚本验证（`pnpm run test:install`）同样使用临时用户目录。
 

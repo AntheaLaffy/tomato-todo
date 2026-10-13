@@ -1,6 +1,16 @@
-//! niri's documented IPC controls focus without terminating or suspending other apps.
+//! Native desktop focus control without terminating or suspending other apps.
+#[cfg(target_os = "macos")]
+#[path = "guard_macos.rs"]
+mod macos;
+#[cfg(target_os = "windows")]
+#[path = "guard_windows.rs"]
+mod win32;
+#[cfg(target_os = "linux")]
+#[path = "guard_x11.rs"]
+mod x11;
 use crate::{AppResult, GuardMode, Protection};
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "linux")]
 use serde_json::{json, Value};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -21,7 +31,7 @@ pub struct GuardInfo {
     pub windows: Vec<Window>,
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn request(value: Value) -> AppResult<Value> {
     use std::{
         io::{BufRead, BufReader, Read, Write},
@@ -47,27 +57,51 @@ fn request(value: Value) -> AppResult<Value> {
         .cloned()
         .ok_or_else(|| format!("niri 拒绝了请求：{}", response["Err"]))
 }
-#[cfg(not(unix))]
-fn request(_: Value) -> AppResult<Value> {
-    Err("专注保护目前支持 Linux niri 桌面".into())
-}
-
 pub fn windows() -> AppResult<Vec<Window>> {
-    let reply = request(json!("Windows"))?;
-    serde_json::from_value(reply["Windows"].clone()).map_err(|e| e.to_string())
+    #[cfg(target_os = "macos")]
+    {
+        macos::windows()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        win32::windows()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("NIRI_SOCKET").is_none() {
+            return x11::windows();
+        }
+        let reply = request(json!("Windows"))?;
+        serde_json::from_value(reply["Windows"].clone()).map_err(|e| e.to_string())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        Err("当前平台尚未提供原生窗口保护接口".into())
+    }
+}
+fn backend() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "Win32 / Windows"
+    } else if cfg!(target_os = "macos") {
+        "Quartz / macOS Accessibility"
+    } else if std::env::var_os("NIRI_SOCKET").is_some() {
+        "niri / Wayland"
+    } else {
+        "EWMH / X11"
+    }
 }
 pub fn info() -> GuardInfo {
     match windows() {
         Ok(windows) => GuardInfo {
             available: true,
-            backend: "niri / Wayland".into(),
+            backend: backend().into(),
             message: "窗口保护可用。非白名单应用会被切回专注界面。".into(),
             windows,
         },
         Err(e) => GuardInfo {
             available: false,
             backend: "当前环境".into(),
-            message: format!("{e}。应用白名单管控需要 niri 桌面；普通番茄计时仍可使用。"),
+            message: format!("{e}。普通番茄计时仍可使用。"),
             windows: vec![],
         },
     }
@@ -84,7 +118,10 @@ pub fn allowed(window: &Window, own_pid: u32, protection: &Protection) -> bool {
                 .is_some_and(|app| protection.whitelist.iter().any(|allowed| allowed == app)))
 }
 pub fn preflight(own_pid: u32) -> AppResult<()> {
-    if !windows()?.iter().any(|w| w.pid == Some(own_pid)) {
+    if !windows()?
+        .iter()
+        .any(|w| w.pid == Some(own_pid) && !(cfg!(target_os = "macos") && w.id == 0))
+    {
         return Err("未找到番茄 Todo 的桌面窗口，无法开启专注保护".into());
     }
     Ok(())
@@ -96,29 +133,50 @@ pub fn enforce(protection: &Protection, own_pid: u32) -> AppResult<bool> {
     let windows = windows()?;
     let own = windows
         .iter()
-        .find(|w| w.pid == Some(own_pid))
+        .find(|w| w.pid == Some(own_pid) && !(cfg!(target_os = "macos") && w.id == 0))
         .ok_or("专注窗口已关闭")?;
     if let Some(active) = windows.iter().find(|w| w.is_focused) {
         if !allowed(active, own_pid, protection) {
-            request(json!({"Action": {"FocusWindow": {"id": own.id}}}))?;
+            focus_window(own.id)?;
             return Ok(true);
         }
     }
     Ok(false)
 }
-/// Ask niri to focus our own window. A plain focus request can be ignored under
-/// niri, while the IPC action is honoured; this is what pulls the user back after
-/// a reminder or a finished focus/break.
+fn focus_window(id: u64) -> AppResult<()> {
+    #[cfg(target_os = "macos")]
+    {
+        macos::focus(id)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        win32::focus(id)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("NIRI_SOCKET").is_none() {
+            return x11::focus(id);
+        }
+        request(json!({"Action": {"FocusWindow": {"id": id}}}))?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        let _ = id;
+        Err("当前平台尚未提供原生窗口保护接口".into())
+    }
+}
+/// Use the desktop's native activation interface for reminders and protection.
 pub fn focus_own(own_pid: u32) -> AppResult<()> {
     let windows = windows()?;
     let own = windows
         .iter()
-        .find(|w| w.pid == Some(own_pid))
+        .find(|w| w.pid == Some(own_pid) && !(cfg!(target_os = "macos") && w.id == 0))
         .ok_or("未找到番茄 Todo 的窗口")?;
     if own.is_focused {
         return Ok(());
     }
-    request(json!({"Action": {"FocusWindow": {"id": own.id}}}))?;
+    focus_window(own.id)?;
     Ok(())
 }
 

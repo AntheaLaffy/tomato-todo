@@ -3,9 +3,9 @@
 [![CI](https://github.com/AntheaLaffy/tomato-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/AntheaLaffy/tomato-todo/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/AntheaLaffy/tomato-todo?include_prereleases)](https://github.com/AntheaLaffy/tomato-todo/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86__64-blue)
+![Linux / Windows](https://img.shields.io/badge/platform-Linux%20%2F%20Windows-blue)
 
-一个以 Rust 为核心的 Linux 桌面专注工具。奶油白与番茄红界面，任务、番茄钟、统计和备份都留在本机，不依赖账号或联网。
+一个以 Rust 为核心的 Linux / Windows 桌面专注工具。奶油白与番茄红界面，任务、番茄钟、统计和备份都留在本机，不依赖账号或联网。
 
 > **不靠意志力，靠环境**：白名单把分心挡在外面，AI 帮你把环境调成你的样子。
 
@@ -123,7 +123,8 @@
 在 [Releases](https://github.com/AntheaLaffy/tomato-todo/releases) 选择对应版本：
 
 - Debian / Ubuntu：下载 `.deb` 安装。
-- 其他发行版：解压 `*-x86_64-linux.tar.gz`，用其中的 `install.py` 安装到用户目录，无需 root。
+- 其他 Linux 发行版（含 niri）：按架构解压 `*-x86_64-linux.tar.gz` 或 `*-aarch64-linux.tar.gz`，用其中的 `install.py` 安装到用户目录，无需 root。
+- Windows：按架构下载 `*x64-setup.exe` 或 `*arm64-setup.exe`，运行 NSIS 安装程序。
 
 ```sh
 tar -xzf tomato-todo-*-x86_64-linux.tar.gz
@@ -152,13 +153,15 @@ pnpm run desktop:deb    # 构建生产 .deb
 
 ## 桌面环境适配
 
-番茄 Todo 是 Linux 桌面应用，任务、番茄钟、统计、备份等主体功能在各主流桌面环境都可用。与桌面深度耦合的两项能力——**专注保护**和**定时锁机**——目前只在 **niri / Wayland** 上完整可用，因为它们需要通过 niri IPC 获取前台窗口并把不允许的应用切回番茄 Todo。
+Windows/macOS 桌面层与跨平台 CI 正在适配，Android 已加入核心编译检查；当前证据和剩余验收项见 [跨平台适配记录](docs/CROSS_PLATFORM.md)。
+
+番茄 Todo 是 Linux 桌面应用，任务、番茄钟、统计、备份等主体功能在各主流桌面环境都可用。与桌面深度耦合的两项能力——**专注保护**和**定时锁机**——目前已实现 **niri / Wayland** 和原生 **X11 / EWMH** 后端，通过各自的窗口接口获取前台应用并把不允许的窗口切回番茄 Todo。X11 已使用 Openbox 隔离验证，其他窗口管理器仍需逐项验收。
 
 | 桌面 / 会话                          | 任务、计时与统计 | 专注保护与定时锁机 | 托盘与自启动                        |
 | ------------------------------------ | ---------------- | ------------------ | ----------------------------------- |
 | **niri / Wayland**（主要验证环境）   | ✅               | ✅ 完整可用        | ✅                                  |
 | 其他 Wayland 合成器（GNOME、KDE 等） | ✅               | ⚠️ 按钮显示不可用  | ✅ 需 AppIndicator / StatusNotifier |
-| X11                                  | ✅               | ⚠️ 按钮显示不可用  | ✅ 需 AppIndicator / StatusNotifier |
+| X11 / EWMH（Openbox 已隔离验证）      | ✅               | ✅ 已实现          | ✅ 需 AppIndicator / StatusNotifier |
 
 - **niri / Wayland**：程序优先使用原生 Wayland，让窗口 PID 和应用标识能被正确识别；即使启动终端设置了 `GDK_BACKEND=x11`，也不会误用 Xwayland 中转窗口。
 - **托盘**：需要 AppIndicator 运行库（Arch 的 `libappindicator-gtk3`，Debian 的 `libayatana-appindicator3-1`）及桌面上的 StatusNotifier 组件。没有托盘时正常显示窗口和退出，后台启动会等待桌面组件最多约 10 秒后显示窗口。
@@ -168,7 +171,7 @@ pnpm run desktop:deb    # 构建生产 .deb
 
 ## 专注保护能做什么、不能做什么
 
-程序通过 niri IPC 获取前台窗口并把不允许的应用切回番茄 Todo。白名单按精确 `app_id` 匹配，可直接添加当前打开的应用。浏览器内的所有网站共用一个应用标识，因此允许浏览器也会允许其中的娱乐网站。
+程序通过 niri IPC 或 X11 EWMH 获取前台窗口并把不允许的应用切回番茄 Todo。白名单按精确应用标识匹配（niri 的 `app_id`、X11 的 `WM_CLASS` 应用类），可直接添加当前打开的应用。浏览器内的所有网站共用一个应用标识，因此允许浏览器也会允许其中的娱乐网站。
 
 这是**自律辅助功能**。它不会结束其他进程，不会暂停或修改其他应用；无法阻止系统快捷键、工作区总览、其他显示器的内容或外部结束进程。严格模式由 Rust 拒绝提前退出，而非只隐藏按钮；IPC 故障仍会解除当前保护并报错。尚未实现云同步、在线自习室、网站过滤或操作系统级安全锁屏。
 

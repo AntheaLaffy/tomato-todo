@@ -55,6 +55,7 @@ import {
   RefreshCw,
   ArrowUpDown,
   Lightbulb,
+  Menu,
 } from "lucide";
 import { listen } from "@tauri-apps/api/event";
 import { initPonder, openPonder, openPonderList } from "./ponder";
@@ -69,6 +70,9 @@ import { blocksTour } from "./hand-demo";
 import { createNodeGraph } from "./nodegraph";
 import {
   desktop,
+  native,
+  mobile,
+  initPlatform,
   dispatch,
   exportData,
   exportPlan,
@@ -176,6 +180,7 @@ const iconSet = {
   RefreshCw,
   ArrowUpDown,
   Lightbulb,
+  Menu,
 };
 const $ = <T extends Element = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -226,6 +231,7 @@ const icons = () => {};
 const logo = `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 12C8 5 3 19 8 32c3 9 12 12 16 8 5 4 15 0 17-9C45 17 38 6 24 12Z" fill="currentColor"/><path d="m24 13-8-5 8 2 5-6-1 7 8 1-10 3" fill="#7c997a"/><path d="M14 22c-1 4 0 7 2 9" stroke="white" stroke-opacity=".65" stroke-width="3" stroke-linecap="round"/></svg>`;
 let state: Snapshot;
 let page = "focus";
+let mobileNavOpen = false;
 let goalsTab = "goals";
 let selectMode = false;
 const selectedTaskIds = new Set<string>();
@@ -235,6 +241,7 @@ let filter = "active";
 let reminderSeen = "";
 let priority = "all";
 let sort = "time";
+let undatedExpanded = false;
 let search = "";
 let immersive = false;
 let noiseKind = "off";
@@ -525,6 +532,7 @@ async function navigate(next: string) {
   if (page === "settings" && settingsDirty && next !== page) {
     if (!(await savePreferences())) return;
   }
+  setMobileNav(false);
   page = next;
   search = "";
   filter = "active";
@@ -542,6 +550,22 @@ async function navigate(next: string) {
       .catch((error) => toast(String(error)));
   }
 }
+function setMobileNav(open: boolean) {
+  mobileNavOpen = mobile && open && matchMedia("(max-width: 700px)").matches;
+  document.documentElement.classList.toggle("mobile-nav-open", mobileNavOpen);
+  const sidebar = document.querySelector<HTMLElement>(".sidebar");
+  const workspace = document.querySelector<HTMLElement>(".workspace");
+  if (sidebar)
+    sidebar.inert =
+      mobile && matchMedia("(max-width: 700px)").matches && !mobileNavOpen;
+  if (workspace) workspace.inert = mobileNavOpen;
+  document
+    .querySelector(".mobile-menu")
+    ?.setAttribute("aria-expanded", String(mobileNavOpen));
+}
+matchMedia("(max-width: 700px)").addEventListener("change", () =>
+  setMobileNav(false),
+);
 function render() {
   if (protectedNow() || immersive) {
     renderImmersive();
@@ -550,8 +574,10 @@ function render() {
   const d = state.data,
     s = state.stats;
   const look = ensureDerived();
-  $("#app").innerHTML = `<aside class="sidebar">
+  $("#app").innerHTML =
+    `${mobile ? `<button class="mobile-nav-backdrop" data-action="close-navigation" aria-label="关闭导航"></button>` : ""}<aside class="sidebar" aria-label="空间导航">
     <button class="brand" data-page="focus"><span class="brand-mark">${logo}</span><span>番茄 <b>Todo</b><small>让专注，成为日常</small></span></button>
+    ${mobile ? `<button class="icon-btn mobile-nav-close" data-action="close-navigation" aria-label="关闭导航">${icon("x")}</button>` : ""}
     <div class="workspace-label">我的空间 <span>PERSONAL</span></div>
     <nav aria-label="主导航">${[
       ["focus", "sun"],
@@ -571,10 +597,11 @@ function render() {
     <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
     <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${look.activeByProject.get(p.id) ?? 0}</b></button>`).join("")}</nav>
     <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
-    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.8.3</span></div></div>
+    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.8.4</span></div></div>
   </aside>
-  <div class="workspace"><header class="topbar"><div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="ponder-list" aria-label="概念讲解">${icon("lightbulb")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
+  <div class="workspace"><header class="topbar">${mobile ? `<button class="icon-btn mobile-menu" data-action="toggle-navigation" aria-label="打开导航" aria-expanded="${mobileNavOpen}">${icon("menu")}</button>` : ""}<div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="ponder-list" aria-label="概念讲解">${icon("lightbulb")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
   <main data-ponder="${page.startsWith("project:") ? "project" : page}">${reminderBanner()}${page === "agent" ? agentPage() : page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  setMobileNav(mobileNavOpen);
   bindForms();
   if (page === "agent") mountAgent();
   icons();
@@ -648,6 +675,9 @@ let welcomed = false;
 try {
   welcomed = localStorage.getItem("tomato.welcomed") === "1";
 } catch {}
+function backgroundSoundButton() {
+  return `<button class="sound-button ${noiseKind !== "off" || bgmPlaying ? "on" : ""}" data-action="sound">${icon("headphones")}<span>${bgmPlaying ? "写作业 BGM · 正在播放" : noiseKind === "off" ? "选择背景音" : noiseKind === "rain" ? "雨声 · 正在播放" : "棕噪音 · 正在播放"}</span>${icon("chevron-right")}</button>`;
+}
 function focusPage() {
   const s = state.stats;
   const weekday = new Date(`${state.today}T12:00:00`).toLocaleDateString(
@@ -660,15 +690,50 @@ function focusPage() {
   );
   const catchUpTasks = todayTasks.filter(isCatchUp);
   const regularTasks = todayTasks.filter((t) => !isCatchUp(t));
+  const timedTasks = regularTasks.filter((t) => t.dueDate && t.reminderTime);
+  const untimedTasks = regularTasks.filter((t) => t.dueDate && !t.reminderTime);
+  const undatedTasks = regularTasks.filter((t) => !t.dueDate);
+  const activeList = todayTasks.length
+    ? todayTaskGroup("今日定时", timedTasks, "time") +
+      todayTaskGroup("待补队列", catchUpTasks, "time", "catch-up") +
+      todayTaskGroup("今日未定时", untimedTasks, "priority") +
+      todayTaskGroup("无日期任务", undatedTasks, "priority", "undated")
+    : taskList([], true);
   return `${heading("今天，也要慢慢向前。", `${weekday} <span class="dot-separator">·</span> 专注当下，让每一小步都有回响。`)}
     ${welcomeCard()}
     <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办，按自己的节奏来`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
     <div class="focus-grid"><section class="card focus-card"><div class="card-heading"><h2>${icon("timer")} 我的番茄钟</h2><button class="icon-btn" data-action="immersive" aria-label="进入沉浸模式">${icon("maximize-2")}</button></div>${timerContent()}
-    <div class="sound-bar"><button class="sound-button ${noiseKind !== "off" || bgmPlaying ? "on" : ""}" data-action="sound">${icon("headphones")}<span>${bgmPlaying ? "写作业 BGM · 正在播放" : noiseKind === "off" ? "来一点背景音？" : noiseKind === "rain" ? "雨声 · 正在播放" : "棕噪音 · 正在播放"}</span>${icon("chevron-right")}</button><button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
+    <div class="sound-bar">${backgroundSoundButton()}<button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
     <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayTasks.length}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayTasks.length}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small">一步一步，来就好</span></div>
-    <div class="today-list">${taskList(filter === "completed" ? state.data.tasks.filter((t) => t.completed && t.completedAt && new Date(t.completedAt * 1000).toLocaleDateString("sv-SE") === state.today) : regularTasks, true)}${filter !== "completed" && catchUpTasks.length ? `<h3 class="group-title" data-ponder="catch-up">待补队列<span>${catchUpTasks.length}</span></h3>${taskList(catchUpTasks, true)}` : ""}</div>
+    <div class="today-list">${
+      filter === "completed"
+        ? taskList(
+            state.data.tasks.filter(
+              (t) =>
+                t.completed &&
+                t.completedAt &&
+                new Date(t.completedAt * 1000).toLocaleDateString("sv-SE") ===
+                  state.today,
+            ),
+            true,
+            "time",
+          )
+        : activeList
+    }</div>
     <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的小目标 <kbd>N</kbd></button><div class="list-footnote">${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
     <div class="bottom-grid"><section class="card week-card"><div class="card-heading"><h2>这一周的专注节奏</h2><button class="text-button" data-page="stats">查看统计 ${icon("arrow-up-right")}</button></div>${weekChart(false)}</section><section class="quote-card"><div class="quote-leaf">${icon("leaf")}</div><span class="eyebrow">ONE THING AT A TIME</span><h3>不求每一天都满分，<br>只求每一刻都投入。</h3><p>一个番茄，一点进步。</p><div class="quote-dots"><i></i><i></i><i></i></div></section></div>`;
+}
+function todayTaskGroup(
+  title: string,
+  tasks: Task[],
+  order: "time" | "priority",
+  kind?: "catch-up" | "undated",
+) {
+  if (!tasks.length) return "";
+  const expanded = kind !== "undated" || undatedExpanded;
+  const collapsible = kind === "undated";
+  const shown = expanded ? tasks : [];
+  return `<section class="today-task-group"><div class="today-group-heading"><h3 class="group-title" ${kind === "catch-up" ? 'data-ponder="catch-up"' : ""}>${title}<span>${tasks.length}</span></h3>${collapsible ? `<button class="text-button small" data-action="toggle-${kind}" aria-expanded="${expanded}" aria-controls="today-${kind}-tasks">${expanded ? "收起" : `查看全部 ${tasks.length} 项`}${icon(expanded ? "chevron-down" : "chevron-right")}</button>` : ""}</div><div ${kind ? `id="today-${kind}-tasks"` : ""} ${kind === "undated" && !expanded ? "hidden" : ""}>${shown.length ? taskList(shown, true, order) : ""}</div></section>`;
 }
 function timerContent() {
   const t = state.data.timer,
@@ -696,18 +761,19 @@ function isCatchUp(task: Task) {
   end.setMinutes(hour * 60 + minute + minutes);
   return state.serverTime >= end.getTime() / 1000;
 }
-function taskList(tasks: Task[], compact = false) {
+function compareTaskTime(a: Task, b: Task) {
+  return (
+    (a.dueDate || "9999-12-31").localeCompare(b.dueDate || "9999-12-31") ||
+    (a.reminderTime || "99:99").localeCompare(b.reminderTime || "99:99") ||
+    a.createdAt - b.createdAt
+  );
+}
+function taskList(tasks: Task[], compact = false, order = sort) {
   const items = [...tasks].sort((a, b) =>
-    sort === "priority"
-      ? b.priority - a.priority
-      : sort === "time"
-        ? (a.dueDate || "9999-12-31").localeCompare(
-            b.dueDate || "9999-12-31",
-          ) ||
-          (a.reminderTime || "99:99").localeCompare(
-            b.reminderTime || "99:99",
-          ) ||
-          a.createdAt - b.createdAt
+    order === "priority"
+      ? b.priority - a.priority || a.createdAt - b.createdAt
+      : order === "time"
+        ? compareTaskTime(a, b)
         : a.createdAt - b.createdAt,
   );
   if (!items.length)
@@ -1365,7 +1431,7 @@ function projectWhitelistCard(project: Project) {
           )
           .join(
             "",
-          )}</div><form id="project-whitelist-form" class="manual-app"><input type="hidden" name="projectId" value="${escape(project.id)}"><input name="appId" maxlength="200" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="项目应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form>`
+          )}</div><form id="project-whitelist-form" class="manual-app"><input type="hidden" name="projectId" value="${escape(project.id)}"><input name="appId" maxlength="32768" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="项目应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form>`
       : ""
   }</section>`;
 }
@@ -1396,8 +1462,8 @@ function guardPage() {
     .join(
       "",
     )}</div><div class="guard-capability ${guardInfo?.available ? "available" : ""}">${icon(guardInfo?.available ? "check-circle-2" : "alert-circle")}<span>${escape(guardInfo?.message || "正在检查窗口控制接口…")}</span></div></section>
-  <section class="card guard-card guard-strict-card"><label class="setting-row"><span><strong>严格模式 · 不允许临时退出</strong><small>用于界面锁定和应用白名单。开启后，计时中不能暂停、提前结束或关闭保护；结束时自动解除。</small></span><input id="guard-strict" class="switch" type="checkbox" ${p.strict ? "checked" : ""} ${!guardInfo?.available ? "disabled" : ""}></label><p class="subtle small">请在开始前确认所需应用已加入白名单。未开启严格模式时，仍可通过确认文字提前结束。</p></section><section class="card whitelist-card"><div class="card-heading"><div><h2>允许使用的应用 <span class="count-label">${p.whitelist.length}</span></h2><p class="subtle small">以应用 ID 精确匹配。番茄 Todo 始终允许使用。</p></div><button class="button secondary small-button" data-action="refresh-apps">${icon("refresh-cw")} 刷新应用</button></div><div class="whitelist-tags">${p.whitelist.map((app) => `<span class="app-tag">${icon("monitor")} ${escape(app)}<button class="icon-btn tiny" data-remove-app="${escape(app)}" aria-label="移除 ${escape(app)}">${icon("x")}</button></span>`).join("") || '<p class="subtle small">还没有添加应用。先打开需要使用的软件，再从下方添加。</p>'}</div><div class="available-apps">${[...new Map((guardInfo?.windows || []).filter((w) => w.app_id).map((w) => [w.app_id!, w])).values()].map((w) => `<button class="available-app" data-add-app="${escape(w.app_id)}" ${p.whitelist.includes(w.app_id!) ? "disabled" : ""}>${icon("monitor")}<span><strong>${escape(w.app_id)}</strong><small>${escape(w.title)}</small></span>${icon(p.whitelist.includes(w.app_id!) ? "check" : "plus")}</button>`).join("")}</div><form id="whitelist-form" class="manual-app"><input name="appId" maxlength="200" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form></section>
-  <div class="guard-explanation">${icon("circle-help")}<p>白名单限制的是整个应用，不区分浏览器网站。此功能使用 niri 的窗口接口，每 0.6 秒检查一次并拉回未允许的窗口；不会结束其他软件。系统快捷键、桌面概览、多个显示器和主动终止进程不属于这项自律保护的管控范围。</p></div>`;
+  <section class="card guard-card guard-strict-card"><label class="setting-row"><span><strong>严格模式 · 不允许临时退出</strong><small>用于界面锁定和应用白名单。开启后，计时中不能暂停、提前结束或关闭保护；结束时自动解除。</small></span><input id="guard-strict" class="switch" type="checkbox" ${p.strict ? "checked" : ""} ${!guardInfo?.available ? "disabled" : ""}></label><p class="subtle small">请在开始前确认所需应用已加入白名单。未开启严格模式时，仍可通过确认文字提前结束。</p></section><section class="card whitelist-card"><div class="card-heading"><div><h2>允许使用的应用 <span class="count-label">${p.whitelist.length}</span></h2><p class="subtle small">以应用 ID 精确匹配。番茄 Todo 始终允许使用。</p></div><button class="button secondary small-button" data-action="refresh-apps">${icon("refresh-cw")} 刷新应用</button></div><div class="whitelist-tags">${p.whitelist.map((app) => `<span class="app-tag">${icon("monitor")} ${escape(app)}<button class="icon-btn tiny" data-remove-app="${escape(app)}" aria-label="移除 ${escape(app)}">${icon("x")}</button></span>`).join("") || '<p class="subtle small">还没有添加应用。先打开需要使用的软件，再从下方添加。</p>'}</div><div class="available-apps">${[...new Map((guardInfo?.windows || []).filter((w) => w.app_id).map((w) => [w.app_id!, w])).values()].map((w) => `<button class="available-app" data-add-app="${escape(w.app_id)}" ${p.whitelist.includes(w.app_id!) ? "disabled" : ""}>${icon("monitor")}<span><strong>${escape(w.app_id)}</strong><small>${escape(w.title)}</small></span>${icon(p.whitelist.includes(w.app_id!) ? "check" : "plus")}</button>`).join("")}</div><form id="whitelist-form" class="manual-app"><input name="appId" maxlength="32768" placeholder="手动输入应用 ID，例如 org.mozilla.firefox" aria-label="应用 ID" required><button class="button secondary" type="submit">${icon("plus")} 添加</button></form></section>
+  <div class="guard-explanation">${icon("circle-help")}<p>白名单限制的是整个应用，不区分浏览器网站。此功能通过当前桌面的窗口接口，每 0.6 秒检查一次并拉回未允许的窗口；不会结束其他软件。系统快捷键、桌面概览、多个显示器和主动终止进程不属于这项自律保护的管控范围。</p></div>`;
 }
 async function refreshGuard() {
   try {
@@ -1506,7 +1572,7 @@ function renderImmersive() {
     ? Math.max(0, rest.endsAt - state.serverTime)
     : state.remainingSecs;
   $("#app").innerHTML =
-    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow">${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div><button class="text-button tomorrow-entry" data-action="tomorrow-schedule">${icon("calendar-days")} 查看明天日程</button>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
+    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow">${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div><button class="text-button tomorrow-entry" data-action="tomorrow-schedule">${icon("calendar-days")} 查看明天日程</button>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}${!rest ? `<div class="immersive-sound">${backgroundSoundButton()}</div>` : ""}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
   icons();
   updateClock();
 }
@@ -1532,6 +1598,7 @@ function updateClock() {
 }
 
 function modal(content: string, wide = false) {
+  setMobileNav(false);
   lastFocus = document.activeElement as HTMLElement;
   $("#modal-root").innerHTML =
     `<div class="modal-backdrop"><section class="modal ${wide ? "wide" : ""}" role="dialog" aria-modal="true" aria-labelledby="modal-title">${content}</section></div>`;
@@ -2990,6 +3057,12 @@ document.addEventListener("click", async (e) => {
     return;
   }
   switch (d.action) {
+    case "toggle-navigation":
+      setMobileNav(!mobileNavOpen);
+      break;
+    case "close-navigation":
+      setMobileNav(false);
+      break;
     case "hide-tray":
       try {
         await hideToTray();
@@ -3090,6 +3163,10 @@ document.addEventListener("click", async (e) => {
     case "sound":
       soundDialog();
       break;
+    case "toggle-undated":
+      undatedExpanded = !undatedExpanded;
+      render();
+      break;
     case "toggle-chime":
       await act({
         type: "saveSettings",
@@ -3183,6 +3260,7 @@ document.addEventListener("keydown", (e) => {
   const modalOpen = !!document.querySelector(".modal");
   if (e.key === "Escape") {
     if (modalOpen) closeModal();
+    else if (mobileNavOpen) setMobileNav(false);
     else if (immersive && !protectedNow()) {
       immersive = false;
       render();
@@ -3401,6 +3479,20 @@ async function boot() {
   initPonder();
   installHand();
   try {
+    await initPlatform();
+    if (mobile) {
+      (window as unknown as Record<string, unknown>).tomatoBack = () => {
+        if (document.querySelector(".modal")) closeModal();
+        else if (mobileNavOpen) setMobileNav(false);
+        else if (protectedNow()) toast("专注保护中，先把眼前这件事做好。");
+        else if (immersive) {
+          immersive = false;
+          render();
+        } else if (page !== "focus") void navigate("focus");
+        else return false;
+        return true;
+      };
+    }
     if (desktop) nativeStatus = await getDesktopStatus();
     accept(await getSnapshot());
   } catch (e) {
@@ -3414,7 +3506,7 @@ async function boot() {
   } catch {
     toast("本地 BGM 读取失败，可在背景音中重新导入");
   }
-  if (desktop) {
+  if (native) {
     await listen("agent-wake", () => {
       agentWakePending = true;
       void revealAgent();

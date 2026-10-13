@@ -24,7 +24,7 @@ generated_at: 2026-10-10
 | 修复倒计时与统计 | 业务核心 | lib.rs 的 tick/stats/Engine | tests.rs、桌面后台线程 |
 | 主线统计与纵切面 | 业务核心 | lib.rs 的 stats/GoalStat/NodeStat/DayStat | node_tests.rs、src/main.ts 的 statsPage/goalStatsCard/crossSectionCard |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
-| 扩展桌面白名单 | 桌面保护 | guard.rs | src-tauri/src/main.rs、tests/native.mjs |
+| 扩展桌面白名单 | 桌面保护 | guard.rs、guard_x11.rs | src-tauri/src/desktop_app.rs、tests/native.mjs、tests/x11.mjs |
 | 学习助手的异常诊断 | 诊断 | diagnostics.rs 的 diagnose/Anomaly | crates/agent 的唤醒排队、tests.rs、docs/AGENT.md |
 | 课表阻塞时段与课内并行 | 业务核心 | blocks.rs 的 Block/Attention/on_date/required_minutes、diagnostics.rs 的 blockConflict | plan.rs、lib.rs 的 SaveBlock/DeleteBlock、src/main.ts 的 schedulePage/blocksCard、crates/agent 的 save_block、docs/PLAN_FORMAT.md |
 
@@ -35,8 +35,8 @@ generated_at: 2026-10-10
 | AppData / Action | nodes.rs | 主线 | 时间配对、完成条件、不可逆裁定、局域阻断、信号防重/追溯、冻结配置 |
 | identities.rs | 标识符 | 跨实体类型唯一、删除与历史引用永久保留、原任务恢复校验、导入历史合并 |
 | node_tests.rs | 验证 | 主线配对/信号/阻断/检查/裁定/删除/重启/备份/历史 ID 与专注收尾；见 node_tests.rs.analysis.md |
-| Settings / AppData / Action | lib.rs | L:223 / L:343 / L:425 |
-| Engine | lib.rs | L:1779 |
+| Settings / AppData / Action | lib.rs | L:225 / L:345 / L:432 |
+| Engine | lib.rs | L:1829 |
 | guard | guard.rs | L:1 |
 
 ## 文件
@@ -47,7 +47,10 @@ generated_at: 2026-10-10
 | plan.rs | 文件契约 | v1/v2 转换与 v5 主线/课表 DTO、导出未完成任务、按 ID 更新配置与保留进度、`replace` 整份同步、稳定 ID 去重、番茄时长换算 |
 | blocks.rs | 课表占用 | 计划之外的每周固定占用（课程/实验）：星期与跨午夜时间段校验、按日期取时段、需专心分钟统计 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
-| guard.rs | 桌面保护 | niri IPC 能力检测、精确应用匹配和回焦 |
+| guard.rs | 桌面保护 | niri/X11/Win32/macOS 后端选择、能力检测、精确应用匹配和回焦；macOS 无窗口前台标记不满足本应用窗口预检 |
+| guard_macos.rs | 桌面保护 | Quartz 窗口/PID/完整路径与 Accessibility 前台识别、权限检测、本进程主窗口激活/回焦确认；CF 对象按 Create/Copy 规则释放 |
+| guard_windows.rs | 桌面保护 | Win32 窗口/PID/路径与封装应用 AUMID 识别、共享 UWP 框架解析、DWM 隐藏窗口过滤及输入队列回焦；拒绝激活时报告失败 |
+| guard_x11.rs | 桌面保护 | EWMH 活跃窗口管理器检测、窗口/PID/WM_CLASS/标题枚举与激活；拒绝把 Xwayland 当成完整 Wayland 管控 |
 | diagnostics.rs | 诊断 | 本地异常检测（需专心课内安排、时段重叠、计划超量/过少、习惯缺勤、主线停滞、深夜记录、投入下降）与证据字段，供学习助手唤醒 |
 | tests.rs | 验证 | 状态、持久化、保护与计划往返/失败原子性回归测试 |
 | reminders.rs | 时间安排 | 日期/时间与单次时长校验、当天待处理队列、计时/锁机延后、跨日清理 |

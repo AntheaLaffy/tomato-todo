@@ -6,7 +6,15 @@ import type {
   Snapshot,
   PlanFile,
 } from "./types";
-export const desktop = isTauri();
+export const native = isTauri();
+export let desktop = native;
+export let mobile = false;
+export async function initPlatform(): Promise<void> {
+  if (!native) return;
+  mobile = (await invoke<string>("platform_kind")) === "android";
+  desktop = !mobile;
+  document.documentElement.dataset.platform = mobile ? "android" : "desktop";
+}
 async function request<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(
     `/api/${path}`,
@@ -22,29 +30,29 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return response.json();
 }
 export const getSnapshot = () =>
-  desktop ? invoke<Snapshot>("snapshot") : request<Snapshot>("snapshot");
+  native ? invoke<Snapshot>("snapshot") : request<Snapshot>("snapshot");
 export const dispatch = (action: Record<string, unknown>) =>
-  desktop
+  native
     ? invoke<Snapshot>("dispatch", { action })
     : request<Snapshot>("action", action);
 export const getGuard = () =>
-  desktop ? invoke<GuardInfo>("guard_info") : request<GuardInfo>("guard");
+  native ? invoke<GuardInfo>("guard_info") : request<GuardInfo>("guard");
 export const getDesktopStatus = () => invoke<DesktopStatus>("desktop_status");
 export const saveDesktopSettings = (autostart: boolean, closeToTray: boolean) =>
   invoke<DesktopStatus>("save_desktop_settings", { autostart, closeToTray });
 export const hideToTray = () => invoke<void>("hide_to_tray");
 export const quitApp = () => invoke<void>("quit_app");
 export const agentCall = <T>(requestBody: Record<string, unknown>) =>
-  desktop
+  native
     ? invoke<T>("agent_call", { request: requestBody })
     : request<T>("agent", requestBody);
 export const openAgentLogin = () => invoke<void>("agent_open_login");
 export async function exportData(data: AppData): Promise<boolean> {
-  if (desktop) return invoke<boolean>("export_data");
+  if (native) return invoke<boolean>("export_data");
   return downloadJson(data, "tomato-todo-backup.json");
 }
 export async function exportPlan(): Promise<boolean> {
-  if (desktop) return invoke<boolean>("export_data", { plan: true });
+  if (native) return invoke<boolean>("export_data", { plan: true });
   return downloadJson(await request<PlanFile>("plan"), "tomato-todo-plan.json");
 }
 export function downloadJson(data: unknown, filename: string): boolean {
@@ -61,7 +69,7 @@ export function downloadJson(data: unknown, filename: string): boolean {
 export const readImport = () => readJson<AppData>(false);
 export const readPlan = () => readJson<PlanFile>(true);
 async function readJson<T>(plan: boolean): Promise<T | null> {
-  if (desktop) return invoke<T | null>("read_import", { plan });
+  if (native) return invoke<T | null>("read_import", { plan });
   return new Promise((resolve, reject) => {
     const input = document.createElement("input");
     input.type = "file";

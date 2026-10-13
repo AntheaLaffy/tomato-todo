@@ -10,6 +10,7 @@ generated_at: 2026-10-09
 | Dir | Domain | Depends On | Purpose |
 | --- | --- | --- | --- |
 | src/ | 业务核心 | rusqlite、serde、chrono | 可测试的状态与持久化 |
+| tests/ | 验证 | Xvfb、Openbox、x11rb | 独立 X11 会话的真实窗口保护集成测试 |
 
 ## 文件
 

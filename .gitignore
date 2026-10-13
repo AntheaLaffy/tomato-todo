@@ -4,7 +4,8 @@
 /artifacts
 /agent/node_modules
 /agent/bundle
-/src-tauri/gen
+/src-tauri/gen/*
+!/src-tauri/gen/android/
 *.sqlite3*
 .DS_Store
 

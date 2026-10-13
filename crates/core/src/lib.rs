@@ -211,13 +211,13 @@ fn default_estimate() -> u32 {
     1
 }
 
-/// App IDs must be short, non-blank and free of control characters, matching the
-/// global whitelist rule so project lists cannot smuggle in unenforceable values.
+/// Windows executable paths can exceed short app IDs. Share the same bounded,
+/// non-blank, control-free validation between global and project lists.
 fn valid_app_ids(list: &[String]) -> bool {
     list.len() <= 100
-        && list
-            .iter()
-            .all(|a| !a.trim().is_empty() && a.len() <= 200 && !a.chars().any(char::is_control))
+        && list.iter().all(|a| {
+            !a.trim().is_empty() && a.chars().count() <= 32768 && !a.chars().any(char::is_control)
+        })
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

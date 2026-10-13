@@ -9,6 +9,7 @@ generated_at: 2026-10-09
 
 | File            | Domain | Function                                           |
 | --------------- | ------ | -------------------------------------------------- |
+| proxy_agent_worker.mjs | 验证 | 固定无效域名的用量请求，配合本地 HTTP 代理验证 Rust 启动随包 Node 的实际代理路径；无账号或外网 |
 | slow_agent_worker.mjs | 验证 | 2 秒延迟的用量回复，验证真实桌面 IPC 与窗口线程保持响应；无账号或联网 |
 | guard_window.py | 验证   | 创建带不同 app_id 的 GTK 测试程序                  |
 | tray_bus.py     | 验证   | 私有 StatusNotifier 宿主及真实 DBusMenu 读写客户端 |

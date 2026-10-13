@@ -2,8 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
+import { createConnection } from "node:net";
 import { createInterface } from "node:readline";
-import { mkdtemp, readFile, stat, mkdir, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  stat,
+  mkdir,
+  writeFile,
+  copyFile,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { chromium, expect } from "@playwright/test";
@@ -17,6 +25,99 @@ import {
   normalizeCodexCredential,
   parseCodexConfig,
 } from "../agent/codex-config.mjs";
+
+test(
+  "Rust worker starts packaged Node with HTTP proxy support",
+  { timeout: 20000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tomato-proxy-"));
+    const requests = [];
+    const proxy = createServer((request, response) => {
+      requests.push(request.url);
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ codex: { route: "local-proxy" } }));
+    });
+    const target = createServer((request, response) => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ codex: { route: "local-proxy" } }));
+    });
+    await new Promise((resolve) => target.listen(0, "127.0.0.1", resolve));
+    const tunnels = new Set();
+    proxy.on("connect", (request, socket, head) => {
+      requests.push(request.url);
+      const upstream = createConnection(
+        target.address().port,
+        "127.0.0.1",
+        () => {
+          socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+          if (head.length) upstream.write(head);
+          socket.pipe(upstream).pipe(socket);
+        },
+      );
+      tunnels.add(socket);
+      tunnels.add(upstream);
+      socket.on("error", () => upstream.destroy());
+      upstream.on("error", () => socket.destroy());
+    });
+    await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+    await mkdir(join(dir, "agent/bin"), { recursive: true });
+    await copyFile("target/debug/tomato-preview", join(dir, "tomato-preview"));
+    await copyFile("agent/bundle/bin/node", join(dir, "agent/bin/node"));
+    await copyFile(
+      "tests/fixtures/proxy_agent_worker.mjs",
+      join(dir, "agent/worker.mjs"),
+    );
+    const endpoint = "http://127.0.0.1:4343";
+    const server = spawn(join(dir, "tomato-preview"), [], {
+      env: {
+        ...process.env,
+        TOMATO_PORT: "4343",
+        TOMATO_DATA_PATH: join(dir, "data.sqlite3"),
+        HTTP_PROXY: `http://127.0.0.1:${proxy.address().port}`,
+        http_proxy: `http://127.0.0.1:${proxy.address().port}`,
+        NO_PROXY: "localhost,127.0.0.1,::1",
+        no_proxy: "localhost,127.0.0.1,::1",
+      },
+      stdio: "pipe",
+    });
+    let logs = "";
+    server.stderr.on("data", (chunk) => (logs += chunk));
+    try {
+      await waitFor(async () => {
+        try {
+          return (await fetch(`${endpoint}/api/snapshot`)).ok;
+        } catch {
+          return false;
+        }
+      });
+      const response = await fetch(`${endpoint}/api/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "usage" }),
+      });
+      assert.equal(response.status, 200, await response.clone().text());
+      assert.deepEqual(await response.json(), {
+        codex: { route: "local-proxy" },
+      });
+      assert.ok(
+        requests.includes("proxy-target.invalid:80") ||
+          requests.includes("http://proxy-target.invalid/usage"),
+        JSON.stringify(requests),
+      );
+    } catch (error) {
+      throw new Error(`${error.message}\n${logs}`, { cause: error });
+    } finally {
+      server.kill("SIGTERM");
+      for (const socket of tunnels) socket.destroy();
+      proxy.closeAllConnections();
+      target.closeAllConnections();
+      await Promise.all([
+        new Promise((resolve) => proxy.close(resolve)),
+        new Promise((resolve) => target.close(resolve)),
+      ]);
+    }
+  },
+);
 
 test("Codex CLI provider and OAuth files map to Pi without network access", async () => {
   const config = parseCodexConfig(`model = "gpt-6-sol"

@@ -1,6 +1,6 @@
 name: Release
 
-# Tag pushes such as v0.1.0 publish a GitHub Release with the Linux packages.
+# This release line publishes native Linux (including niri) and Windows packages.
 # The workflow can also be started by hand from an existing tag.
 on:
   push:
@@ -12,15 +12,31 @@ on:
         required: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
-  release:
-    name: Build and publish Linux packages
-    runs-on: ubuntu-22.04
+  build:
+    name: Package / ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: x86_64
+            bundles: deb
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+            bundles: deb
+          - runner: windows-2022
+            arch: x86_64
+            bundles: nsis
+          - runner: windows-11-arm
+            arch: aarch64
+            bundles: nsis
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -43,6 +59,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install system dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -53,10 +70,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Debian package
-        run: pnpm run desktop:deb
+      - name: Build host agent runtime
+        run: pnpm run agent:build
+
+      - name: Check packaged Node and Pi SDK
+        run: node --test tests/agent-runtime.mjs
+
+      - name: Build native package
+        env:
+          DESKTOP_BUNDLES: ${{ matrix.bundles }}
+        run: pnpm exec tauri build --bundles "$env:DESKTOP_BUNDLES"
+        if: runner.os == 'Windows'
+
+      - name: Build native package
+        env:
+          DESKTOP_BUNDLES: ${{ matrix.bundles }}
+        run: pnpm exec tauri build --bundles "$DESKTOP_BUNDLES"
+        if: runner.os != 'Windows'
 
       - name: Assemble standalone archive
+        if: runner.os == 'Linux'
+        env:
+          DESKTOP_ARCH: ${{ matrix.arch }}
         run: |
           VERSION="${RELEASE_TAG#v}"
           mkdir -p dist/release/stage
@@ -65,8 +100,33 @@ jobs:
           cp README.md dist/release/stage/
           cp -a agent/bundle dist/release/stage/agent
           cp -a src-tauri/icons dist/release/stage/icons
-          tar -czf "dist/release/tomato-todo-${VERSION}-x86_64-linux.tar.gz" -C dist/release/stage .
+          tar -czf "dist/release/tomato-todo-${VERSION}-${DESKTOP_ARCH}-linux.tar.gz" -C dist/release/stage .
 
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.runner }}
+          if-no-files-found: error
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/nsis/*.exe
+            dist/release/*.tar.gz
+
+  publish:
+    name: Publish Linux and Windows packages
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: packages
+          merge-multiple: true
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -75,5 +135,6 @@ jobs:
           fail_on_unmatched_files: true
           body_path: .github/releases/${{ env.RELEASE_TAG }}.md
           files: |
-            target/release/bundle/deb/*.deb
-            dist/release/*.tar.gz
+            packages/**/*.deb
+            packages/**/*.exe
+            packages/**/*.tar.gz

@@ -177,6 +177,7 @@ input[type="color"] {
 #app {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
 }
 .sidebar {
@@ -1624,6 +1625,20 @@ main {
   margin-left: 8px;
   color: var(--muted);
 }
+.today-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 8px 4px;
+}
+.today-group-heading .group-title {
+  padding: 0;
+  margin: 0;
+}
+.today-group-heading .text-button {
+  flex-shrink: 0;
+}
 .stats-grid {
   display: grid;
   grid-template-columns: 1.65fr 1fr;
@@ -2018,6 +2033,8 @@ main {
   padding: 10px 24px 18px;
 }
 .app-tag {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -2029,6 +2046,7 @@ main {
   background: var(--surface-soft);
 }
 .app-tag > svg {
+  flex-shrink: 0;
   width: 14px;
   height: 14px;
 }
@@ -2062,6 +2080,7 @@ main {
   min-width: 0;
 }
 .available-app strong {
+  overflow-wrap: anywhere;
   font-size: 11px;
   font-weight: 500;
   display: block;
@@ -2199,6 +2218,7 @@ main {
   width: 470px;
   max-width: 100%;
   max-height: 92vh;
+  max-height: 92dvh;
   overflow: auto;
   border-radius: 15px;
   box-shadow: 0 22px 100px #17221430;
@@ -5032,4 +5052,85 @@ body.ponder-open #toast {
 }
 .agent-choice-confirm[disabled] {
   opacity: 0.55;
+}
+
+.immersive-sound {
+  margin-top: 24px;
+}
+.immersive-sound .sound-button {
+  font-size: 12px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface-soft);
+}
+
+.mobile-menu,
+.mobile-nav-close,
+.mobile-nav-backdrop {
+  display: none;
+}
+@media (max-width: 700px) {
+  :root[data-platform="android"] .workspace {
+    width: 100%;
+    margin-left: 0;
+  }
+  :root[data-platform="android"] .topbar {
+    gap: 8px;
+  }
+  :root[data-platform="android"] .breadcrumb {
+    flex: 1;
+    min-width: 0;
+  }
+  :root[data-platform="android"] .sidebar {
+    width: min(300px, 90vw);
+    padding: 24px 17px 17px;
+    transform: translateX(-100%);
+    overflow-y: auto;
+    z-index: 12;
+  }
+  :root[data-platform="android"].mobile-nav-open .sidebar {
+    transform: translateX(0);
+  }
+  :root[data-platform="android"] .brand {
+    justify-content: flex-start;
+    margin-bottom: 24px;
+  }
+  :root[data-platform="android"] .brand > span:last-child,
+  :root[data-platform="android"] .sidebar-section,
+  :root[data-platform="android"] .sidebar .nav-item > span,
+  :root[data-platform="android"] .sidebar .nav-item > b {
+    display: block;
+  }
+  :root[data-platform="android"] .sidebar-section,
+  :root[data-platform="android"] .sidebar .project-nav {
+    display: flex;
+  }
+  :root[data-platform="android"] .sidebar .nav-item {
+    justify-content: flex-start;
+    min-height: 44px;
+  }
+  :root[data-platform="android"] .mobile-menu,
+  :root[data-platform="android"] .mobile-nav-close {
+    display: flex;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root[data-platform="android"] .mobile-nav-close {
+    position: absolute;
+    right: 12px;
+    top: 10px;
+  }
+  :root[data-platform="android"].mobile-nav-open .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 11;
+    background: #1c231f66;
+  }
+  :root[data-platform="android"] .top-actions .icon-btn,
+  :root[data-platform="android"] .button,
+  :root[data-platform="android"] .modal .icon-btn {
+    min-height: 44px;
+  }
 }

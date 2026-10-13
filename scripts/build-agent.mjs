@@ -11,15 +11,20 @@ import {
 } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
+import { nodeVersion, runtimeFor } from "./agent-runtime.mjs";
 const root = resolve(import.meta.dirname, "..");
 const source = join(root, "agent");
 const bundle = join(source, "bundle");
-const nodeVersion = "22.23.3";
-const checksum =
-  "df450af89261115ef9f9e3830c3eeb2cc9213b63c720b1af623cb5dcbe2e02de";
-if (process.platform !== "linux" || process.arch !== "x64")
-  throw new Error("The desktop package currently targets Linux x86_64");
+const args = process.argv.slice(2);
+if (
+  args.length > 1 ||
+  (args.length && (!args[0].startsWith("--target=") || args[0] === "--target="))
+)
+  throw new Error(
+    "Usage: node scripts/build-agent.mjs [--target=<Rust target triple>]",
+  );
+const runtime = runtimeFor(args[0]?.slice("--target=".length));
 await rm(bundle, { recursive: true, force: true });
 await mkdir(bundle, { recursive: true });
 try {
@@ -27,24 +32,36 @@ try {
     join(source, "node_modules/@earendil-works/pi-coding-agent/package.json"),
   );
 } catch {
-  execFileSync(
-    "npm",
-    ["ci", "--prefix", source, "--ignore-scripts", "--no-audit", "--no-fund"],
-    { stdio: "inherit" },
-  );
+  const npmArgs = [
+    "ci",
+    "--prefix",
+    source,
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+  ];
+  // npm.cmd requires a shell. Invoke npm's JS entry instead so paths remain arguments.
+  if (process.platform === "win32") {
+    execFileSync(
+      process.execPath,
+      [
+        join(dirname(process.execPath), "node_modules/npm/bin/npm-cli.js"),
+        ...npmArgs,
+      ],
+      { stdio: "inherit" },
+    );
+  } else {
+    execFileSync("npm", npmArgs, { stdio: "inherit" });
+  }
 }
-const archive = join(
-  root,
-  "artifacts/agent-build",
-  `node-v${nodeVersion}-linux-x64.tar.xz`,
-);
+const archive = join(root, "artifacts/agent-build", runtime.archive);
 await mkdir(resolve(archive, ".."), { recursive: true });
 let valid = false;
 try {
   valid =
     createHash("sha256")
       .update(await readFile(archive))
-      .digest("hex") === checksum;
+      .digest("hex") === runtime.checksum;
 } catch {}
 if (!valid) {
   const partial = `${archive}.part`;
@@ -57,7 +74,7 @@ if (!valid) {
     "2",
     "--max-time",
     "600",
-    `https://nodejs.org/dist/v${nodeVersion}/node-v${nodeVersion}-linux-x64.tar.xz`,
+    `https://nodejs.org/dist/v${nodeVersion}/${runtime.archive}`,
     "-o",
     partial,
   ];
@@ -69,21 +86,43 @@ if (!valid) {
   if (
     createHash("sha256")
       .update(await readFile(partial))
-      .digest("hex") !== checksum
+      .digest("hex") !== runtime.checksum
   )
     throw new Error("Node runtime archive checksum mismatch");
   await rename(partial, archive);
 }
-execFileSync("tar", [
-  "-xf",
-  archive,
-  "--strip-components=1",
-  "-C",
-  bundle,
-  `node-v${nodeVersion}-linux-x64/bin/node`,
-  `node-v${nodeVersion}-linux-x64/LICENSE`,
-]);
-await chmod(join(bundle, "bin/node"), 0o755);
+if (runtime.windows) {
+  // Windows ships bsdtar; Linux cross-packaging can use unzip for the ZIP archive.
+  const staging = join(root, "artifacts/agent-build", runtime.directory);
+  await rm(staging, { recursive: true, force: true });
+  await mkdir(staging, { recursive: true });
+  if (process.platform === "linux") {
+    execFileSync("unzip", ["-q", archive, "-d", staging]);
+  } else {
+    execFileSync("tar", ["-xf", archive, "-C", staging]);
+  }
+  await mkdir(join(bundle, "bin"), { recursive: true });
+  await cp(
+    join(staging, runtime.directory, runtime.executable),
+    join(bundle, "bin/node.exe"),
+  );
+  await cp(
+    join(staging, runtime.directory, "LICENSE"),
+    join(bundle, "LICENSE"),
+  );
+  await rm(staging, { recursive: true, force: true });
+} else {
+  execFileSync("tar", [
+    "-xf",
+    archive,
+    "--strip-components=1",
+    "-C",
+    bundle,
+    `${runtime.directory}/bin/node`,
+    `${runtime.directory}/LICENSE`,
+  ]);
+  await chmod(join(bundle, "bin/node"), 0o755);
+}
 for (const name of [
   "worker.mjs",
   "codex-config.mjs",
@@ -115,5 +154,5 @@ for (const name of [
 ])
   await cp(join(root, "docs", name), join(refs, name));
 console.log(
-  `Agent bundle ready: Pi 1.1.0, Node ${nodeVersion}, private data excluded`,
+  `Agent bundle ready: Pi 1.1.0, Node ${nodeVersion} (${runtime.directory}), private data excluded`,
 );

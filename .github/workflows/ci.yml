@@ -14,6 +14,11 @@ on:
       - "**/*.md"
       - LICENSE
   workflow_dispatch:
+    inputs:
+      android:
+        description: Run deferred Android builds and device checks
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -58,7 +63,7 @@ jobs:
             build-essential pkg-config file curl wget \
             libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev libxdo-dev libssl-dev \
-            desktop-file-utils
+            desktop-file-utils xvfb openbox xdotool x11-utils python3-gi webkit2gtk-driver
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -83,3 +88,163 @@ jobs:
 
       - name: Rust, browser and install tests
         run: pnpm test
+
+      - name: Install Tauri WebDriver
+        run: cargo install tauri-driver --version 2.0.6 --locked
+
+      - name: Isolated X11 desktop protection
+        run: pnpm run test:x11:app
+
+  desktop-platforms:
+    name: Desktop / ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-22.04
+          - ubuntu-24.04-arm
+          - windows-2022
+          - windows-11-arm
+          - macos-15-intel
+          - macos-15
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - run: pnpm install --frozen-lockfile
+      - name: Build host agent runtime
+        run: pnpm run agent:build
+      - name: Packaged Node and Pi SDK smoke tests
+        run: node --test tests/agent-runtime.mjs
+      - name: Core, agent and desktop tests
+        run: cargo test --locked -p tomato-core -p tomato-agent -p tomato-todo
+      - name: Windows native window protection
+        if: runner.os == 'Windows'
+        run: pnpm run test:windows
+      - name: Desktop workspace Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Build production desktop executable
+        run: pnpm exec tauri build --no-bundle
+
+  android-core:
+    if: github.event_name == 'workflow_dispatch' && inputs.android
+    name: Android core / ${{ matrix.target }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            compiler: aarch64-linux-android24-clang
+          - target: armv7-linux-androideabi
+            compiler: armv7a-linux-androideabi24-clang
+          - target: x86_64-linux-android
+            compiler: x86_64-linux-android24-clang
+          - target: i686-linux-android
+            compiler: i686-linux-android24-clang
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: "platform-tools ndk;28.2.13676358"
+      - name: Compile Android core with bundled SQLite
+        env:
+          ANDROID_TARGET: ${{ matrix.target }}
+          ANDROID_COMPILER: ${{ matrix.compiler }}
+        run: |
+          NDK_BIN="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CC="$NDK_BIN/$ANDROID_COMPILER"
+          export AR="$NDK_BIN/llvm-ar"
+          cargo check --locked -p tomato-core --target "$ANDROID_TARGET"
+
+  android-app:
+    if: github.event_name == 'workflow_dispatch' && inputs.android
+    name: Android APK / API ${{ matrix.api }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [33, 35]
+    env:
+      ANDROID_NDK_VERSION: "28.2.13676358"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi, i686-linux-android, x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: "platform-tools platforms;android-37.0 ndk;28.2.13676358"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Build Android app and debug APK
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+          pnpm exec tauri android build --debug --target aarch64 armv7 i686 x86_64 --apk --ci
+      - name: Check universal APK architectures and resources
+        run: python3 scripts/check-android-apk.py src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+      - name: Release build daemon memory before emulator
+        run: src-tauri/gen/android/gradlew --stop
+      - name: Install Android UI driver
+        run: pnpm exec playwright install android
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Real Android WebView and core integration
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          ram-size: 3072M
+          emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: node tests/android-app.mjs
+      - name: Save Android failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-diagnostics-api-${{ matrix.api }}
+          path: artifacts/android-*
+          if-no-files-found: ignore
+      - name: Save Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-api-${{ matrix.api }}
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
