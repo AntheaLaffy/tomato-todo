@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync, execFileSync } from "node:child_process";
-import { mkdtemp, writeFile, readFile, readdir, mkdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  writeFile,
+  readFile,
+  readdir,
+  mkdir,
+  copyFile,
+  symlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createConnection } from "node:net";
@@ -221,14 +229,24 @@ try {
       return false;
     }
   }, "WebDriver did not start");
+  // A private binary/resource copy keeps the delayed worker out of real installs.
+  const testBinary = join(dir, "app", "tomato-todo");
+  await mkdir(join(dir, "app", "agent", "bin"), { recursive: true });
+  await copyFile(
+    resolve(process.env.TOMATO_TEST_BINARY || "target/debug/tomato-todo"),
+    testBinary,
+  );
+  await symlink(process.execPath, join(dir, "app", "agent", "bin", "node"));
+  await copyFile(
+    "tests/fixtures/slow_agent_worker.mjs",
+    join(dir, "app", "agent", "worker.mjs"),
+  );
   const created = await wd("/session", {
     capabilities: {
       alwaysMatch: {
         "tauri:options": {
           args: ["--background"],
-          application: resolve(
-            process.env.TOMATO_TEST_BINARY || "target/debug/tomato-todo",
-          ),
+          application: testBinary,
         },
       },
     },
@@ -247,6 +265,31 @@ try {
   );
   trayClick("打开番茄 Todo");
   await waitSelector("[data-action=example]");
+  await js(`window.agentEntryAt = performance.now();
+    window.agentEntryFrames = 0;
+    const frame = () => { window.agentEntryFrames++; window.agentFrame = requestAnimationFrame(frame); };
+    window.agentFrame = requestAnimationFrame(frame);
+    document.querySelector('[data-page="agent"]').click();`);
+  await pause(200);
+  const responsive = await invoke("snapshot");
+  assert.ok(responsive.value, "Snapshot responds during quota lookup");
+  const agentEntry = await js(
+    `return { elapsed: performance.now() - window.agentEntryAt, frames: window.agentEntryFrames, heading: document.querySelector('h1').textContent }`,
+  );
+  console.log("agent entry during 2s quota lookup:", agentEntry);
+  assert.equal(agentEntry.heading, "学习助手");
+  assert.ok(
+    agentEntry.elapsed < 1000,
+    `Quota lookup blocked window for ${agentEntry.elapsed}ms`,
+  );
+  assert.ok(
+    agentEntry.frames > 1,
+    "Window continues painting during quota lookup",
+  );
+  await click('[data-page="focus"]');
+  await waitSelector("[data-action=example]");
+  await js("cancelAnimationFrame(window.agentFrame)");
+  await pause(2200);
   await click("[data-action=example]");
   await until(
     () => js('return document.querySelectorAll(".task-row").length===3'),
@@ -732,9 +775,7 @@ try {
     capabilities: {
       alwaysMatch: {
         "tauri:options": {
-          application: resolve(
-            process.env.TOMATO_TEST_BINARY || "target/debug/tomato-todo",
-          ),
+          application: testBinary,
           args: ["--background"],
         },
       },

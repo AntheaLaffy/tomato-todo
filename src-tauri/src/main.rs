@@ -65,11 +65,15 @@ fn apply_action(
     Ok(result)
 }
 #[tauri::command]
-fn agent_call(
+async fn agent_call(
     request: serde_json::Value,
-    service: State<Arc<tomato_agent::Agent>>,
+    service: State<'_, Arc<tomato_agent::Agent>>,
 ) -> AppResult<serde_json::Value> {
-    service.request(request)
+    // Quota and worker replies can wait on network I/O; keep the window thread free.
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || service.request(request))
+        .await
+        .map_err(|e| e.to_string())?
 }
 #[tauri::command]
 fn agent_open_login(service: State<Arc<tomato_agent::Agent>>) -> AppResult<()> {

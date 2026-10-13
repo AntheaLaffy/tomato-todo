@@ -95,7 +95,11 @@ async fn agent_call(
     Json(args): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     check_origin(&headers)?;
-    service.request(args).map(Json).map_err(error)
+    tokio::task::spawn_blocking(move || service.request(args))
+        .await
+        .map_err(error)?
+        .map(Json)
+        .map_err(error)
 }
 async fn guard_info() -> Json<tomato_core::guard::GuardInfo> {
     Json(tomato_core::guard::GuardInfo {
