@@ -2,6 +2,20 @@ use super::*;
 use chrono::TimeZone;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[test]
+fn thinking_preference_defaults_and_validates_sdk_levels() {
+    let mut preferences: Preferences = serde_json::from_value(json!({})).unwrap();
+    assert_eq!(preferences.thinking_level, "medium");
+    for level in ["off", "minimal", "low", "medium", "high", "xhigh", "max"] {
+        preferences.thinking_level = level.into();
+        preferences.validate().unwrap();
+        let saved = serde_json::to_value(&preferences).unwrap();
+        assert_eq!(saved["thinkingLevel"], level);
+    }
+    preferences.thinking_level = "unknown".into();
+    assert!(preferences.validate().is_err());
+}
+
 fn action(value: Value) -> Action {
     serde_json::from_value(value).unwrap()
 }

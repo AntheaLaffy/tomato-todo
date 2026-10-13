@@ -3,11 +3,14 @@ import type { Snapshot } from "./types";
 import { runHandScript } from "./hand";
 import type { HandStep } from "./hand";
 
+type ThinkingLevel =
+  "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 type Preferences = {
   enabled: boolean;
   automatic: boolean;
   provider: string;
   model: string;
+  thinkingLevel: ThinkingLevel;
   dailyCapacityMinutes: number | null;
   maxAutoWakesPerDay: number;
   cooldownHours: number;
@@ -120,6 +123,7 @@ const defaults: Preferences = {
   automatic: true,
   provider: "deepseek",
   model: "",
+  thinkingLevel: "medium",
   dailyCapacityMinutes: null,
   maxAutoWakesPerDay: 3,
   cooldownHours: 24,
@@ -220,7 +224,7 @@ export function agentPage(): string {
       <div id="agent-questions"></div>
       <form id="agent-chat">
         <textarea id="agent-text" name="text" rows="3" maxlength="32000" placeholder="问点什么，或贴一段最近的安排">${esc(draft)}</textarea>
-        <div class="agent-actions"><span class="agent-status"><span class="agent-model" id="agent-model">${modelSelectHtml()}</span><span class="agent-usage" id="agent-usage">${usageHtml()}</span></span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
+        <div class="agent-actions"><span class="agent-status"><span class="agent-model" id="agent-model">${modelSelectHtml()}</span><span class="agent-thinking" id="agent-thinking">${thinkingSelectHtml()}</span><span class="agent-usage" id="agent-usage">${usageHtml()}</span></span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
       </form>
     </section>
     <div id="agent-sheet" class="agent-sheet" hidden></div>
@@ -277,6 +281,9 @@ function renderChat() {
       : "",
   );
   replace("agent-questions", questionHtml());
+  const thinkingBox = document.getElementById("agent-thinking");
+  if (thinkingBox && !thinkingBox.contains(document.activeElement))
+    replace("agent-thinking", thinkingSelectHtml());
   const modelBox = document.getElementById("agent-model");
   if (modelBox && !modelBox.contains(document.activeElement))
     replace("agent-model", modelSelectHtml());
@@ -464,6 +471,19 @@ function modelSelectHtml() {
     })
     .join("");
   return `<select id="agent-model-select" aria-label="后端与模型">${groups}</select>`;
+}
+function thinkingSelectHtml() {
+  const level = status?.preferences.thinkingLevel ?? "medium";
+  const labels: [ThinkingLevel, string][] = [
+    ["off", "关闭"],
+    ["minimal", "最低"],
+    ["low", "低"],
+    ["medium", "中"],
+    ["high", "高"],
+    ["xhigh", "更高"],
+    ["max", "最高"],
+  ];
+  return `<label title="强度越高，通常思考越久；实际强度按所选模型支持范围调整">思考强度 <select id="agent-thinking-select" aria-label="思考强度" ${!status || status.busy ? "disabled" : ""}>${labels.map(([value, label]) => `<option value="${value}" ${level === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>`;
 }
 function renderUsage() {
   const element = document.getElementById("agent-usage");
@@ -687,6 +707,18 @@ export function mountAgent() {
   });
   panel.addEventListener("change", (event) => {
     const select = event.target as HTMLSelectElement;
+    if (select.id === "agent-thinking-select" && status) {
+      void call({
+        op: "configure",
+        preferences: {
+          ...status.preferences,
+          thinkingLevel: select.value as ThinkingLevel,
+        },
+        apiKey: "",
+        exaKey: "",
+      }).catch((error) => hooks.toast(String(error)));
+      return;
+    }
     if (select.id !== "agent-model-select" || !status) return;
     const [provider, model] = select.value.split("|");
     void call({
@@ -732,6 +764,7 @@ async function submit(form: HTMLFormElement) {
       automatic: data.has("automatic"),
       provider: status?.preferences.provider ?? "deepseek",
       model: status?.preferences.model ?? "",
+      thinkingLevel: status?.preferences.thinkingLevel ?? "medium",
       dailyCapacityMinutes: data.get("dailyCapacityMinutes")
         ? Number(data.get("dailyCapacityMinutes"))
         : null,

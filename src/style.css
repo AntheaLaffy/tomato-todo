@@ -4767,7 +4767,15 @@ body.ponder-open #toast {
   gap: 10px;
   min-width: 0;
 }
-.agent-model select {
+.agent-thinking label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.agent-model select,
+.agent-thinking select {
+  width: auto;
   padding: 4px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -4775,7 +4783,8 @@ body.ponder-open #toast {
   color: var(--secondary);
   font-size: 12px;
 }
-.agent-model select:focus {
+.agent-model select:focus,
+.agent-thinking select:focus {
   border-color: var(--accent);
   outline: none;
 }

@@ -10,6 +10,7 @@ pub struct Preferences {
     pub automatic: bool,
     pub provider: String,
     pub model: String,
+    pub thinking_level: String,
     pub daily_capacity_minutes: Option<u32>,
     pub max_auto_wakes_per_day: u32,
     pub cooldown_hours: u32,
@@ -26,6 +27,7 @@ impl Default for Preferences {
             automatic: true,
             provider: "deepseek".into(),
             model: String::new(),
+            thinking_level: "medium".into(),
             daily_capacity_minutes: None,
             max_auto_wakes_per_day: 3,
             cooldown_hours: 24,
@@ -38,6 +40,11 @@ impl Default for Preferences {
 }
 impl Preferences {
     pub fn validate(&self) -> AppResult<()> {
+        if !["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+            .contains(&self.thinking_level.as_str())
+        {
+            return Err("思考强度需为 off/minimal/low/medium/high/xhigh/max".into());
+        }
         if !["disabled", "cached", "live"].contains(&self.web_search.as_str()) {
             return Err("联网模式需为 disabled/cached/live".into());
         }

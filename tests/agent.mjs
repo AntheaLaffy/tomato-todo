@@ -324,7 +324,7 @@ test(
         {
           id: "fake",
           name: "Fake local model",
-          reasoning: false,
+          reasoning: true,
           input: ["text"],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
           contextWindow: 65536,
@@ -335,6 +335,7 @@ test(
     const command = {
       provider: "deepseek",
       model: "fake",
+      preferences: { thinkingLevel: "high" },
       automatic: true,
       tools: [
         {
@@ -367,6 +368,7 @@ test(
         },
       });
       session = created.session;
+      assert.equal(session.thinkingLevel, "high");
       // Pi's coding tools plus codemode/tool_search stay available in the sandboxed
       // workspace; the Rust-side dispatch/bash entries must never reach the model.
       const studyTools = [
@@ -405,10 +407,19 @@ test(
         runtime,
         dir,
         root: resolve("agent"),
-        command: { ...command, sessionFile: file },
+        command: {
+          ...command,
+          preferences: { thinkingLevel: "low" },
+          sessionFile: file,
+        },
         toolRequest: async () => ({}),
       });
       session = resumed.session;
+      assert.equal(
+        session.thinkingLevel,
+        "low",
+        "current preference overrides restored thinking level",
+      );
       await session.prompt("接着刚才的讨论");
       assert.ok(
         requests
@@ -570,6 +581,18 @@ test(
       await expect(page.locator(".welcome-card")).toBeVisible();
       await page.locator('[data-page="agent"]').click();
       await expect(page.locator("h1")).toContainText("学习助手");
+      await expect(page.locator("#agent-thinking-select")).toHaveValue(
+        "medium",
+      );
+      await page.locator("#agent-thinking-select").selectOption("high");
+      await expect
+        .poll(
+          async () => (await api({ op: "status" })).preferences.thinkingLevel,
+        )
+        .toBe("high");
+      await page.reload();
+      await page.locator('[data-page="agent"]').click();
+      await expect(page.locator("#agent-thinking-select")).toHaveValue("high");
       // Memory and files live in on-demand sheets, not on the conversation page.
       await page.locator('[data-agent="memory"]').click();
       await page

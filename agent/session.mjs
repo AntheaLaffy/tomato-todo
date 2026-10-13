@@ -177,6 +177,7 @@ export async function createStudySession({
     agentDir: dir,
     modelRuntime: runtime,
     model,
+    thinkingLevel: command.preferences?.thinkingLevel ?? "medium",
     tools: toolNames,
     customTools,
     resourceLoader: loader,
