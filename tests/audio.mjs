@@ -346,3 +346,104 @@ test(
     }
   },
 );
+
+test(
+  "homework BGM validates real metadata, persists files and controls playback",
+  { timeout: 30000 },
+  async () => {
+    const browser = await chromium.launch({
+      executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+      args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.route("http://bgm.test/**", (route) =>
+        route.fulfill({ contentType: "text/html", body: "<html></html>" }),
+      );
+      await page.goto("http://bgm.test");
+      const code = await source("src/bgm.ts");
+      await page.evaluate(async (code) => {
+        const moduleUrl = URL.createObjectURL(
+          new Blob([code], { type: "text/javascript" }),
+        );
+        const bgm = await import(moduleUrl);
+        function wav(seconds) {
+          const count = seconds * 8000;
+          const bytes = new Uint8Array(44 + count).fill(128);
+          const view = new DataView(bytes.buffer);
+          const text = (at, value) =>
+            [...value].forEach((c, i) => (bytes[at + i] = c.charCodeAt(0)));
+          text(0, "RIFF");
+          view.setUint32(4, 36 + count, true);
+          text(8, "WAVE");
+          text(12, "fmt ");
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
+          view.setUint32(24, 8000, true);
+          view.setUint32(28, 8000, true);
+          view.setUint16(32, 1, true);
+          view.setUint16(34, 8, true);
+          text(36, "data");
+          view.setUint32(40, count, true);
+          return new File([bytes], `${seconds}.wav`, { type: "audio/wav" });
+        }
+        const check = (condition, message) => {
+          if (!condition) throw new Error(message);
+        };
+        check((await bgm.loadBgm()) === undefined, "initially empty");
+        const track = await bgm.importBgm(wav(3600));
+        check(track.duration === 3600, "exactly one hour accepted");
+        const again = await import(moduleUrl + "#reload");
+        const saved = await again.loadBgm();
+        check(
+          saved.name === track.name && saved.file.size === track.file.size,
+          "file persisted independently of module",
+        );
+        for (const file of [
+          wav(3599),
+          new File(["broken"], "bad.mp3", { type: "audio/mpeg" }),
+        ]) {
+          let rejected = false;
+          try {
+            await bgm.importBgm(file);
+          } catch {
+            rejected = true;
+          }
+          check(rejected, "invalid or short audio rejected");
+          check(
+            (await bgm.loadBgm()).name === track.name,
+            "failed import preserves original",
+          );
+        }
+        const NativeAudio = window.Audio;
+        let player;
+        window.Audio = function (...args) {
+          player = new NativeAudio(...args);
+          return player;
+        };
+        await bgm.playBgm(saved, 0.2);
+        check(
+          !player.paused && player.loop && player.volume === 0.2,
+          "plays and loops",
+        );
+        bgm.setBgmVolume(0);
+        check(player.volume === 0, "independent volume");
+        bgm.pauseBgm();
+        check(player.paused, "pause");
+        await bgm.playBgm(saved, 0.4);
+        check(!player.paused && player.volume === 0.4, "resume");
+        bgm.stopBgm();
+        check(
+          player.paused && !player.getAttribute("src"),
+          "release playback source",
+        );
+        await bgm.removeBgm();
+        check((await again.loadBgm()) === undefined, "persistent removal");
+        URL.revokeObjectURL(moduleUrl);
+      }, code);
+    } finally {
+      await browser.close();
+    }
+  },
+);

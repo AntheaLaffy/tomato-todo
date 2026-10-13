@@ -69,6 +69,52 @@ test(
         page.getByRole("heading", { name: "今天，也要慢慢向前。" }),
       ).toBeVisible();
       await expect(page.locator(".welcome-card")).toHaveCount(0);
+      await page.locator('[data-action="sound"]').click();
+      await expect(page.locator("#bgm-file")).toBeVisible();
+      await page.locator("#bgm-file").setInputFiles({
+        name: "broken.mp3",
+        mimeType: "audio/mpeg",
+        buffer: Buffer.from("invalid audio"),
+      });
+      await expect(page.locator("#bgm-file")).toBeEnabled();
+      await expect(page.locator("#bgm-play")).toHaveCount(0);
+      const samples = 3600 * 8000;
+      const wav = Buffer.alloc(44 + samples, 128);
+      wav.write("RIFF", 0);
+      wav.writeUInt32LE(36 + samples, 4);
+      wav.write("WAVE", 8);
+      wav.write("fmt ", 12);
+      wav.writeUInt32LE(16, 16);
+      wav.writeUInt16LE(1, 20);
+      wav.writeUInt16LE(1, 22);
+      wav.writeUInt32LE(8000, 24);
+      wav.writeUInt32LE(8000, 28);
+      wav.writeUInt16LE(1, 32);
+      wav.writeUInt16LE(8, 34);
+      wav.write("data", 36);
+      wav.writeUInt32LE(samples, 40);
+      await page.locator("#bgm-file").setInputFiles({
+        name: "homework.wav",
+        mimeType: "audio/wav",
+        buffer: wav,
+      });
+      await expect(page.locator("#bgm-play")).toBeVisible();
+      await expect(page.getByRole("dialog")).toContainText(
+        "homework.wav · 60 分钟",
+      );
+      await page.locator("#bgm-play").click();
+      await expect(page.locator("#bgm-play")).toContainText("暂停");
+      await page.locator('[data-noise="rain"]').click();
+      await expect(page.locator("#bgm-play")).toContainText("播放");
+      await page.locator('[data-noise="off"]').click();
+      await page.reload();
+      await page.locator('[data-action="sound"]').click();
+      await expect(page.getByRole("dialog")).toContainText(
+        "homework.wav · 60 分钟",
+      );
+      await page.locator("#bgm-remove").click();
+      await expect(page.locator("#bgm-play")).toHaveCount(0);
+      await page.locator('[data-action="close-modal"]').click();
       await page
         .getByRole("button", { name: "新建任务 N", exact: true })
         .click();

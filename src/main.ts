@@ -89,6 +89,16 @@ import {
   unlockAudio,
 } from "./audio";
 import type { SoundCue } from "./audio";
+import {
+  importBgm,
+  loadBgm,
+  removeBgm,
+  playBgm,
+  pauseBgm,
+  stopBgm,
+  setBgmVolume,
+} from "./bgm";
+import type { BgmTrack } from "./bgm";
 import { pendingTaskReminder, soundForTransition } from "./sound-events";
 import type {
   AppData,
@@ -228,6 +238,10 @@ let sort = "time";
 let search = "";
 let immersive = false;
 let noiseKind = "off";
+let backgroundVolume = 0.2;
+let bgmTrack: BgmTrack | undefined;
+let bgmPlaying = false;
+let bgmImporting = false;
 let guardInfo: GuardInfo | null = null;
 let nativeStatus: DesktopStatus | null = null;
 let pending = false;
@@ -650,7 +664,7 @@ function focusPage() {
     ${welcomeCard()}
     <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办，按自己的节奏来`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
     <div class="focus-grid"><section class="card focus-card"><div class="card-heading"><h2>${icon("timer")} 我的番茄钟</h2><button class="icon-btn" data-action="immersive" aria-label="进入沉浸模式">${icon("maximize-2")}</button></div>${timerContent()}
-    <div class="sound-bar"><button class="sound-button ${noiseKind !== "off" ? "on" : ""}" data-action="sound">${icon("headphones")}<span>${noiseKind === "off" ? "来一点背景音？" : noiseKind === "rain" ? "雨声 · 正在播放" : "棕噪音 · 正在播放"}</span>${icon("chevron-right")}</button><button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
+    <div class="sound-bar"><button class="sound-button ${noiseKind !== "off" || bgmPlaying ? "on" : ""}" data-action="sound">${icon("headphones")}<span>${bgmPlaying ? "写作业 BGM · 正在播放" : noiseKind === "off" ? "来一点背景音？" : noiseKind === "rain" ? "雨声 · 正在播放" : "棕噪音 · 正在播放"}</span>${icon("chevron-right")}</button><button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
     <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayTasks.length}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayTasks.length}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small">一步一步，来就好</span></div>
     <div class="today-list">${taskList(filter === "completed" ? state.data.tasks.filter((t) => t.completed && t.completedAt && new Date(t.completedAt * 1000).toLocaleDateString("sv-SE") === state.today) : regularTasks, true)}${filter !== "completed" && catchUpTasks.length ? `<h3 class="group-title" data-ponder="catch-up">待补队列<span>${catchUpTasks.length}</span></h3>${taskList(catchUpTasks, true)}` : ""}</div>
     <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的小目标 <kbd>N</kbd></button><div class="list-footnote">${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
@@ -2319,22 +2333,80 @@ function helpDialog() {
 }
 function soundDialog() {
   modal(
-    `${modalHeader("为专注，添一点声音", "在本地合成的背景音，不需要联网。")}<div class="sound-options">${[
+    `${modalHeader("为专注，添一点声音", "本地背景音与写作业 BGM，无需联网。")}<div class="sound-options">${[
       ["off", "volume-x", "安静"],
       ["rain", "headphones", "柔和雨声"],
       ["brown", "leaf", "低沉棕噪音"],
     ]
       .map(
         ([kind, ic, title]) =>
-          `<button class="${noiseKind === kind ? "selected" : ""}" data-noise="${kind}">${icon(ic)}${title}</button>`,
+          `<button class="${noiseKind === kind && !bgmPlaying ? "selected" : ""}" data-noise="${kind}">${icon(ic)}${title}</button>`,
       )
       .join(
         "",
-      )}</div><label class="form-field"><span>音量</span><input id="noise-volume" type="range" min="0" max="0.8" step="0.02" value="0.2"></label>`,
+      )}</div><label class="form-field"><span>音量</span><input id="noise-volume" type="range" min="0" max="0.8" step="0.02" value="${backgroundVolume}"></label><section><h3>写作业 BGM</h3><p class="subtle small">导入时长至少 1 小时的本地音频。仅保存在本机，不随任务备份导出；再次导入会替换原文件。</p>${bgmTrack ? `<p>${escape(bgmTrack.name)} · ${Math.floor(bgmTrack.duration / 60)} 分钟</p><div class="button-row"><button class="button secondary" id="bgm-play">${icon(bgmPlaying ? "pause" : "play")} ${bgmPlaying ? "暂停" : "播放"}</button><button class="button secondary" id="bgm-remove" ${bgmImporting ? "disabled" : ""}>移除</button></div>` : ""}<label class="form-field"><span>${bgmImporting ? "正在检查时长并保存…" : "导入音频（至少 60 分钟）"}</span><input id="bgm-file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.opus" ${bgmImporting ? "disabled" : ""}></label></section>`,
   );
-  $("#noise-volume").addEventListener("input", (e) =>
-    setNoiseVolume(Number((e.target as HTMLInputElement).value)),
-  );
+  $("#noise-volume").addEventListener("input", (e) => {
+    backgroundVolume = Number((e.target as HTMLInputElement).value);
+    setNoiseVolume(backgroundVolume);
+    setBgmVolume(backgroundVolume);
+  });
+  const fileInput = $<HTMLInputElement>("#bgm-file");
+  fileInput.onchange = async () => {
+    const file = fileInput.files?.[0];
+    if (!file || bgmImporting) return;
+    bgmImporting = true;
+    fileInput.disabled = true;
+    const remove = document.getElementById(
+      "bgm-remove",
+    ) as HTMLButtonElement | null;
+    if (remove) remove.disabled = true;
+    try {
+      const track = await importBgm(file);
+      stopBgm();
+      bgmPlaying = false;
+      bgmTrack = track;
+      render();
+      toast("写作业 BGM 已导入，点击播放即可开始");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : String(error));
+    } finally {
+      bgmImporting = false;
+      if (document.getElementById("bgm-file")) soundDialog();
+    }
+  };
+  if (bgmTrack) {
+    $("#bgm-play").onclick = async () => {
+      if (bgmPlaying) {
+        pauseBgm();
+        bgmPlaying = false;
+      } else {
+        try {
+          await playBgm(bgmTrack!, backgroundVolume);
+          setNoise("off");
+          noiseKind = "off";
+          bgmPlaying = true;
+        } catch {
+          pauseBgm();
+          toast("无法播放 BGM，请检查音频格式或再次点击播放");
+        }
+      }
+      render();
+      if (document.getElementById("bgm-file")) soundDialog();
+    };
+    $("#bgm-remove").onclick = async () => {
+      try {
+        await removeBgm();
+        stopBgm();
+        bgmTrack = undefined;
+        bgmPlaying = false;
+        render();
+        if (document.getElementById("bgm-file")) soundDialog();
+      } catch (error) {
+        toast(String(error));
+      }
+    };
+  }
 }
 function emergencyDialog() {
   if (strictNow()) {
@@ -2910,7 +2982,9 @@ document.addEventListener("click", async (e) => {
   }
   if (d.noise) {
     noiseKind = d.noise;
-    setNoise(noiseKind);
+    pauseBgm();
+    bgmPlaying = false;
+    setNoise(noiseKind, backgroundVolume);
     render();
     soundDialog();
     return;
@@ -3334,6 +3408,11 @@ async function boot() {
       `<div class="boot error"><span class="brand-mark">${logo}</span><h1>专注空间暂时没有连上</h1><p>${escape(String(e))}</p><p>请检查 Rust 服务是否已经启动。</p><button class="button primary" id="retry">重新连接</button></div>`;
     $("#retry").onclick = () => void boot();
     return;
+  }
+  try {
+    bgmTrack = await loadBgm();
+  } catch {
+    toast("本地 BGM 读取失败，可在背景音中重新导入");
   }
   if (desktop) {
     await listen("agent-wake", () => {
