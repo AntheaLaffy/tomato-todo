@@ -22,7 +22,7 @@ generated_at: 2026-10-11
 | lib.rs | 智能体 | Agent 生命周期、配置/登录/状态、工具授权、网络转发、唤醒排队与工作区锁 |
 | bridge.rs | 桥接 | 仅监听 127.0.0.1 的 MCP JSON-RPC，校验私有令牌并拒绝浏览器 Origin |
 | files.rs | 文件契约 | 私有工作区的导出/分段读取/补丁/审阅/应用，来源与文件哈希并发校验 |
-| state.rs | 状态 | Preferences（含联网模式）、Memory、Store 与原子写入的私有文件 |
+| state.rs | 状态 | Preferences（含联网模式与 thinkingLevel 思考强度）、Memory、Store 与原子写入的私有文件 |
 | tools.rs | 契约 | 内嵌与外部的工具定义及允许集合（内嵌无 dispatch/apply_file） |
 | worker.rs | 运行时 | 子进程管理：启动、行协议收发与重启 |
 | tests.rs | 验证 | 权限、记忆确认、补丁原子性、来源冲突、空闲排队与重启冷却 |

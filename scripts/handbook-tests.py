@@ -39,6 +39,7 @@ CHAPTER_TESTS = {
     "28-声音的实现": ["tests/audio.mjs"],
     "29-CODEMAP与索引维护": [],
     "30-存储层": ["crates/core/src/tests.rs"],
+    "31-概念讲解": ["tests/integration.mjs"],
 }
 
 

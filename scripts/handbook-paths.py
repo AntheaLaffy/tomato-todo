@@ -25,6 +25,7 @@ NAV = HAND / "04-导航对照.md"
 
 # 入口句：一句话说清「先看哪个函数，再看哪个」。改动这里，然后重跑脚本。
 ENTRY = {
+    "31-概念讲解": "先读 `src/ponder.ts` 的 `PONDER_TARGETS`（概念表）与 `resolveTarget()`（命中规则），再看 `initPonder()` 的四个入口；界面侧的接线在 `src/main.ts` 的 `data-ponder` 与 `ponder-page`/`ponder-list` 两个动作。",
     "30-存储层": "整章都在 `crates/core/src/lib.rs`：先读 `Engine::open()` 与 `persist()`（一行 JSON 的读写），再读 `preview_action()` 与 `dispatch()`（校验与执行同一条路径）。",
     "28-声音的实现": "先读 `src/sound-events.ts` 的 `soundForTransition()`（选哪一个提示、优先级与静音规则），再读 `src/audio.ts` 的 `scores` 与 `stopSound()`（怎么发声、怎么淡出）。",
     "29-CODEMAP与索引维护": "先读根 `CODEMAP.md` 的 Scope 与任务指南，再看 `.agents/skills/codemap/SKILL.md`（地图的结构与维护协议），最后对照本手册的 [04-导航对照](04-导航对照.md)。",
@@ -94,7 +95,7 @@ def symbols(path: pathlib.Path, cap: int | None = None) -> list[str]:
 
 def repo_index() -> dict[str, list[pathlib.Path]]:
     """文件名 → 仓库里的真实路径（用于把 A 表里的简写补全）。"""
-    skip = {"node_modules", "target", "dist", "bundle", "gen", ".git"}
+    skip = {"node_modules", "target", "dist", "bundle", "gen", ".git", "artifacts"}
     index: dict[str, list[pathlib.Path]] = {}
     for p in ROOT.rglob("*"):
         if not p.is_file() or p.suffix not in (".rs", ".ts", ".mjs", ".py", ".css", ".json"):
@@ -111,7 +112,7 @@ INDEX: dict[str, list[pathlib.Path]] = {}
 def resolve(candidate: str) -> str | None:
     """把 A 表里的路径（可能是 `reminders.rs` 这种简写）补成仓库里的真实相对路径。"""
     candidate = candidate.strip().strip("`")
-    if candidate.startswith("docs/HANDBOOK") or candidate in ("同上", "—", "-"):
+    if candidate.startswith(("docs/HANDBOOK", "artifacts/")) or candidate in ("同上", "—", "-"):
         return None
     direct = ROOT / candidate
     if direct.is_file():

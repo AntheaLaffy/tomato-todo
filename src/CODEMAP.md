@@ -24,9 +24,10 @@ generated_at: 2026-10-10
 | 定时锁机/严格模式界面            | 界面      | main.ts 的 lockPage/lockDialog/bindForms/guardPage/renderImmersive/tomorrowScheduleDialog（时段严格开关与锁机只读明日日程） | types.ts、crates/core/src/lock.rs、桌面桥接                                                                          |
 | 数据统计与纵切面                 | 界面      | main.ts 的 statsPage/goalStatsCard/crossSectionCard、types.ts 的 GoalStat/NodeStat/LineOutcome                              | crates/core/src/lib.rs 的 stats/GoalStat/NodeStat/DayStat、docs/BACKUP_FORMAT.md                                     |
 | 本周日程表与课表阻塞时段         | 界面      | main.ts 的 schedulePage/weekOffset/blocksCard/blockDialog、style.css 的 schedule-grid 与 calendar-band                       | types.ts 的 Task、Block（dueDate/reminderTime/attention）、crates/core/src/blocks.rs、docs/PLAN_FORMAT.md             |
+| 写作业 BGM 导入与播放 | 声音 | bgm.ts、main.ts 的 soundDialog | tests/audio.mjs、tests/integration.mjs；至少 3600 秒，本机 IndexedDB 保存，不随备份导出 |
 | 关键节点音效与音量               | 声音/契约 | audio.ts、sound-events.ts、main.ts 的 accept/soundPreviewControls                                                           | types.ts、Rust Settings、备份契约、tests/audio.mjs                                                                   |
 | 侧栏项目排序与右键菜单           | 界面      | main.ts 的 showContextMenu/hideContextMenu/sortProjects 与捕获阶段的外部点击关闭                                            | tests/integration.mjs 的打开/排序/保存/关闭回归                                                                      |
-| 学习助手界面                     | 界面/桥接 | agent.ts 的 agentPage/mountAgent/setupAgent/refreshAgent/questionHtml/reviewHtml/renderSessions（会话侧栏）                                            | api.ts 的 agentCall、main.ts 的 revealAgent/轮询、style.css 的 agent-proposal/agent-option、docs/AGENT.md、tests/agent.mjs |
+| 学习助手界面                     | 界面/桥接 | agent.ts 的 agentPage/mountAgent/setupAgent/refreshAgent/thinkingSelectHtml/questionHtml/reviewHtml/renderSessions（会话侧栏）                                            | api.ts 的 agentCall、main.ts 的 revealAgent/轮询、style.css 的 agent-proposal/agent-option、docs/AGENT.md、tests/agent.mjs |
 | 助手的「手」（动画演示层）        | 界面      | hand.ts 的 runHandScript/handStep/moveTo/typeInto/say、main.ts 的 installHand                                              | hand-demo.ts 的 blocksTour、style.css 的 #hand-layer/hand-keyboard、docs/AGENT.md、tests/integration.mjs             |
 | 概念讲解（思索）                 | 界面/引导 | ponder.ts 的 PONDER_TARGETS/initPonder/openPonderList                                                                       | main.ts 的 data-ponder 与 data-action="ponder-list"、style.css、tests/integration.mjs                                |
 
@@ -38,9 +39,10 @@ generated_at: 2026-10-10
 | style.css       | 视觉   | 设计变量、页面布局、明暗主题与响应式；见 style.css.analysis.md                      |
 | api.ts          | 桥接   | 选择 Tauri IPC 或本地 HTTP，处理计划/备份文件及桌面独有命令                         |
 | types.ts        | 契约   | 实例、Template/Printing/PrintRecord、计划 v4 与备份 v3 的 Rust serde camelCase 类型 |
+| bgm.ts          | 声音   | 本地长音频元数据校验、IndexedDB 持久化、循环播放/暂停与背景音量 |
 | audio.ts        | 声音   | 本地背景噪音、11 种关键节点短音效、音量与安全音频激活                               |
 | sound-events.ts | 声音   | 按已接受快照选择一次音效，共享提醒队列排序、静音/导入抑制与同时事件优先级           |
-| agent.ts        | 桥接   | 对话页与状态轮询、设置/记忆/方案/信号浮层、登录与审阅应用、自动唤醒切页             |
+| agent.ts        | 桥接   | 对话页与状态轮询、设置/记忆/方案/信号浮层、登录与审阅应用、自动唤醒切页；见 agent.ts.analysis.md |
 | nodegraph.ts    | 界面   | 主线节点图：横向节点卡、信号横条、缩略图与节点检查器，拖拽重排                      |
 | ponder.ts       | 引导   | 概念登记表与讲解机制：悬停胶囊、长按 G 打开讲解面、全部概念列表                     |
 

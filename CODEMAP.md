@@ -31,6 +31,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 课表阻塞时段与课内并行 | 业务核心 / 界面 / 智能体 | crates/core/src/blocks.rs、src/main.ts 的 schedulePage/blocksCard/blockDialog | crates/core/src/diagnostics.rs、docs/HANDBOOK/12-课表与提醒.md、docs/HANDBOOK/17-诊断与统计.md、plan.rs、crates/agent/src/{tools.rs,lib.rs}、docs/PLAN_FORMAT.md |
 | 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
 | 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
+| 写作业 BGM 导入与播放 | 声音 / 界面 | src/bgm.ts、src/main.ts 的 soundDialog | src/CODEMAP.md、tests/audio.mjs、tests/integration.mjs、docs/HANDBOOK/24-界面手感与音效.md |
 | 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、docs/HANDBOOK/24-界面手感与音效.md、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
 | 学习助手、异常诊断、联网与 MCP | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | docs/HANDBOOK/18-助手-权限与唤醒.md、docs/HANDBOOK/19-助手-文件工作区与MCP.md、agent/mcp-config.mjs 与 agent/session.mjs 的 MCP 加载、docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
 | Codex CLI 登录与第三方模型配置 | 智能体 / 界面 | agent/codex-config.mjs、agent/worker.mjs | agent/session.mjs、agent/web.mjs、src/agent.ts、tests/agent.mjs、docs/AGENT.md、scripts/build-agent.mjs |
