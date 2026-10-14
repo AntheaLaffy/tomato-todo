@@ -106,7 +106,7 @@ jobs:
           - windows-2022
           # Windows ARM64 暂不支持：ARM64 宿主上隔离桌面保护回归拿不到前台窗口，
           # 该平台既不出安装包，也不在 CI 里占位（见 docs/CROSS_PLATFORM.md）。
-          - macos-15-intel
+          # macOS Intel 构建耗时过高，桌面矩阵仅保留 Apple Silicon。
           - macos-15
     runs-on: ${{ matrix.runner }}
     steps:
