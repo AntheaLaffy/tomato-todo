@@ -7,6 +7,53 @@ use tauri_plugin_fs::FsExt;
 use tomato_core::{now, AppResult};
 
 #[tauri::command]
+pub async fn save_agent_file(app: tauri::AppHandle, name: String, data: String) -> AppResult<bool> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    if name.is_empty()
+        || name.chars().count() > 200
+        || name
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '/' | '\\' | ':'))
+    {
+        return Err("文件名无效".into());
+    }
+    if data.len() > 28 * 1024 * 1024 {
+        return Err("导出文件最多 20 MB".into());
+    }
+    let bytes = STANDARD.decode(data).map_err(|_| "导出文件 Base64 无效")?;
+    if bytes.len() > 20 * 1024 * 1024 {
+        return Err("导出文件最多 20 MB".into());
+    }
+    let picker = app.dialog().file().set_file_name(&name);
+    let path = tauri::async_runtime::spawn_blocking(move || picker.blocking_save_file())
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(path) = path else {
+        return Ok(false);
+    };
+    #[cfg(target_os = "android")]
+    {
+        use std::io::Write;
+        let mut options = tauri_plugin_fs::OpenOptions::new();
+        options.write(true).create(true).truncate(true);
+        app.fs()
+            .open(path, options)
+            .map_err(|e| e.to_string())?
+            .write_all(&bytes)
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let path = path.into_path().map_err(|e| e.to_string())?;
+        tauri::async_runtime::spawn_blocking(move || std::fs::write(path, bytes))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(true)
+}
+
+#[tauri::command]
 pub async fn export_data(
     app: tauri::AppHandle,
     engine: State<'_, Shared>,

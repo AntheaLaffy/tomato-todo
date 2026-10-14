@@ -7,19 +7,23 @@ use std::{
 };
 use tomato_core::{guard, GuardMode, Protection};
 use windows_sys::Win32::{
-    Foundation::HWND,
-    System::{
-        LibraryLoader::GetModuleHandleW,
-        Threading::{AttachThreadInput, GetCurrentThreadId},
-    },
-    UI::WindowsAndMessaging::{
-        AllowSetForegroundWindow, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-        GetForegroundWindow, GetWindowThreadProcessId, PeekMessageW, RegisterClassW,
-        SetForegroundWindow, MSG, PM_REMOVE, WNDCLASSW, WS_OVERLAPPEDWINDOW, WS_VISIBLE,
+    Foundation::{HWND, RECT},
+    System::LibraryLoader::GetModuleHandleW,
+    UI::{
+        Input::KeyboardAndMouse::{
+            GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT,
+            KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEINPUT, VK_MENU,
+            VK_SHIFT,
+        },
+        WindowsAndMessaging::{
+            CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetForegroundWindow,
+            GetWindowRect, LockSetForegroundWindow, PeekMessageW, RegisterClassW, SetCursorPos,
+            LSFW_LOCK, MSG, PM_REMOVE, WNDCLASSW, WS_OVERLAPPEDWINDOW, WS_VISIBLE,
+        },
     },
 };
 
-fn window(title: &str) -> HWND {
+fn window(title: &str, left: i32) -> HWND {
     let wide = |text: &str| text.encode_utf16().chain([0]).collect::<Vec<_>>();
     let class = wide("TomatoIsolatedGuardTest");
     let title = wide(title);
@@ -37,7 +41,7 @@ fn window(title: &str) -> HWND {
             class.as_ptr(),
             title.as_ptr(),
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-            20,
+            left,
             20,
             320,
             220,
@@ -58,6 +62,7 @@ fn pump() {
         }
     }
 }
+#[track_caller]
 fn until(mut condition: impl FnMut() -> bool) {
     let start = Instant::now();
     while !condition() {
@@ -85,20 +90,27 @@ fn fixture_window() {
         Ok("1")
     );
     let title = std::env::var("TOMATO_WINDOWS_FIXTURE_TITLE").unwrap();
-    let _window = window(&title);
+    let fixture = window(
+        &title,
+        std::env::var("TOMATO_WINDOWS_FIXTURE_LEFT")
+            .unwrap()
+            .parse()
+            .unwrap(),
+    );
     pump();
     std::fs::write(
         std::env::var("TOMATO_WINDOWS_FIXTURE_READY").unwrap(),
         "ready",
     )
     .unwrap();
-    let controller: u32 = std::env::var("TOMATO_WINDOWS_TEST_CONTROLLER")
-        .unwrap()
-        .parse()
-        .unwrap();
+    let lock_request =
+        std::path::PathBuf::from(std::env::var("TOMATO_WINDOWS_FIXTURE_LOCK").unwrap());
     loop {
         unsafe {
-            AllowSetForegroundWindow(controller);
+            if lock_request.exists() && GetForegroundWindow() == fixture {
+                assert_ne!(LockSetForegroundWindow(LSFW_LOCK), 0);
+                std::fs::rename(&lock_request, lock_request.with_extension("locked")).unwrap();
+            }
         }
         pump();
         sleep(Duration::from_millis(10));
@@ -113,7 +125,7 @@ fn real_win32_windows_focus_whitelist_and_failure() {
         Ok("1")
     );
     let root = tempfile::tempdir().unwrap();
-    let launch = |name: &str| {
+    let launch = |name: &str, left: i32| {
         let folder = root
             .path()
             .join(format!("{name}-{}", "directory".repeat(15)));
@@ -128,17 +140,18 @@ fn real_win32_windows_focus_whitelist_and_failure() {
                 root.path().join(format!("{name}.ready")),
             )
             .env(
-                "TOMATO_WINDOWS_TEST_CONTROLLER",
-                std::process::id().to_string(),
+                "TOMATO_WINDOWS_FIXTURE_LOCK",
+                root.path().join(format!("{name}.lock")),
             )
+            .env("TOMATO_WINDOWS_FIXTURE_LEFT", left.to_string())
             .spawn()
             .unwrap();
         Fixture(child)
     };
-    let own = window("Tomato-Win32-Own");
+    let own = window("Tomato-Win32-Own", 20);
     let own_pid = std::process::id();
-    let allowed = launch("Tomato-Win32-Allowed");
-    let blocked = launch("Tomato-Win32-Blocked");
+    let allowed = launch("Tomato-Win32-Allowed", 380);
+    let blocked = launch("Tomato-Win32-Blocked", 740);
     until(|| {
         root.path().join("Tomato-Win32-Allowed.ready").exists()
             && root.path().join("Tomato-Win32-Blocked.ready").exists()
@@ -174,22 +187,22 @@ fn real_win32_windows_focus_whitelist_and_failure() {
         let target = id as usize as HWND;
         until(|| {
             unsafe {
-                let current = GetCurrentThreadId();
-                let foreground =
-                    GetWindowThreadProcessId(GetForegroundWindow(), std::ptr::null_mut());
-                let target_thread = GetWindowThreadProcessId(target, std::ptr::null_mut());
-                let foreground_link =
-                    foreground != current && AttachThreadInput(current, foreground, 1) != 0;
-                let target_link = target_thread != current
-                    && target_thread != foreground
-                    && AttachThreadInput(current, target_thread, 1) != 0;
-                SetForegroundWindow(target);
-                if target_link {
-                    AttachThreadInput(current, target_thread, 0);
-                }
-                if foreground_link {
-                    AttachThreadInput(current, foreground, 0);
-                }
+                let mut bounds: RECT = std::mem::zeroed();
+                assert_ne!(GetWindowRect(target, &mut bounds), 0);
+                assert_ne!(SetCursorPos(bounds.left + 80, bounds.top + 80), 0);
+                let inputs = [MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP].map(|flags| INPUT {
+                    r#type: INPUT_MOUSE,
+                    Anonymous: INPUT_0 {
+                        mi: MOUSEINPUT {
+                            dwFlags: flags,
+                            ..Default::default()
+                        },
+                    },
+                });
+                assert_eq!(
+                    SendInput(2, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32),
+                    2
+                );
             }
             pump();
             guard::windows().is_ok_and(|windows| windows.iter().any(|w| w.id == id && w.is_focused))
@@ -203,11 +216,35 @@ fn real_win32_windows_focus_whitelist_and_failure() {
     focus(allow.id);
     assert!(!guard::enforce(&protection, own_pid).unwrap());
     focus(block.id);
-    // Exercise the same background thread used by the desktop timer.
-    let copy = protection.clone();
-    let worker = std::thread::spawn(move || guard::enforce(&copy, own_pid));
-    until(|| worker.is_finished());
-    assert!(worker.join().unwrap().unwrap());
+    let lock_request = root.path().join("Tomato-Win32-Blocked.lock");
+    std::fs::write(&lock_request, "lock").unwrap();
+    until(|| lock_request.with_extension("locked").exists());
+    let shift = |flags| unsafe {
+        let input = INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VK_SHIFT,
+                    dwFlags: flags,
+                    ..Default::default()
+                },
+            },
+        };
+        assert_eq!(SendInput(1, &input, std::mem::size_of::<INPUT>() as i32), 1);
+    };
+    let enforce_background = |protection: &Protection| {
+        let copy = protection.clone();
+        let worker = std::thread::spawn(move || guard::enforce(&copy, own_pid));
+        until(|| worker.is_finished());
+        worker.join().unwrap()
+    };
+    shift(0);
+    pump();
+    let deferred = enforce_background(&protection);
+    shift(KEYEVENTF_KEYUP);
+    assert!(!deferred.unwrap());
+    assert_eq!(unsafe { GetForegroundWindow() }, block.id as usize as HWND);
+    until(|| enforce_background(&protection).unwrap());
     until(|| {
         guard::windows().is_ok_and(|windows| {
             windows
@@ -215,6 +252,12 @@ fn real_win32_windows_focus_whitelist_and_failure() {
                 .any(|w| w.pid == Some(own_pid) && w.is_focused)
         })
     });
+    for _ in 0..3 {
+        focus(block.id);
+        until(|| enforce_background(&protection).unwrap());
+        assert!(unsafe { GetAsyncKeyState(i32::from(VK_MENU)) } >= 0);
+        assert!(unsafe { GetAsyncKeyState(i32::from(VK_SHIFT)) } >= 0);
+    }
     protection.mode = GuardMode::Lock;
     focus(allow.id);
     assert!(guard::enforce(&protection, own_pid).unwrap());

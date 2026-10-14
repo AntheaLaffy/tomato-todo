@@ -1,5 +1,7 @@
 //! App-owned Pi orchestration. The embedded agent cannot dispatch app mutations.
+mod attachments;
 mod bridge;
+mod conversations;
 pub mod files;
 mod state;
 #[cfg(test)]
@@ -10,7 +12,7 @@ mod worker;
 use chrono::{Local, TimeZone, Timelike};
 use serde_json::{json, Value};
 pub use state::Preferences;
-use state::{nonempty_text, private_directory, Memory, Store, WakeRecord};
+use state::{nonempty_text, private_directory, Attachment, Memory, Store, WakeRecord};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -265,16 +267,30 @@ impl Agent {
                 }
                 self.status()
             }
+            "upload_attachment" => serde_json::to_value(attachments::upload(&self.dir, &args)?)
+                .map_err(|e| e.to_string()),
+            "download_attachment" => {
+                attachments::download(&self.dir, &nonempty_text(&args, "id", 100)?)
+            }
+            "search_conversations"
+            | "rename_conversation"
+            | "pin_conversation"
+            | "branch_conversation"
+            | "edit_message"
+            | "retry_message" => self.conversation_operation(args["op"].as_str().unwrap(), &args),
             "send" => {
-                let images = validated_images(&args["images"])?;
+                let (attachments, mut images) =
+                    attachments::for_prompt(&self.dir, &args["attachmentIds"])?;
+                images.extend(validated_images(&args["images"])?);
+                validated_images(&json!(images))?;
                 let text = if args["text"].as_str().is_none_or(|t| t.trim().is_empty())
-                    && !images.is_empty()
+                    && (!images.is_empty() || !attachments.is_empty())
                 {
-                    "请识别并分析这些图片，不清楚的地方先问我。".into()
+                    "请分析这些附件，不清楚的地方先问我。".into()
                 } else {
                     nonempty_text(&args, "text", 32000)?
                 };
-                self.prompt(text, false, false, images)?;
+                self.prompt(text, false, false, images, attachments)?;
                 self.status()
             }
             "cancel" => {
@@ -324,6 +340,8 @@ impl Agent {
                 inner.store.new_conversation(now());
                 inner.live.questions = Value::Null;
                 inner.live.plan = Value::Null;
+                inner.live.text.clear();
+                inner.live.error = None;
                 inner.store.save(&self.dir)?;
                 drop(inner);
                 self.status()
@@ -337,6 +355,8 @@ impl Agent {
                 inner.store.switch_conversation(&id)?;
                 inner.live.questions = Value::Null;
                 inner.live.plan = Value::Null;
+                inner.live.text.clear();
+                inner.live.error = None;
                 inner.store.save(&self.dir)?;
                 drop(inner);
                 self.status()
@@ -385,35 +405,79 @@ impl Agent {
         automatic: bool,
         scheduled: bool,
         images: Vec<Value>,
+        attachments: Vec<Attachment>,
     ) -> AppResult<()> {
         let command = {
             let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
             if inner.live.busy && !automatic {
                 return Err("当前分析尚未结束".into());
             }
-            let p = inner.store.preferences.clone();
-            if automatic && !p.enabled {
-                return Err("请先在连接配置中启用学习助手".into());
-            }
-            if inner.live.auth[&p.provider]["configured"] != true {
-                return Err("请先配置 DeepSeek API Key 或完成 Codex 账号登录".into());
-            }
-            inner.live.busy = true;
-            inner.live.authentication = false;
-            inner.live.questions = Value::Null;
-            inner.live.text.clear();
-            inner.live.error = None;
-            inner.live.automatic = automatic && !scheduled;
-            inner.live.job_id = uuid::Uuid::new_v4().to_string();
-            let displayed = if images.is_empty() {
-                text.clone()
-            } else {
-                format!("{text}\n（附{}张图片，保存在私有会话中）", images.len())
-            };
-            inner.store.message("user", displayed, now(), automatic);
-            inner.store.save(&self.dir)?;
-            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"jobId":inner.live.job_id,"text":text,"images":images,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":tools::definitions(automatic)})
+            self.prompt_command(&mut inner, text, automatic, scheduled, images, attachments)?
         };
+        self.send_prompt(command)
+    }
+    fn validate_prompt(inner: &Inner, automatic: bool, images: &[Value]) -> AppResult<Preferences> {
+        let p = inner.store.preferences.clone();
+        if automatic && !p.enabled {
+            return Err("请先在连接配置中启用学习助手".into());
+        }
+        if inner.live.auth[&p.provider]["configured"] != true {
+            return Err("请先配置 DeepSeek API Key 或完成 Codex 账号登录".into());
+        }
+        if !images.is_empty() {
+            let models = inner.live.auth[&p.provider]["models"].as_array();
+            let model = models.and_then(|models| {
+                if !p.model.is_empty() {
+                    return models.iter().find(|m| m["id"] == p.model);
+                }
+                models
+                    .iter()
+                    .find(|m| m["id"] == "deepseek-chat")
+                    .or_else(|| {
+                        models
+                            .iter()
+                            .find(|m| m["id"].as_str().is_some_and(|id| !id.contains("spark")))
+                    })
+                    .or_else(|| models.first())
+            });
+            if model.is_some_and(|m| m["vision"] == false) {
+                return Err("所选模型不支持图片，请选择支持视觉的模型后发送".into());
+            }
+        }
+        Ok(p)
+    }
+    fn prompt_command(
+        &self,
+        inner: &mut Inner,
+        text: String,
+        automatic: bool,
+        scheduled: bool,
+        images: Vec<Value>,
+        attachments: Vec<Attachment>,
+    ) -> AppResult<Value> {
+        let p = Self::validate_prompt(inner, automatic, &images)?;
+        let displayed = if images.is_empty() || !attachments.is_empty() {
+            text.clone()
+        } else {
+            format!("{text}\n（附{}张图片，保存在私有会话中）", images.len())
+        };
+        let mut next = inner.store.clone();
+        let message_id = next.message("user", displayed, now(), automatic);
+        next.message_mut(&message_id).unwrap().attachments = attachments.clone();
+        next.save(&self.dir)?;
+        inner.store = next;
+        inner.live.busy = true;
+        inner.live.authentication = false;
+        inner.live.questions = Value::Null;
+        inner.live.text.clear();
+        inner.live.error = None;
+        inner.live.automatic = automatic && !scheduled;
+        inner.live.job_id = uuid::Uuid::new_v4().to_string();
+        Ok(
+            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":tools::definitions(automatic)}),
+        )
+    }
+    fn send_prompt(self: &Arc<Self>, command: Value) -> AppResult<()> {
         if let Err(error) = self.send(command) {
             self.failure(&error);
             return Err(error);
@@ -490,6 +554,8 @@ impl Agent {
                     }
                 }
             }
+            "text_reset" => inner.live.text.clear(),
+            "tool_end" => inner.live.tool.clear(),
             "tool_start" => {
                 inner.live.tool = event["name"].as_str().unwrap_or_default().into();
             }
@@ -499,6 +565,14 @@ impl Agent {
                     if path.starts_with(self.dir.join("sessions")) {
                         inner.store.set_session(&path.to_string_lossy(), now());
                     }
+                }
+            }
+            "message_entry" => {
+                if let Some(message) = event["messageId"]
+                    .as_str()
+                    .and_then(|id| inner.store.message_mut(id))
+                {
+                    message.entry_id = event["entryId"].as_str().map(str::to_owned);
                 }
             }
             "done" => {
@@ -512,7 +586,10 @@ impl Agent {
                     .to_string();
                 let automatic = inner.live.automatic;
                 if !text.is_empty() {
-                    inner.store.message("assistant", text, now(), automatic);
+                    let id = inner.store.message("assistant", text, now(), automatic);
+                    let message = inner.store.message_mut(&id).unwrap();
+                    message.entry_id = event["entryId"].as_str().map(str::to_owned);
+                    message.stopped = event["stopped"] == true;
                 }
                 inner.live.text.clear();
                 for w in &mut inner.store.wakes {
@@ -543,7 +620,7 @@ impl Agent {
         }
         if !matches!(
             event["type"].as_str(),
-            Some("text" | "tool_start" | "auth_event")
+            Some("text" | "text_reset" | "tool_start" | "tool_end" | "auth_event")
         ) {
             let _ = inner.store.save(&self.dir);
         }
@@ -654,7 +731,7 @@ impl Agent {
                 .map_err(|e| e.to_string())?
                 .live
                 .wake_serial += 1;
-            return self.prompt(text, false, true, vec![]);
+            return self.prompt(text, false, true, vec![], vec![]);
         }
         let prompt = {
             let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
@@ -727,7 +804,7 @@ impl Agent {
             format!("本地检测到一个学习安排信号。看一眼当前数据和已确认背景，用一两句话说你注意到了什么、你的建议（怎么调、为什么）和想问的一个点，不要罗列清单。这一轮只分析、提问和准备待审阅文件，不直接改数据；用户回应后即可直接调整。信号：{}",serde_json::to_string(&eligible).map_err(|e|e.to_string())?)
         };
         (self.wake)();
-        self.prompt(prompt, true, false, vec![])
+        self.prompt(prompt, true, false, vec![], vec![])
     }
     pub fn call_job(self: &Arc<Self>, name: &str, args: &Value, job_id: &str) -> AppResult<Value> {
         let automatic = {

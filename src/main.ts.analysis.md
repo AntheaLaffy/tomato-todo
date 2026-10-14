@@ -1,7 +1,7 @@
 ---
 source: main.ts
-lines: 3556
-generated_at: 2026-10-13
+lines: 3569
+generated_at: 2026-10-14
 ---
 
 ## 功能索引
@@ -9,58 +9,59 @@ generated_at: 2026-10-13
 | 用途                                                | Lines     | Notes                                       |
 | --------------------------------------------------- | --------- | ------------------------------------------- |
 | 导入、状态、管辖与格式化                            | 1–452     | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 分发、快照、导航与提醒                              | 453–677   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 今日待办、本周日程日历、待补队列与静态实例列表      | 678–934   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 任务、目标、习惯模板、愿景与统计设置                | 935–1437  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 保护、定时锁机、沉浸与刷新                          | 1438–1657 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1658–2297 | 节点图在 src/nodegraph.ts                   |
-| 容器、搜索与设置操作                                | 2298–2697 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 文件导入、模板动作与页面事件                        | 2698–3374 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 右键菜单、批量删除/移出、拖拽与快捷键               | 3371–3456 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动、概念讲解挂载与轮询                            | 3457–3556 | 概念目标与讲解内容在 src/ponder.ts          |
+| 分发、快照、导航与提醒                              | 453–678   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 今日待办、本周日程日历、待补队列与静态实例列表      | 679–947   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 任务、目标、习惯模板、愿景与统计设置                | 948–1450  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 保护、定时锁机、沉浸与刷新                          | 1451–1664 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1665–2368 | 节点图在 src/nodegraph.ts                   |
+| 搜索、声音、紧急操作与表单绑定                                | 2369–2710 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 文件导入、模板动作与页面事件                        | 2711–3341 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 右键菜单、批量删除/移出、拖拽与快捷键               | 3342–3465 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 启动、概念讲解挂载与轮询                            | 3466–3569 | 概念目标与讲解内容在 src/ponder.ts          |
 
 ## Symbols
 
 | Symbol               | Type     | Line |
 | -------------------- | -------- | ---- |
-| focusPage            | function | 681  |
-| todayTaskGroup       | function | 726 |
-| compareTaskTime      | function | 764 |
-| isCatchUp            | function | 747  |
-| taskList             | function | 771  |
-| isoDate              | const    | 797  |
-| schedulePage         | function | 799  |
-| tasksPage            | function | 935  |
-| goalsPage            | function | 985  |
-| habitsTab            | function | 1042 |
-| visionDialog         | function | 1116 |
-| lineOutcomeLabel     | const    | 1176 |
-| spanLabel            | const    | 1191 |
-| goalStatsCard        | function | 1193 |
-| crossSectionCard     | function | 1213 |
-| statsPage            | function | 1231 |
-| savePreferences      | function | 1295 |
-| settingsPage         | function | 1384 |
-| projectWhitelistCard | function | 1398 |
-| guardPage            | function | 1438 |
-| templatesCard        | function | 1652 |
-| datesForPrinting     | function | 1663 |
-| printDialog          | function | 1691 |
-| templateDialog       | function | 1747 |
-| taskDialog           | function | 2141 |
-| goalDialog           | function | 2298 |
-| importPlan           | function | 2698 |
-| selectControls       | function | 3371 |
-| detachSelected       | function | 3376 |
-| deleteSelectedTasks  | function | 3386 |
-| sortProjects         | function | 3411 |
-| boot                 | function | 3478 |
+| focusPage            | function | 682  |
+| todayTaskGroup       | function | 727  |
+| compareTaskTime      | function | 765  |
+| isCatchUp            | function | 748  |
+| taskList             | function | 772  |
+| isoDate              | const    | 798  |
+| resizeCalendar       | function | 800  |
+| schedulePage         | function | 812  |
+| tasksPage            | function | 948  |
+| goalsPage            | function | 998  |
+| habitsTab            | function | 1055 |
+| visionDialog         | function | 1129 |
+| lineOutcomeLabel     | const    | 1189 |
+| spanLabel            | const    | 1204 |
+| goalStatsCard        | function | 1206 |
+| crossSectionCard     | function | 1226 |
+| statsPage            | function | 1244 |
+| savePreferences      | function | 1308 |
+| settingsPage         | function | 1397 |
+| projectWhitelistCard | function | 1411 |
+| guardPage            | function | 1451 |
+| templatesCard        | function | 1665 |
+| datesForPrinting     | function | 1676 |
+| printDialog          | function | 1704 |
+| templateDialog       | function | 1760 |
+| taskDialog           | function | 2154 |
+| goalDialog           | function | 2311 |
+| importPlan           | function | 2711 |
+| selectControls       | function | 3384 |
+| detachSelected       | function | 3389 |
+| deleteSelectedTasks  | function | 3399 |
+| sortProjects         | function | 3424 |
+| boot                 | function | 3491 |
 
 模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通/目标待补呈现。
 
 实例管辖（普通/习惯/目标）由 Rust 核心定义并随 Snapshot.taskKinds 下发，前端 isHabit 直接读取，不再自行推导；从习惯组移出或删除习惯组只清 habitId，不改写冻结的 recurring，历史缺勤不变。
 
-本周日程：schedulePage 是二维日历（横轴周一到周日，纵轴 07:00–23:00），任务块按 `reminderTime` 定位、按 `estimate × 单次时长 + 休息` 给高度，不吸附整点；weekOffset 翻周，点击块打开任务。只用 `state.data.tasks` 的 `dueDate/reminderTime`，不依赖核心新接口。
+本周日程：resizeCalendar 按时间轴上方的实际空间计算可用高度，render、窗口 resize 与字体就绪时重算，滚动不改变比例；schedulePage 是二维日历（横轴周一到周日，纵轴 07:00–23:00），任务块按 `reminderTime` 定位、按 `estimate × 单次时长 + 休息` 给高度，不吸附整点；weekOffset 翻周，点击块打开任务。只用 `state.data.tasks` 的 `dueDate/reminderTime`，不依赖核心新接口。
 
 统计页：goalStatsCard 读 `stats.goals`（整线裁定 Success/Failure/Pending 与逐节点时序），crossSectionCard 读 `stats.days` 的每日完成/缺勤/作废/主线裁定与报废，把同一时段的主线与其它任务并排看；两者都由核心计算，前端不重算成败。
 
@@ -76,7 +77,7 @@ generated_at: 2026-10-13
 
 偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/备份。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。
 
-锁机日程：tomorrowScheduleDialog（L:1531）按 state.today 的本地日期取次日，时间排序、无时间排末尾，排除已报废实例。展示任务/项目/备注/步骤，无修改和计时入口；renderImmersive 在保护期间提供入口，严格模式可用，休息锁机使用深色弹窗。
+锁机日程：tomorrowScheduleDialog（L:1544）按 state.today 的本地日期取次日，时间排序、无时间排末尾，排除已报废实例。展示任务/项目/备注/步骤，无修改和计时入口；renderImmersive 在保护期间提供入口，严格模式可用，休息锁机使用深色弹窗。
 
 Android 导航：setMobileNav（L:553）控制抽屉和工作区 inert；平台身份由原生 platform_kind 报告，boot 安装 tomatoBack 供 Kotlin 返回键处理。桌面专属偏好只在 desktop 为 true 时显示。
 

@@ -5,7 +5,7 @@ import {
   DefaultResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, realpath } from "node:fs/promises";
 import { join, relative, isAbsolute } from "node:path";
 import { codingTools } from "./coding.mjs";
 import { networkTool, withHostedSearch } from "./web.mjs";
@@ -42,6 +42,21 @@ export async function closeStudySession(session, reason = "new") {
  */
 export const mcpStatus = { servers: [], errors: [] };
 const noOp = () => {};
+// Let Pi extract the actual path, including tools and compaction entries. Replaying
+// the UI's text would silently change what the model sees after editing a message.
+export async function forkStudySession(dir, command) {
+  const sessions=join(dir,"sessions"), saved=command.sessionFile;
+  const rel=saved&&relative(sessions,saved);
+  if(!rel||rel.startsWith("..")||isAbsolute(rel)||(await realpath(saved))!==saved)throw new Error("会话文件路径无效");
+  const manager=SessionManager.open(saved,sessions,join(dir,"workspace/coding"));
+  const entry=manager.getEntry(command.entryId);
+  if(!entry||entry.type!=="message"||!["user","assistant"].includes(entry.message.role))throw new Error("Pi 会话节点不存在");
+  if(command.before&&entry.message.role!=="user")throw new Error("只能从用户消息之前重新生成");
+  const leaf=command.before?entry.parentId:entry.id;
+  const sessionFile=leaf?manager.createBranchedSession(leaf):SessionManager.create(join(dir,"workspace/coding"),sessions).getSessionFile();
+  const content=typeof entry.message.content==="string"?[{type:"text",text:entry.message.content}]:entry.message.content;
+  return {sessionFile,images:command.before?content.filter(c=>c.type==="image"):[],text:command.before?content.filter(c=>c.type==="text").map(c=>c.text).join("\n"):undefined};
+}
 const mcpUIContext = {
   select: async () => undefined,
   confirm: async () => false,

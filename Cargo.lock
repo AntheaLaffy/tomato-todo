@@ -4276,6 +4276,7 @@ dependencies = [
 name = "tomato-todo"
 version = "0.8.4"
 dependencies = [
+ "base64 0.22.1",
  "gio",
  "libloading",
  "serde",

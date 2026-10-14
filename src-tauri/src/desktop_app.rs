@@ -272,6 +272,7 @@ pub fn run() {
             guard_info,
             files::export_data,
             files::read_import,
+            files::save_agent_file,
             crate::platform_kind,
             desktop::desktop_status,
             desktop::save_desktop_settings,

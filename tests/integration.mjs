@@ -896,6 +896,98 @@ test(
       await page.locator("[data-week-next]").click();
       await expect(page.locator("[data-week-now]")).toHaveCount(1);
       await page.locator("[data-week-now]").click();
+      for (const [width, height, scale] of [
+        [1440, 1050, 1],
+        [2048, 1216, 4 / 3],
+        [1920, 1080, 1.25],
+        [1536, 960, 1.5],
+        [1366, 768, 1.25],
+      ]) {
+        const viewport = {
+          width: Math.round(width / scale),
+          height: Math.round(height / scale),
+        };
+        const calendarPage = await browser.newPage({
+          viewport,
+          deviceScaleFactor: scale,
+        });
+        try {
+          await calendarPage.route("**/api/snapshot", async (route) => {
+            const response = await route.fetch();
+            const snapshot = await response.json();
+            for (const task of snapshot.data.tasks)
+              task.reminderPending = false;
+            await route.fulfill({ response, json: snapshot });
+          });
+          await calendarPage.goto(url);
+          await calendarPage.locator("[data-page=schedule]").first().click();
+          await calendarPage.evaluate(() => document.fonts.ready);
+          const layout = await calendarPage
+            .locator(".calendar")
+            .evaluate((calendar) => {
+              const bounds = calendar.getBoundingClientRect();
+              const body = calendar
+                .querySelector(".calendar-body")
+                .getBoundingClientRect();
+              const labels = [
+                ...calendar.querySelectorAll(".calendar-gutter span"),
+              ].map((label) => label.getBoundingClientRect());
+              const blocks = [...calendar.querySelectorAll(".calendar-block")]
+                .map((block) => ({
+                  bounds: block.getBoundingClientRect(),
+                  title: block.querySelector("span").getBoundingClientRect(),
+                }))
+                .filter(
+                  ({ bounds }) =>
+                    bounds.top >= body.top && bounds.bottom <= body.bottom,
+                );
+              return {
+                top: bounds.top,
+                bottom: bounds.bottom,
+                first: labels[0].top,
+                last: labels.at(-1).bottom,
+                height: body.height,
+                blockCount: blocks.length,
+                readable: blocks.every(
+                  ({ bounds, title }) => title.bottom <= bounds.bottom,
+                ),
+              };
+            });
+          assert.ok(
+            layout.top >= 0 && layout.bottom <= viewport.height,
+            `Calendar must fit ${width}×${height} at ${scale}× scaling: ${JSON.stringify(layout)}`,
+          );
+          assert.ok(
+            layout.first >= layout.top && layout.last <= layout.bottom,
+            "Both 07:00 and 23:00 must remain inside the calendar",
+          );
+          assert.ok(layout.readable, "Short task blocks must show their title");
+          assert.ok(
+            layout.blockCount > 0,
+            "The calendar must contain task blocks",
+          );
+          await calendarPage.evaluate(() => {
+            window.scrollTo(0, 80);
+            window.dispatchEvent(new Event("resize"));
+          });
+          const axisHeight = () =>
+            calendarPage
+              .locator(".calendar-body")
+              .evaluate((body) => body.getBoundingClientRect().height);
+          assert.equal(
+            await axisHeight(),
+            layout.height,
+            "Scrolling must keep the time scale unchanged",
+          );
+          await calendarPage.setViewportSize({
+            ...viewport,
+            height: viewport.height + 80,
+          });
+          await expect.poll(axisHeight).toBeGreaterThan(layout.height);
+        } finally {
+          await calendarPage.close();
+        }
+      }
       await page.screenshot({
         path: join(dir, "schedule.png"),
         fullPage: true,

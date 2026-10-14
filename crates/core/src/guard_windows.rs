@@ -9,10 +9,17 @@ use windows_sys::Win32::{
         AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW,
         PROCESS_QUERY_LIMITED_INFORMATION,
     },
-    UI::WindowsAndMessaging::{
-        EnumChildWindows, EnumWindows, GetClassNameW, GetForegroundWindow, GetWindowTextLengthW,
-        GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
-        PeekMessageW, SetForegroundWindow, ShowWindowAsync, MSG, PM_NOREMOVE, SW_RESTORE,
+    UI::{
+        Input::KeyboardAndMouse::{
+            GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT,
+            KEYEVENTF_KEYUP, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+        },
+        WindowsAndMessaging::{
+            EnumChildWindows, EnumWindows, GetClassNameW, GetForegroundWindow,
+            GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow,
+            IsWindowVisible, PeekMessageW, SendMessageTimeoutW, SetForegroundWindow,
+            ShowWindowAsync, MSG, PM_NOREMOVE, SMTO_ABORTIFHUNG, SW_RESTORE, WM_NULL,
+        },
     },
 };
 
@@ -143,9 +150,6 @@ unsafe extern "system" fn collect(window: HWND, context: LPARAM) -> i32 {
 pub fn windows() -> AppResult<Vec<Window>> {
     unsafe {
         let foreground = GetForegroundWindow();
-        if foreground.is_null() {
-            return Err("当前 Windows 桌面没有可访问的前台窗口".into());
-        }
         let mut enumeration = Enumeration {
             foreground,
             windows: Vec::new(),
@@ -160,13 +164,15 @@ pub fn windows() -> AppResult<Vec<Window>> {
                 std::io::Error::last_os_error()
             ));
         }
-        if !enumeration.windows.iter().any(|w| w.is_focused) {
-            return Err("当前 Windows 前台窗口不可访问".into());
-        }
         Ok(enumeration.windows)
     }
 }
 
+fn modifier_pressed() -> bool {
+    [VK_MENU, VK_CONTROL, VK_SHIFT, VK_LWIN, VK_RWIN]
+        .into_iter()
+        .any(|key| unsafe { GetAsyncKeyState(i32::from(key)) } < 0)
+}
 struct InputLink(u32, u32);
 impl Drop for InputLink {
     fn drop(&mut self) {
@@ -175,38 +181,92 @@ impl Drop for InputLink {
         }
     }
 }
-fn link(from: u32, to: u32) -> Option<InputLink> {
-    (from != to && to != 0 && unsafe { AttachThreadInput(from, to, 1) } != 0)
-        .then(|| InputLink(from, to))
+fn activate(window: HWND) -> bool {
+    unsafe {
+        if SetForegroundWindow(window) != 0 {
+            // Foreground activation across input queues is asynchronous. Give
+            // the UI a short chance to handle it before confirming a redirect.
+            SendMessageTimeoutW(
+                window,
+                WM_NULL,
+                0,
+                0,
+                SMTO_ABORTIFHUNG,
+                100,
+                std::ptr::null_mut(),
+            );
+        }
+        pid(GetForegroundWindow()) == std::process::id()
+    }
 }
-pub fn focus(id: u64) -> AppResult<()> {
+pub fn focus(id: u64) -> AppResult<bool> {
     let window = usize::try_from(id).map_err(|e| e.to_string())? as HWND;
     unsafe {
         if IsWindow(window) == 0 || pid(window) != std::process::id() {
             return Err("专注窗口已关闭或进程已变化".into());
         }
+        if pid(GetForegroundWindow()) == std::process::id() {
+            return Ok(true);
+        }
+        if modifier_pressed() {
+            return Ok(false);
+        }
+        // The protection timer runs outside the UI thread and needs its own queue.
+        let mut message: MSG = std::mem::zeroed();
+        PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_NOREMOVE);
         if IsIconic(window) != 0 {
             ShowWindowAsync(window, SW_RESTORE);
         }
-        if SetForegroundWindow(window) != 0 && pid(GetForegroundWindow()) == std::process::id() {
-            return Ok(());
+        if activate(window) {
+            return Ok(true);
         }
-        // The timer runs off the UI thread. Give it a message queue and briefly
-        // share input with our UI and foreground thread; restore both links on exit.
-        let mut message: MSG = std::mem::zeroed();
-        PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_NOREMOVE);
+        if modifier_pressed() {
+            return Ok(false);
+        }
+        // ALT releases the foreground lock. Avoid combining it with held user
+        // modifiers, and keep a denied activation pending for the next guard tick.
+        let inputs = [0, KEYEVENTF_KEYUP].map(|flags| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VK_MENU,
+                    dwFlags: flags,
+                    ..Default::default()
+                },
+            },
+        });
+        let sent = SendInput(2, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+        if sent != 2 {
+            if sent == 1 {
+                SendInput(1, &inputs[1], std::mem::size_of::<INPUT>() as i32);
+            }
+            return Ok(false);
+        }
+        if activate(window) {
+            return Ok(true);
+        }
+        let foreground = GetForegroundWindow();
         let current = GetCurrentThreadId();
-        let ui = GetWindowThreadProcessId(window, std::ptr::null_mut());
-        let foreground = GetWindowThreadProcessId(GetForegroundWindow(), std::ptr::null_mut());
-        let _ui = link(current, ui);
-        let _foreground = if foreground != ui {
-            link(current, foreground)
-        } else {
-            None
-        };
-        if SetForegroundWindow(window) == 0 || pid(GetForegroundWindow()) != std::process::id() {
-            return Err("Windows 拒绝了前台激活请求，已停止窗口保护".into());
+        let thread = GetWindowThreadProcessId(foreground, std::ptr::null_mut());
+        if thread == 0 || thread == current || modifier_pressed() {
+            return Ok(false);
         }
+        // Queue attachment makes activation synchronous with the previous app.
+        // Leave unresponsive windows alone and always detach before returning.
+        if SendMessageTimeoutW(
+            foreground,
+            WM_NULL,
+            0,
+            0,
+            SMTO_ABORTIFHUNG,
+            100,
+            std::ptr::null_mut(),
+        ) == 0
+            || AttachThreadInput(current, thread, 1) == 0
+        {
+            return Ok(false);
+        }
+        let _input = InputLink(current, thread);
+        Ok(activate(window))
     }
-    Ok(())
 }

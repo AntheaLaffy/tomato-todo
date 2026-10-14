@@ -47,6 +47,27 @@ export const agentCall = <T>(requestBody: Record<string, unknown>) =>
     ? invoke<T>("agent_call", { request: requestBody })
     : request<T>("agent", requestBody);
 export const openAgentLogin = () => invoke<void>("agent_open_login");
+export async function saveAgentFile(
+  bytes: BlobPart,
+  name: string,
+  type: string,
+): Promise<boolean> {
+  const blob = new Blob([bytes], { type });
+  if (native) {
+    const raw = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let at = 0; at < raw.length; at += 32768)
+      binary += String.fromCharCode(...raw.subarray(at, at + 32768));
+    return invoke<boolean>("save_agent_file", { name, data: btoa(binary) });
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
 export async function exportData(data: AppData): Promise<boolean> {
   if (native) return invoke<boolean>("export_data");
   return downloadJson(data, "tomato-todo-backup.json");

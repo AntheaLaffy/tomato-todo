@@ -606,6 +606,7 @@ function render() {
   if (page === "agent") mountAgent();
   icons();
   updateClock();
+  resizeCalendar();
 }
 // 每一页的思索条目：悬停整页不弹胶囊（整页都是它），所以在标题旁给一个
 // 明确的入口，点开就是这一页的「设计理念 + 怎么用」。
@@ -796,6 +797,18 @@ function taskList(tasks: Task[], compact = false, order = sort) {
 let weekOffset = 0;
 const isoDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function resizeCalendar() {
+  const body = document.querySelector<HTMLElement>(".calendar-body");
+  if (!body) return;
+  // Use document coordinates so scrolling never changes the time scale.
+  const top = body.getBoundingClientRect().top + window.scrollY;
+  body.style.setProperty(
+    "--calendar-height",
+    `${Math.max(0, window.innerHeight - top - 24)}px`,
+  );
+}
+window.addEventListener("resize", resizeCalendar);
+void document.fonts.ready.then(resizeCalendar);
 function schedulePage() {
   const base = new Date(`${state.today}T12:00:00`);
   const monday = new Date(base);

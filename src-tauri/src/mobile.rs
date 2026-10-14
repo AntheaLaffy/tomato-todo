@@ -67,6 +67,7 @@ pub fn run() {
             agent_open_login,
             files::export_data,
             files::read_import,
+            files::save_agent_file,
             crate::platform_kind
         ])
         .run(tauri::generate_context!())

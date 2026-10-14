@@ -33,11 +33,15 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
-    "lucide": "^1.53.0"
+    "dompurify": "^3.4.17",
+    "katex": "^0.19.0",
+    "lucide": "^1.53.0",
+    "marked": "^18.1.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tauri-apps/cli": "^2.12.1",
+    "@types/katex": "^0.16.8",
     "prettier": "^3.9.9",
     "typescript": "^5.9.3",
     "vite": "^8.3.4"

@@ -495,6 +495,154 @@ fn conversations_switch_and_delete() {
     assert_eq!(store.conversations_view().len(), 1);
 }
 #[test]
+fn conversation_search_keeps_old_content_and_branch_preserves_original() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let (original, target) = {
+        let mut inner = agent.inner.lock().unwrap();
+        let original = inner.store.new_conversation(1);
+        inner.store.message("user", "第一轮".into(), 2, false);
+        let target =
+            inner
+                .store
+                .message("assistant", format!("{}微积分", "x".repeat(200)), 3, false);
+        inner.store.message_mut(&target).unwrap().entry_id = Some("pi-node".into());
+        inner.store.set_session("original.jsonl", 3);
+        for at in 4..360 {
+            inner
+                .store
+                .message("assistant", "后续讨论".into(), at, false);
+        }
+        inner.store.save(dir.path()).unwrap();
+        (original, target)
+    };
+    let found = agent
+        .request(json!({"op":"search_conversations","query":"微积分"}))
+        .unwrap();
+    assert_eq!(found["conversations"][0]["id"], original);
+    assert_eq!(found["conversations"][0]["messageId"], target);
+    assert!(found["conversations"][0]["snippet"]
+        .as_str()
+        .unwrap()
+        .contains("微积分"));
+    agent
+        .request(json!({"op":"rename_conversation","id":original,"title":"Analysis"}))
+        .unwrap();
+    assert_eq!(
+        agent
+            .request(json!({"op":"search_conversations","query":"ANALYSIS"}))
+            .unwrap()["conversations"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    agent
+        .request(json!({"op":"pin_conversation","id":original,"pinned":true}))
+        .unwrap();
+    let mut store = Store::load(dir.path()).unwrap();
+    assert!(store.messages().len() > 300);
+    let before = serde_json::to_value(store.active_conversation().unwrap()).unwrap();
+    let branch = store
+        .fork_conversation(&target, false, "branch.jsonl".into(), 400)
+        .unwrap();
+    assert_eq!(store.messages().len(), 2);
+    assert_eq!(store.messages()[1].entry_id.as_deref(), Some("pi-node"));
+    assert_eq!(store.active_session().as_deref(), Some("branch.jsonl"));
+    assert_eq!(
+        store
+            .active_conversation()
+            .unwrap()
+            .branched_from
+            .as_ref()
+            .unwrap()
+            .conversation_id,
+        original
+    );
+    store.switch_conversation(&original).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.active_conversation().unwrap()).unwrap(),
+        before
+    );
+    store.delete_conversation(&original).unwrap();
+    assert_eq!(store.active.as_deref(), Some(branch.as_str()));
+}
+#[test]
+fn attachments_are_private_validated_and_survive_message_branches() {
+    use base64::Engine as _;
+    let dir = tempfile::tempdir().unwrap();
+    private_directory(&dir.path().join("workspace")).unwrap();
+    let content = "科目,小时\n数学,3\n";
+    let args = json!({"name":"复习.csv","mimeType":"text/csv","data":base64::engine::general_purpose::STANDARD.encode(content)});
+    let file = attachments::upload(dir.path(), &args).unwrap();
+    let (meta, bytes) = attachments::load(dir.path(), &file.id).unwrap();
+    assert_eq!(meta.bytes, content.len());
+    assert_eq!(bytes, content.as_bytes());
+    assert!(attachments::upload(dir.path(), &json!({"name":"../outside","data":"AA=="})).is_err());
+    assert!(attachments::upload(
+        dir.path(),
+        &json!({"name":"image.png","mimeType":"image/png","data":"AA=="})
+    )
+    .is_err());
+    assert!(attachments::load(dir.path(), "../outside").is_err());
+    assert!(attachments::for_prompt(dir.path(), &json!([file.id, file.id])).is_err());
+    let mut store = Store::default();
+    let original = store.new_conversation(1);
+    let message = store.message("user", "看附件".into(), 2, false);
+    store.message_mut(&message).unwrap().attachments = vec![file.clone()];
+    store
+        .fork_conversation(&message, false, "branch.jsonl".into(), 3)
+        .unwrap();
+    store.delete_conversation(&original).unwrap();
+    store.save(dir.path()).unwrap();
+    let loaded = Store::load(dir.path()).unwrap();
+    assert_eq!(loaded.messages()[0].attachments[0].id, file.id);
+    assert_eq!(
+        attachments::download(dir.path(), &file.id).unwrap()["data"],
+        args["data"]
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let path = dir
+            .path()
+            .join("workspace/attachments")
+            .join(&file.id)
+            .join(&file.name);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("state.json"), &path).unwrap();
+        assert!(attachments::download(dir.path(), &file.id).is_err());
+    }
+}
+#[test]
+fn sdk_entry_ids_and_user_stop_persist_without_a_failure() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let id = agent
+        .inner
+        .lock()
+        .unwrap()
+        .store
+        .message("user", "请求".into(), 1, false);
+    agent.event(json!({"type":"message_entry","messageId":id,"entryId":"user-node"}));
+    agent.event(json!({"type":"text","text":"工具前的说明"}));
+    agent.event(json!({"type":"text_reset"}));
+    agent.event(json!({"type":"text","text":"部分回复"}));
+    agent.event(json!({"type":"done","text":"部分回复","entryId":"assistant-node","stopped":true}));
+    let s = agent.status().unwrap();
+    assert_eq!(s["messages"][0]["entryId"], "user-node");
+    assert_eq!(s["messages"][1]["entryId"], "assistant-node");
+    assert_eq!(s["messages"][1]["stopped"], true);
+    assert_eq!(s["stream"], "");
+    assert!(s["error"].is_null());
+    let saved = Store::load(dir.path()).unwrap();
+    assert!(saved.messages()[1].stopped);
+}
+#[test]
 fn legacy_single_conversation_migrates() {
     let dir = tempfile::tempdir().unwrap();
     let legacy = json!({

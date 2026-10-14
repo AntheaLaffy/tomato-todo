@@ -16,7 +16,11 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { chromium, expect } from "@playwright/test";
 import { ModelRuntime } from "../agent/node_modules/@earendil-works/pi-coding-agent/dist/index.js";
-import { closeStudySession, createStudySession } from "../agent/session.mjs";
+import {
+  closeStudySession,
+  createStudySession,
+  forkStudySession,
+} from "../agent/session.mjs";
 import { mcpCommand } from "../agent/mcp-config.mjs";
 import { parseExa, publicAddress } from "../agent/web.mjs";
 import {
@@ -533,10 +537,448 @@ test(
         requests.at(-1).tools.map((t) => t.function.name),
         studyTools,
       );
+      const original = await readFile(file, "utf8");
+      const entries = resumed.manager.getBranch();
+      const users = entries.filter(
+        (e) => e.type === "message" && e.message.role === "user",
+      );
+      const firstReply = entries.find(
+        (e) =>
+          e.type === "message" &&
+          e.message.role === "assistant" &&
+          e.message.stopReason === "stop",
+      );
+      await closeStudySession(session);
+      session = null;
+      const branch = await forkStudySession(dir, {
+        sessionFile: file,
+        entryId: firstReply.id,
+      });
+      assert.notEqual(branch.sessionFile, file);
+      const branchHistory = await readFile(branch.sessionFile, "utf8");
+      assert.ok(
+        branchHistory.includes("call_context"),
+        "tool history is kept in a branch",
+      );
+      assert.ok(
+        !branchHistory.includes("接着刚才的讨论"),
+        "later turns are excluded",
+      );
+      const edited = await forkStudySession(dir, {
+        sessionFile: file,
+        entryId: users[0].id,
+        before: true,
+      });
+      const fresh = await createStudySession({
+        runtime,
+        dir,
+        root: resolve("agent"),
+        command: { ...command, sessionFile: edited.sessionFile },
+        toolRequest: async () => ({}),
+      });
+      session = fresh.session;
+      await session.prompt("改成讨论线性代数");
+      const request = JSON.stringify(requests.at(-1).messages);
+      assert.ok(request.includes("改成讨论线性代数"));
+      assert.ok(!request.includes("请先读学情摘要"));
+      assert.ok(!request.includes("接着刚才的讨论"));
+      assert.equal(
+        await readFile(file, "utf8"),
+        original,
+        "the original SDK session stays byte-for-byte intact",
+      );
+      await assert.rejects(
+        forkStudySession(dir, { sessionFile: file, entryId: "missing" }),
+        /节点不存在/,
+      );
+      await assert.rejects(
+        forkStudySession(dir, {
+          sessionFile: join(dir, "outside.jsonl"),
+          entryId: users[0].id,
+        }),
+        /路径无效/,
+      );
     } finally {
       session?.dispose();
       server.closeAllConnections();
       await new Promise((r) => server.close(r));
+    }
+  },
+);
+
+test(
+  "local model drives attachment analysis, message edits, retries and conversation branches in the browser",
+  { timeout: 90000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tomato-chat-"));
+    const requests = [];
+    const answer =
+      '## 复习路径\n\n**先看例题**，再做练习。\n\n| 科目 | 小时 |\n| --- | --- |\n| 数学 | 3 |\n\n公式 $x^2 + y^2$。\n\n$$\\int_0^1 x\\,dx = \\frac{1}{2}$$\n\n```python\nprint(\'<example>\')\n```\n\n[参考](https://example.com) [无效链接](javascript:alert(1))\n\n<button data-agent="new" onclick="window.injected=true">伪造操作</button>';
+    const model = createServer(async (req, res) => {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      const parsed = JSON.parse(body);
+      requests.push(parsed);
+      const user = [...parsed.messages]
+        .reverse()
+        .find((m) => m.role === "user");
+      const text =
+        typeof user.content === "string"
+          ? user.content
+          : user.content
+              .filter((c) => c.type === "text")
+              .map((c) => c.text)
+              .join("\n");
+      const path = text.match(/"(\/workspace\/attachments\/[^"\n]+)"/)?.[1];
+      const read = path && parsed.messages.at(-1).role === "user";
+      const chunk = (delta, finish_reason = null) => ({
+        id: "local",
+        object: "chat.completion.chunk",
+        created: 1,
+        model: "local-chat",
+        choices: [{ index: 0, delta, finish_reason }],
+      });
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      if (text.includes("停止用例")) {
+        res.write(
+          `data: ${JSON.stringify(chunk({ role: "assistant", content: "正在处理，可随时停止。" }))}\n\n`,
+        );
+        return;
+      }
+      const delta = read
+        ? {
+            role: "assistant",
+            tool_calls: [
+              {
+                index: 0,
+                id: "read_attachment",
+                type: "function",
+                function: { name: "read", arguments: JSON.stringify({ path }) },
+              },
+            ],
+          }
+        : { role: "assistant", content: answer };
+      res.write(`data: ${JSON.stringify(chunk(delta))}\n\n`);
+      res.write(
+        `data: ${JSON.stringify(chunk({}, read ? "tool_calls" : "stop"))}\n\n`,
+      );
+      res.end("data: [DONE]\n\n");
+    });
+    await new Promise((r) => model.listen(0, "127.0.0.1", r));
+    const codexDir = join(dir, "codex");
+    await mkdir(codexDir);
+    await writeFile(
+      join(codexDir, "config.toml"),
+      `model_provider = "deepseek"\nmodel = "local-chat"\n[model_providers.deepseek]\nbase_url = "http://127.0.0.1:${model.address().port}"\nwire_api = "chat"\nexperimental_bearer_token = "synthetic-local-token"\n`,
+    );
+    const url = "http://127.0.0.1:4342";
+    // An installed runtime next to target/debug outranks the source bundle. Use
+    // a private executable so this regression exercises the package just built.
+    await copyFile("target/debug/tomato-preview", join(dir, "tomato-preview"));
+    const server = spawn(join(dir, "tomato-preview"), [], {
+      env: {
+        ...process.env,
+        CODEX_HOME: codexDir,
+        NO_PROXY: "127.0.0.1,localhost",
+        TOMATO_PORT: "4342",
+        TOMATO_DATA_PATH: join(dir, "data.sqlite3"),
+      },
+      stdio: "pipe",
+    });
+    let browser,
+      output = "";
+    server.stderr.on("data", (bytes) => (output += bytes));
+    const api = async (body) => {
+      const response = await fetch(`${url}/api/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    };
+    const idle = (expectedText) =>
+      waitFor(async () => {
+        const s = await api({ op: "status" });
+        assert.equal(s.error, null, JSON.stringify(s.error));
+        const user = [...s.messages].reverse().find((m) => m.role === "user");
+        return !s.busy &&
+          s.messages.at(-1)?.role === "assistant" &&
+          (!expectedText || user?.text === expectedText)
+          ? s
+          : false;
+      });
+    try {
+      const initial = await waitFor(async () => {
+        try {
+          const s = await api({ op: "status" });
+          return s.providers?.deepseek?.configured ? s : false;
+        } catch {
+          return false;
+        }
+      }, 150).catch(() => {
+        throw new Error(output);
+      });
+      await api({
+        op: "configure",
+        preferences: {
+          ...initial.preferences,
+          enabled: true,
+          automatic: false,
+          model: "local-chat",
+        },
+      });
+      browser = await chromium.launch({
+        executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+        headless: true,
+        args: ["--no-sandbox"],
+      });
+      const page = await browser.newPage({
+        viewport: { width: 1440, height: 1100 },
+      });
+      await page
+        .context()
+        .grantPermissions(["clipboard-read", "clipboard-write"]);
+      const errors = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      await page.goto(url);
+      await expect(page.locator(".welcome-card")).toBeVisible();
+      await page.locator('[data-page="agent"]').click();
+      await page.locator("#agent-attachment-input").setInputFiles({
+        name: "学习资料.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from("科目,小时\n数学,3\n"),
+      });
+      await expect(page.locator("#agent-attachments")).toContainText(
+        "学习资料.csv",
+      );
+      await page.locator("#agent-text").fill("读取附件，说明如何复习微积分");
+      await page.locator("#agent-text").press("Enter");
+      const first = await idle();
+      const originalId = first.conversations.find((c) => c.active).id;
+      assert.ok(first.messages.every((m) => m.entryId));
+      assert.ok(
+        JSON.stringify(requests.at(-1).messages).includes("数学,3"),
+        "the model actually read the uploaded file",
+      );
+      await expect(page.locator(".agent-markdown h2")).toContainText(
+        "复习路径",
+      );
+      await expect(page.locator(".agent-markdown table")).toContainText("数学");
+      await expect(page.locator(".agent-markdown .katex")).toHaveCount(2);
+      await expect(
+        page.locator(".agent-markdown [data-agent=new]"),
+      ).toHaveCount(0);
+      await expect(
+        page.locator('.agent-markdown a[href^="javascript:"]'),
+      ).toHaveCount(0);
+      assert.equal(await page.evaluate(() => window.injected), undefined);
+      await page.locator('[data-agent="copy-code"]').click();
+      assert.equal(
+        await page.evaluate(() => navigator.clipboard.readText()),
+        "print('<example>')",
+      );
+      const downloaded = page.waitForEvent("download");
+      await page
+        .locator('.agent-message [data-agent="download-attachment"]')
+        .click();
+      assert.equal((await downloaded).suggestedFilename(), "学习资料.csv");
+      await page
+        .locator("#agent-text")
+        .fill("这条后续消息应排除在早期分支之外");
+      await page.locator("#agent-text").press("Enter");
+      const complete = await idle("这条后续消息应排除在早期分支之外");
+      const state = JSON.parse(
+        await readFile(join(dir, "agent/state.json"), "utf8"),
+      );
+      const original = state.conversations.find((c) => c.id === originalId);
+      const originalFile = await readFile(original.sessionFile, "utf8");
+      await expect(page.locator(".agent-message")).toHaveCount(4);
+      await page.locator("#agent-text").fill("原对话草稿");
+      await page.locator('[data-agent="conversations"]').click();
+      await page.locator("#agent-history-search").fill("复习路径");
+      await expect(page.locator(".agent-search-snippet")).toContainText(
+        "复习路径",
+      );
+      await page.locator("#agent-history-search").fill("");
+      await page.locator('[data-agent="rename-conversation"]').click();
+      await page
+        .locator(".agent-conversation-rename input")
+        .fill("微积分资料分析");
+      await page
+        .locator('.agent-conversation-rename button[type="submit"]')
+        .click();
+      await expect(page.locator(".agent-conversation-open b")).toContainText(
+        "微积分资料分析",
+      );
+      await page.locator('[data-agent="pin-conversation"]').click();
+      await expect(
+        page.locator('[data-agent="pin-conversation"]'),
+      ).toContainText("取消置顶");
+      const firstReply = page.locator(
+        `[data-message-id="${complete.messages[1].id}"]`,
+      );
+      await firstReply.locator('[data-agent="branch-message"]').click();
+      await expect(page.locator(".agent-message")).toHaveCount(2);
+      await expect(page.locator("#agent-text")).toHaveValue("");
+      await page
+        .locator('#agent-branch-source [data-agent="switch-conversation"]')
+        .click();
+      await expect(page.locator("#agent-text")).toHaveValue("原对话草稿");
+      await firstReply.locator('[data-agent="retry-message"]').click();
+      await idle();
+      await expect(page.locator(".agent-message")).toHaveCount(2);
+      assert.ok(
+        !JSON.stringify(requests.at(-1).messages).includes(
+          "这条后续消息应排除",
+        ),
+      );
+      await page
+        .locator('#agent-branch-source [data-agent="switch-conversation"]')
+        .click();
+      await page
+        .locator('.agent-message.user [data-agent="edit-message"]')
+        .first()
+        .click();
+      await page
+        .locator(".agent-message-edit textarea")
+        .fill("读取附件，改为解释线性代数");
+      await page.waitForTimeout(2800);
+      await expect(page.locator(".agent-message-edit textarea")).toHaveValue(
+        "读取附件，改为解释线性代数",
+      );
+      await page.locator('.agent-message-edit button[type="submit"]').click();
+      const edited = await idle("读取附件，改为解释线性代数");
+      assert.equal(edited.messages[0].text, "读取附件，改为解释线性代数");
+      assert.equal(
+        edited.messages[0].attachments[0].id,
+        first.messages[0].attachments[0].id,
+      );
+      assert.equal(await readFile(original.sessionFile, "utf8"), originalFile);
+      const originalStatus = await api({
+        op: "switch_conversation",
+        id: originalId,
+      });
+      assert.deepEqual(originalStatus.messages, complete.messages);
+      await expect(page.locator(".agent-message")).toHaveCount(4);
+      await page.locator("#agent-text").evaluate((el) => {
+        const data = new DataTransfer();
+        data.items.add(
+          new File(["粘贴的资料"], "pasted.txt", { type: "text/plain" }),
+        );
+        el.dispatchEvent(
+          new ClipboardEvent("paste", {
+            clipboardData: data,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      });
+      await expect(page.locator("#agent-attachments")).toContainText(
+        "pasted.txt",
+      );
+      await page.locator("#agent-chat").evaluate((el) => {
+        const data = new DataTransfer();
+        data.items.add(
+          new File(["拖入的资料"], "dropped.md", { type: "text/markdown" }),
+        );
+        el.dispatchEvent(
+          new DragEvent("drop", {
+            dataTransfer: data,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      });
+      await expect(page.locator("#agent-attachments")).toContainText(
+        "dropped.md",
+      );
+      await page.locator("#agent-attachment-input").setInputFiles({
+        name: "photo.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=",
+          "base64",
+        ),
+      });
+      await expect(page.locator("#agent-attachments")).toContainText(
+        "photo.png",
+      );
+      await page.locator("#agent-text").fill("图片草稿保留");
+      await expect(page.locator(".agent-attachment-preview")).toHaveCount(1);
+      await page.locator("#agent-text").press("Enter");
+      await expect(page.locator("#toast")).toContainText("所选模型不支持图片");
+      await expect(page.locator("#agent-text")).toHaveValue("图片草稿保留");
+      await expect(page.locator("#agent-attachments")).toContainText(
+        "photo.png",
+      );
+      while (await page.locator('[data-agent="remove-attachment"]').count())
+        await page.locator('[data-agent="remove-attachment"]').first().click();
+      await page.locator("#agent-text").fill("停止用例");
+      await page.locator("#agent-text").press("Shift+Enter");
+      assert.equal((await api({ op: "status" })).busy, false);
+      await page.locator("#agent-text").evaluate((el) =>
+        el.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Enter",
+            bubbles: true,
+            isComposing: true,
+          }),
+        ),
+      );
+      assert.equal((await api({ op: "status" })).busy, false);
+      await page.locator("#agent-text").press("Enter");
+      await expect(page.locator(".streaming")).toContainText("正在处理");
+      await page.locator('[data-agent="cancel"]').click();
+      const stopped = await idle("停止用例");
+      assert.equal(stopped.messages.at(-1).stopped, true);
+      await expect(page.locator(".agent-stopped")).toContainText("已停止");
+      for (const width of [1440, 700, 360]) {
+        await page.setViewportSize({ width, height: 1100 });
+        assert.ok(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth + 1,
+          ),
+          `chat overflow at ${width}`,
+        );
+      }
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await mkdir("artifacts", { recursive: true });
+      await page.screenshot({
+        path: "artifacts/agent-chat.png",
+        fullPage: true,
+      });
+      await expect(page.locator('[data-agent="cancel"]')).toBeHidden();
+      const longHistory = {
+        ...stopped,
+        messages: Array.from({ length: 75 }, (_, i) => ({
+          id: `history-${i}`,
+          role: "user",
+          text: `早期历史 ${i}`,
+          at: 1,
+          automatic: false,
+        })),
+      };
+      await page.route("**/api/agent", async (route) => {
+        if (route.request().postDataJSON()?.op === "status")
+          await route.fulfill({ json: longHistory });
+        else await route.continue();
+      });
+      await expect(page.locator('[data-agent="older-messages"]')).toBeVisible();
+      await page.locator('[data-agent="older-messages"]').click();
+      await expect(page.locator(".agent-message")).toHaveCount(75);
+      await expect(page.locator(".agent-message").first()).toContainText(
+        "早期历史 0",
+      );
+      const exported = page.waitForEvent("download");
+      await page.locator('[data-agent="export-conversation"]').click();
+      assert.ok((await exported).suggestedFilename().endsWith(".md"));
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser?.close();
+      server.kill("SIGTERM");
+      model.closeAllConnections();
+      await new Promise((r) => model.close(r));
     }
   },
 );

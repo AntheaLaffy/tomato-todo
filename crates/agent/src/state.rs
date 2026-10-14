@@ -87,6 +87,26 @@ pub struct Message {
     pub text: String,
     pub at: i64,
     pub automatic: bool,
+    #[serde(default)]
+    pub entry_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<Attachment>,
+    #[serde(default)]
+    pub stopped: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Attachment {
+    pub id: String,
+    pub name: String,
+    pub mime_type: String,
+    pub bytes: usize,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchSource {
+    pub conversation_id: String,
+    pub message_id: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -96,6 +116,8 @@ pub struct Conversation {
     pub session_file: Option<String>,
     pub messages: Vec<Message>,
     pub updated_at: i64,
+    pub pinned: bool,
+    pub branched_from: Option<BranchSource>,
 }
 impl Default for Conversation {
     fn default() -> Self {
@@ -105,6 +127,8 @@ impl Default for Conversation {
             session_file: None,
             messages: Vec::new(),
             updated_at: 0,
+            pinned: false,
+            branched_from: None,
         }
     }
 }
@@ -317,6 +341,7 @@ impl Store {
             session_file: self.session_file.take(),
             messages: std::mem::take(&mut self.messages),
             updated_at,
+            ..Default::default()
         };
         self.active = Some(conversation.id.clone());
         self.conversations.push(conversation);
@@ -339,10 +364,10 @@ impl Store {
     }
     pub fn conversations_view(&self) -> Vec<Value> {
         let mut list: Vec<&Conversation> = self.conversations.iter().collect();
-        list.sort_by_key(|c| std::cmp::Reverse(c.updated_at));
+        list.sort_by_key(|c| (std::cmp::Reverse(c.pinned), std::cmp::Reverse(c.updated_at)));
         list.into_iter()
             .map(|c| {
-                json!({"id":c.id,"title":c.title,"updatedAt":c.updated_at,"messageCount":c.messages.len(),"active":Some(c.id.as_str())==self.active.as_deref()})
+                json!({"id":c.id,"title":c.title,"updatedAt":c.updated_at,"messageCount":c.messages.len(),"active":Some(c.id.as_str())==self.active.as_deref(),"pinned":c.pinned,"branchedFrom":c.branched_from})
             })
             .collect()
     }
@@ -412,14 +437,48 @@ impl Store {
             text,
             at,
             automatic,
+            entry_id: None,
+            attachments: vec![],
+            stopped: false,
         });
-        if conversation.messages.len() > 300 {
-            conversation
-                .messages
-                .drain(..conversation.messages.len() - 300);
-        }
         conversation.updated_at = at;
         id
+    }
+    pub fn message_mut(&mut self, id: &str) -> Option<&mut Message> {
+        self.conversations
+            .iter_mut()
+            .flat_map(|c| &mut c.messages)
+            .find(|m| m.id == id)
+    }
+    pub fn fork_conversation(
+        &mut self,
+        message_id: &str,
+        before: bool,
+        session_file: String,
+        at: i64,
+    ) -> AppResult<String> {
+        let source = self.active_conversation().ok_or("会话不存在")?;
+        let index = source
+            .messages
+            .iter()
+            .position(|m| m.id == message_id)
+            .ok_or("消息不存在")?;
+        let conversation = Conversation {
+            id: uuid::Uuid::new_v4().to_string(),
+            title: format!("{} · 分支", source.title),
+            session_file: Some(session_file),
+            messages: source.messages[..index + usize::from(!before)].to_vec(),
+            updated_at: at,
+            branched_from: Some(BranchSource {
+                conversation_id: source.id.clone(),
+                message_id: message_id.into(),
+            }),
+            ..Default::default()
+        };
+        let id = conversation.id.clone();
+        self.conversations.push(conversation);
+        self.active = Some(id.clone());
+        Ok(id)
     }
     pub fn set_session(&mut self, path: &str, at: i64) {
         let conversation = self.ensure_active(at);

@@ -49,7 +49,7 @@ generated_at: 2026-10-10
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
 | guard.rs | 桌面保护 | niri/X11/Win32/macOS 后端选择、能力检测、精确应用匹配和回焦；macOS 无窗口前台标记不满足本应用窗口预检 |
 | guard_macos.rs | 桌面保护 | Quartz 窗口/PID/完整路径与 Accessibility 前台识别、权限检测、本进程主窗口激活/回焦确认；CF 对象按 Create/Copy 规则释放 |
-| guard_windows.rs | 桌面保护 | Win32 窗口/PID/路径与封装应用 AUMID 识别、共享 UWP 框架解析、DWM 隐藏窗口过滤及输入队列回焦；拒绝激活时报告失败 |
+| guard_windows.rs | 桌面保护 | Win32 窗口/PID/路径与封装应用 AUMID 识别、共享 UWP 框架解析、DWM 隐藏窗口过滤；后台消息队列、ALT 与临时前台输入队列回焦，确认前台后才报告成功；修饰键/暂时拒绝/切换无前台时延后，窗口失效才报错 |
 | guard_x11.rs | 桌面保护 | EWMH 活跃窗口管理器检测、窗口/PID/WM_CLASS/标题枚举与激活；拒绝把 Xwayland 当成完整 Wayland 管控 |
 | diagnostics.rs | 诊断 | 本地异常检测（需专心课内安排、时段重叠、计划超量/过少、习惯缺勤、主线停滞、深夜记录、投入下降）与证据字段，供学习助手唤醒 |
 | tests.rs | 验证 | 状态、持久化、保护与计划往返/失败原子性回归测试 |

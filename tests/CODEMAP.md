@@ -11,6 +11,7 @@ generated_at: 2026-10-10
 | -------------------- | ------ | ------------------------------ | --------------------------------------------------------------------------------------- |
 | 验证偏好页           | 验证   | integration.mjs                | 保存时机、失败保留输入、左右分列与 360/700/1280px 防外溢                                |
 | 验证前端业务         | 验证   | integration.mjs                | package.json                                                                            |
+| 验证本周日程布局     | 验证   | integration.mjs 的周历检查      | 物理分辨率与 125%/约 133%/150% 缩放、完整小时标签、短任务标题、滚动时比例不变、窗口拉伸；src/main.ts 的 resizeCalendar |
 | 验证侧栏排序菜单     | 验证   | integration.mjs 的项目排序     | src/main.ts 的菜单捕获阶段关闭与 sortProjects                                           |
 | 验证音效与静音       | 验证   | audio.mjs、integration.mjs     | src/audio.ts、src/sound-events.ts、native.mjs                                           |
 | 验证锁机只读明日日程 | 验证   | integration.mjs 的合成锁机快照 | 跨年/闰日、时间排序、备注/步骤、严格/普通、空日程、360/1280px、零写请求；不启用原生保护 |
@@ -18,6 +19,7 @@ generated_at: 2026-10-10
 | 验证白名单与全屏     | 验证   | native.mjs                     | fixtures/guard_window.py、crates/core/src/guard.rs                                      |
 | 验证桌面集成         | 验证   | native.mjs、install.mjs        | fixtures/tray_bus.py、src-tauri/src/desktop.rs、scripts/install.py                      |
 | 验证学习助手与联网   | 验证   | agent.mjs                      | agent/、crates/agent/、docs/AGENT.md、模拟模型与 MCP stdio                              |
+| 验证对话编辑/重试/分支与附件 | 验证 | agent.mjs.analysis.md | 临时可执行文件 + 本机模型 + 浏览器，校验实际文件读取、原会话保留、流式停止、渲染与复制 |
 
 ## 子目录
 

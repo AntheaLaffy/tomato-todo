@@ -40,9 +40,11 @@ X11 和 niri 的应用标识可能不同；切换桌面后应从保护页的真�
 
 Windows 使用 Win32 窗口接口；普通程序以操作系统报告的完整可执行路径作为精确应用标识，不按文件名合并不同目录的程序，也不通过字符大小写转换合并文件。封装应用优先使用 `aumid:` 标识；老式 UWP 的共享 ApplicationFrameHost 从应用子窗口识别真实进程，不能通过允许框架进程一次放行所有应用。
 
-后台计时线程创建自己的消息队列，按需要短暂连接前台/UI 输入队列，退出时恢复连接。Windows 拒绝激活或前台窗口不可访问时返回失败，桌面循环解除当前保护并报错。不给用户注入键盘事件，也不结束其他应用。
+后台计时线程创建自己的消息队列，先尝试普通前台激活；拒绝时在没有修饰键按下的情况下发送成对的 ALT 按下/释放并重试，必要时短暂连接能响应的前台输入队列，退出时恢复连接。跨线程激活用 `WM_NULL` 消息确认前台状态，只有确认本进程窗口已在前台才计为拦截成功。修饰键尚未松开、激活暂时被拒绝或切换期间没有可访问的前台窗口，都留到下一次 0.6 秒检查继续处理，保持本轮专注；窗口枚举失败或本应用窗口失效才由桌面循环释放保护。前台限制与 ALT 解锁规则见 [SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow) 和 [LockSetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-locksetforegroundwindow)。
 
-`pnpm run test:windows` 在 Windows GitHub Actions 的 x64 runner 上执行原生测试；Linux 本机自动交叉编译并使用新 Wine 前缀和 Xvfb/Openbox。原生回归只覆盖 x64：ARM64 runner 上同一用例等不到前台窗口而超时，尚未定位；在原因查清之前，ARM64 不进入 CI 与发布矩阵，而不是把这条必检改成跳过。Wine 当前缺少 AppModel API，测试只验证普通程序；商店应用身份和真实 Windows 策略必须在原生环境验收。白名单上限同步为每项 32768 字符，长路径与 Unicode 路径的全局/项目白名单、备份和计划已验证。
+`pnpm run test:windows` 在 Windows GitHub Actions 的 x64 runner 上执行原生测试；Linux 本机自动交叉编译并使用新 Wine 前缀和 Xvfb/Openbox。fixture 用鼠标输入切换应用，并请求前台锁定，覆盖后台线程反复回焦与按住修饰键时延后且保持按键状态。2026-10-14 的独立 Wine 回归已通过；Wine 的 AppModel 与前台锁定语义不完整，不能代替本轮改动的原生 Windows 整应用验收。原生回归只覆盖 x64：ARM64 runner 上同一用例等不到前台窗口而超时，尚未定位；在原因查清之前，ARM64 不进入 CI 与发布矩阵，而不是把这条必检改成跳过。白名单上限同步为每项 32768 字符，长路径与 Unicode 路径的全局/项目白名单、备份和计划已验证。
+
+本周日程按时间轴上方实际占用的空间计算剩余窗口高度，保留原来的 780px 最大高度；窗口缩小或显示缩放增大时才压缩。时间轴至少 224px，保持小时刻度可辨，短任务块至少 34px；07:00、23:00 标签留在两端以内。Chromium 已覆盖常见物理分辨率及 125%、约 133%、150% 缩放，并验证滚动不改变时间比例、拉高窗口会增加时间轴高度。非常矮的窗口或较高提醒横幅可能需要滚动页面；原生 WebView2 实际缩放仍需 Windows 整应用验收。
 
 ## 构建助手运行包
 

@@ -126,6 +126,7 @@ pub fn preflight(own_pid: u32) -> AppResult<()> {
     }
     Ok(())
 }
+/// Report a confirmed redirect; a deferred Windows activation leaves protection running.
 pub fn enforce(protection: &Protection, own_pid: u32) -> AppResult<bool> {
     if protection.mode == GuardMode::Off {
         return Ok(false);
@@ -137,16 +138,15 @@ pub fn enforce(protection: &Protection, own_pid: u32) -> AppResult<bool> {
         .ok_or("专注窗口已关闭")?;
     if let Some(active) = windows.iter().find(|w| w.is_focused) {
         if !allowed(active, own_pid, protection) {
-            focus_window(own.id)?;
-            return Ok(true);
+            return focus_window(own.id);
         }
     }
     Ok(false)
 }
-fn focus_window(id: u64) -> AppResult<()> {
+fn focus_window(id: u64) -> AppResult<bool> {
     #[cfg(target_os = "macos")]
     {
-        macos::focus(id)
+        macos::focus(id).map(|()| true)
     }
     #[cfg(target_os = "windows")]
     {
@@ -155,10 +155,10 @@ fn focus_window(id: u64) -> AppResult<()> {
     #[cfg(target_os = "linux")]
     {
         if std::env::var_os("NIRI_SOCKET").is_none() {
-            return x11::focus(id);
+            return x11::focus(id).map(|()| true);
         }
         request(json!({"Action": {"FocusWindow": {"id": id}}}))?;
-        Ok(())
+        Ok(true)
     }
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
@@ -176,8 +176,11 @@ pub fn focus_own(own_pid: u32) -> AppResult<()> {
     if own.is_focused {
         return Ok(());
     }
-    focus_window(own.id)?;
-    Ok(())
+    if focus_window(own.id)? {
+        Ok(())
+    } else {
+        Err("前台激活请求暂未完成".into())
+    }
 }
 
 #[cfg(test)]
