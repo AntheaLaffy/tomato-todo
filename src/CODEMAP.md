@@ -10,6 +10,7 @@ generated_at: 2026-10-10
 | 任务                             | Domain    | Target                                                                                                                      | Also Check                                                                                                           |
 | -------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | 偏好布局与保存时机               | 界面      | main.ts 的 settingsPage/savePreferences/navigate、style.css 的 settings-grid                                                | tests/integration.mjs 的失焦/离页/手动/失败与布局检查                                                                |
+| 简洁模式与说明显隐 | 界面 | compact.ts、main.ts 的 settingsPage/bindForms/ponderChip、style.css 的 data-explanation | agent.ts 的输入提示、ponder.ts 的偏好讲解、tests/integration.mjs 的 compact mode、docs/DESIGN.md |
 | 调整页面布局                     | 界面      | main.ts.analysis.md、style.css.analysis.md                                                                                  | —                                                                                                                    |
 | 任务到点提醒                     | 界面      | main.ts 的 pendingReminder/reminderBanner/taskDialog                                                                        | Rust reminders.rs、桌面轮询                                                                                          |
 | 模板编辑、自动预印与手动整批印刷 | 界面/契约 | main.ts 的 templateDialog/focusBudget/printDialog/templatesCard（临时 / 手动 / 自动渐进披露）、types.ts 的 Template         | crates/core/src/templates.rs、plan.rs、docs/CODEMAP.md                                                               |
@@ -35,6 +36,7 @@ generated_at: 2026-10-10
 
 | File            | Domain | Function                                                                            |
 | --------------- | ------ | ----------------------------------------------------------------------------------- |
+| compact.ts | 界面偏好 | 简洁模式的本机保存与根元素标记，默认展示完整说明；全局按 data-explanation 隐藏解释文字 |
 | main.ts         | 界面   | 页面、弹窗、事件与刷新；见 main.ts.analysis.md                                      |
 | style.css       | 视觉   | 设计变量、页面布局、明暗主题与响应式；见 style.css.analysis.md                      |
 | api.ts          | 桥接   | 原生入口报告桌面/Android 身份，选择 Tauri IPC 或本地 HTTP；计划/备份、助手附件和 Markdown 的系统保存与浏览器下载 |

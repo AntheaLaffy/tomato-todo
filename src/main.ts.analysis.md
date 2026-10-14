@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3569
+lines: 3581
 generated_at: 2026-10-14
 ---
 
@@ -8,54 +8,54 @@ generated_at: 2026-10-14
 
 | 用途                                                | Lines     | Notes                                       |
 | --------------------------------------------------- | --------- | ------------------------------------------- |
-| 导入、状态、管辖与格式化                            | 1–452     | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 分发、快照、导航与提醒                              | 453–678   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 今日待办、本周日程日历、待补队列与静态实例列表      | 679–947   | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 任务、目标、习惯模板、愿景与统计设置                | 948–1450  | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 保护、定时锁机、沉浸与刷新                          | 1451–1664 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1665–2368 | 节点图在 src/nodegraph.ts                   |
-| 搜索、声音、紧急操作与表单绑定                                | 2369–2710 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 文件导入、模板动作与页面事件                        | 2711–3341 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 右键菜单、批量删除/移出、拖拽与快捷键               | 3342–3465 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动、概念讲解挂载与轮询                            | 3466–3569 | 概念目标与讲解内容在 src/ponder.ts          |
+| 导入、状态、管辖与格式化                            | 1–453 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 分发、快照、导航与提醒                              | 454–679 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 今日待办、本周日程日历、待补队列与静态实例列表      | 680–948 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 任务、目标、习惯模板、愿景与统计设置                | 949–1451 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 保护、定时锁机、沉浸与刷新                          | 1452–1665 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1666–2369 | 节点图在 src/nodegraph.ts                   |
+| 搜索、声音、紧急操作与表单绑定                                | 2370–2722 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 文件导入、模板动作与页面事件                        | 2723–3353 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 右键菜单、批量删除/移出、拖拽与快捷键               | 3354–3477 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 启动、概念讲解挂载与轮询                            | 3478–3581 | 概念目标与讲解内容在 src/ponder.ts          |
 
 ## Symbols
 
 | Symbol               | Type     | Line |
 | -------------------- | -------- | ---- |
-| focusPage            | function | 682  |
-| todayTaskGroup       | function | 727  |
-| compareTaskTime      | function | 765  |
-| isCatchUp            | function | 748  |
-| taskList             | function | 772  |
-| isoDate              | const    | 798  |
-| resizeCalendar       | function | 800  |
-| schedulePage         | function | 812  |
-| tasksPage            | function | 948  |
-| goalsPage            | function | 998  |
-| habitsTab            | function | 1055 |
-| visionDialog         | function | 1129 |
-| lineOutcomeLabel     | const    | 1189 |
-| spanLabel            | const    | 1204 |
-| goalStatsCard        | function | 1206 |
-| crossSectionCard     | function | 1226 |
-| statsPage            | function | 1244 |
-| savePreferences      | function | 1308 |
-| settingsPage         | function | 1397 |
-| projectWhitelistCard | function | 1411 |
-| guardPage            | function | 1451 |
-| templatesCard        | function | 1665 |
-| datesForPrinting     | function | 1676 |
-| printDialog          | function | 1704 |
-| templateDialog       | function | 1760 |
-| taskDialog           | function | 2154 |
-| goalDialog           | function | 2311 |
-| importPlan           | function | 2711 |
-| selectControls       | function | 3384 |
-| detachSelected       | function | 3389 |
-| deleteSelectedTasks  | function | 3399 |
-| sortProjects         | function | 3424 |
-| boot                 | function | 3491 |
+| focusPage            | function | 683 |
+| todayTaskGroup       | function | 728 |
+| compareTaskTime      | function | 766 |
+| isCatchUp            | function | 749 |
+| taskList             | function | 773 |
+| isoDate              | const    | 799 |
+| resizeCalendar       | function | 801 |
+| schedulePage         | function | 813 |
+| tasksPage            | function | 949 |
+| goalsPage            | function | 999 |
+| habitsTab            | function | 1056 |
+| visionDialog         | function | 1130 |
+| lineOutcomeLabel     | const    | 1190 |
+| spanLabel            | const    | 1205 |
+| goalStatsCard        | function | 1207 |
+| crossSectionCard     | function | 1227 |
+| statsPage            | function | 1245 |
+| savePreferences      | function | 1309 |
+| settingsPage         | function | 1398 |
+| projectWhitelistCard | function | 1412 |
+| guardPage            | function | 1452 |
+| templatesCard        | function | 1666 |
+| datesForPrinting     | function | 1677 |
+| printDialog          | function | 1705 |
+| templateDialog       | function | 1761 |
+| taskDialog           | function | 2155 |
+| goalDialog           | function | 2312 |
+| importPlan           | function | 2723 |
+| selectControls       | function | 3396 |
+| detachSelected       | function | 3401 |
+| deleteSelectedTasks  | function | 3411 |
+| sortProjects         | function | 3436 |
+| boot                 | function | 3503 |
 
 模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通/目标待补呈现。
 
@@ -82,3 +82,5 @@ generated_at: 2026-10-14
 Android 导航：setMobileNav（L:553）控制抽屉和工作区 inert；平台身份由原生 platform_kind 报告，boot 安装 tomatoBack 供 Kotlin 返回键处理。桌面专属偏好只在 desktop 为 true 时显示。
 
 首页待完成：focusPage 固定分为今日定时、待补、今日未定时、无日期；todayTaskGroup 控制待补全部显示与无日期默认折叠，展开状态在应用会话内保留。taskList 接受独立排序参数，compareTaskTime 为日期/提醒时间/创建顺序比较器；全部任务页继续使用用户选择的排序。
+
+简洁模式：compact.ts 保存本机开关并设置根元素 data-compact-mode；settingsPage 的无 name 开关由 bindForms 立即保存，不标记业务配置 dirty、不重建正在编辑的表单。说明按用途显式标记 data-explanation；日期、进度、错误、权限及保护后果不隐藏。ponderChip 改为灯泡图标，保留无障碍名称。

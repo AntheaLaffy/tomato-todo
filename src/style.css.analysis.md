@@ -1,6 +1,6 @@
 ---
 source: style.css
-lines: 5428
+lines: 5435
 generated_at: 2026-10-14
 ---
 
@@ -57,3 +57,5 @@ generated_at: 2026-10-14
 Android 手机导航与触控（L:5360–5428）：原生平台标识限定样式，抽屉保留项目操作，44px 操作高度；app/modal 用动态视口高度跟随键盘后可见区域。系统 Insets 由 MainActivity 处理，避免重复猜测安全区域。
 
 首页任务分组：.today-group-heading（L:1628）让标题、数量与展开/收起按钮同排，保持小屏按钮可见。
+
+简洁模式样式：`html[data-compact-mode="true"] [data-explanation]` 在 L5268 起全局隐藏显式标记的说明，首页隐藏语录卡后将 bottom-grid 改为单列。

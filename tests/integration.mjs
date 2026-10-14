@@ -6,6 +6,174 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, expect } from "@playwright/test";
 
+test("compact mode: global hiding, local persistence and important information", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tomato-compact-"));
+  const url = "http://127.0.0.1:4326";
+  const server = spawn("target/debug/tomato-preview", [], {
+    env: {
+      ...process.env,
+      TOMATO_PORT: "4326",
+      TOMATO_DATA_PATH: join(dir, "test.sqlite3"),
+    },
+    stdio: "pipe",
+  });
+  let browser;
+  let output = "";
+  server.stderr.on("data", (data) => (output += data));
+  try {
+    let ready = false;
+    for (let i = 0; i < 100; i++) {
+      try {
+        if ((await fetch(`${url}/api/snapshot`)).ok) {
+          ready = true;
+          break;
+        }
+      } catch {}
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.ok(ready, `Rust server did not start: ${output}`);
+    browser = await chromium.launch({
+      executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+      headless: true,
+      args: ["--no-sandbox"],
+    });
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 1000 },
+    });
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto(url);
+    await expect(page.locator(".welcome-card")).toBeVisible();
+    await expect(page.locator(".brand small")).toBeVisible();
+    await expect(page.locator(".page-heading .eyebrow")).toBeVisible();
+    await page.locator('[data-action="new-task"]').first().click();
+    await page
+      .locator('#template-form [name="title"]')
+      .fill("简洁模式验证任务");
+    await page.locator('#template-form [name="dueDate"]').fill("2099-12-31");
+    await page.locator('#template-form [name="reminderTime"]').fill("13:45");
+    await page.locator("#create-from-editor").click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.locator('[data-page="settings"]').click();
+    const toggle = page.getByRole("checkbox", { name: "简洁模式" });
+    await expect(toggle).not.toBeChecked();
+    // Switching the local preference must not replace a partially edited form.
+    await page.locator('[name="focusMinutes"]').fill("31");
+    const status = await page.locator("#settings-status").textContent();
+    await toggle.focus();
+    await page.keyboard.press("Space");
+    await expect(toggle).toBeChecked();
+    await expect(page.locator('[name="focusMinutes"]')).toHaveValue("31");
+    await expect(page.locator("#settings-status")).toHaveText(status);
+    await expect(page.locator(".page-heading .eyebrow")).toBeHidden();
+    await expect(
+      page.getByText("每个番茄的持续时间", { exact: true }),
+    ).toBeHidden();
+    await expect(
+      page.getByText("休息结束后自动进入专注", { exact: true }),
+    ).toBeVisible();
+    await expect(page.locator("#settings-status")).toBeVisible();
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem("tomato.compactMode")),
+      "1",
+    );
+    await page.locator('[data-page="focus"]').first().click();
+    await expect(page.locator(".welcome-card")).toBeHidden();
+    await expect(page.locator(".quote-card")).toBeHidden();
+    await expect(page.locator(".brand small")).toBeHidden();
+    await expect(page.locator(".clock")).toHaveText("31:00");
+    await expect(page.locator(".page-heading p")).toBeVisible();
+    await expect(page.locator(".metric-value small").first()).toBeVisible();
+    await expect(page.locator("#connection")).toBeVisible();
+    await page.screenshot({
+      path: join(dir, "compact-focus.png"),
+      fullPage: true,
+    });
+    const chip = page.getByRole("button", { name: "这一页为什么这样设计" });
+    assert.equal((await chip.textContent()).trim(), "");
+    await chip.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#ponder-title")).toHaveText("今日专注");
+    await page.keyboard.press("Escape");
+    await page.locator('[data-action="new-task"]').first().click();
+    await expect(page.locator(".modal-heading p")).toBeHidden();
+    await expect(page.locator("#duration-preview")).toBeVisible();
+    await expect(page.locator("#creation-mode-hint")).toBeVisible();
+    await page.getByRole("button", { name: "关闭对话框", exact: true }).click();
+    for (const name of ["tasks", "goals", "stats", "schedule"]) {
+      await page.locator(`[data-page="${name}"]`).first().click();
+      const visible = await page
+        .locator("[data-explanation]")
+        .evaluateAll(
+          (nodes) =>
+            nodes.filter((node) => getComputedStyle(node).display !== "none")
+              .length,
+        );
+      assert.equal(visible, 0, `${name} should globally hide explanations`);
+      await expect(page.locator("main h1")).toBeVisible();
+      if (name === "tasks") {
+        const task = page.locator(".task-row", { hasText: "简洁模式验证任务" });
+        await expect(task).toBeVisible();
+        await expect(task.locator(".task-meta")).toContainText("13:45");
+        await expect(task.locator(".task-meta")).toBeVisible();
+        await expect(task.locator(".tomato-count")).toBeVisible();
+      }
+    }
+    // Restrictive actions keep their consequences visible; never enable protection.
+    await page.locator('[data-page="guard"]').first().click();
+    await expect(page.locator(".guard-intro")).toContainText("保护中无法暂停");
+    await expect(page.getByText(/保护中无法暂停/)).toBeVisible();
+    await page.locator('[data-page="agent"]').first().click();
+    await expect(
+      page.locator(".agent-composer-hint [data-explanation]"),
+    ).toBeHidden();
+    await expect(page.locator('[data-agent="attach"]')).toBeVisible();
+    await page.locator('[data-agent="settings"]').click();
+    await expect(page.getByText(/完整访问时以你的用户权限运行/)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await expect(page.locator(".brand small")).toBeHidden();
+    await page.locator('[data-page="settings"]').click();
+    await expect(toggle).toBeChecked();
+    await page.setViewportSize({ width: 360, height: 800 });
+    await toggle.uncheck();
+    await expect(
+      page.getByText("每个番茄的持续时间", { exact: true }),
+    ).toBeVisible();
+    assert.ok(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      "small viewport should not overflow",
+    );
+    await page.screenshot({
+      path: join(dir, "compact-settings-mobile.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.reload();
+    await expect(page.locator(".brand small")).toBeVisible();
+    // A storage failure is reported, and must not pretend the preference was saved.
+    await page.locator('[data-page="settings"]').click();
+    await page.evaluate(() => {
+      Storage.prototype.setItem = () => {
+        throw new Error("storage unavailable");
+      };
+    });
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await expect(page.locator("#toast")).toContainText("简洁模式保存失败");
+    await expect(
+      page.getByText("每个番茄的持续时间", { exact: true }),
+    ).toBeVisible();
+    assert.deepEqual(errors, []);
+    console.log(`compact mode artifacts: ${dir}`);
+  } finally {
+    await browser?.close();
+    server.kill("SIGTERM");
+  }
+});
+
 test("today task groups: fixed order, full catch-up queue and undated collapse", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tomato-today-"));
   const url = "http://127.0.0.1:4325";

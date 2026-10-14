@@ -254,7 +254,7 @@ export function agentPage(): string {
         <div id="agent-attachments" class="agent-attachments"></div>
         <input id="agent-attachment-input" type="file" multiple hidden aria-label="选择附件">
         <textarea id="agent-text" name="text" rows="3" maxlength="32000" placeholder="问点什么，也可以拖入文件或粘贴图片" aria-label="给助手发送消息">${esc(draft)}</textarea>
-        <div class="agent-composer-hint">Enter 发送 · Shift + Enter 换行<span id="agent-upload-status" role="status"></span></div>
+        <div class="agent-composer-hint"><span data-explanation>Enter 发送 · Shift + Enter 换行</span><span id="agent-upload-status" role="status"></span></div>
         <div class="agent-actions"><button type="button" class="button small" data-agent="attach" aria-label="添加附件">＋ 附件</button><span class="agent-status"><span class="agent-model" id="agent-model">${modelSelectHtml()}</span><span class="agent-thinking" id="agent-thinking">${thinkingSelectHtml()}</span><span class="agent-usage" id="agent-usage">${usageHtml()}</span></span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
       </form>
     </section>

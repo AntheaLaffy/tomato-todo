@@ -1,4 +1,5 @@
 import "./style.css";
+import { compactModeEnabled, setCompactMode } from "./compact";
 import { agentPage, mountAgent, prefillAgent, setupAgent } from "./agent";
 import {
   type IconNode,
@@ -576,7 +577,7 @@ function render() {
   const look = ensureDerived();
   $("#app").innerHTML =
     `${mobile ? `<button class="mobile-nav-backdrop" data-action="close-navigation" aria-label="关闭导航"></button>` : ""}<aside class="sidebar" aria-label="空间导航">
-    <button class="brand" data-page="focus"><span class="brand-mark">${logo}</span><span>番茄 <b>Todo</b><small>让专注，成为日常</small></span></button>
+    <button class="brand" data-page="focus"><span class="brand-mark">${logo}</span><span>番茄 <b>Todo</b><small data-explanation>让专注，成为日常</small></span></button>
     ${mobile ? `<button class="icon-btn mobile-nav-close" data-action="close-navigation" aria-label="关闭导航">${icon("x")}</button>` : ""}
     <div class="workspace-label">我的空间 <span>PERSONAL</span></div>
     <nav aria-label="主导航">${[
@@ -596,11 +597,11 @@ function render() {
       .join("")}</nav>
     <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
     <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${look.activeByProject.get(p.id) ?? 0}</b></button>`).join("")}</nav>
-    <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
+    <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p data-explanation>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.8.5</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar">${mobile ? `<button class="icon-btn mobile-menu" data-action="toggle-navigation" aria-label="打开导航" aria-expanded="${mobileNavOpen}">${icon("menu")}</button>` : ""}<div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="ponder-list" aria-label="概念讲解">${icon("lightbulb")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
-  <main data-ponder="${page.startsWith("project:") ? "project" : page}">${reminderBanner()}${page === "agent" ? agentPage() : page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  <main data-ponder="${page.startsWith("project:") ? "project" : page}">${reminderBanner()}${page === "agent" ? agentPage() : page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span data-explanation>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
   setMobileNav(mobileNavOpen);
   bindForms();
   if (page === "agent") mountAgent();
@@ -626,7 +627,7 @@ function ponderChip() {
     ? "projects"
     : PONDER_OF_PAGE[page as string];
   if (!id) return "";
-  return `<button class="text-button ponder-chip" data-action="ponder-page" data-ponder-id="${id}" aria-label="这一页为什么这样设计">${icon("lightbulb")} 这一页为什么这样设计</button>`;
+  return `<button class="icon-btn ponder-chip" data-action="ponder-page" data-ponder-id="${id}" aria-label="这一页为什么这样设计" title="这一页为什么这样设计">${icon("lightbulb")}</button>`;
 }
 function heading(
   title: string,
@@ -634,7 +635,7 @@ function heading(
   eyebrow = "A LITTLE FOCUS, A BETTER DAY",
   action = true,
 ) {
-  return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p>${ponderChip()}</div>${action ? `<button class="button primary" data-action="new-task">${icon("plus")} 新建任务 <kbd>N</kbd></button>` : ""}</div>`;
+  return `<div class="page-heading"><div><div class="eyebrow" data-explanation>${eyebrow}</div><h1>${title}</h1><p${page === "focus" || page === "tasks" || page.startsWith("project:") ? "" : " data-explanation"}>${subtitle}</p>${ponderChip()}</div>${action ? `<button class="button primary" data-action="new-task">${icon("plus")} 新建任务 <kbd>N</kbd></button>` : ""}</div>`;
 }
 function metric(
   iconName: string,
@@ -644,7 +645,7 @@ function metric(
   detail: string,
   color: string,
 ) {
-  return `<div class="metric"><span class="metric-icon ${color}">${icon(iconName)}</span><div><p>${label}</p><div class="metric-value">${value}<small>${unit}</small></div></div><span class="metric-detail">${detail}</span></div>`;
+  return `<div class="metric"><span class="metric-icon ${color}">${icon(iconName)}</span><div><p>${label}</p><div class="metric-value">${value}<small>${unit}</small></div></div><span class="metric-detail"${["给重要的事留一点时间", "小小坚持，慢慢积累", "每一分钟都算数", "从一个小小的坚持开始"].includes(detail) ? " data-explanation" : ""}>${detail}</span></div>`;
 }
 function pendingReminder() {
   return state ? pendingTaskReminder(state) : undefined;
@@ -661,7 +662,7 @@ function reminderBanner() {
  */
 function welcomeCard(): string {
   if (welcomed) return "";
-  return `<section class="card welcome-card" role="region" aria-label="怎么用番茄 Todo">
+  return `<section class="card welcome-card" data-explanation role="region" aria-label="怎么用番茄 Todo">
     <h2>这里只有两件事值得你操心</h2>
     <p class="subtle small">不靠意志力，靠环境——而环境由你和助手一起搭。规划半天不动手，是最常见的失败方式；所以先把注意力放在下面这两件事上。</p>
     <div class="welcome-pair">
@@ -700,12 +701,12 @@ function focusPage() {
       todayTaskGroup("今日未定时", untimedTasks, "priority") +
       todayTaskGroup("无日期任务", undatedTasks, "priority", "undated")
     : taskList([], true);
-  return `${heading("今天，也要慢慢向前。", `${weekday} <span class="dot-separator">·</span> 专注当下，让每一小步都有回响。`)}
+  return `${heading("今天，也要慢慢向前。", `${weekday} <span data-explanation><span class="dot-separator">·</span> 专注当下，让每一小步都有回响。</span>`)}
     ${welcomeCard()}
-    <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办，按自己的节奏来`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
+    <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办<span data-explanation>，按自己的节奏来</span>`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
     <div class="focus-grid"><section class="card focus-card"><div class="card-heading"><h2>${icon("timer")} 我的番茄钟</h2><button class="icon-btn" data-action="immersive" aria-label="进入沉浸模式">${icon("maximize-2")}</button></div>${timerContent()}
     <div class="sound-bar">${backgroundSoundButton()}<button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
-    <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayTasks.length}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayTasks.length}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small">一步一步，来就好</span></div>
+    <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayTasks.length}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayTasks.length}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small" data-explanation>一步一步，来就好</span></div>
     <div class="today-list">${
       filter === "completed"
         ? taskList(
@@ -721,8 +722,8 @@ function focusPage() {
           )
         : activeList
     }</div>
-    <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的小目标 <kbd>N</kbd></button><div class="list-footnote">${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
-    <div class="bottom-grid"><section class="card week-card"><div class="card-heading"><h2>这一周的专注节奏</h2><button class="text-button" data-page="stats">查看统计 ${icon("arrow-up-right")}</button></div>${weekChart(false)}</section><section class="quote-card"><div class="quote-leaf">${icon("leaf")}</div><span class="eyebrow">ONE THING AT A TIME</span><h3>不求每一天都满分，<br>只求每一刻都投入。</h3><p>一个番茄，一点进步。</p><div class="quote-dots"><i></i><i></i><i></i></div></section></div>`;
+    <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的小目标 <kbd>N</kbd></button><div class="list-footnote" data-explanation>${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
+    <div class="bottom-grid"><section class="card week-card"><div class="card-heading"><h2>这一周的专注节奏</h2><button class="text-button" data-page="stats">查看统计 ${icon("arrow-up-right")}</button></div>${weekChart(false)}</section><section class="quote-card" data-explanation><div class="quote-leaf">${icon("leaf")}</div><span class="eyebrow">ONE THING AT A TIME</span><h3>不求每一天都满分，<br>只求每一刻都投入。</h3><p>一个番茄，一点进步。</p><div class="quote-dots"><i></i><i></i><i></i></div></section></div>`;
 }
 function todayTaskGroup(
   title: string,
@@ -741,9 +742,9 @@ function timerContent() {
     selected = state.data.tasks.find((task) => task.id === t.taskId);
   const started = t.remainingSecs !== t.durationSecs || t.running;
   return `<div class="mode-tabs" role="group" aria-label="计时模式">${(Object.keys(modeLabels) as Mode[]).map((mode) => `<button class="${mode === t.mode ? "active" : ""}" data-mode="${mode}">${modeLabels[mode]}</button>`).join("")}</div>
-    <div class="timer-ring ${t.mode !== "focus" ? "break" : ""}"><svg viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="134"/><circle class="ring-progress" cx="150" cy="150" r="134"/><circle class="ring-inner" cx="150" cy="150" r="121"/></svg><div class="timer-center"><span class="timer-eyebrow">${t.mode === "focus" ? (t.running ? "专注正在发生" : started ? "暂停一下，随时继续" : "准备好，进入心流") : "好好休息，也很重要"}</span><div class="clock" aria-live="off">${time(state.remainingSecs)}</div><div class="cycle-dots">${Array.from({ length: state.data.settings.longBreakEvery }, (_, i) => `<span class="${i < t.cycle % state.data.settings.longBreakEvery ? "filled" : ""}">${logo}</span>`).join("")}</div><span class="timer-cycle">第 ${(t.cycle % state.data.settings.longBreakEvery) + 1} / ${state.data.settings.longBreakEvery} 个番茄</span></div></div>
+    <div class="timer-ring ${t.mode !== "focus" ? "break" : ""}"><svg viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="134"/><circle class="ring-progress" cx="150" cy="150" r="134"/><circle class="ring-inner" cx="150" cy="150" r="121"/></svg><div class="timer-center"><span class="timer-eyebrow"${!t.running && !started ? " data-explanation" : ""}>${t.mode === "focus" ? (t.running ? "专注正在发生" : started ? "暂停一下，随时继续" : "准备好，进入心流") : "好好休息，也很重要"}</span><div class="clock" aria-live="off">${time(state.remainingSecs)}</div><div class="cycle-dots">${Array.from({ length: state.data.settings.longBreakEvery }, (_, i) => `<span class="${i < t.cycle % state.data.settings.longBreakEvery ? "filled" : ""}">${logo}</span>`).join("")}</div><span class="timer-cycle">第 ${(t.cycle % state.data.settings.longBreakEvery) + 1} / ${state.data.settings.longBreakEvery} 个番茄</span></div></div>
     <button class="current-task" data-action="select-task">${icon(t.mode === "focus" ? "target" : "coffee")}<span>${selected ? escape(selected.title) : "自由专注 · 选择一个任务"}</span>${icon("chevron-down")}</button>
-    <div class="timer-controls"><button class="icon-btn control-secondary" data-action="reset" aria-label="重置计时">${icon("rotate-ccw")}</button><button class="button primary start-button" data-action="toggle-timer">${icon(t.running ? "pause" : "play")} ${t.running ? "暂停专注" : started ? "继续计时" : t.mode === "focus" ? "开始专注" : "开始休息"}</button><button class="icon-btn control-secondary" data-action="skip" aria-label="跳过当前阶段">${icon("skip-forward")}</button></div><div class="timer-hint"><kbd>Space</kbd> ${t.running ? "暂停" : "开始"} <span>·</span> ${state.data.settings.protection.mode === "off" ? "给自己一段不被打扰的时间" : `${state.data.settings.protection.mode === "lock" ? "界面锁定" : "白名单"}保护已配置`}</div>`;
+    <div class="timer-controls"><button class="icon-btn control-secondary" data-action="reset" aria-label="重置计时">${icon("rotate-ccw")}</button><button class="button primary start-button" data-action="toggle-timer">${icon(t.running ? "pause" : "play")} ${t.running ? "暂停专注" : started ? "继续计时" : t.mode === "focus" ? "开始专注" : "开始休息"}</button><button class="icon-btn control-secondary" data-action="skip" aria-label="跳过当前阶段">${icon("skip-forward")}</button></div><div class="timer-hint"${state.data.settings.protection.mode === "off" ? " data-explanation" : ""}><span data-explanation><kbd>Space</kbd> ${t.running ? "暂停" : "开始"} · </span> ${state.data.settings.protection.mode === "off" ? "给自己一段不被打扰的时间" : `${state.data.settings.protection.mode === "lock" ? "界面锁定" : "白名单"}保护已配置`}</div>`;
 }
 function isCatchUp(task: Task) {
   if (task.completed || isVoid(task) || isHabit(task)) return false;
@@ -778,7 +779,7 @@ function taskList(tasks: Task[], compact = false, order = sort) {
         : a.createdAt - b.createdAt,
   );
   if (!items.length)
-    return `<div class="empty-state"><div class="empty-illustration">${icon(filter === "completed" ? "check-check" : "leaf")}</div><h3>${search ? "没有找到匹配的任务" : filter === "completed" ? "每一次完成，都值得被记录" : "给今天，一个小小的开始"}</h3><p>${search ? "试试其他关键词，或新建一个任务。" : filter === "completed" ? "完成的任务会出现在这里。" : "写下想做的事，把第一步留给现在。"}</p>${!state.data.tasks.length ? '<button class="text-button" data-action="example">还没想好？体验示例任务 →</button>' : ""}</div>`;
+    return `<div class="empty-state"><div class="empty-illustration">${icon(filter === "completed" ? "check-check" : "leaf")}</div><h3>${search ? "没有找到匹配的任务" : filter === "completed" ? "每一次完成，都值得被记录" : "给今天，一个小小的开始"}</h3><p data-explanation>${search ? "试试其他关键词，或新建一个任务。" : filter === "completed" ? "完成的任务会出现在这里。" : "写下想做的事，把第一步留给现在。"}</p>${!state.data.tasks.length ? '<button class="text-button" data-action="example">还没想好？体验示例任务 →</button>' : ""}</div>`;
   visibleTaskIds = items.map((t) => t.id);
   return items
     .map((task) => {
@@ -895,7 +896,7 @@ function schedulePage() {
 }
 function blockRows(): string {
   if (!state.data.blocks.length)
-    return `<div class="blocks-empty"><p><strong>还没有固定占用。</strong>把每周重复的课加进来，软件才知道哪些时间不是你的。</p><ol><li>「添加时段」填名称、星期和起止时间（体育、实验这类一节一节加）。</li><li>标成「需专心」的课，排任务会被提示冲突；标成「水课」的课，签到就行，课上可以写作业。</li><li>只上某几周的课，把周次写进备注，到期自己删。</li></ol><div class="button-row"><button class="button primary" data-action="new-block">${icon("plus")} 添加第一个时段</button><button class="button secondary" data-action="ask-agent-blocks">${icon("sparkles")} 把课表交给助手</button></div><p class="subtle small">鼠标停在这张卡片上按住 <kbd>G</kbd> 可以随时再看一遍说明。</p></div>`;
+    return `<div class="blocks-empty"><p><strong>还没有固定占用。</strong><span data-explanation>把每周重复的课加进来，软件才知道哪些时间不是你的。</span></p><ol data-explanation><li>「添加时段」填名称、星期和起止时间（体育、实验这类一节一节加）。</li><li>标成「需专心」的课，排任务会被提示冲突；标成「水课」的课，签到就行，课上可以写作业。</li><li>只上某几周的课，把周次写进备注，到期自己删。</li></ol><div class="button-row"><button class="button primary" data-action="new-block">${icon("plus")} 添加第一个时段</button><button class="button secondary" data-action="ask-agent-blocks">${icon("sparkles")} 把课表交给助手</button></div><p class="subtle small" data-explanation>鼠标停在这张卡片上按住 <kbd>G</kbd> 可以随时再看一遍说明。</p></div>`;
   const order = [...state.data.blocks].sort(
     (a, b) =>
       a.days[0] - b.days[0] ||
@@ -910,7 +911,7 @@ function blockRows(): string {
     .join("");
 }
 function blocksCard(): string {
-  return `<section class="card blocks-card" data-ponder="blocks"><div class="card-heading"><h2>课表与固定占用</h2><button class="button secondary" data-action="new-block">${icon("plus")} 添加时段</button></div><p class="subtle small">每周重复的课程、实验等占用。标成「需专心」的时段里排专注任务会提示冲突；标成「水课」的时段可以并行写作业。这部分也会随学习计划导出，编辑后再导入。</p><div class="block-list">${blockRows()}</div></section>`;
+  return `<section class="card blocks-card" data-ponder="blocks"><div class="card-heading"><h2>课表与固定占用</h2><button class="button secondary" data-action="new-block">${icon("plus")} 添加时段</button></div><p class="subtle small" data-explanation>每周重复的课程、实验等占用。标成「需专心」的时段里排专注任务会提示冲突；标成「水课」的时段可以并行写作业。这部分也会随学习计划导出，编辑后再导入。</p><div class="block-list">${blockRows()}</div></section>`;
 }
 function blockDialog(id?: string) {
   const b = state.data.blocks.find((x) => x.id === id);
@@ -968,7 +969,7 @@ function tasksPage() {
   const title = project
     ? `${escape(project.name)} <button class="icon-btn title-edit" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>`
     : "把想做的事，慢慢完成。";
-  return `${heading(title, `还有 ${count} 件事等着你。清空头脑，让清单帮你记住。`, "SMALL STEPS, REAL PROGRESS")}
+  return `${heading(title, `还有 ${count} 件事等着你。<span data-explanation>清空头脑，让清单帮你记住。</span>`, "SMALL STEPS, REAL PROGRESS")}
   ${project ? projectWhitelistCard(project) + projectVisionCard(project) : ""}
   <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs">${[
     ["active", "待完成"],
@@ -1011,7 +1012,7 @@ function goalsPage() {
 }
 function goalsTabContent(goals: Goal[]) {
   if (!goals.length)
-    return `<div class="empty-state"><div class="empty-illustration">${icon("target")}</div><h3>还没有目标组</h3><p>为主线设置节点，再把不同任务按组标识与执行时间配对。</p><button class="text-button" data-action="new-goal">新建目标 →</button></div>`;
+    return `<div class="empty-state"><div class="empty-illustration">${icon("target")}</div><h3>还没有目标组</h3><p data-explanation>为主线设置节点，再把不同任务按组标识与执行时间配对。</p><button class="text-button" data-action="new-goal">新建目标 →</button></div>`;
   return goals
     .map((g) => {
       const tasks = state.data.tasks.filter((t) => t.goalId === g.id);
@@ -1054,7 +1055,7 @@ function goalsTabContent(goals: Goal[]) {
 
 function habitsTab(habits: Task[]) {
   if (!state.data.habits.length && !habits.length)
-    return `<div class="empty-state"><h3>还没有习惯</h3><p>在一份模板中设置开始时间及其周期单元，按习惯组查看执行情况。</p><button class="text-button" data-action="new-habit">新建习惯 →</button></div>`;
+    return `<div class="empty-state"><h3>还没有习惯</h3><p data-explanation>在一份模板中设置开始时间及其周期单元，按习惯组查看执行情况。</p><button class="text-button" data-action="new-habit">新建习惯 →</button></div>`;
   const groups = state.data.habits
     .map((h) => {
       const templates = state.data.templates.filter(
@@ -1100,7 +1101,7 @@ function visionCard(v: Vision) {
 function visionsTab() {
   const all = state.data.visions;
   if (!all.length)
-    return `<div class="empty-state"><div class="empty-illustration">${icon("sparkles")}</div><h3>还没有愿景</h3><p>写下你真正想去的地方、想成为的样子。它不影响任务和进度，只写给你自己看。</p><button class="text-button" data-new-vision="">新建愿景 →</button></div>`;
+    return `<div class="empty-state"><div class="empty-illustration">${icon("sparkles")}</div><h3>还没有愿景</h3><p data-explanation>写下你真正想去的地方、想成为的样子。它不影响任务和进度，只写给你自己看。</p><button class="text-button" data-new-vision="">新建愿景 →</button></div>`;
   const global = all.filter((v) => !v.projectId && !v.goalId);
   const owned = all.filter((v) => v.projectId || v.goalId);
   return [
@@ -1115,7 +1116,7 @@ function visionsTab() {
 }
 function projectVisionCard(project: Project) {
   const items = state.data.visions.filter((v) => v.projectId === project.id);
-  return `<section class="card vision-card"><div class="card-heading"><div><h2>愿景</h2><p class="subtle small">这个项目想达成什么；只写给自己看，不参与任务与进度。</p></div><button class="button secondary small-button" data-new-vision="project:${project.id}">${icon("plus")} 添加愿景</button></div>${
+  return `<section class="card vision-card"><div class="card-heading"><div><h2>愿景</h2><p class="subtle small" data-explanation>这个项目想达成什么；只写给自己看，不参与任务与进度。</p></div><button class="button secondary small-button" data-new-vision="project:${project.id}">${icon("plus")} 添加愿景</button></div>${
     items.length
       ? items
           .map(
@@ -1147,7 +1148,7 @@ function visionDialog(id?: string, ownerArg?: string) {
     ]),
   ];
   modal(
-    `${modalHeader(v ? "编辑愿景" : "新建愿景", "它是方向，不是任务：不影响进度，也不会有缺勤。")}<form id="vision-form"><label class="form-field"><span>愿景</span><input name="name" maxlength="40" required autofocus value="${escape(v?.name)}" placeholder="例如：考上北大"></label><label class="form-field"><span>归属</span><select name="owner">${options.map(([val, label]) => `<option value="${val}" ${owner === val ? "selected" : ""}>${escape(label)}</option>`).join("")}</select></label><label class="form-field"><span>写点什么 <small>鸡汤、目标值、想去的地方…</small></span><textarea name="notes" rows="5" placeholder="研究生工资、未来的生活…">${escape(v?.notes)}</textarea></label><div class="modal-actions">${v ? `<button type="button" class="text-button danger-text" id="delete-vision">删除愿景</button>` : "<span></span>"}<button type="submit" class="button primary">保存愿景</button></div></form>`,
+    `${modalHeader(v ? "编辑愿景" : "新建愿景", "它是方向，不是任务：不影响进度，也不会有缺勤。")}<form id="vision-form"><label class="form-field"><span>愿景</span><input name="name" maxlength="40" required autofocus value="${escape(v?.name)}" placeholder="例如：考上北大"></label><label class="form-field"><span>归属</span><select name="owner">${options.map(([val, label]) => `<option value="${val}" ${owner === val ? "selected" : ""}>${escape(label)}</option>`).join("")}</select></label><label class="form-field"><span>写点什么 <small data-explanation>鸡汤、目标值、想去的地方…</small></span><textarea name="notes" rows="5" placeholder="研究生工资、未来的生活…">${escape(v?.notes)}</textarea></label><div class="modal-actions">${v ? `<button type="button" class="text-button danger-text" id="delete-vision">删除愿景</button>` : "<span></span>"}<button type="submit" class="button primary">保存愿景</button></div></form>`,
   );
   $("#vision-form").onsubmit = async (e) => {
     e.preventDefault();
@@ -1205,7 +1206,7 @@ const spanLabel = (start: string, end: string) =>
   `${start.slice(5, 16).replace("T", " ")}\u2013${end.slice(11, 16)}`;
 function goalStatsCard() {
   const goals = state.stats.goals;
-  return `<section class="card mainline-card"><div class="card-heading"><h2>主线</h2><span class="subtle small">整条线通过才算成功，失败与未完成更值得回看</span></div>${
+  return `<section class="card mainline-card"><div class="card-heading"><h2>主线</h2><span class="subtle small" data-explanation>整条线通过才算成功，失败与未完成更值得回看</span></div>${
     goals.length
       ? goals
           .map((g) => {
@@ -1230,7 +1231,7 @@ function crossSectionCard() {
       (d) =>
         d.goalFailure || d.goalSuccess || d.goalVoided || d.voided || d.missed,
     );
-  return `<section class="card cross-section"><div class="card-heading"><h2>纵切面</h2><span class="subtle small">同一天的成败并排看，才看得见相互影响</span></div>${
+  return `<section class="card cross-section"><div class="card-heading"><h2>纵切面</h2><span class="subtle small" data-explanation>同一天的成败并排看，才看得见相互影响</span></div>${
     days.length
       ? `<div class="cross-table"><div class="cross-head"><span>日期</span><span>完成</span><span>缺勤</span><span>作废</span><span>主线成功</span><span>主线失败</span><span>主线报废</span></div>${days
           .map(
@@ -1283,7 +1284,7 @@ function statsPage() {
           )}</div>${sessions.length > 100 ? '<p class="subtle small">显示最近 100 条，导出备份可查看全部记录。</p>' : ""}`
       : '<div class="empty-state short"><div class="empty-illustration">' +
         icon("clock-3") +
-        '</div><h3>从第一个番茄开始</h3><p>你的每一段专注，都会在这里留下足迹。</p><button class="button secondary" data-page="focus">去专注 ' +
+        '</div><h3>从第一个番茄开始</h3><p data-explanation>你的每一段专注，都会在这里留下足迹。</p><button class="button secondary" data-page="focus">去专注 ' +
         icon("arrow-right") +
         "</button></div>"
   }</section>`;
@@ -1296,7 +1297,7 @@ function settingNumber(
   max: number,
   unit: string,
 ) {
-  return `<label class="setting-row"><span><strong>${label}</strong><small>${hint}</small></span><span class="number-field"><input name="${name}" type="number" min="${min}" max="${max}" required value="${state.data.settings[name]}"><span>${unit}</span></span></label>`;
+  return `<label class="setting-row"><span><strong>${label}</strong><small${name === "soundVolume" ? "" : " data-explanation"}>${hint}</small></span><span class="number-field"><input name="${name}" type="number" min="${min}" max="${max}" required value="${state.data.settings[name]}"><span>${unit}</span></span></label>`;
 }
 function settingSwitch(name: keyof Settings, label: string, hint: string) {
   return `<label class="setting-row"><span><strong>${label}</strong><small>${hint}</small></span><input class="switch" name="${name}" type="checkbox" ${state.data.settings[name] ? "checked" : ""}></label>`;
@@ -1396,7 +1397,7 @@ function soundPreviewControls() {
 }
 function settingsPage() {
   const s = state.data.settings;
-  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><div><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><section class="card settings-card data-settings" data-ponder="plan-file"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务、步骤与课表阻塞时段，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用数据与备份。</div></section><section class="settings-tip">${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>外观主题</strong><small>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings" data-ponder="backup"><h2>${icon("download")} 数据与备份</h2><p>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note">${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section></div></div><div class="settings-save"><span id="settings-status" role="status" aria-live="polite">离开偏好页时自动保存</span><button type="submit" class="button primary">${icon("check")} 保存配置</button></div></form>`;
+  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><div><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><section class="card settings-card data-settings" data-ponder="plan-file"><h2>${icon("list-todo")} 学习计划</h2><p data-explanation>导出全部未完成任务、步骤与课表阻塞时段，方便编辑或分享。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用数据与备份。</div></section><section class="settings-tip" data-explanation>${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>简洁模式</strong><small data-explanation>隐藏解释性小字；立即生效，仅保存在本机</small></span><input class="switch" id="compact-mode" type="checkbox" ${compactModeEnabled() ? "checked" : ""}></label><label class="setting-row"><span><strong>外观主题</strong><small data-explanation>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings" data-ponder="backup"><h2>${icon("download")} 数据与备份</h2><p data-explanation>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note" data-explanation>${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section></div></div><div class="settings-save"><span id="settings-status" role="status" aria-live="polite">离开偏好页时自动保存</span><button type="submit" class="button primary">${icon("check")} 保存配置</button></div></form>`;
 }
 function desktopSettingsCard() {
   if (!desktop || !nativeStatus) return "";
@@ -1585,7 +1586,7 @@ function renderImmersive() {
     ? Math.max(0, rest.endsAt - state.serverTime)
     : state.remainingSecs;
   $("#app").innerHTML =
-    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow">${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div><button class="text-button tomorrow-entry" data-action="tomorrow-schedule">${icon("calendar-days")} 查看明天日程</button>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}${!rest ? `<div class="immersive-sound">${backgroundSoundButton()}</div>` : ""}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
+    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow" data-explanation>${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div><button class="text-button tomorrow-entry" data-action="tomorrow-schedule">${icon("calendar-days")} 查看明天日程</button>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}${!rest ? `<div class="immersive-sound">${backgroundSoundButton()}</div>` : ""}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
   icons();
   updateClock();
 }
@@ -1630,8 +1631,8 @@ function closeModal() {
   $("#app").inert = false;
   lastFocus?.focus();
 }
-const modalHeader = (title: string, subtitle = "") =>
-  `<div class="modal-heading"><div><h2 id="modal-title">${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ""}</div><button class="icon-btn" data-action="close-modal" aria-label="关闭对话框">${icon("x")}</button></div>`;
+const modalHeader = (title: string, subtitle = "", explanation = false) =>
+  `<div class="modal-heading"><div><h2 id="modal-title">${title}</h2>${subtitle ? `<p${explanation ? " data-explanation" : ""}>${subtitle}</p>` : ""}</div><button class="icon-btn" data-action="close-modal" aria-label="关闭对话框">${icon("x")}</button></div>`;
 function confirmDialog(
   title: string,
   message: string,
@@ -1666,7 +1667,7 @@ function templatesCard(projectId?: string) {
   const templates = state.data.templates.filter(
     (t) => !projectId || t.shape.projectId === projectId,
   );
-  return `<section class="card templates-card"><div class="card-heading"><div><h2>印刷模板 <span class="count-label">${templates.length}</span></h2><p class="subtle small">模板保留形状，实例记录每一次执行。关闭自动印刷后可以随时手动使用。</p></div><button class="button secondary" data-action="new-template">${icon("plus")} 新建模板</button></div>${templates.map((t) => `<section class="goal-section" data-template-id="${escape(t.id)}"><div class="goal-head"><h3>${escape(t.shape.title)}</h3><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑模板 ${escape(t.shape.title)}">${icon("pencil")}</button></div><p class="subtle small">${escape(printingLabel(t))} · ${t.shape.goalId ? "目标组" : t.printing.kind === "weekly" && t.printing.slots.some((s) => s.time) ? "习惯组" : "普通组"}</p><div class="template-actions"><button class="button secondary small-button" data-print-template="${escape(t.id)}">手动印刷</button><button class="text-button" data-sync-template="${escape(t.id)}">同步到未完成实例</button><button class="text-button danger-text" data-delete-template="${escape(t.id)}">删除模板</button></div></section>`).join("") || '<p class="subtle">还没有模板。也可以在编辑器中直接创建一条实例。</p>'}</section>`;
+  return `<section class="card templates-card"><div class="card-heading"><div><h2>印刷模板 <span class="count-label">${templates.length}</span></h2><p class="subtle small" data-explanation>模板保留形状，实例记录每一次执行。关闭自动印刷后可以随时手动使用。</p></div><button class="button secondary" data-action="new-template">${icon("plus")} 新建模板</button></div>${templates.map((t) => `<section class="goal-section" data-template-id="${escape(t.id)}"><div class="goal-head"><h3>${escape(t.shape.title)}</h3><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑模板 ${escape(t.shape.title)}">${icon("pencil")}</button></div><p class="subtle small">${escape(printingLabel(t))} · ${t.shape.goalId ? "目标组" : t.printing.kind === "weekly" && t.printing.slots.some((s) => s.time) ? "习惯组" : "普通组"}</p><div class="template-actions"><button class="button secondary small-button" data-print-template="${escape(t.id)}">手动印刷</button><button class="text-button" data-sync-template="${escape(t.id)}">同步到未完成实例</button><button class="text-button danger-text" data-delete-template="${escape(t.id)}">删除模板</button></div></section>`).join("") || '<p class="subtle">还没有模板。也可以在编辑器中直接创建一条实例。</p>'}</section>`;
 }
 function shiftedDate(date: string, days: number) {
   const value = new Date(`${date}T12:00:00Z`);
@@ -1785,7 +1786,7 @@ function templateDialog(
       : [{ dates: [state.today], time: null }];
   const kind = rule?.kind ?? (weekly ? "weekly" : "once");
   modal(
-    `${modalHeader(template ? "编辑模板" : "新建任务", "先选择用途，只填写这次需要的信息。")}
+    `${modalHeader(template ? "编辑模板" : "新建任务", "先选择用途，只填写这次需要的信息。", true)}
   <form id="template-form">
     <label class="form-field"><span>这次想怎么创建？</span><select name="creationMode"><option value="instance" ${mode === "instance" ? "selected" : ""}>临时实例 · 只做这一次</option><option value="manual" ${mode === "manual" ? "selected" : ""}>手动模板 · 保留，以后再用</option><option value="automatic" ${mode === "automatic" ? "selected" : ""}>自动模板 · 按安排持续印刷</option></select></label><p id="creation-mode-hint" class="editor-hint"></p>
     <label class="form-field"><span>任务名称</span><input name="title" required maxlength="200" autofocus value="${escape(shape?.title)}" placeholder="你想完成什么？"></label>
@@ -2277,7 +2278,7 @@ function projectDialog(id?: string) {
   const p = state.data.projects.find((p) => p.id === id),
     colors = ["#df7561", "#849b7d", "#d5a553", "#8b92b9", "#75a5ac", "#b787a3"];
   modal(
-    `${modalHeader(p ? "编辑项目" : "新建项目", "把相关的任务，放在一起。")}<form id="project-form"><label class="form-field"><span>项目名称</span><input name="name" maxlength="40" required autofocus value="${escape(p?.name)}" placeholder="例如：学习 Rust"></label><label class="form-field"><span>项目颜色</span><input name="color" type="color" value="${p?.color || colors[state.data.projects.length % colors.length]}"></label><div class="modal-actions">${p ? `<button type="button" class="text-button danger-text" id="delete-project">删除项目</button>` : "<span></span>"}<button type="submit" class="button primary">保存项目</button></div></form>`,
+    `${modalHeader(p ? "编辑项目" : "新建项目", "把相关的任务，放在一起。", true)}<form id="project-form"><label class="form-field"><span>项目名称</span><input name="name" maxlength="40" required autofocus value="${escape(p?.name)}" placeholder="例如：学习 Rust"></label><label class="form-field"><span>项目颜色</span><input name="color" type="color" value="${p?.color || colors[state.data.projects.length % colors.length]}"></label><div class="modal-actions">${p ? `<button type="button" class="text-button danger-text" id="delete-project">删除项目</button>` : "<span></span>"}<button type="submit" class="button primary">保存项目</button></div></form>`,
   );
   $("#project-form").onsubmit = async (e) => {
     e.preventDefault();
@@ -2369,7 +2370,7 @@ function goalDialog(id?: string) {
 function chooseTask() {
   const tasks = state.data.tasks.filter((t) => !t.completed);
   modal(
-    `${modalHeader("这一刻，专注什么？")}<div class="task-picker"><button data-pick-task="">${icon("leaf")}<span>自由专注<small>留一段属于自己的时间</small></span>${icon("chevron-right")}</button>${tasks.map((t) => `<button data-pick-task="${t.id}">${icon("target")}<span>${escape(t.title)}<small>${escape(projectOf(t)?.name || "收件箱")}</small></span>${icon("chevron-right")}</button>`).join("")}</div>`,
+    `${modalHeader("这一刻，专注什么？")}<div class="task-picker"><button data-pick-task="">${icon("leaf")}<span>自由专注<small data-explanation>留一段属于自己的时间</small></span>${icon("chevron-right")}</button>${tasks.map((t) => `<button data-pick-task="${t.id}">${icon("target")}<span>${escape(t.title)}<small>${escape(projectOf(t)?.name || "收件箱")}</small></span>${icon("chevron-right")}</button>`).join("")}</div>`,
   );
 }
 function searchDialog() {
@@ -2567,7 +2568,18 @@ function bindForms() {
   const settingsForm =
     document.querySelector<HTMLFormElement>("#settings-form");
   settingsForm?.addEventListener("input", (e) => {
-    if (!(e.target as HTMLInputElement).name) return;
+    const input = e.target as HTMLInputElement;
+    if (input.id === "compact-mode") {
+      try {
+        setCompactMode(input.checked);
+        resizeCalendar();
+      } catch (error) {
+        input.checked = compactModeEnabled();
+        toast(`简洁模式保存失败：${String(error)}`);
+      }
+      return;
+    }
+    if (!input.name) return;
     settingsDirty = true;
     settingsRevision++;
     $("#settings-status").textContent =
