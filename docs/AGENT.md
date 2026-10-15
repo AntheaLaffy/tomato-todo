@@ -171,6 +171,8 @@ MCP 使用标准换行 JSON-RPC stdio，不启动第二份数据库。它连接�
 
 让助手在界面上「做给人看」：一句话脚本演成一段动画，人手、键盘、讲稿一起动。形状照两件现成实现来——matinee（可编程幽灵光标：`moveTo/click/type/say`，覆盖层 `pointer-events: none`、`aria-hidden`、尊重 `prefers-reduced-motion`）与 demowright（可见光标 + 按键 HUD + 字幕 + 音效）。实现是 `src/hand.ts`（无 React，一层挂在 `body` 上的覆盖层）。
 
+整段脚本结束或出错时自动收起手势、讲稿与键盘，无需末尾显式 `hide`；失败仍报告给调用方，后续排队演示继续执行。
+
 脚本是一串步骤，`:kind` 取 `move / click / type / highlight / say / keyboard / wait / hide`：
 
 - 位移动画沿一条带轻微过冲的贝塞尔路径走，落点前收一下，看起来像手而不是补间；目标不在视野里会先滚进来。

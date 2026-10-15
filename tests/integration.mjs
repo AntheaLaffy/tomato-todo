@@ -2012,8 +2012,54 @@ test(
       await expect(page.locator("#task-search")).toHaveValue("考研英语", {
         timeout: 15000,
       });
-      await page.evaluate(() => window.tomatoHand.hide());
+      await page.evaluate(() => window.__hand);
       await expect(page.locator(".hand-actor.on")).toBeHidden();
+      await expect(page.locator(".hand-actor")).toHaveCSS("opacity", "0");
+      await expect(page.locator(".hand-caption")).toBeHidden();
+      await expect(page.locator(".hand-keyboard")).toBeHidden();
+      // A failed performance must clean up held UI and leave the queue usable.
+      const failed = await page.evaluate(async () => {
+        try {
+          await window.tomatoHand.run({
+            steps: [
+              { kind: "say", lines: "失败前的讲稿", hold: true },
+              { kind: "keyboard", on: true },
+              { kind: "move", target: "[" },
+            ],
+          });
+          return false;
+        } catch {
+          return true;
+        }
+      });
+      assert.equal(failed, true);
+      await expect(page.locator(".hand-actor")).toHaveCSS("opacity", "0");
+      await expect(page.locator(".hand-caption")).toBeHidden();
+      await expect(page.locator(".hand-keyboard")).toBeHidden();
+      await page.evaluate(() =>
+        window.tomatoHand.run({
+          steps: [
+            { kind: "type", target: "#task-search", text: "恢复", cps: 30 },
+          ],
+        }),
+      );
+      await expect(page.locator("#task-search")).toHaveValue("考研英语恢复");
+      await expect(page.locator(".hand-actor")).toHaveCSS("opacity", "0");
+      // Reduced motion still needs to clear captions and an explicitly open HUD.
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.reload();
+      await expect(page.locator(".focus-card")).toBeVisible();
+      await page.evaluate(() =>
+        window.tomatoHand.run({
+          steps: [
+            { kind: "say", lines: "减少动画", hold: true },
+            { kind: "keyboard", on: true },
+          ],
+        }),
+      );
+      await expect(page.locator(".hand-actor")).toHaveCSS("opacity", "0");
+      await expect(page.locator(".hand-caption")).toBeHidden();
+      await expect(page.locator(".hand-keyboard")).toBeHidden();
       assert.deepEqual(errors, []);
       console.log(`ponder artifacts: ${dir}`);
     } finally {

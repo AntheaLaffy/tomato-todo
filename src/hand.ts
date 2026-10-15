@@ -467,24 +467,35 @@ export function runHandScript(
   optionOverrides: HandOptions = {},
 ) {
   options = { ...options, ...optionOverrides };
-  script = script.then(async () => {
+  const running = script.then(async () => {
     // 锁机或沉浸计时占着屏幕时不出手：那是用户明确说了「别打扰」的状态。
     if (options.suppressed?.()) return;
-    showHand(next.label ?? "助手");
-    if (next.accent) layer?.style.setProperty("--hand-accent", next.accent);
-    await wait(180);
-    for (const step of next.steps) await apply(step);
+    try {
+      showHand(next.label ?? "助手");
+      if (next.accent) layer?.style.setProperty("--hand-accent", next.accent);
+      await wait(180);
+      for (const step of next.steps) await apply(step);
+    } finally {
+      await hideHand();
+    }
   });
-  return script;
+  script = running.catch(() => undefined);
+  return running;
 }
 /** 一步一动，方便助手边做边说，或者外部按需驱动。 */
 export function handStep(step: HandStep, optionOverrides: HandOptions = {}) {
   options = { ...options, ...optionOverrides };
-  script = script.then(() => {
+  const running = script.then(async () => {
     if (options.suppressed?.()) return;
-    return apply(step);
+    try {
+      await apply(step);
+    } catch (error) {
+      await hideHand();
+      throw error;
+    }
   });
-  return script;
+  script = running.catch(() => undefined);
+  return running;
 }
 export function handPosition() {
   return { ...at };

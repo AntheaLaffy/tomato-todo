@@ -620,11 +620,11 @@ export const PONDER_TARGETS: PonderTarget[] = [
     id: "agent-review",
     title: "审阅与应用",
     category: "智能体",
-    selectors: ["#agent-review", '[data-agent="review"]', "#agent-files"],
+    selectors: [".agent-proposal"],
     sections: [
       {
         heading: "设计理念",
-        text: "改动先审阅再应用：差异、影响与来源指纹都摆出来，点下去才生效。",
+        text: "改动先审阅再应用：助手在对话中展示差异与影响，你批准后才应用；来源指纹由工具核对。",
       },
       {
         text: "批量修改走文件流程：导出 → 分段读取 → JSON Patch → 审阅 → 你确认后应用。",
@@ -668,7 +668,7 @@ export const PONDER_TARGETS: PonderTarget[] = [
     sections: [
       {
         heading: "设计理念",
-        text: "连接、密钥、方案文件与学情信号都收在这里：配置和对话分开，页面才清爽。",
+        text: "连接信息与密钥都收在这里：配置和对话分开，页面才清爽。",
       },
       {
         text: "先选后端并填好连接信息，再勾选「启用」。启用后助手才能应答；「异常时自动唤醒」允许它在空闲时主动分析。",
