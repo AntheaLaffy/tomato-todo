@@ -285,7 +285,8 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
     assert.deepEqual(await ids(`${list} .task-row`), initialIds);
     await expect(
       page.locator('.today-card [data-filter="active"]'),
-    ).toContainText("11");
+    ).toContainText("9");
+    await expect(page.locator(".today-card .count-label")).toHaveText("9");
     await expect(
       page.locator('[data-action="toggle-undated"]'),
     ).toHaveAttribute("aria-expanded", "false");
@@ -303,6 +304,7 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       "undated-high",
       "undated-low",
     ]);
+    await expect(page.locator(".today-card .count-label")).toHaveText("9");
     // A real snapshot refresh must preserve the user's expanded groups.
     snapshot.data.tasks[0].notes = "refreshed";
     await page.waitForResponse("**/api/snapshot");
@@ -340,6 +342,10 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       "无日期任务1",
     ]);
     await expect(page.locator(`${list} .empty-state`)).toHaveCount(0);
+    await expect(page.locator(".today-card .count-label")).toHaveText("0");
+    await expect(
+      page.locator('.today-card [data-filter="active"] span'),
+    ).toHaveText("0");
     snapshot.data.tasks = [];
     await page.reload();
     await expect(page.locator(`${list} .empty-state`)).toBeVisible();
@@ -1122,8 +1128,8 @@ test(
               };
             });
           assert.ok(
-            layout.top >= 0 && layout.bottom <= viewport.height,
-            `Calendar must fit ${width}×${height} at ${scale}× scaling: ${JSON.stringify(layout)}`,
+            layout.top >= 0 && layout.height >= 384 && layout.height <= 1040,
+            `Calendar must keep a readable default height at ${width}×${height} and ${scale}× scaling: ${JSON.stringify(layout)}`,
           );
           assert.ok(
             layout.first >= layout.top && layout.last <= layout.bottom,
@@ -1152,6 +1158,33 @@ test(
             height: viewport.height + 80,
           });
           await expect.poll(axisHeight).toBeGreaterThan(layout.height);
+          const automaticHeight = await axisHeight();
+          const handle = calendarPage.locator(".calendar-resize-handle");
+          await handle.scrollIntoViewIfNeeded();
+          const grip = await handle.boundingBox();
+          await calendarPage.mouse.move(
+            grip.x + grip.width / 2,
+            grip.y + grip.height / 2,
+          );
+          await calendarPage.mouse.down();
+          await calendarPage.mouse.move(
+            grip.x + grip.width / 2,
+            grip.y + grip.height / 2 + 120,
+            { steps: 5 },
+          );
+          await calendarPage.mouse.up();
+          await expect.poll(axisHeight).toBe(Math.round(automaticHeight + 120));
+          const manualHeight = await axisHeight();
+          await calendarPage.locator("[data-week-next]").click();
+          await expect.poll(axisHeight).toBe(manualHeight);
+          await calendarPage.reload();
+          await calendarPage.locator("[data-page=schedule]").first().click();
+          await expect.poll(axisHeight).toBe(manualHeight);
+          await calendarPage.locator(".calendar-resize-handle").focus();
+          await calendarPage.keyboard.press("ArrowUp");
+          await expect.poll(axisHeight).toBe(manualHeight - 40);
+          await calendarPage.locator("[data-calendar-auto]").click();
+          await expect.poll(axisHeight).toBeCloseTo(automaticHeight, 0);
         } finally {
           await calendarPage.close();
         }
@@ -1318,6 +1351,18 @@ test(
       assert.equal(snapshot.data.templates[0].automatic, false);
       const templateId = snapshot.data.templates[0].id;
       await page.locator("[data-page=tasks]").first().click();
+      await expect(
+        page.locator(`[data-template-id="${templateId}"]`),
+      ).toHaveCount(0);
+      await page.locator('[data-filter="templates"]').click();
+      await expect(page.locator('[data-filter="templates"]')).toHaveClass(
+        "active",
+      );
+      await expect(page.locator("#tasks-results")).toHaveCount(0);
+      await page.locator('[data-filter="active"]').click();
+      await expect(page.locator("#tasks-results")).toBeVisible();
+      await expect(page.locator(".templates-card")).toHaveCount(0);
+      await page.locator('[data-filter="templates"]').click();
       const catalog = page.locator(`[data-template-id="${templateId}"]`);
       await catalog.locator("[data-print-template]").click();
       const last = new Date(`${snapshot.today}T12:00:00Z`);
@@ -1329,10 +1374,12 @@ test(
         .getByRole("button", { name: "印刷全部实例", exact: true })
         .click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
+      await page.locator('[data-filter="active"]').click();
       await expect(page.locator("#tasks-results [data-task-id]")).toHaveCount(
         3,
       );
       // Reprinting this same finite range creates no duplicate instances.
+      await page.locator('[data-filter="templates"]').click();
       await catalog.locator("[data-print-template]").click();
       await page
         .locator("#print-form [name=end]")
@@ -1341,6 +1388,7 @@ test(
         .getByRole("button", { name: "印刷全部实例", exact: true })
         .click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
+      await page.locator('[data-filter="active"]').click();
       await expect(page.locator("#tasks-results [data-task-id]")).toHaveCount(
         3,
       );
@@ -1355,6 +1403,7 @@ test(
       );
       await page.getByRole("button", { name: "保存修改", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
+      await page.locator('[data-filter="templates"]').click();
       await catalog.locator("[data-edit-template]").click();
       await page.locator("#template-form [name=title]").fill("新版模板");
       await page.getByRole("button", { name: "保存模板", exact: true }).click();
@@ -1430,6 +1479,7 @@ test(
           .map((t) => t.id),
       );
       await page.locator("[data-page=tasks]").first().click();
+      await page.locator('[data-filter="templates"]').click();
       await page.screenshot({
         path: join(dir, "templates-list.png"),
         fullPage: true,
@@ -1548,6 +1598,7 @@ test(
         0,
       );
       await page.locator("[data-page=tasks]").first().click();
+      await page.locator('[data-filter="templates"]').click();
       const calendarCard = page.locator(`[data-template-id="${calendar.id}"]`);
       await calendarCard.locator("[data-print-template]").click();
       await page

@@ -13,7 +13,7 @@ generated_at: 2026-10-10
 | 简洁模式与说明显隐 | 界面 | compact.ts、main.ts 的 settingsPage/bindForms/ponderChip、style.css 的 data-explanation | agent.ts 的输入提示、ponder.ts 的偏好讲解、tests/integration.mjs 的 compact mode、docs/DESIGN.md |
 | 调整页面布局                     | 界面      | main.ts.analysis.md、style.css.analysis.md                                                                                  | —                                                                                                                    |
 | 任务到点提醒                     | 界面      | main.ts 的 pendingReminder/reminderBanner/taskDialog                                                                        | Rust reminders.rs、桌面轮询                                                                                          |
-| 模板编辑、自动预印与手动整批印刷 | 界面/契约 | main.ts 的 templateDialog/focusBudget/printDialog/templatesCard（临时 / 手动 / 自动渐进披露）、types.ts 的 Template         | crates/core/src/templates.rs、plan.rs、docs/CODEMAP.md                                                               |
+| 模板编辑、独立标签、自动预印与手动整批印刷 | 界面/契约 | main.ts 的 tasksPage/templateDialog/focusBudget/printDialog/templatesCard（临时 / 手动 / 自动渐进披露）、types.ts 的 Template | crates/core/src/templates.rs、plan.rs、docs/CODEMAP.md |
 | 修改任务字段                     | 契约      | types.ts、main.ts 的 taskDialog                                                                                             | crates/core/src/lib.rs                                                                                               |
 | 修改备份流程                     | 桥接      | api.ts                                                                                                                      | main.ts 的 importBackup、Rust Import Action                                                                          |
 | 修改计划文件流程                 | 桥接      | api.ts、types.ts、main.ts 的 importPlan                                                                                     | crates/core/src/plan.rs、docs/CODEMAP.md、桌面/预览适配层                                                            |
@@ -24,7 +24,7 @@ generated_at: 2026-10-10
 | 愿景标记                         | 界面      | main.ts 的 visionsTab/visionDialog/projectVisionCard、types.ts 的 Vision                                                    | crates/core/src/lib.rs 的 Vision、docs/BACKUP_FORMAT.md                                                              |
 | 定时锁机/严格模式界面            | 界面      | main.ts 的 lockPage/lockDialog/bindForms/guardPage/renderImmersive/tomorrowScheduleDialog（时段严格开关与锁机只读明日日程） | types.ts、crates/core/src/lock.rs、桌面桥接                                                                          |
 | 数据统计与纵切面                 | 界面      | main.ts 的 statsPage/goalStatsCard/crossSectionCard、types.ts 的 GoalStat/NodeStat/LineOutcome                              | crates/core/src/lib.rs 的 stats/GoalStat/NodeStat/DayStat、docs/BACKUP_FORMAT.md                                     |
-| 本周日程表与课表阻塞时段         | 界面      | main.ts 的 schedulePage/resizeCalendar/weekOffset/blocksCard/blockDialog、style.css 的 calendar-body/calendar-block/calendar-band | types.ts 的 Task、Block（dueDate/reminderTime/attention）、crates/core/src/blocks.rs、docs/PLAN_FORMAT.md、tests/integration.mjs 的窗口/显示缩放/拉伸检查 |
+| 本周日程表与课表阻塞时段         | 界面      | main.ts 的 schedulePage/resizeCalendar/mountCalendarResize/weekOffset/blocksCard/blockDialog、style.css 的 calendar-body/calendar-block/calendar-band | types.ts 的 Task、Block（dueDate/reminderTime/attention）、crates/core/src/blocks.rs、docs/PLAN_FORMAT.md、tests/integration.mjs 的窗口/显示缩放/拉伸检查 |
 | 写作业 BGM 导入与播放 | 声音 | bgm.ts、main.ts 的 backgroundSoundButton/soundDialog/renderImmersive | tests/audio.mjs、tests/integration.mjs；至少 3600 秒，本机 IndexedDB 保存，不随备份导出 |
 | 关键节点音效与音量               | 声音/契约 | audio.ts、sound-events.ts、main.ts 的 accept/soundPreviewControls                                                           | types.ts、Rust Settings、备份契约、tests/audio.mjs                                                                   |
 | 侧栏项目排序与右键菜单           | 界面      | main.ts 的 showContextMenu/hideContextMenu/sortProjects 与捕获阶段的外部点击关闭                                            | tests/integration.mjs 的打开/排序/保存/关闭回归                                                                      |
@@ -42,13 +42,15 @@ generated_at: 2026-10-10
 | api.ts          | 桥接   | 原生入口报告桌面/Android 身份，选择 Tauri IPC 或本地 HTTP；计划/备份、助手附件和 Markdown 的系统保存与浏览器下载 |
 | types.ts        | 契约   | 实例、Template/Printing/PrintRecord、计划 v4 与备份 v3 的 Rust serde camelCase 类型 |
 | bgm.ts          | 声音   | 本地长音频元数据校验、IndexedDB 持久化、循环播放/暂停与背景音量 |
-| audio.ts        | 声音   | 本地背景噪音、11 种关键节点短音效、音量与安全音频激活                               |
+| audio.ts        | 声音   | 本地真实雨声解码/缓存与加载取消、棕噪音循环、11 种关键节点短音效、独立音量与安全音频激活；雨声及许可在 public/audio/ |
 | sound-events.ts | 声音   | 按已接受快照选择一次音效，共享提醒队列排序、静音/导入抑制与同时事件优先级           |
 | agent.ts        | 桥接   | 对话页与状态轮询、设置/记忆/信号浮层、登录、对话批准与自动唤醒切页；见 agent.ts.analysis.md |
 | agent-canvas.ts | 文档工作区 | Canvas 编辑/选段草稿、版本读取/恢复、冲突保留、格式导出与隔离 HTML 预览；所有文本模型共用 |
 | agent-media.ts | 图片 | 私有图片预览加载、大图对话框、下载与继续编辑入口；账号能力由 agent.ts 检查 |
 | agent-chat.ts   | 对话   | 消息/会话/附件契约、思考折叠、消息与附件卡片、上传编码、消息和代码复制 |
 | agent-markdown.ts | 对话 | Marked + KaTeX + DOMPurify，回答排版、公式、代码复制按钮与安全链接 |
+| hand.ts         | 引导 | 助手手势、讲稿与键盘演示；脚本结束/出错自动收起，失败不阻断后续队列 |
+| hand-demo.ts    | 引导 | blocksTour 课表阻塞时段演示脚本 |
 | nodegraph.ts    | 界面   | 主线节点图：横向节点卡、信号横条、缩略图与节点检查器，拖拽重排                      |
 | ponder.ts       | 引导   | 概念登记表与讲解机制：悬停胶囊、长按 G 打开讲解面、全部概念列表                     |
 

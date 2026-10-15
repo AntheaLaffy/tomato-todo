@@ -3599,8 +3599,41 @@ main {
 }
 .calendar-body {
   /* Keep hourly labels readable when the available window height is small. */
-  height: clamp(224px, var(--calendar-height, 70dvh), 780px);
+  height: max(224px, var(--calendar-height, 70dvh));
   margin-block: 8px;
+}
+.calendar-size-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.calendar-resize-handle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 32px;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+  color: var(--muted);
+  border-radius: 6px;
+}
+.calendar-resize-handle:hover,
+.calendar-resize-handle:focus-visible {
+  background: var(--surface-soft);
+  color: var(--accent);
+}
+.calendar-resize-handle > span {
+  width: 32px;
+  height: 4px;
+  border-radius: 4px;
+  background: currentColor;
+}
+.calendar-resize-handle small {
+  font-size: 11px;
 }
 .calendar-gutter {
   position: relative;

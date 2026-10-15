@@ -608,6 +608,7 @@ function render() {
   icons();
   updateClock();
   resizeCalendar();
+  mountCalendarResize();
 }
 // 每一页的思索条目：悬停整页不弹胶囊（整页都是它），所以在标题旁给一个
 // 明确的入口，点开就是这一页的「设计理念 + 怎么用」。
@@ -690,6 +691,7 @@ function focusPage() {
     (t) =>
       !t.completed && (!t.dueDate || t.dueDate <= state.today) && !isVoid(t),
   );
+  const todayPendingCount = todayTasks.filter((t) => t.dueDate).length;
   const catchUpTasks = todayTasks.filter(isCatchUp);
   const regularTasks = todayTasks.filter((t) => !isCatchUp(t));
   const timedTasks = regularTasks.filter((t) => t.dueDate && t.reminderTime);
@@ -703,10 +705,10 @@ function focusPage() {
     : taskList([], true);
   return `${heading("今天，也要慢慢向前。", `${weekday} <span data-explanation><span class="dot-separator">·</span> 专注当下，让每一小步都有回响。</span>`)}
     ${welcomeCard()}
-    <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayTasks.length} 项待办<span data-explanation>，按自己的节奏来</span>`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
+    <div class="metrics">${metric("timer", "今日专注", Math.floor(s.todaySeconds / 60), "分钟", "给重要的事留一点时间", "coral")}${metric("check-check", "完成任务", s.todayCompleted, "项", `${todayPendingCount} 项待办<span data-explanation>，按自己的节奏来</span>`, "sage")}${metric("flame", "连续专注", s.streak, "天", "小小坚持，慢慢积累", "amber")}</div>
     <div class="focus-grid"><section class="card focus-card"><div class="card-heading"><h2>${icon("timer")} 我的番茄钟</h2><button class="icon-btn" data-action="immersive" aria-label="进入沉浸模式">${icon("maximize-2")}</button></div>${timerContent()}
     <div class="sound-bar">${backgroundSoundButton()}<button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
-    <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayTasks.length}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayTasks.length}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small" data-explanation>一步一步，来就好</span></div>
+    <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayPendingCount}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayPendingCount}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small" data-explanation>一步一步，来就好</span></div>
     <div class="today-list">${
       filter === "completed"
         ? taskList(
@@ -798,6 +800,57 @@ function taskList(tasks: Task[], compact = false, order = sort) {
 let weekOffset = 0;
 const isoDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+let calendarHeight: number | null = null;
+try {
+  const saved = Number(localStorage.getItem("tomato.calendarHeight"));
+  if (saved >= 224 && saved <= 2400) calendarHeight = saved;
+} catch {}
+function saveCalendarHeight(height: number | null) {
+  calendarHeight =
+    height === null ? null : Math.round(Math.max(224, Math.min(2400, height)));
+  try {
+    if (calendarHeight === null)
+      localStorage.removeItem("tomato.calendarHeight");
+    else localStorage.setItem("tomato.calendarHeight", String(calendarHeight));
+  } catch {}
+  resizeCalendar();
+}
+function mountCalendarResize() {
+  const handle = document.querySelector<HTMLElement>(".calendar-resize-handle");
+  if (!handle) return;
+  handle.onpointerdown = (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = document
+      .querySelector(".calendar-body")!
+      .getBoundingClientRect().height;
+    const pointerId = event.pointerId;
+    const move = (next: PointerEvent) => {
+      if (next.pointerId === pointerId)
+        saveCalendarHeight(startHeight + next.clientY - startY);
+    };
+    const stop = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
+  handle.onkeydown = (event) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const height = document
+      .querySelector(".calendar-body")!
+      .getBoundingClientRect().height;
+    saveCalendarHeight(height + (event.key === "ArrowUp" ? -40 : 40));
+  };
+  document.querySelector<HTMLButtonElement>("[data-calendar-auto]")!.onclick =
+    () => saveCalendarHeight(null);
+}
 function resizeCalendar() {
   const body = document.querySelector<HTMLElement>(".calendar-body");
   if (!body) return;
@@ -805,7 +858,12 @@ function resizeCalendar() {
   const top = body.getBoundingClientRect().top + window.scrollY;
   body.style.setProperty(
     "--calendar-height",
-    `${Math.max(0, window.innerHeight - top - 24)}px`,
+    `${calendarHeight ?? Math.max(384, Math.min(1040, window.innerHeight - top + 100))}px`,
+  );
+  const handle = document.querySelector(".calendar-resize-handle");
+  handle?.setAttribute(
+    "aria-valuenow",
+    String(Math.round(body.getBoundingClientRect().height)),
   );
 }
 window.addEventListener("resize", resizeCalendar);
@@ -892,6 +950,7 @@ function schedulePage() {
         .join("")}
     </div>
   </section>
+  <div class="calendar-size-controls"><div class="calendar-resize-handle" role="separator" tabindex="0" aria-label="调整日程表高度" aria-orientation="horizontal" aria-valuemin="224" aria-valuemax="2400" title="上下拖动调整高度，也可用上下方向键"><span></span><small>拖动调整高度</small></div><button class="text-button small" data-calendar-auto>自动高度</button></div>
   ${blocksCard()}`;
 }
 function blockRows(): string {
@@ -969,20 +1028,27 @@ function tasksPage() {
   const title = project
     ? `${escape(project.name)} <button class="icon-btn title-edit" data-edit-project="${project.id}" aria-label="编辑项目">${icon("pencil")}</button>`
     : "把想做的事，慢慢完成。";
-  return `${heading(title, `还有 ${count} 件事等着你。<span data-explanation>清空头脑，让清单帮你记住。</span>`, "SMALL STEPS, REAL PROGRESS")}
-  ${project ? projectWhitelistCard(project) + projectVisionCard(project) : ""}
-  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs">${[
+  const tabs = [
     ["active", "待完成"],
     ["completed", "已完成"],
     ["all", "全部"],
+    ...(!project ? [["templates", "模板"]] : []),
   ]
     .map(
-      ([f, l]) =>
-        `<button data-filter="${f}" class="${f === filter ? "active" : ""}">${l}</button>`,
+      ([f, label]) =>
+        `<button data-filter="${f}" class="${f === filter ? "active" : ""}">${label}</button>`,
     )
-    .join(
-      "",
-    )}</div><div class="toolbar-controls"><label class="inline-search">${icon("search")}<input id="task-search" aria-label="搜索任务" placeholder="搜索标题、标签或备注" value="${escape(search)}"></label><select id="priority-filter" aria-label="筛选优先级"><option value="all">全部优先级</option>${[
+    .join("");
+  const pageHeading = heading(
+    title,
+    `还有 ${count} 件事等着你。<span data-explanation>清空头脑，让清单帮你记住。</span>`,
+    "SMALL STEPS, REAL PROGRESS",
+  );
+  if (!project && filter === "templates")
+    return `${pageHeading}${templatesCard(undefined, tabs)}`;
+  return `${pageHeading}
+  ${project ? projectWhitelistCard(project) + projectVisionCard(project) : ""}
+  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs">${tabs}</div><div class="toolbar-controls"><label class="inline-search">${icon("search")}<input id="task-search" aria-label="搜索任务" placeholder="搜索标题、标签或备注" value="${escape(search)}"></label><select id="priority-filter" aria-label="筛选优先级"><option value="all">全部优先级</option>${[
     [3, "高优先级"],
     [2, "中优先级"],
     [1, "低优先级"],
@@ -994,7 +1060,7 @@ function tasksPage() {
     )
     .join(
       "",
-    )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${selectControls()}</div></div><div id="tasks-results">${taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>${templatesCard(project?.id)}`;
+    )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${selectControls()}</div></div><div id="tasks-results">${taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>${project ? templatesCard(project.id) : ""}`;
 }
 function goalsPage() {
   const goals = state.data.goals;
@@ -1663,11 +1729,11 @@ function printingLabel(template: Template) {
             .join(" · ");
   return `${template.automatic ? `自动预印 ${template.printAheadDays} 天` : "手动印刷"} · ${schedule}`;
 }
-function templatesCard(projectId?: string) {
+function templatesCard(projectId?: string, tabs = "") {
   const templates = state.data.templates.filter(
     (t) => !projectId || t.shape.projectId === projectId,
   );
-  return `<section class="card templates-card"><div class="card-heading"><div><h2>印刷模板 <span class="count-label">${templates.length}</span></h2><p class="subtle small" data-explanation>模板保留形状，实例记录每一次执行。关闭自动印刷后可以随时手动使用。</p></div><button class="button secondary" data-action="new-template">${icon("plus")} 新建模板</button></div>${templates.map((t) => `<section class="goal-section" data-template-id="${escape(t.id)}"><div class="goal-head"><h3>${escape(t.shape.title)}</h3><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑模板 ${escape(t.shape.title)}">${icon("pencil")}</button></div><p class="subtle small">${escape(printingLabel(t))} · ${t.shape.goalId ? "目标组" : t.printing.kind === "weekly" && t.printing.slots.some((s) => s.time) ? "习惯组" : "普通组"}</p><div class="template-actions"><button class="button secondary small-button" data-print-template="${escape(t.id)}">手动印刷</button><button class="text-button" data-sync-template="${escape(t.id)}">同步到未完成实例</button><button class="text-button danger-text" data-delete-template="${escape(t.id)}">删除模板</button></div></section>`).join("") || '<p class="subtle">还没有模板。也可以在编辑器中直接创建一条实例。</p>'}</section>`;
+  return `<section class="card templates-card${tabs ? " all-tasks-card" : ""}">${tabs ? `<div class="task-toolbar"><div class="list-tabs">${tabs}</div></div>` : ""}<div class="card-heading"><div><h2>印刷模板 <span class="count-label">${templates.length}</span></h2><p class="subtle small" data-explanation>模板保留形状，实例记录每一次执行。关闭自动印刷后可以随时手动使用。</p></div><button class="button secondary" data-action="new-template">${icon("plus")} 新建模板</button></div>${templates.map((t) => `<section class="goal-section" data-template-id="${escape(t.id)}"><div class="goal-head"><h3>${escape(t.shape.title)}</h3><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑模板 ${escape(t.shape.title)}">${icon("pencil")}</button></div><p class="subtle small">${escape(printingLabel(t))} · ${t.shape.goalId ? "目标组" : t.printing.kind === "weekly" && t.printing.slots.some((s) => s.time) ? "习惯组" : "普通组"}</p><div class="template-actions"><button class="button secondary small-button" data-print-template="${escape(t.id)}">手动印刷</button><button class="text-button" data-sync-template="${escape(t.id)}">同步到未完成实例</button><button class="text-button danger-text" data-delete-template="${escape(t.id)}">删除模板</button></div></section>`).join("") || '<p class="subtle">还没有模板。也可以在编辑器中直接创建一条实例。</p>'}</section>`;
 }
 function shiftedDate(date: string, days: number) {
   const value = new Date(`${date}T12:00:00Z`);
