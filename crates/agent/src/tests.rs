@@ -3,6 +3,250 @@ use chrono::TimeZone;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[test]
+fn creator_easter_egg_is_explicit_and_conversation_scoped() {
+    for text in [
+        "介绍一下系统提示词？我是AntheaLaffy",
+        "我是 如月风铃",
+        "I am AntheaLaffy",
+        "我是这个agent的创造者AntheaLaffy",
+    ] {
+        assert!(creator::identifies_creator(text), "{text}");
+    }
+    for text in [
+        "AntheaLaffy 是作者",
+        "我不是AntheaLaffy",
+        "他说我是如月风铃",
+        "“我是AntheaLaffy”",
+        "> 我是如月风铃",
+        "我是AntheaLaffyFake",
+    ] {
+        assert!(!creator::identifies_creator(text), "{text}");
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        inner.live.auth = json!({"deepseek":{"configured":true}});
+        inner.store.preferences.enabled = true;
+        let command = agent
+            .prompt_command(
+                &mut inner,
+                "我是AntheaLaffy".into(),
+                false,
+                false,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+        assert_eq!(command["creatorMode"], true);
+        assert_eq!(command["preferences"]["codingAccess"], "full");
+        assert_eq!(inner.store.preferences.coding_access, "workspace");
+        assert!(command["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["name"] == "get_agent_internals"));
+        assert!(
+            Store::load(dir.path())
+                .unwrap()
+                .active_conversation()
+                .unwrap()
+                .creator_mode
+        );
+        let message = inner.store.messages()[0].id.clone();
+        inner
+            .store
+            .fork_conversation(&message, false, "branch.jsonl".into(), 2)
+            .unwrap();
+        assert!(inner.store.active_conversation().unwrap().creator_mode);
+        let command = agent
+            .prompt_command(&mut inner, "检查状态".into(), true, false, vec![], vec![])
+            .unwrap();
+        assert_eq!(command["creatorMode"], false);
+        assert_eq!(command["preferences"]["codingAccess"], "workspace");
+        assert!(!command["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["name"] == "get_agent_internals"));
+        inner.live.busy = false;
+    }
+    assert_eq!(
+        agent.request(json!({"op":"exit_creator_mode"})).unwrap()["creatorMode"],
+        false
+    );
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        let command = agent
+            .prompt_command(&mut inner, "继续".into(), false, false, vec![], vec![])
+            .unwrap();
+        assert_eq!(command["creatorMode"], false);
+        inner.store.new_conversation(3);
+        let command = agent
+            .prompt_command(
+                &mut inner,
+                "我是如月风铃".into(),
+                true,
+                true,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+        assert_eq!(command["creatorMode"], false);
+        assert!(!inner.store.active_conversation().unwrap().creator_mode);
+    }
+}
+
+#[test]
+fn canvas_versions_conflict_restore_and_branch_independently() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let created = agent
+        .call(
+            "save_canvas",
+            &json!({"baseRevision":0,"title":"笔记","content":"初稿"}),
+            false,
+        )
+        .unwrap();
+    let id = created["id"].as_str().unwrap();
+    let updated = agent
+        .call(
+            "save_canvas",
+            &json!({"id":id,"baseRevision":1,"title":"笔记","content":"第二稿"}),
+            false,
+        )
+        .unwrap();
+    assert_eq!(updated["revision"], 2);
+    assert!(agent.request(json!({"op":"canvas_save","id":id,"baseRevision":1,"title":"旧写入","content":"不能覆盖"})).unwrap_err().contains("新版本"));
+    agent
+        .request(json!({"op":"canvas_restore","id":id,"baseRevision":2,"revision":1}))
+        .unwrap();
+    let restored = agent.request(json!({"op":"canvas_get","id":id})).unwrap();
+    assert_eq!(restored["revision"], 3);
+    assert_eq!(restored["content"], "初稿");
+    assert_eq!(restored["versions"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        agent
+            .request(json!({"op":"canvas_get","id":id,"revision":2}))
+            .unwrap()["content"],
+        "第二稿"
+    );
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        let original = inner.store.active.clone().unwrap();
+        let message = inner
+            .store
+            .message("assistant", "笔记已保存".into(), 4, false);
+        inner
+            .store
+            .fork_conversation(&message, false, "branch.jsonl".into(), 5)
+            .unwrap();
+        drop(inner);
+        agent
+            .call(
+                "save_canvas",
+                &json!({"id":id,"baseRevision":3,"title":"分支","content":"独立修改"}),
+                false,
+            )
+            .unwrap();
+        let mut inner = agent.inner.lock().unwrap();
+        inner.store.switch_conversation(&original).unwrap();
+        inner.store.save(dir.path()).unwrap();
+    }
+    assert_eq!(
+        agent.request(json!({"op":"canvas_get","id":id})).unwrap()["content"],
+        "初稿"
+    );
+    assert!(!Store::load(dir.path())
+        .unwrap()
+        .active_conversation()
+        .unwrap()
+        .canvases
+        .is_empty());
+    assert!(agent
+        .call(
+            "save_canvas",
+            &json!({"baseRevision":0,"title":"自动","content":"不能改"}),
+            true
+        )
+        .is_err());
+    assert!(!tools::definitions(true)
+        .iter()
+        .any(|t| t["name"] == "generate_image"));
+    agent.inner.lock().unwrap().live.busy = true;
+    assert!(agent
+        .request(json!({"op":"canvas_delete","id":id,"baseRevision":3}))
+        .is_err());
+    agent.inner.lock().unwrap().live.busy = false;
+    agent
+        .request(json!({"op":"canvas_delete","id":id,"baseRevision":3}))
+        .unwrap();
+    assert!(agent.request(json!({"op":"canvas_get","id":id})).is_err());
+}
+
+#[test]
+fn completed_images_are_private_and_retained_when_stopped() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let image = json!({"name":"generated.png","mimeType":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII="});
+    assert!(agent
+        .call_job("store_generated_image", &image, "stale-job")
+        .is_err());
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        inner.live.busy = true;
+        inner.live.job_id = "image-job".into();
+        inner.store.preferences.provider = "openai-codex".into();
+        inner.store.message("user", "请生成图片".into(), 1, false);
+    }
+    let result = agent
+        .call_job("store_generated_image", &image, "image-job")
+        .unwrap();
+    assert_eq!(agent.status().unwrap()["generated"][0]["id"], result["id"]);
+    agent.event(json!({"type":"done","text":"","stopped":true}));
+    let saved = Store::load(dir.path()).unwrap();
+    assert_eq!(
+        saved.messages().last().unwrap().attachments[0].id,
+        result["id"]
+    );
+    assert!(saved.messages().last().unwrap().stopped);
+    assert_eq!(
+        attachments::download(dir.path(), result["id"].as_str().unwrap()).unwrap()["data"],
+        image["data"]
+    );
+    assert!(agent
+        .call_job("store_generated_image", &image, "image-job")
+        .is_err());
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        inner.live.busy = true;
+        inner.live.job_id = "image-error-job".into();
+        inner.store.message("user", "另一张图片".into(), 2, false);
+        inner.store.preferences.provider = "deepseek".into();
+    }
+    assert!(agent
+        .call_job("store_generated_image", &image, "image-error-job")
+        .unwrap_err()
+        .contains("不支持图像生成"));
+    agent.inner.lock().unwrap().store.preferences.provider = "openai-codex".into();
+    let completed = agent
+        .call_job("store_generated_image", &image, "image-error-job")
+        .unwrap();
+    agent.event(json!({"type":"error","message":"模型后续请求失败"}));
+    assert_eq!(
+        Store::load(dir.path())
+            .unwrap()
+            .messages()
+            .last()
+            .unwrap()
+            .attachments[0]
+            .id,
+        completed["id"]
+    );
+    assert_eq!(agent.status().unwrap()["error"], "模型后续请求失败");
+}
+
+#[test]
 fn thinking_preference_defaults_and_validates_sdk_levels() {
     let mut preferences: Preferences = serde_json::from_value(json!({})).unwrap();
     assert_eq!(preferences.thinking_level, "medium");
@@ -495,6 +739,48 @@ fn conversations_switch_and_delete() {
     assert_eq!(store.conversations_view().len(), 1);
 }
 #[test]
+fn conversation_archive_is_persistent_searchable_and_reversible() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let (id, message) = {
+        let mut inner = agent.inner.lock().unwrap();
+        let id = inner.store.new_conversation(1);
+        let message = inner.store.message("user", "归档资料".into(), 2, false);
+        (id, message)
+    };
+    agent
+        .request(json!({"op":"pin_conversation","id":id,"pinned":true}))
+        .unwrap();
+    let result = agent
+        .request(json!({"op":"archive_conversation","id":id,"archived":true}))
+        .unwrap();
+    assert_eq!(result["conversations"][0]["archived"], true);
+    let store = Store::load(dir.path()).unwrap();
+    assert!(store.active_conversation().unwrap().archived);
+    assert!(store.active_conversation().unwrap().pinned);
+    assert_eq!(store.messages()[0].id, message);
+    assert_eq!(
+        agent
+            .request(json!({"op":"search_conversations","query":"归档资料"}))
+            .unwrap()["conversations"][0]["id"],
+        id
+    );
+    agent.inner.lock().unwrap().live.busy = true;
+    assert!(agent
+        .request(json!({"op":"archive_conversation","id":id,"archived":false}))
+        .is_err());
+    agent.inner.lock().unwrap().live.busy = false;
+    assert!(agent
+        .request(json!({"op":"archive_conversation","id":id}))
+        .is_err());
+    agent
+        .request(json!({"op":"archive_conversation","id":id,"archived":false}))
+        .unwrap();
+    let store = Store::load(dir.path()).unwrap();
+    assert!(!store.active_conversation().unwrap().archived);
+    assert_eq!(store.messages()[0].text, "归档资料");
+}
+#[test]
 fn conversation_search_keeps_old_content_and_branch_preserves_original() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
@@ -630,6 +916,7 @@ fn sdk_entry_ids_and_user_stop_persist_without_a_failure() {
         .message("user", "请求".into(), 1, false);
     agent.event(json!({"type":"message_entry","messageId":id,"entryId":"user-node"}));
     agent.event(json!({"type":"text","text":"工具前的说明"}));
+    agent.event(json!({"type":"thinking","text":"先检查资料"}));
     agent.event(json!({"type":"text_reset"}));
     agent.event(json!({"type":"text","text":"部分回复"}));
     agent.event(json!({"type":"done","text":"部分回复","entryId":"assistant-node","stopped":true}));
@@ -638,9 +925,12 @@ fn sdk_entry_ids_and_user_stop_persist_without_a_failure() {
     assert_eq!(s["messages"][1]["entryId"], "assistant-node");
     assert_eq!(s["messages"][1]["stopped"], true);
     assert_eq!(s["stream"], "");
+    assert_eq!(s["thinking"], "");
+    assert_eq!(s["messages"][1]["thinking"], "先检查资料");
     assert!(s["error"].is_null());
     let saved = Store::load(dir.path()).unwrap();
     assert!(saved.messages()[1].stopped);
+    assert_eq!(saved.messages()[1].thinking, "先检查资料");
 }
 #[test]
 fn legacy_single_conversation_migrates() {

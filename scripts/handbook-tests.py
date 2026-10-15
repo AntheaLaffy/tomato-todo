@@ -17,7 +17,7 @@ OUT = ROOT / "docs" / "HANDBOOK" / "95-测试索引.md"
 
 # 章节 → 背书该章事实的测试来源（人工映射，改动测试文件时同步）
 CHAPTER_TESTS = {
-    "06-安全与隐私边界": ["crates/agent/src/state.rs", "tests/agent.mjs"],
+    "06-安全与隐私边界": ["tests/agent-workspace.mjs","crates/agent/src/state.rs", "tests/agent.mjs"],
     "10-锁与专注保护": ["crates/core/src/guard.rs", "crates/core/tests/guard_x11.rs", "crates/core/tests/guard_windows.rs", "tests/native.mjs", "tests/x11-app.mjs"],
     "11-定时锁机": ["crates/core/src/lock.rs", "tests/integration.mjs", "tests/native.mjs", "tests/x11-app.mjs"],
     "12-课表与提醒": ["crates/core/src/blocks.rs", "crates/core/src/reminders.rs", "tests/integration.mjs"],
@@ -26,7 +26,7 @@ CHAPTER_TESTS = {
     "15-目标与主线": ["crates/core/src/node_tests.rs"],
     "16-习惯与愿景": ["crates/core/src/template_tests.rs", "crates/core/src/tests.rs"],
     "17-诊断与统计": ["crates/core/src/diagnostics.rs"],
-    "18-助手-权限与唤醒": ["crates/agent/src/tests.rs", "tests/agent.mjs", "tests/agent-runtime.mjs"],
+    "18-助手-权限与唤醒": ["crates/agent/src/tests.rs", "tests/agent.mjs", "tests/agent-workspace.mjs", "tests/agent-runtime.mjs"],
     "19-助手-文件工作区与MCP": ["crates/agent/src/tests.rs", "tests/agent.mjs"],
     "20-数据与格式": ["crates/core/src/tests.rs", "crates/core/src/node_tests.rs", "tests/integration.mjs"],
     "21-安装与桌面集成": ["tests/install.mjs", "tests/native.mjs", "tests/android-app.mjs"],
@@ -34,7 +34,7 @@ CHAPTER_TESTS = {
     "23-手部演示动画": ["tests/agent.mjs", "tests/native.mjs"],
     "24-界面手感与音效": ["tests/audio.mjs", "tests/integration.mjs"],
     "26-工具面与开发流程": ["crates/agent/src/tests.rs", "tests/agent.mjs"],
-    "25-前端架构与状态流": ["tests/integration.mjs", "tests/audio.mjs", "tests/android-app.mjs"],
+    "25-前端架构与状态流": ["tests/agent-workspace.mjs", "tests/integration.mjs", "tests/audio.mjs", "tests/android-app.mjs"],
     "27-预览服务": ["tests/integration.mjs"],
     "28-声音的实现": ["tests/audio.mjs"],
     "29-CODEMAP与索引维护": [],

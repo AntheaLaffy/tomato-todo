@@ -93,6 +93,8 @@ pub struct Message {
     pub attachments: Vec<Attachment>,
     #[serde(default)]
     pub stopped: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub thinking: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,6 +119,9 @@ pub struct Conversation {
     pub messages: Vec<Message>,
     pub updated_at: i64,
     pub pinned: bool,
+    pub archived: bool,
+    pub creator_mode: bool,
+    pub canvases: Vec<super::canvas::Canvas>,
     pub branched_from: Option<BranchSource>,
 }
 impl Default for Conversation {
@@ -128,6 +133,9 @@ impl Default for Conversation {
             messages: Vec::new(),
             updated_at: 0,
             pinned: false,
+            archived: false,
+            creator_mode: false,
+            canvases: vec![],
             branched_from: None,
         }
     }
@@ -367,7 +375,7 @@ impl Store {
         list.sort_by_key(|c| (std::cmp::Reverse(c.pinned), std::cmp::Reverse(c.updated_at)));
         list.into_iter()
             .map(|c| {
-                json!({"id":c.id,"title":c.title,"updatedAt":c.updated_at,"messageCount":c.messages.len(),"active":Some(c.id.as_str())==self.active.as_deref(),"pinned":c.pinned,"branchedFrom":c.branched_from})
+                json!({"id":c.id,"title":c.title,"updatedAt":c.updated_at,"messageCount":c.messages.len(),"active":Some(c.id.as_str())==self.active.as_deref(),"pinned":c.pinned,"archived":c.archived,"branchedFrom":c.branched_from})
             })
             .collect()
     }
@@ -440,6 +448,7 @@ impl Store {
             entry_id: None,
             attachments: vec![],
             stopped: false,
+            thinking: String::new(),
         });
         conversation.updated_at = at;
         id
@@ -473,6 +482,8 @@ impl Store {
                 conversation_id: source.id.clone(),
                 message_id: message_id.into(),
             }),
+            canvases: source.canvases.clone(),
+            creator_mode: source.creator_mode,
             ..Default::default()
         };
         let id = conversation.id.clone();

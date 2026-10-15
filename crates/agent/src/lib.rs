@@ -1,7 +1,9 @@
 //! App-owned Pi orchestration. The embedded agent cannot dispatch app mutations.
 mod attachments;
 mod bridge;
+mod canvas;
 mod conversations;
+mod creator;
 pub mod files;
 mod state;
 #[cfg(test)]
@@ -30,6 +32,8 @@ struct Live {
     busy: bool,
     authentication: bool,
     text: String,
+    thinking: String,
+    generated: Vec<Attachment>,
     error: Option<String>,
     auth: Value,
     auth_event: Value,
@@ -182,6 +186,24 @@ impl Agent {
         let op = args["op"].as_str().ok_or("缺少 Agent 操作")?;
         match op {
             "status" => self.status(),
+            "exit_creator_mode" => {
+                let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                if inner.live.busy {
+                    return Err("请先停止当前运行，再退出作者模式".into());
+                }
+                let mut next = inner.store.clone();
+                if let Some(c) = next
+                    .conversations
+                    .iter_mut()
+                    .find(|c| Some(&c.id) == next.active.as_ref())
+                {
+                    c.creator_mode = false;
+                }
+                next.save(&self.dir)?;
+                inner.store = next;
+                drop(inner);
+                self.status()
+            }
             "usage" => {
                 let provider = self
                     .inner
@@ -272,9 +294,15 @@ impl Agent {
             "download_attachment" => {
                 attachments::download(&self.dir, &nonempty_text(&args, "id", 100)?)
             }
+            "canvas_get" => self.canvas_operation("get_canvas", &args, "user"),
+            "canvas_save" | "canvas_restore" | "canvas_delete" => {
+                self.canvas_operation(args["op"].as_str().unwrap(), &args, "user")?;
+                self.status()
+            }
             "search_conversations"
             | "rename_conversation"
             | "pin_conversation"
+            | "archive_conversation"
             | "branch_conversation"
             | "edit_message"
             | "retry_message" => self.conversation_operation(args["op"].as_str().unwrap(), &args),
@@ -341,6 +369,8 @@ impl Agent {
                 inner.live.questions = Value::Null;
                 inner.live.plan = Value::Null;
                 inner.live.text.clear();
+                inner.live.thinking.clear();
+                inner.live.generated.clear();
                 inner.live.error = None;
                 inner.store.save(&self.dir)?;
                 drop(inner);
@@ -356,6 +386,8 @@ impl Agent {
                 inner.live.questions = Value::Null;
                 inner.live.plan = Value::Null;
                 inner.live.text.clear();
+                inner.live.thinking.clear();
+                inner.live.generated.clear();
                 inner.live.error = None;
                 inner.store.save(&self.dir)?;
                 drop(inner);
@@ -455,7 +487,7 @@ impl Agent {
         images: Vec<Value>,
         attachments: Vec<Attachment>,
     ) -> AppResult<Value> {
-        let p = Self::validate_prompt(inner, automatic, &images)?;
+        let mut p = Self::validate_prompt(inner, automatic, &images)?;
         let displayed = if images.is_empty() || !attachments.is_empty() {
             text.clone()
         } else {
@@ -464,17 +496,35 @@ impl Agent {
         let mut next = inner.store.clone();
         let message_id = next.message("user", displayed, now(), automatic);
         next.message_mut(&message_id).unwrap().attachments = attachments.clone();
+        if !automatic && !scheduled && creator::identifies_creator(&text) {
+            if let Some(c) = next
+                .conversations
+                .iter_mut()
+                .find(|c| Some(&c.id) == next.active.as_ref())
+            {
+                c.creator_mode = true;
+            }
+        }
+        let creator_mode =
+            !automatic && !scheduled && next.active_conversation().is_some_and(|c| c.creator_mode);
+        let mut definitions = tools::definitions(automatic);
+        if creator_mode {
+            p.coding_access = "full".into();
+            definitions.push(creator::tool());
+        }
         next.save(&self.dir)?;
         inner.store = next;
         inner.live.busy = true;
         inner.live.authentication = false;
         inner.live.questions = Value::Null;
         inner.live.text.clear();
+        inner.live.thinking.clear();
+        inner.live.generated.clear();
         inner.live.error = None;
         inner.live.automatic = automatic && !scheduled;
         inner.live.job_id = uuid::Uuid::new_v4().to_string();
         Ok(
-            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":tools::definitions(automatic)}),
+            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"creatorMode":creator_mode,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":definitions}),
         )
     }
     fn send_prompt(self: &Arc<Self>, command: Value) -> AppResult<()> {
@@ -555,6 +605,13 @@ impl Agent {
                 }
             }
             "text_reset" => inner.live.text.clear(),
+            "thinking" => {
+                if let Some(text) = event["text"].as_str() {
+                    if inner.live.thinking.len() < 512 * 1024 {
+                        inner.live.thinking.push_str(text);
+                    }
+                }
+            }
             "tool_end" => inner.live.tool.clear(),
             "tool_start" => {
                 inner.live.tool = event["name"].as_str().unwrap_or_default().into();
@@ -585,13 +642,19 @@ impl Agent {
                     .unwrap_or(&inner.live.text)
                     .to_string();
                 let automatic = inner.live.automatic;
-                if !text.is_empty() {
+                let thinking = std::mem::take(&mut inner.live.thinking);
+                let generated = std::mem::take(&mut inner.live.generated);
+                if !text.is_empty() || !thinking.is_empty() || !generated.is_empty() {
                     let id = inner.store.message("assistant", text, now(), automatic);
                     let message = inner.store.message_mut(&id).unwrap();
                     message.entry_id = event["entryId"].as_str().map(str::to_owned);
                     message.stopped = event["stopped"] == true;
+                    message.thinking = thinking;
+                    message.attachments = generated;
                 }
                 inner.live.text.clear();
+                inner.live.thinking.clear();
+                inner.live.generated.clear();
                 for w in &mut inner.store.wakes {
                     if w.status == "running" {
                         w.status = "completed".into();
@@ -604,6 +667,16 @@ impl Agent {
                 inner.live.busy = false;
                 inner.live.authentication = false;
                 inner.live.tool.clear();
+                if !inner.live.generated.is_empty() {
+                    let images = std::mem::take(&mut inner.live.generated);
+                    let text = std::mem::take(&mut inner.live.text);
+                    let thinking = std::mem::take(&mut inner.live.thinking);
+                    let automatic = inner.live.automatic;
+                    let id = inner.store.message("assistant", text, now(), automatic);
+                    let message = inner.store.message_mut(&id).unwrap();
+                    message.attachments = images;
+                    message.thinking = thinking;
+                }
                 inner.live.error = Some(
                     event["message"]
                         .as_str()
@@ -620,7 +693,7 @@ impl Agent {
         }
         if !matches!(
             event["type"].as_str(),
-            Some("text" | "text_reset" | "tool_start" | "tool_end" | "auth_event")
+            Some("text" | "thinking" | "text_reset" | "tool_start" | "tool_end" | "auth_event")
         ) {
             let _ = inner.store.save(&self.dir);
         }
@@ -631,7 +704,7 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -814,6 +887,32 @@ impl Agent {
             }
             inner.live.automatic
         };
+        if matches!(name, "store_generated_image" | "image_reference") {
+            if automatic {
+                return Err("自动唤醒不能生成或编辑图片".into());
+            }
+            if self
+                .inner
+                .lock()
+                .map_err(|e| e.to_string())?
+                .store
+                .preferences
+                .provider
+                != "openai-codex"
+            {
+                return Err("当前模型连接不支持图像生成，请切换到 Codex 账号".into());
+            }
+            if name == "image_reference" {
+                return attachments::download(&self.dir, &nonempty_text(args, "id", 100)?);
+            }
+            let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if !inner.live.busy || inner.live.job_id != job_id {
+                return Err("此图片请求已经结束".into());
+            }
+            let image = attachments::upload(&self.dir, args)?;
+            inner.live.generated.push(image.clone());
+            return Ok(json!(image));
+        }
         self.call(name, args, automatic)
     }
     pub fn call(self: &Arc<Self>, name: &str, args: &Value, agent: bool) -> AppResult<Value> {
@@ -838,6 +937,7 @@ impl Agent {
             None
         };
         match name {
+            "get_canvas" | "save_canvas" => self.canvas_operation(name, args, "assistant"),
             "web_search" | "web_fetch" => {
                 let preferences = self
                     .inner

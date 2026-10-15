@@ -15,7 +15,7 @@
     "desktop:build": "pnpm run agent:build && tauri build --no-bundle",
     "desktop:package": "pnpm run agent:build && tauri build",
     "desktop:deb": "pnpm run agent:build && tauri build --bundles deb",
-    "test": "pnpm run agent:build && cargo test -p tomato-core -p tomato-agent -p tomato-todo && cargo build -p tomato-preview && pnpm run build && node --test tests/audio.mjs tests/integration.mjs tests/install.mjs tests/agent.mjs tests/agent-runtime.mjs",
+    "test": "pnpm run agent:build && cargo test -p tomato-core -p tomato-agent -p tomato-todo && cargo build -p tomato-preview && pnpm run build && node --test tests/audio.mjs tests/integration.mjs tests/install.mjs tests/agent.mjs tests/agent-workspace.mjs tests/agent-runtime.mjs",
     "test:x11:app": "pnpm run agent:build && pnpm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/x11.mjs --app",
     "test:windows": "node tests/windows.mjs",
     "test:android": "node tests/android.mjs",

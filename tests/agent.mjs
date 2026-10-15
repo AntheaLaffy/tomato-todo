@@ -587,6 +587,77 @@ test(
         original,
         "the original SDK session stays byte-for-byte intact",
       );
+      await closeStudySession(session);
+      session = null;
+      const internalsTool = {
+        name: "get_agent_internals",
+        description: "Read exact app internals",
+        inputSchema: { type: "object", properties: {} },
+      };
+      for (const creatorMode of [false, true]) {
+        const author = await createStudySession({
+          runtime,
+          dir,
+          root: resolve("agent"),
+          command: {
+            ...command,
+            automatic: false,
+            creatorMode,
+            preferences: { ...command.preferences, codingAccess: "full" },
+            tools: [...command.tools, internalsTool],
+          },
+          toolRequest: async () => {
+            throw new Error("internals must be local");
+          },
+        });
+        session = author.session;
+        const tool = session.getToolDefinition("get_agent_internals");
+        assert.equal(!!tool, creatorMode);
+        if (creatorMode) {
+          const result = await tool.execute(
+            "inspect",
+            {},
+            new AbortController().signal,
+          );
+          const value = JSON.parse(result.content[0].text);
+          assert.equal(value.systemPrompt, session.systemPrompt);
+          assert.ok(
+            value.systemPrompt.includes(
+              await readFile(resolve("agent/system-prompt.md"), "utf8"),
+            ),
+          );
+          assert.ok(value.systemPrompt.includes("作者模式：已开启"));
+          assert.ok(value.tools.some((t) => t.name === "get_agent_internals"));
+          assert.equal(value.preferences.codingAccess, "full");
+          assert.ok(!JSON.stringify(value).includes("synthetic-test-key"));
+          const outside = join(dir, "author-note.txt");
+          await session
+            .getToolDefinition("write")
+            .execute(
+              "author-write",
+              { path: outside, content: "作者可修改 agent 文件" },
+              new AbortController().signal,
+            );
+          assert.equal(
+            await readFile(outside, "utf8"),
+            "作者可修改 agent 文件",
+          );
+          const readBack = await session
+            .getToolDefinition("read")
+            .execute(
+              "author-read",
+              { path: outside },
+              new AbortController().signal,
+            );
+          assert.ok(
+            readBack.content.some((c) =>
+              c.text?.includes("作者可修改 agent 文件"),
+            ),
+          );
+        }
+        await closeStudySession(session);
+        session = null;
+      }
       await assert.rejects(
         forkStudySession(dir, { sessionFile: file, entryId: "missing" }),
         /节点不存在/,
@@ -645,22 +716,51 @@ test(
         );
         return;
       }
-      const delta = read
+      const canvas =
+        text.includes("Canvas用例") && parsed.messages.at(-1).role === "user";
+      const delta = canvas
         ? {
             role: "assistant",
             tool_calls: [
               {
                 index: 0,
-                id: "read_attachment",
+                id: "save_note",
                 type: "function",
-                function: { name: "read", arguments: JSON.stringify({ path }) },
+                function: {
+                  name: "save_canvas",
+                  arguments: JSON.stringify({
+                    baseRevision: 0,
+                    title: "助手创建的笔记",
+                    language: "markdown",
+                    content: "# 导数\n\n先理解变化率。",
+                  }),
+                },
               },
             ],
           }
-        : { role: "assistant", content: answer };
+        : read
+          ? {
+              role: "assistant",
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "read_attachment",
+                  type: "function",
+                  function: {
+                    name: "read",
+                    arguments: JSON.stringify({ path }),
+                  },
+                },
+              ],
+            }
+          : {
+              role: "assistant",
+              reasoning_content: "先核对资料，再解释复习路径。",
+              content: answer,
+            };
       res.write(`data: ${JSON.stringify(chunk(delta))}\n\n`);
       res.write(
-        `data: ${JSON.stringify(chunk({}, read ? "tool_calls" : "stop"))}\n\n`,
+        `data: ${JSON.stringify(chunk({}, read || canvas ? "tool_calls" : "stop"))}\n\n`,
       );
       res.end("data: [DONE]\n\n");
     });
@@ -744,6 +844,24 @@ test(
       await page.goto(url);
       await expect(page.locator(".welcome-card")).toBeVisible();
       await page.locator('[data-page="agent"]').click();
+      await expect(page.locator(".agent-welcome")).toBeVisible();
+      await mkdir("artifacts", { recursive: true });
+      await page.screenshot({
+        path: "artifacts/agent-welcome.png",
+        fullPage: true,
+      });
+      await page.locator('[data-agent="starter"]').first().click();
+      await expect(page.locator("#agent-text")).toBeFocused();
+      await expect(page.locator("#agent-text")).toHaveValue(/今天的任务/);
+      assert.equal(requests.length, 0, "starter cards only prepare a draft");
+      const shortHeight = await page
+        .locator("#agent-text")
+        .evaluate((el) => el.clientHeight);
+      await page.locator("#agent-text").fill("多行草稿\n".repeat(15));
+      assert.ok(
+        (await page.locator("#agent-text").evaluate((el) => el.clientHeight)) >
+          shortHeight,
+      );
       await page.locator("#agent-attachment-input").setInputFiles({
         name: "学习资料.csv",
         mimeType: "text/csv",
@@ -753,10 +871,44 @@ test(
         "学习资料.csv",
       );
       await page.locator("#agent-text").fill("读取附件，说明如何复习微积分");
+      let releaseSend, sending;
+      const sendGate = new Promise((resolve) => {
+        releaseSend = resolve;
+      });
+      const sendStarted = new Promise((resolve) => {
+        sending = resolve;
+      });
+      const holdSend = async (route) => {
+        if (route.request().postDataJSON()?.op === "send") {
+          sending();
+          await sendGate;
+        }
+        await route.continue();
+      };
+      await page.route("**/api/agent", holdSend);
       await page.locator("#agent-text").press("Enter");
+      await sendStarted;
+      await page.locator("#agent-text").fill("发送期间写的下一条草稿");
+      releaseSend();
       const first = await idle();
+      await page.unroute("**/api/agent", holdSend);
+      await expect(page.locator("#agent-text")).toHaveValue(
+        "发送期间写的下一条草稿",
+      );
+      await page.locator("#agent-text").fill("");
       const originalId = first.conversations.find((c) => c.active).id;
       assert.ok(first.messages.every((m) => m.entryId));
+      assert.equal(
+        first.messages.at(-1).thinking,
+        "先核对资料，再解释复习路径。",
+      );
+      await expect(page.locator(".agent-reasoning-text")).toBeHidden();
+      await page.locator(".agent-reasoning summary").press("Space");
+      await expect(page.locator(".agent-reasoning-text")).toContainText(
+        "先核对资料",
+      );
+      await page.waitForTimeout(2800);
+      await expect(page.locator(".agent-reasoning-text")).toBeVisible();
       assert.ok(
         JSON.stringify(requests.at(-1).messages).includes("数学,3"),
         "the model actually read the uploaded file",
@@ -795,7 +947,8 @@ test(
       const originalFile = await readFile(original.sessionFile, "utf8");
       await expect(page.locator(".agent-message")).toHaveCount(4);
       await page.locator("#agent-text").fill("原对话草稿");
-      await page.locator('[data-agent="conversations"]').click();
+      await page.locator("#agent-text").press("Control+k");
+      await expect(page.locator("#agent-history-search")).toBeFocused();
       await page.locator("#agent-history-search").fill("复习路径");
       await expect(page.locator(".agent-search-snippet")).toContainText(
         "复习路径",
@@ -815,9 +968,48 @@ test(
       await expect(
         page.locator('[data-agent="pin-conversation"]'),
       ).toContainText("取消置顶");
+      await page
+        .locator('#agent-sessions [data-agent="archive-conversation"]')
+        .click();
+      await expect(page.locator(".agent-conversation-row")).toHaveCount(0);
+      await expect(page.locator("#agent-conversation-title")).toContainText(
+        "已归档",
+      );
+      await page.locator("#agent-history-search").fill("微积分资料");
+      await expect(page.locator(".agent-conversation-open")).toContainText(
+        "已归档",
+      );
+      await page.locator('[data-agent="show-archived"]').click();
+      await expect(page.locator("#agent-history-search")).toHaveValue("");
+      await expect(page.locator(".agent-conversation-open b")).toContainText(
+        "微积分资料分析",
+      );
+      await page
+        .locator('#agent-sessions [data-agent="archive-conversation"]')
+        .click();
+      await expect(page.locator(".agent-conversation-row")).toHaveCount(0);
+      await page.locator('[data-agent="show-archived"]').click();
+      await expect(page.locator(".agent-conversation-open b")).toContainText(
+        "微积分资料分析",
+      );
+      await expect(page.locator("#agent-text")).toHaveValue("原对话草稿");
       const firstReply = page.locator(
         `[data-message-id="${complete.messages[1].id}"]`,
       );
+      await firstReply.locator('[data-agent="quote-message"]').click();
+      await expect(page.locator("#agent-text")).toHaveValue(
+        /原对话草稿\n\n> ## 复习路径/,
+      );
+      await expect(page.locator("#agent-text")).toBeFocused();
+      await page.locator("#agent-text").fill("原对话草稿");
+      await page.locator("#agent-text").fill("");
+      await page.locator("#agent-text").press("ArrowUp");
+      await expect(page.locator(".agent-message-edit textarea")).toHaveValue(
+        "这条后续消息应排除在早期分支之外",
+      );
+      await page.locator(".agent-message-edit textarea").press("Escape");
+      await expect(page.locator(".agent-message-edit")).toHaveCount(0);
+      await page.locator("#agent-text").fill("原对话草稿");
       await firstReply.locator('[data-agent="branch-message"]').click();
       await expect(page.locator(".agent-message")).toHaveCount(2);
       await expect(page.locator("#agent-text")).toHaveValue("");
@@ -933,6 +1125,31 @@ test(
       const stopped = await idle("停止用例");
       assert.equal(stopped.messages.at(-1).stopped, true);
       await expect(page.locator(".agent-stopped")).toContainText("已停止");
+      await page.locator("#agent-text").fill("Canvas用例：整理一份导数笔记");
+      await page.locator("#agent-text").press("Enter");
+      const canvasResult = await idle("Canvas用例：整理一份导数笔记");
+      assert.equal(canvasResult.canvases[0].title, "助手创建的笔记");
+      assert.equal(
+        (await api({ op: "canvas_get", id: canvasResult.canvases[0].id }))
+          .content,
+        "# 导数\n\n先理解变化率。",
+      );
+      await page.locator("#agent-text").fill("我是如月风铃");
+      await expect(
+        page.locator('#agent-chat button[type="submit"]'),
+      ).toBeEnabled();
+      await page.locator("#agent-text").press("Enter");
+      const creator = await idle("我是如月风铃");
+      assert.equal(creator.creatorMode, true);
+      assert.equal(creator.preferences.codingAccess, "workspace");
+      await expect(
+        page.locator('[data-agent="exit-creator-mode"]'),
+      ).toBeVisible();
+      await page.locator('[data-agent="exit-creator-mode"]').click();
+      await expect(
+        page.locator('[data-agent="exit-creator-mode"]'),
+      ).toHaveCount(0);
+      assert.equal((await api({ op: "status" })).creatorMode, false);
       for (const width of [1440, 700, 360]) {
         await page.setViewportSize({ width, height: 1100 });
         assert.ok(
@@ -941,6 +1158,23 @@ test(
           ),
           `chat overflow at ${width}`,
         );
+        await expect(
+          page.locator('#agent-chat button[type="submit"]'),
+        ).toBeInViewport();
+        assert.ok(
+          await page
+            .locator("#agent-messages")
+            .evaluate((el) => el.scrollHeight > el.clientHeight),
+          `history must scroll inside the conversation at ${width}`,
+        );
+        if (width === 360) {
+          await page.locator('[data-agent="toggle-sessions"]').click();
+          await expect(page.locator("#agent-sessions")).toBeHidden();
+          await page.screenshot({
+            path: "artifacts/agent-chat-mobile.png",
+            fullPage: true,
+          });
+        }
       }
       await page.setViewportSize({ width: 1440, height: 1100 });
       await mkdir("artifacts", { recursive: true });
@@ -970,9 +1204,41 @@ test(
       await expect(page.locator(".agent-message").first()).toContainText(
         "早期历史 0",
       );
+      await page.locator("#agent-messages").evaluate((list) => {
+        list.scrollTop = 0;
+        list.dispatchEvent(new Event("scroll"));
+      });
+      await expect(page.locator('[data-agent="latest-message"]')).toBeVisible();
+      await page.waitForTimeout(2800);
+      assert.equal(
+        await page
+          .locator("#agent-messages")
+          .evaluate((list) => list.scrollTop),
+        0,
+      );
+      await page.locator("#agent-messages").evaluate((list) => {
+        const text = list.querySelector(".agent-user-text").firstChild;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+      });
+      await page.waitForTimeout(2800);
+      assert.equal(
+        await page.evaluate(() => window.getSelection().toString()),
+        "早期历史 0",
+      );
+      await page.evaluate(() => window.getSelection().removeAllRanges());
+      await page.locator('[data-agent="latest-message"]').click();
+      await expect(page.locator('[data-agent="latest-message"]')).toBeHidden();
       const exported = page.waitForEvent("download");
       await page.locator('[data-agent="export-conversation"]').click();
       assert.ok((await exported).suggestedFilename().endsWith(".md"));
+      await page.unroute("**/api/agent");
+      await page.locator("#agent-text").press("Control+Shift+O");
+      await expect(page.locator(".agent-welcome")).toBeVisible();
+      await expect(page.locator("#agent-text")).toBeFocused();
+      await expect(page.locator("#agent-text")).toHaveValue("");
       assert.deepEqual(errors, []);
     } finally {
       await browser?.close();
@@ -1053,6 +1319,14 @@ test(
         review.changes.some(
           (c) => c.before === "Review test" && c.after === "Reviewed task",
         ),
+      );
+      await tool("apply_file", {
+        name: "review.json",
+        fileHash: review.fileHash,
+      });
+      assert.equal(
+        (await (await fetch(`${url}/api/snapshot`)).json()).data.tasks[0].title,
+        "Reviewed task",
       );
       const connectionFile = join(dir, "agent/connection.json");
       const connection = JSON.parse(await readFile(connectionFile));
@@ -1136,7 +1410,7 @@ test(
       await page.reload();
       await page.locator('[data-page="agent"]').click();
       await expect(page.locator("#agent-thinking-select")).toHaveValue("high");
-      // Memory and files live in on-demand sheets, not on the conversation page.
+      // Memory lives in an on-demand sheet.
       await page.locator('[data-agent="memory"]').click();
       await page
         .locator("#agent-memory-text")
@@ -1149,26 +1423,6 @@ test(
       await expect(page.locator("#agent-text")).toHaveValue(
         "草稿不会被轮询覆盖",
       );
-      await page.locator('[data-agent="plans"]').click();
-      await page
-        .locator('[data-agent="review"][data-name="review.json"]')
-        .click();
-      await expect(page.locator("#agent-review")).toContainText("Review test");
-      // Reviewing lists the file as pending; approving IS the consent now.
-      await expect(page.locator(".agent-file.pending")).toContainText(
-        "已审阅，待批准",
-      );
-      await expect(
-        page.locator('#agent-files [data-agent="reject"]'),
-      ).toBeVisible();
-      await page.locator('[data-agent="apply"]').click();
-      await expect
-        .poll(
-          async () =>
-            (await (await fetch(`${url}/api/snapshot`)).json()).data.tasks[0]
-              .title,
-        )
-        .toBe("Reviewed task");
       // Auto navigation must wait for focus/paused focus. A synthetic status event
       // exercises UI routing without contacting a paid model or enabling protection.
       await page.locator('[data-page="tasks"]').click();
@@ -1339,7 +1593,7 @@ test(
       await asked.evaluate(() => window.tomatoHand.hide());
       // 会话列表是侧栏（照 dsh 的形状），点顶栏拉开、再点收起；长对话里状态栏
       // 和输入框都留在原处（卡片自己滚动）。
-      await asked.locator('[data-agent="conversations"]').click();
+      await asked.locator('[data-agent="search-conversations"]').click();
       await expect(asked.locator("#agent-sessions")).toBeVisible();
       await expect(
         asked.locator("#agent-sessions .agent-sessions-new"),

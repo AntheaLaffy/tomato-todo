@@ -130,6 +130,7 @@ for (const name of [
   "session.mjs",
   "coding.mjs",
   "web.mjs",
+  "imagegen.mjs",
   "mcp.mjs",
   "system-prompt.md",
   "package.json",

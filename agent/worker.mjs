@@ -233,6 +233,7 @@ async function runPrompt(command) {
       event.assistantMessageEvent?.type === "text_delta"
     )
       emit({ type: "text", text: event.assistantMessageEvent.delta });
+    if(event.type==="message_update"&&event.assistantMessageEvent?.type==="thinking_delta")emit({type:"thinking",text:event.assistantMessageEvent.delta});
     if (event.type === "tool_execution_start")
       emit({ type: "tool_start", name: event.toolName });
     if(event.type==="tool_execution_end")emit({type:"tool_end"});

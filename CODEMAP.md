@@ -35,7 +35,9 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 写作业 BGM 导入与播放 | 声音 / 界面 | src/bgm.ts、src/main.ts 的 soundDialog | src/CODEMAP.md、tests/audio.mjs、tests/integration.mjs、docs/HANDBOOK/24-界面手感与音效.md |
 | 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、docs/HANDBOOK/24-界面手感与音效.md、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
 | 学习助手、异常诊断、联网与 MCP | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | docs/HANDBOOK/18-助手-权限与唤醒.md、docs/HANDBOOK/19-助手-文件工作区与MCP.md、agent/mcp-config.mjs 与 agent/session.mjs 的 MCP 加载、docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
-| 对话历史搜索、编辑重试、分支、附件与 Markdown | 智能体 / 界面 | crates/agent/src/CODEMAP.md、agent/CODEMAP.md、src/agent.ts、src/agent-chat.ts、src/agent-markdown.ts | src/api.ts、src-tauri/src/files.rs、tests/agent.mjs、docs/AGENT.md |
+| 作者彩蛋、提示词原文与完整访问 | 智能体 | crates/agent/src/creator.rs、agent/session.mjs、agent/system-prompt.md | crates/agent/src/{lib.rs,state.rs}、src/agent.ts、tests/agent.mjs、docs/AGENT.md |
+| Canvas 文档与 Codex ImageGen | 智能体 / 界面 | crates/agent/src/canvas.rs、src/agent-canvas.ts、agent/imagegen.mjs、src/agent-media.ts | agent/session.mjs、crates/agent/src/{lib.rs,state.rs,tools.rs}、src/agent.ts、tests/agent-workspace.mjs、docs/AGENT.md |
+| 对话历史搜索/归档、思考展示、编辑重试、分支、附件与 Markdown | 智能体 / 界面 | crates/agent/src/CODEMAP.md、agent/CODEMAP.md、src/agent.ts、src/agent-chat.ts、src/agent-markdown.ts | src/api.ts、src-tauri/src/files.rs、tests/agent.mjs、docs/AGENT.md |
 | Codex CLI 登录与第三方模型配置 | 智能体 / 界面 | agent/codex-config.mjs、agent/worker.mjs | agent/session.mjs、agent/web.mjs、src/agent.ts、tests/agent.mjs、docs/AGENT.md、scripts/build-agent.mjs |
 | 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、crates/core/src/guard_windows.rs、src-tauri/src/desktop_app.rs | crates/core/tests/guard_windows.rs、tests/windows.mjs、tests/native.mjs、src 的 guardPage |

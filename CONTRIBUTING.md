@@ -60,7 +60,7 @@ Windows 保护测试在独立 GitHub runner 上执行；Linux 本机需要 Windo
 
 > **必须在独立的嵌套桌面里跑，不得在用户当前桌面自动启用保护。** 安装脚本验证（`pnpm run test:install`）同样使用临时用户目录。
 
-真实账号、联网与桌面行为由你自测：改动助手运行时，先用 `node --test tests/agent.mjs` 的本地 mock 模型覆盖流式工具调用与会话恢复，不花额度；写清怎么复现。
+真实账号、联网与桌面行为由你自测：改动助手运行时，先用 `node --test tests/agent.mjs tests/agent-workspace.mjs` 的本地 mock 模型覆盖流式工具调用与会话恢复，不花额度；写清怎么复现。
 
 ## 提交与 PR
 

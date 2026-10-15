@@ -53,7 +53,10 @@ impl Agent {
             }
             return Ok(json!({"conversations":results}));
         }
-        if matches!(op, "rename_conversation" | "pin_conversation") {
+        if matches!(
+            op,
+            "rename_conversation" | "pin_conversation" | "archive_conversation"
+        ) {
             let id = nonempty_text(args, "id", 100)?;
             let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
             if inner.live.busy {
@@ -67,8 +70,10 @@ impl Agent {
                 .ok_or("会话不存在")?;
             if op == "rename_conversation" {
                 c.title = nonempty_text(args, "title", 80)?;
-            } else {
+            } else if op == "pin_conversation" {
                 c.pinned = args["pinned"].as_bool().ok_or("缺少置顶状态")?;
+            } else {
+                c.archived = args["archived"].as_bool().ok_or("缺少归档状态")?;
             }
             inner.store.save(&self.dir)?;
             drop(inner);
@@ -151,6 +156,8 @@ impl Agent {
             inner.live.questions = Value::Null;
             inner.live.plan = Value::Null;
             inner.live.text.clear();
+            inner.live.thinking.clear();
+            inner.live.generated.clear();
             inner.live.error = None;
             inner.live.tool.clear();
             if let Some((text, attachments, images)) = retry {

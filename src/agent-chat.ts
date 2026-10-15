@@ -16,6 +16,7 @@ export type ChatMessage = {
   entryId?: string | null;
   attachments?: ChatAttachment[];
   stopped?: boolean;
+  thinking?: string;
 };
 export type ConversationSummary = {
   id: string;
@@ -24,6 +25,7 @@ export type ConversationSummary = {
   messageCount: number;
   active: boolean;
   pinned?: boolean;
+  archived?: boolean;
   branchedFrom?: { conversationId: string; messageId: string } | null;
   snippet?: string;
   messageId?: string;
@@ -49,7 +51,7 @@ export function attachmentHtml(
   return files
     .map(
       (a) =>
-        `<div class="agent-attachment"><button type="button" data-agent="download-attachment" data-id="${chatEscape(a.id)}" title="下载 ${chatEscape(a.name)}">${a.preview ? `<img class="agent-attachment-preview" src="${chatEscape(a.preview)}" alt="${chatEscape(a.name)}">` : `<span aria-hidden="true">${a.mimeType.startsWith("image/") ? "▧" : "▤"}</span>`}<span><b>${chatEscape(a.name)}</b><small>${fileSize(a.bytes)}</small></span></button>${removable ? `<button type="button" class="icon-btn tiny" data-agent="remove-attachment" data-id="${chatEscape(a.id)}" aria-label="移除 ${chatEscape(a.name)}">✕</button>` : ""}</div>`,
+        `<div class="agent-attachment"><button type="button" data-agent="${a.mimeType.startsWith("image/") ? "view-image" : "download-attachment"}" data-id="${chatEscape(a.id)}" title="${a.mimeType.startsWith("image/") ? "预览" : "下载"} ${chatEscape(a.name)}">${a.preview ? `<img class="agent-attachment-preview" src="${chatEscape(a.preview)}" alt="${chatEscape(a.name)}">` : a.mimeType.startsWith("image/") ? `<img class="agent-attachment-preview" data-image-id="${chatEscape(a.id)}" alt="${chatEscape(a.name)}">` : `<span aria-hidden="true">▤</span>`}<span><b>${chatEscape(a.name)}</b><small>${fileSize(a.bytes)}</small></span></button>${removable ? `<button type="button" class="icon-btn tiny" data-agent="remove-attachment" data-id="${chatEscape(a.id)}" aria-label="移除 ${chatEscape(a.name)}">✕</button>` : ""}</div>`,
     )
     .join("");
 }
@@ -57,6 +59,7 @@ export function messageHtml(
   m: ChatMessage,
   busy: boolean,
   editing: { id: string; text: string } | null,
+  thinkingOpen = false,
 ): string {
   const esc = chatEscape;
   const user = m.role === "user";
@@ -69,7 +72,16 @@ export function messageHtml(
       : user
         ? `<p class="agent-user-text">${esc(text)}</p>`
         : `<div class="agent-markdown">${renderAgentMarkdown(text)}</div>`;
-  return `<article class="agent-message ${user ? "user" : "assistant"}" data-message-id="${esc(m.id)}"><div class="agent-message-head">${user ? (m.automatic ? "自动" : "我") : "助手"}<time>${new Date(m.at * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</time>${m.stopped ? '<span class="agent-stopped">已停止</span>' : ""}</div>${body}${m.attachments?.length ? `<div class="agent-attachments">${attachmentHtml(m.attachments)}</div>` : ""}<div class="agent-message-actions"><button type="button" data-agent="copy-message" data-id="${esc(m.id)}">复制</button>${editable ? `<button type="button" data-agent="edit-message" data-id="${esc(m.id)}" ${busy ? "disabled" : ""}>编辑</button>` : ""}${!user && !m.automatic && m.entryId ? `<button type="button" data-agent="retry-message" data-id="${esc(m.id)}" ${busy ? "disabled" : ""}>重新生成</button>` : ""}${m.entryId ? `<button type="button" data-agent="branch-message" data-id="${esc(m.id)}" ${busy ? "disabled" : ""}>新分支</button>` : ""}</div></article>`;
+  return `<article class="agent-message ${user ? "user" : "assistant"}" data-message-id="${esc(m.id)}"><div class="agent-message-head">${user ? (m.automatic ? "自动" : "我") : "助手"}<time>${new Date(m.at * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</time>${m.stopped ? '<span class="agent-stopped">已停止</span>' : ""}</div>${!user ? thinkingHtml(m.thinking, m.id, thinkingOpen) : ""}${body}${m.attachments?.length ? `<div class="agent-attachments">${attachmentHtml(m.attachments)}</div>` : ""}<div class="agent-message-actions"><button type="button" data-agent="copy-message" data-id="${esc(m.id)}">复制</button>${!user ? `<button type="button" data-agent="open-canvas-message" data-id="${esc(m.id)}">打开 Canvas</button><button type="button" data-agent="quote-message" data-id="${esc(m.id)}">引用</button>` : ""}${editable ? `<button type="button" data-agent="edit-message" data-id="${esc(m.id)}" ${busy ? "disabled" : ""}>编辑</button>` : ""}${!user && !m.automatic && m.entryId ? `<button type="button" data-agent="retry-message" data-id="${esc(m.id)}" ${busy ? "disabled" : ""}>重新生成</button>` : ""}${m.entryId ? `<button type="button" data-agent="branch-message" data-id="${esc(m.id)}" ${busy ? "disabled" : ""}>新分支</button>` : ""}</div></article>`;
+}
+export function thinkingHtml(
+  text: string | undefined,
+  id: string,
+  open = false,
+): string {
+  return text
+    ? `<details class="agent-reasoning" data-thinking-id="${chatEscape(id)}" ${open ? "open" : ""}><summary>思考过程<span>模型提供</span></summary><div class="agent-reasoning-text">${chatEscape(text)}</div></details>`
+    : "";
 }
 export async function fileBase64(file: File): Promise<string> {
   if (file.size > 8 * 1024 * 1024) throw new Error(`${file.name} 超过 8 MB`);

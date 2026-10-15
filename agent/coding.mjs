@@ -11,6 +11,7 @@ export async function codingTools(dir, runtimeRoot, preferences = {}) {
   await mkdir(tools,{recursive:true,mode:0o700});
   const inside=(root,path)=>path===root || (!relative(root,path).startsWith("..") && !isAbsolute(relative(root,path)));
   async function path(value,writing=false) {
+    if(preferences.codingAccess==="full")return resolve(coding,value);
     const translated=value==="/workspace"||value.startsWith("/workspace/")?join(workspace,value.slice("/workspace".length)):value;
     const target=resolve(coding,translated);
     if (!inside(writing?coding:workspace,target) || target.endsWith(".origin")) throw new Error(writing?"编程工具只写入工作区 coding/，软件数据通过 MCP 或审阅文件修改":"只能读取当前工作区；认证与数据库不在可读范围内");

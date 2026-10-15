@@ -1,17 +1,21 @@
-import {
-  agentCall,
-  desktop,
-  openAgentLogin,
-  downloadJson,
-  saveAgentFile,
-} from "./api";
+import { agentCall, desktop, openAgentLogin, saveAgentFile } from "./api";
 import type { Snapshot } from "./types";
 import { runHandScript } from "./hand";
 import type { HandStep } from "./hand";
 import { renderAgentMarkdown } from "./agent-markdown";
 import {
+  setupCanvas,
+  mountCanvas,
+  updateCanvas,
+  toggleCanvas,
+  canvasFromMessage,
+  type CanvasSummary,
+} from "./agent-canvas";
+import { hydrateAgentImages, previewAgentImage } from "./agent-media";
+import {
   attachmentHtml,
   messageHtml,
+  thinkingHtml,
   fileBase64,
   copyChatText,
 } from "./agent-chat";
@@ -43,22 +47,17 @@ type Memory = {
   source: string;
   confirmed: boolean;
 };
-type Review = {
-  name: string;
-  fileHash: string;
-  kind: string;
-  valid: boolean;
-  effects: string;
-  changes: { path: string; before?: unknown; after?: unknown }[];
-  truncated: boolean;
-};
 export type AgentStatus = {
+  creatorMode?: boolean;
   preferences: Preferences;
   memories: Memory[];
   messages: ChatMessage[];
   busy: boolean;
   authenticating: boolean;
   stream: string;
+  thinking?: string;
+  generated?: ChatAttachment[];
+  canvases?: CanvasSummary[];
   error: string | null;
   tool: string;
   wakeSerial: number;
@@ -85,9 +84,6 @@ export type AgentStatus = {
     question: string;
     evidence: unknown;
   }[];
-  files: { name: string; bytes: number; reviewable: boolean }[];
-  /** Files already validated and waiting for the user's approval. */
-  reviewed: string[];
   conversations: ConversationSummary[];
   questions: {
     id: string;
@@ -141,8 +137,6 @@ const defaults: Preferences = {
   codingAccess: "workspace",
 };
 let status: AgentStatus | null = null;
-let review: Review | null = null;
-let reviewing = "";
 let draft = "";
 let attachments: ChatAttachment[] = [];
 let uploading = 0;
@@ -154,8 +148,11 @@ const conversationDrafts = new Map<
   { text: string; attachments: ChatAttachment[] }
 >();
 let visibleMessages = 60;
+let revealLatest = true;
 let editingMessage: { id: string; text: string } | null = null;
+const expandedThinking = new Set<string>();
 let searchQuery = "";
+let showArchived = false;
 let searchResults: ConversationSummary[] | null = null;
 let searchTimer: ReturnType<typeof setTimeout>;
 let searchSerial = 0;
@@ -174,14 +171,7 @@ let deedsSerial = 0;
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
-let sheet:
-  | "settings"
-  | "memory"
-  | "plans"
-  | "signals"
-  | "schedules"
-  | "conversations"
-  | null = null;
+let sheet: "settings" | "memory" | "signals" | "schedules" | null = null;
 let openedAuthUrl = "";
 type Usage = {
   deepseek?: {
@@ -218,7 +208,7 @@ const field = (name: string, fallback: string | boolean) =>
 const checked = (name: string, fallback: boolean) =>
   field(name, fallback) ? "checked" : "";
 
-// The conversation page stays a conversation: connection, keys, memory, files
+// The conversation page stays a conversation: connection, keys, memory
 // and signals live in sheets that open on demand.
 /** Put text in the composer from elsewhere in the app (e.g. "hand me the timetable"). */
 export function prefillAgent(text: string) {
@@ -227,37 +217,88 @@ export function prefillAgent(text: string) {
     "agent-text",
   ) as HTMLTextAreaElement | null;
   if (box) box.value = text;
+  resizeComposer();
+}
+function resizeComposer() {
+  const box = document.querySelector<HTMLTextAreaElement>("#agent-text");
+  if (!box) return;
+  box.style.height = "auto";
+  const height = Math.min(box.scrollHeight, 220);
+  box.style.height = `${height}px`;
+  box.style.overflowY = box.scrollHeight > height ? "auto" : "hidden";
+}
+function focusComposer() {
+  const box = document.querySelector<HTMLTextAreaElement>("#agent-text");
+  box?.focus();
+  box?.setSelectionRange(box.value.length, box.value.length);
+  resizeComposer();
+}
+function focusSearch() {
+  sessionsOpen = true;
+  sheet = null;
+  renderSheet();
+  renderSessions();
+  document.querySelector<HTMLInputElement>("#agent-history-search")?.focus();
+}
+function emptyChatHtml() {
+  const connected =
+    status?.providers?.[status.preferences.provider]?.configured;
+  return `<div class="agent-welcome"><span class="agent-welcome-mark" aria-hidden="true">✳</span><h2>今天想一起学点什么？</h2><p>梳理计划、理解难点，或带上资料一起讨论。</p>${
+    connected
+      ? `<div class="agent-starters">${[
+          ["梳理今天的安排", "看看我今天的任务和可用时间，帮我安排学习顺序。"],
+          ["讲懂一个难点", "我想弄懂一个知识点，请先问我在学什么、卡在哪里。"],
+          [
+            "一起分析资料",
+            "我想分析学习资料，请先问我想解决的问题，我会把资料发给你。",
+          ],
+          [
+            "回顾最近的学习",
+            "看看我最近的学习记录，帮我找出一个可以改善的地方。",
+          ],
+        ]
+          .map(
+            ([title, prompt]) =>
+              `<button type="button" data-agent="starter" data-text="${esc(prompt)}">${title}<span aria-hidden="true">↗</span></button>`,
+          )
+          .join("")}</div>`
+      : `<button class="button primary" type="button" data-agent="settings">连接模型，开始对话</button>`
+  }</div>`;
 }
 export function agentPage(): string {
-  const files = status?.files.length ?? 0;
   const signals = status?.anomalies.length ?? 0;
   const badge = (count: number) => (count ? `<b>${count}</b>` : "");
   return `<div id="agent-root"><div class="page-heading agent-page-heading"><div><h1>学习助手</h1></div><div class="agent-topbar">
-    <button class="button small" data-agent="plans">方案${badge(files)}</button>
     <button class="button small" data-agent="memory">记忆</button>
     <button class="button small" data-agent="schedules">定时${badge(status?.schedules?.length ?? 0)}</button>
     <button class="button small" data-agent="signals">信号${badge(signals)}</button>
-    <button class="button small" data-agent="conversations">会话</button>
+    <button class="button small" data-agent="conversations" aria-controls="agent-sessions" aria-expanded="${sessionsOpen}">会话</button>
+    <button class="button small" data-agent="search-conversations" title="搜索对话（Ctrl / ⌘ + K）">搜索</button>
     <button class="button small" data-agent="export-conversation">导出对话</button>
     <button class="button small" data-agent="settings">设置</button>
+    <button class="button small" data-agent="canvas" aria-controls="agent-canvas" aria-expanded="false">Canvas</button>
+    <button class="button small" data-agent="imagegen" title="仅 Codex 账号支持，使用 Codex 用量">生成图片</button>
     <button class="button small" data-agent="new">新对话</button>
   </div></div>
   <div id="agent-panel" class="agent-layout">
     <aside id="agent-sessions" class="agent-sessions" hidden></aside>
     <section class="card agent-conversation">
+      <div id="agent-conversation-title" class="agent-conversation-title"></div>
       <div id="agent-run-status" role="status"></div>
       <div id="agent-branch-source"></div>
       <div id="agent-messages" class="agent-messages" aria-live="polite"></div>
+      <button type="button" class="button small agent-jump-latest" data-agent="latest-message" hidden>↓ 回到最新消息</button>
       <div id="agent-plan"></div>
       <div id="agent-questions"></div>
       <form id="agent-chat">
         <div id="agent-attachments" class="agent-attachments"></div>
         <input id="agent-attachment-input" type="file" multiple hidden aria-label="选择附件">
-        <textarea id="agent-text" name="text" rows="3" maxlength="32000" placeholder="问点什么，也可以拖入文件或粘贴图片" aria-label="给助手发送消息">${esc(draft)}</textarea>
+        <textarea id="agent-text" name="text" rows="1" maxlength="32000" placeholder="问点什么，也可以拖入文件或粘贴图片" aria-label="给助手发送消息">${esc(draft)}</textarea>
         <div class="agent-composer-hint"><span data-explanation>Enter 发送 · Shift + Enter 换行</span><span id="agent-upload-status" role="status"></span></div>
         <div class="agent-actions"><button type="button" class="button small" data-agent="attach" aria-label="添加附件">＋ 附件</button><span class="agent-status"><span class="agent-model" id="agent-model">${modelSelectHtml()}</span><span class="agent-thinking" id="agent-thinking">${thinkingSelectHtml()}</span><span class="agent-usage" id="agent-usage">${usageHtml()}</span></span><button type="button" class="button" data-agent="cancel">停止</button><button class="button primary" type="submit">发送</button></div>
       </form>
     </section>
+    <aside id="agent-canvas" class="agent-canvas" hidden aria-label="Canvas 文档工作区"></aside>
     <div id="agent-sheet" class="agent-sheet" hidden></div>
   </div></div>`;
 }
@@ -271,6 +312,15 @@ function replace(id: string, html: string) {
     rendered.set(id, { element, html });
   }
 }
+function updateLatestButton() {
+  const list = document.getElementById("agent-messages");
+  document
+    .querySelector<HTMLButtonElement>('[data-agent="latest-message"]')
+    ?.toggleAttribute(
+      "hidden",
+      !list || list.scrollHeight - list.scrollTop - list.clientHeight < 90,
+    );
+}
 function renderChat() {
   if (!status) return;
   const busy = status.busy || requestPending;
@@ -279,6 +329,10 @@ function renderChat() {
     `<div class="agent-state ${status.error ? "error" : status.busy ? "busy" : ""}">${status.busy ? `<i class="agent-spinner"></i>${esc(status.authenticating ? "正在登录…" : status.tool ? `正在调用：${status.tool}` : "正在分析…")}` : status.error ? esc(status.error) : "准备好了"}</div>`,
   );
   const current = status.conversations.find((c) => c.active);
+  replace(
+    "agent-conversation-title",
+    `<span title="${esc(current?.title ?? "新对话")}">${esc(current?.title ?? "新对话")}</span>${status.creatorMode ? `<button type="button" class="button small" data-agent="exit-creator-mode" title="作者模式 · 完整访问；点击退出" ${busy ? "disabled" : ""}>作者模式 · 退出</button>` : ""}${current?.archived ? `<button type="button" class="button small" data-agent="archive-conversation" data-id="${esc(current.id)}">已归档 · 恢复</button>` : ""}`,
+  );
   const source = current?.branchedFrom;
   replace(
     "agent-branch-source",
@@ -291,23 +345,45 @@ function renderChat() {
     (status.messages.length > visibleMessages
       ? `<button class="button small agent-history-more" type="button" data-agent="older-messages">加载更早的消息（还有 ${status.messages.length - visibleMessages} 条）</button>`
       : "") +
-    messages.map((m) => messageHtml(m, busy, editingMessage)).join("");
+    messages
+      .map((m) =>
+        messageHtml(m, busy, editingMessage, expandedThinking.has(m.id)),
+      )
+      .join("");
   const messagesEl = document.getElementById("agent-messages");
-  const nearBottom = messagesEl
-    ? messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <
-      90
-    : true;
-  if (!document.activeElement?.closest(".agent-message-edit"))
+  const nearBottom =
+    revealLatest ||
+    (messagesEl
+      ? messagesEl.scrollHeight -
+          messagesEl.scrollTop -
+          messagesEl.clientHeight <
+        90
+      : true);
+  revealLatest = false;
+  const selection = window.getSelection();
+  const readingSelection =
+    selection &&
+    !selection.isCollapsed &&
+    messagesEl?.contains(selection.anchorNode) &&
+    messagesEl.contains(selection.focusNode);
+  const previousTop = messagesEl?.scrollTop ?? 0;
+  if (
+    !document.activeElement?.closest(".agent-message-edit") &&
+    !readingSelection
+  )
     replace(
       "agent-messages",
       html +
-        (status.stream
-          ? `<article class="agent-message assistant ${status.busy ? "streaming" : ""}"><div class="agent-message-head">助手${status.error ? " · 未完成" : ""}</div><div class="agent-markdown">${renderAgentMarkdown(status.stream)}</div></article>`
+        (status.stream || status.thinking || status.generated?.length
+          ? `<article class="agent-message assistant ${status.busy ? "streaming" : ""}"><div class="agent-message-head">助手${status.error ? " · 未完成" : ""}</div>${thinkingHtml(status.thinking, "live", expandedThinking.has("live"))}<div class="agent-markdown">${renderAgentMarkdown(status.stream)}</div>${status.generated?.length ? `<div class="agent-attachments">${attachmentHtml(status.generated)}</div>` : ""}</article>`
           : !messages.length
-            ? `<div class="agent-empty">问点什么，或先让我看看最近的安排。</div>`
+            ? emptyChatHtml()
             : ""),
     );
-  if (messagesEl && nearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (messagesEl && !readingSelection)
+    messagesEl.scrollTop = nearBottom ? messagesEl.scrollHeight : previousTop;
+  updateLatestButton();
+  hydrateAgentImages();
   const lastUser = [...status.messages]
     .reverse()
     .find((m) => m.role === "user");
@@ -328,6 +404,14 @@ function renderChat() {
   document
     .querySelector<HTMLButtonElement>('[data-agent="cancel"]')
     ?.toggleAttribute("hidden", !status.busy);
+  document
+    .querySelector<HTMLButtonElement>("#agent-chat button[type=submit]")
+    ?.toggleAttribute("hidden", status.busy);
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-agent="new"]')
+    .forEach((button) => {
+      button.disabled = busy;
+    });
   document
     .querySelector<HTMLButtonElement>('[data-agent="attach"]')
     ?.toggleAttribute("disabled", uploading > 0 || requestPending);
@@ -365,16 +449,35 @@ function renderChat() {
  * card (approve / discuss), `multiSelect` toggles instead of answering at once,
  * and every question accepts free text — the shape deepseek-harness uses.
  */
+function conversationGroup(c: ConversationSummary): string {
+  if (c.pinned) return "已置顶";
+  const day = new Date();
+  day.setHours(0, 0, 0, 0);
+  if (c.updatedAt * 1000 >= day.getTime()) return "今天";
+  day.setDate(day.getDate() - 1);
+  if (c.updatedAt * 1000 >= day.getTime()) return "昨天";
+  day.setDate(day.getDate() - 6);
+  return c.updatedAt * 1000 >= day.getTime() ? "过去 7 天" : "更早";
+}
 function renderSessions() {
   const aside = document.getElementById("agent-sessions");
   if (!aside) return;
   aside.hidden = !sessionsOpen;
+  document
+    .querySelector('[data-agent="conversations"]')
+    ?.setAttribute("aria-expanded", String(sessionsOpen));
   if (!sessionsOpen) {
     aside.innerHTML = "";
     return;
   }
   if (!aside.querySelector("#agent-history-search"))
-    aside.innerHTML = `<div class="agent-sessions-head"><span>历史会话</span><button class="icon-btn tiny" type="button" data-agent="toggle-sessions" aria-label="收起会话列表">✕</button></div><button class="button small agent-sessions-new" type="button" data-agent="new">＋ 新对话</button><input id="agent-history-search" type="search" maxlength="200" value="${esc(searchQuery)}" placeholder="搜索对话或附件" aria-label="搜索历史会话"><div id="agent-sessions-list" class="agent-sessions-list"></div>`;
+    aside.innerHTML = `<div class="agent-sessions-head"><span>历史会话</span><button class="icon-btn tiny" type="button" data-agent="toggle-sessions" aria-label="收起会话列表">✕</button></div><button class="button small agent-sessions-new" type="button" data-agent="new" ${status?.busy || requestPending ? "disabled" : ""}>＋ 新对话</button><input id="agent-history-search" type="search" maxlength="200" value="${esc(searchQuery)}" placeholder="搜索对话或附件 · Ctrl / ⌘ K" aria-label="搜索历史会话"><button class="button small agent-archive-toggle" type="button" data-agent="show-archived" aria-pressed="${showArchived}">已归档</button><div id="agent-sessions-list" class="agent-sessions-list"></div>`;
+  const archiveToggle = aside.querySelector<HTMLButtonElement>(
+    '[data-agent="show-archived"]',
+  );
+  archiveToggle?.setAttribute("aria-pressed", String(showArchived));
+  if (archiveToggle)
+    archiveToggle.textContent = showArchived ? "返回最近对话" : "已归档";
   const signature = JSON.stringify(status?.conversations);
   if (searchQuery && searchSignature !== signature) {
     searchSignature = signature;
@@ -382,13 +485,15 @@ function renderSessions() {
   }
   const list = searchQuery
     ? (searchResults ?? [])
-    : (status?.conversations ?? []);
+    : (status?.conversations ?? []).filter(
+        (c) => Boolean(c.archived) === showArchived,
+      );
   const busy = status?.busy || requestPending;
   const html = `${
     list
       .map(
-        (c) =>
-          `<div class="agent-conversation-row ${c.id === status?.conversations.find((x) => x.active)?.id ? "active" : ""}">${renaming?.id === c.id ? `<form class="agent-conversation-rename" data-rename-conversation="${esc(c.id)}"><input name="title" maxlength="80" required aria-label="会话名称" value="${esc(renaming.title)}"><button class="button small" type="submit">保存</button><button class="button small" type="button" data-agent="cancel-rename">取消</button></form>` : `<button class="agent-conversation-open" type="button" data-agent="switch-conversation" data-id="${esc(c.id)}" data-message="${esc(c.messageId)}" ${busy ? "disabled" : ""}><b>${c.pinned ? "⌖ " : ""}${esc(c.title)}</b><small>${new Date(c.updatedAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${c.messageCount} 条${c.branchedFrom ? " · 分支" : ""}</small>${c.snippet ? `<span class="agent-search-snippet">${esc(c.snippet)}</span>` : ""}</button><div class="agent-conversation-controls"><button type="button" data-agent="rename-conversation" data-id="${esc(c.id)}" ${busy ? "disabled" : ""}>重命名</button><button type="button" data-agent="pin-conversation" data-id="${esc(c.id)}" ${busy ? "disabled" : ""}>${c.pinned ? "取消置顶" : "置顶"}</button><button type="button" data-agent="delete-conversation" data-id="${esc(c.id)}" ${busy ? "disabled" : ""}>删除</button></div>`}</div>`,
+        (c, index) =>
+          `${!searchQuery && (index === 0 || conversationGroup(c) !== conversationGroup(list[index - 1])) ? `<h3 class="agent-session-group">${conversationGroup(c)}</h3>` : ""}<div class="agent-conversation-row ${c.id === status?.conversations.find((x) => x.active)?.id ? "active" : ""}">${renaming?.id === c.id ? `<form class="agent-conversation-rename" data-rename-conversation="${esc(c.id)}"><input name="title" maxlength="80" required aria-label="会话名称" value="${esc(renaming.title)}"><button class="button small" type="submit">保存</button><button class="button small" type="button" data-agent="cancel-rename">取消</button></form>` : `<button class="agent-conversation-open" type="button" data-agent="switch-conversation" data-id="${esc(c.id)}" data-message="${esc(c.messageId)}" ${busy ? "disabled" : ""}><b>${c.pinned ? "⌖ " : ""}${esc(c.title)}</b><small>${new Date(c.updatedAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${c.messageCount} 条${c.branchedFrom ? " · 分支" : ""}${c.archived ? " · 已归档" : ""}</small>${c.snippet ? `<span class="agent-search-snippet">${esc(c.snippet)}</span>` : ""}</button><div class="agent-conversation-controls"><button type="button" data-agent="rename-conversation" data-id="${esc(c.id)}" ${busy ? "disabled" : ""}>重命名</button><button type="button" data-agent="pin-conversation" data-id="${esc(c.id)}" ${busy ? "disabled" : ""}>${c.pinned ? "取消置顶" : "置顶"}</button><button type="button" data-agent="archive-conversation" data-id="${esc(c.id)}" ${busy ? "disabled" : ""}>${c.archived ? "恢复" : "归档"}</button><button type="button" data-agent="delete-conversation" data-id="${esc(c.id)}" ${busy ? "disabled" : ""}>删除</button></div>`}</div>`,
       )
       .join("") ||
     `<p class="agent-empty">${searchQuery ? (searchResults ? "没有找到匹配的对话。" : "正在搜索…") : "还没有会话。"}</p>`
@@ -416,7 +521,7 @@ async function searchConversations() {
     if (request === searchSerial) hooks.toast(String(error));
   }
 }
-let sessionsOpen = false;
+let sessionsOpen = window.matchMedia("(min-width: 1100px)").matches;
 function questionHtml(): string {
   const questions = status?.questions ?? [];
   const signature = JSON.stringify(questions);
@@ -602,9 +707,8 @@ function sheetHtml(): string {
   const title: Record<string, string> = {
     settings: "设置",
     memory: "记忆",
-    plans: "方案与文件",
     signals: "学情信号",
-    conversations: "会话",
+    schedules: "定时任务",
   };
   const body = () => {
     if (currentSheet === "settings")
@@ -620,15 +724,6 @@ function sheetHtml(): string {
       <div class="agent-actions"><button class="button primary" type="submit">保存</button><button class="button" type="button" data-agent="login">登录 Codex</button><button class="button" type="button" data-agent="logout">退出</button></div></form>
       <div id="agent-auth">${authHtml()}</div>
       <details class="agent-more"><summary>MCP 与私有目录</summary><pre id="agent-mcp">${esc(pretty(s.mcpConfig))}</pre><p class="muted" id="agent-directory">${esc(s.dataDir)}</p></details>`;
-    if (currentSheet === "conversations")
-      return `<div class="agent-actions"><button class="button small" data-agent="new">新对话</button></div><div id="agent-conversations">${
-        (s.conversations ?? [])
-          .map(
-            (c) =>
-              `<div class="agent-conversation-row ${c.active ? "active" : ""}"><button class="agent-conversation-open" type="button" data-agent="switch-conversation" data-id="${esc(c.id)}"><b>${esc(c.title)}</b><small>${new Date(c.updatedAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${c.messageCount} 条</small></button><button class="icon-btn tiny" type="button" data-agent="delete-conversation" data-id="${esc(c.id)}" aria-label="删除会话">✕</button></div>`,
-          )
-          .join("") || `<p class="agent-empty">还没有会话。</p>`
-      }</div>`;
     if (currentSheet === "schedules") {
       const list = s.schedules ?? [];
       const editing = list.find((x) => x.id === editingSchedule) ?? null;
@@ -652,22 +747,6 @@ function sheetHtml(): string {
           .join("") || `<p class="agent-empty">还没有记忆。</p>`
       }</div>
       <form id="agent-memory-add"><textarea id="agent-memory-text" name="text" rows="2" maxlength="8000" placeholder="可用时间、当前阶段、长期愿景">${esc(memoryDraft)}</textarea><button class="button small" type="submit">保存为已确认</button></form>`;
-    if (currentSheet === "plans") {
-      const reviewed = new Set(s.reviewed ?? []);
-      return `<div class="agent-actions"><button class="button small" data-agent="export-plan">导出计划</button><button class="button small" data-agent="export-backup">导出备份</button></div><div id="agent-files">${
-        s.files
-          .map(
-            (f) =>
-              `<div class="agent-file ${reviewed.has(f.name) ? "pending" : ""}"><div><b>${esc(f.name)}</b><small>${(f.bytes / 1024).toFixed(1)} KB${reviewed.has(f.name) ? " · 已审阅，待批准" : ""}</small></div><button class="button small" data-agent="review" data-name="${esc(f.name)}">审阅</button>${
-                reviewed.has(f.name)
-                  ? `<button class="button small primary" data-agent="approve-file" data-name="${esc(f.name)}">批准并应用</button><button class="button small" data-agent="reject" data-name="${esc(f.name)}">暂不批准</button>`
-                  : ""
-              }<button class="button small" data-agent="download" data-name="${esc(f.name)}">导出</button></div>`,
-          )
-          .join("") ||
-        `<p class="agent-empty">还没有方案文件。让助手改安排，或先导出一份。</p>`
-      }</div><div id="agent-review">${reviewHtml()}</div>`;
-    }
     return `<div id="agent-evidence">${
       s.anomalies
         .map(
@@ -678,12 +757,6 @@ function sheetHtml(): string {
     }</div>`;
   };
   return `<section class="agent-sheet-card" role="dialog" aria-label="${esc(title[currentSheet])}"><header><h2>${esc(title[currentSheet])}</h2><button class="icon-btn" data-agent="close-sheet" aria-label="关闭">✕</button></header><div class="agent-sheet-body">${body()}</div></section>`;
-}
-function reviewHtml() {
-  if (!review) return reviewing ? `<p>${esc(reviewing)}</p>` : "";
-  // Approving is the consent: the diff sits right above the button, so no extra
-  // checkbox stands between the user's decision and the change.
-  return `<div class="agent-review"><h3>${esc(review.name)}</h3><p>${esc(review.effects)}</p><div class="agent-diff-list">${review.changes.length ? review.changes.map((c) => `<details><summary>${esc(c.path)}</summary><div class="agent-diff"><pre>原值\n${esc(pretty(c.before))}</pre><pre>新值\n${esc(pretty(c.after))}</pre></div></details>`).join("") : "<p>没有数据变化。</p>"}</div>${review.truncated ? '<p class="muted">变化较多，只显示前100项。</p>' : ""}<div class="agent-actions"><button class="button" type="button" data-agent="discuss">讨论后再定</button><button class="button" type="button" data-agent="reject" data-name="${esc(review.name)}">暂不批准</button><button class="button primary" data-agent="apply" ${review.changes.length ? "" : "disabled"}>批准并应用</button></div></div>`;
 }
 function renderSheet() {
   const element = document.getElementById("agent-sheet");
@@ -736,6 +809,13 @@ function update() {
   if (!hooks?.active() || !status) return;
   const nextKey = status.conversations.find((c) => c.active)?.id ?? "new";
   if (nextKey !== conversationKey) {
+    const selection = window.getSelection();
+    if (
+      document
+        .getElementById("agent-messages")
+        ?.contains(selection?.anchorNode ?? null)
+    )
+      selection?.removeAllRanges();
     if (document.activeElement?.closest(".agent-message-edit"))
       (document.activeElement as HTMLElement).blur();
     conversationDrafts.set(conversationKey, { text: draft, attachments });
@@ -744,14 +824,22 @@ function update() {
     draft = saved?.text ?? "";
     attachments = saved?.attachments ?? [];
     editingMessage = null;
+    expandedThinking.clear();
     visibleMessages = 60;
+    revealLatest = true;
     const box = document.getElementById(
       "agent-text",
     ) as HTMLTextAreaElement | null;
     if (box) box.value = draft;
+    resizeComposer();
   }
   renderChat();
   renderSessions();
+  updateCanvas(
+    conversationKey,
+    status.canvases ?? [],
+    status.busy || requestPending,
+  );
   playHand();
   playDeeds();
   const active = document.activeElement;
@@ -766,7 +854,10 @@ function update() {
   }
   if (!status.authEvent?.url) openedAuthUrl = "";
 }
-async function call(request: Record<string, unknown>) {
+async function call(
+  request: Record<string, unknown>,
+  accepted?: (result: AgentStatus) => void,
+) {
   if (requestPending) throw new Error("正在提交，请稍候");
   requestPending = true;
   statusRevision++;
@@ -774,6 +865,7 @@ async function call(request: Record<string, unknown>) {
   try {
     const result = await agentCall<AgentStatus>(request);
     status = result;
+    accepted?.(result);
     return result;
   } finally {
     requestPending = false;
@@ -803,6 +895,46 @@ export async function refreshAgent() {
 }
 export function setupAgent(options: typeof hooks) {
   hooks = options;
+  setupCanvas({
+    call,
+    prefill: (text) => {
+      prefillAgent(text);
+      focusComposer();
+    },
+    toast: hooks.toast,
+    onOpen: () => {
+      sessionsOpen = false;
+      renderSessions();
+    },
+  });
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (!hooks.active() || event.isComposing) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        event.stopPropagation();
+        focusSearch();
+      } else if (
+        (event.ctrlKey || event.metaKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === "o"
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!status?.busy && !requestPending)
+          void call({ op: "new_conversation" })
+            .then(focusComposer)
+            .catch((error) => hooks.toast(String(error)));
+      } else if (event.key === "Escape" && sheet) {
+        event.stopPropagation();
+        sheet = null;
+        renderSheet();
+        focusComposer();
+      }
+    },
+    { capture: true },
+  );
   void refreshAgent();
   setInterval(() => void refreshAgent(), 2500);
 }
@@ -853,10 +985,30 @@ async function addAttachments(files: File[]) {
 export function mountAgent() {
   const panel = document.getElementById("agent-root");
   if (!panel) return;
+  mountCanvas();
+  panel.addEventListener(
+    "toggle",
+    (event) => {
+      const details = event.target;
+      if (
+        !(details instanceof HTMLDetailsElement) ||
+        !details.dataset.thinkingId ||
+        !details.isConnected
+      )
+        return;
+      if (details.open) expandedThinking.add(details.dataset.thinkingId);
+      else expandedThinking.delete(details.dataset.thinkingId);
+    },
+    { capture: true },
+  );
+  panel
+    .querySelector("#agent-messages")
+    ?.addEventListener("scroll", updateLatestButton, { passive: true });
   panel.addEventListener("input", (event) => {
     const input = event.target as HTMLInputElement;
     if (input.id === "agent-text") {
       draft = input.value;
+      resizeComposer();
       renderChat();
     }
     if (input.closest(".agent-message-edit") && editingMessage)
@@ -931,6 +1083,29 @@ export function mountAgent() {
     void action(button).catch((error) => hooks.toast(String(error)));
   });
   panel.addEventListener("keydown", (event) => {
+    if (event.code === "Space" && (event.target as Element).closest("summary"))
+      event.stopPropagation();
+    if (
+      event.target instanceof HTMLTextAreaElement &&
+      event.target.id === "agent-text" &&
+      event.key === "ArrowUp" &&
+      !event.isComposing &&
+      !draft &&
+      !status?.busy &&
+      !requestPending
+    ) {
+      const message = [...(status?.messages ?? [])]
+        .reverse()
+        .find((m) => m.role === "user");
+      if (message?.entryId && !message.automatic) {
+        event.preventDefault();
+        editingMessage = { id: message.id, text: message.text };
+        renderChat();
+        document
+          .querySelector<HTMLTextAreaElement>(".agent-message-edit textarea")
+          ?.focus();
+      }
+    }
     if (
       event.target instanceof HTMLTextAreaElement &&
       event.target.id === "agent-text" &&
@@ -948,7 +1123,7 @@ export function mountAgent() {
       renderChat();
     }
   });
-  const composer = panel.querySelector<HTMLFormElement>("#agent-chat")!;
+  const composer = panel.querySelector<HTMLElement>(".agent-conversation")!;
   composer.addEventListener("paste", (event) => {
     const files = Array.from(event.clipboardData?.files ?? []);
     if (files.length) {
@@ -974,6 +1149,7 @@ export function mountAgent() {
     );
   });
   update();
+  resizeComposer();
   void refreshAgent();
   void loadUsage();
 }
@@ -988,19 +1164,31 @@ async function submit(form: HTMLFormElement) {
       status?.busy
     )
       return;
-    const key = conversationKey;
-    await call({
-      op: "send",
-      text,
-      attachmentIds: attachments.map((a) => a.id),
-    });
-    conversationDrafts.delete(key);
-    draft = "";
-    attachments = [];
+    const key = conversationKey,
+      sentDraft = draft,
+      sentAttachments = attachments;
+    await call(
+      {
+        op: "send",
+        text,
+        attachmentIds: attachments.map((a) => a.id),
+      },
+      (result) => {
+        if (draft === sentDraft) draft = "";
+        attachments = attachments.filter(
+          (a) => !sentAttachments.some((sent) => sent.id === a.id),
+        );
+        const nextKey = result.conversations.find((c) => c.active)?.id ?? "new";
+        if (nextKey !== key)
+          conversationDrafts.set(nextKey, { text: draft, attachments });
+        conversationDrafts.delete(key);
+      },
+    );
     const box = document.getElementById(
       "agent-text",
     ) as HTMLTextAreaElement | null;
-    if (box) box.value = "";
+    if (box) box.value = draft;
+    focusComposer();
     const messages = document.getElementById("agent-messages");
     if (messages) messages.scrollTop = messages.scrollHeight;
   } else if (form.dataset.editMessage) {
@@ -1085,9 +1273,117 @@ async function submit(form: HTMLFormElement) {
 async function tool<T>(name: string, args: Record<string, unknown> = {}) {
   return agentCall<T>({ op: "tool", name, arguments: args });
 }
+function requireImageGen() {
+  if (status?.preferences.provider !== "openai-codex")
+    throw new Error(
+      "当前模型连接不支持图像生成，请切换到 Codex 账号。Canvas 支持所有模型。",
+    );
+  if (!status.providers?.["openai-codex"]?.configured)
+    throw new Error(
+      "请先在设置中登录 Codex 账号；ImageGen 使用 Codex 用量，不能使用网页免费额度。",
+    );
+}
 async function action(button: HTMLButtonElement) {
-  const name = button.dataset.name;
+  if (button.disabled) return;
   switch (button.dataset.agent) {
+    case "canvas":
+      toggleCanvas();
+      break;
+    case "open-canvas-message": {
+      const message = status?.messages.find((m) => m.id === button.dataset.id);
+      if (message) canvasFromMessage(message.text);
+      break;
+    }
+    case "imagegen":
+      requireImageGen();
+      prefillAgent("请使用 generate_image 生成一张图片。我的要求：");
+      focusComposer();
+      break;
+    case "view-image":
+      await previewAgentImage(
+        button.dataset.id!,
+        (image) => {
+          requireImageGen();
+          if (uploading || requestPending)
+            throw new Error("正在提交或上传，请稍候");
+          if (
+            attachments.length >= 10 ||
+            attachments.filter((a) => a.mimeType.startsWith("image/")).length >=
+              3
+          )
+            throw new Error("请先移除部分附件，每次最多 3 张参考图");
+          if (!attachments.some((a) => a.id === image.id))
+            attachments.push(image);
+          prefillAgent("请使用 generate_image 编辑这张图片。我的修改要求：");
+          focusComposer();
+          renderChat();
+        },
+        hooks.toast,
+      );
+      break;
+    case "starter":
+      prefillAgent(button.dataset.text ?? "");
+      focusComposer();
+      break;
+    case "quote-message": {
+      const message = status?.messages.find((m) => m.id === button.dataset.id);
+      if (!message) break;
+      const selection = window.getSelection();
+      const article = button.closest(".agent-message");
+      const quote =
+        selection &&
+        !selection.isCollapsed &&
+        article?.contains(selection.anchorNode) &&
+        article.contains(selection.focusNode)
+          ? selection.toString()
+          : message.text;
+      const text = `${draft ? `${draft}\n\n` : ""}${quote
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n")}\n\n`;
+      if (text.length > 32000)
+        throw new Error("引用后超出消息长度，请选中需要的片段再引用");
+      prefillAgent(text);
+      selection?.removeAllRanges();
+      focusComposer();
+      break;
+    }
+    case "search-conversations":
+      focusSearch();
+      break;
+    case "show-archived":
+      showArchived = !showArchived;
+      searchQuery = "";
+      searchResults = null;
+      searchSerial++;
+      clearTimeout(searchTimer);
+      {
+        const input = document.querySelector<HTMLInputElement>(
+          "#agent-history-search",
+        );
+        if (input) input.value = "";
+      }
+      renderSessions();
+      break;
+    case "archive-conversation": {
+      const c = status?.conversations.find((c) => c.id === button.dataset.id);
+      if (!c) break;
+      await call({
+        op: "archive_conversation",
+        id: c.id,
+        archived: !c.archived,
+      });
+      hooks.toast(
+        c.archived ? "已恢复到最近对话" : "已归档，可在已归档列表或搜索中找回",
+      );
+      break;
+    }
+    case "latest-message": {
+      const list = document.getElementById("agent-messages");
+      if (list) list.scrollTop = list.scrollHeight;
+      updateLatestButton();
+      break;
+    }
     case "copy-message": {
       const message = status?.messages.find((m) => m.id === button.dataset.id);
       if (message) {
@@ -1191,7 +1487,14 @@ async function action(button: HTMLButtonElement) {
         status.messages
           .map(
             (m) =>
-              `## ${m.role === "user" ? "我" : "助手"}${m.stopped ? "（已停止）" : ""}\n\n${m.text}\n\n${m.attachments?.map((a) => `附件：${a.name}`).join("\n") ?? ""}`,
+              `## ${m.role === "user" ? "我" : "助手"}${m.stopped ? "（已停止）" : ""}\n\n${
+                m.thinking
+                  ? `思考过程（模型提供）：\n\n${m.thinking
+                      .split("\n")
+                      .map((line) => `> ${line}`)
+                      .join("\n")}\n\n`
+                  : ""
+              }${m.text}\n\n${m.attachments?.map((a) => `附件：${a.name}`).join("\n") ?? ""}`,
           )
           .join("\n\n");
       await saveAgentFile(
@@ -1203,7 +1506,6 @@ async function action(button: HTMLButtonElement) {
     }
     case "settings":
     case "memory":
-    case "plans":
     case "schedules":
     case "signals":
       openSheet(button.dataset.agent as NonNullable<typeof sheet>);
@@ -1243,11 +1545,15 @@ async function action(button: HTMLButtonElement) {
       sheet = null;
       renderSheet();
       break;
+    case "exit-creator-mode":
+      await call({ op: "exit_creator_mode" });
+      break;
     case "cancel":
       await call({ op: "cancel" });
       break;
     case "new":
       await call({ op: "new_conversation" });
+      focusComposer();
       break;
     case "login":
       await call({ op: "login" });
@@ -1326,32 +1632,6 @@ async function action(button: HTMLButtonElement) {
       document.getElementById("agent-text")?.focus();
       break;
     }
-    case "reject":
-      await agentCall({ op: "reject_file", name });
-      hooks.toast("已暂缓这份提案，文件还在方案里");
-      await refreshAgent();
-      break;
-    case "approve-file": {
-      const file = await tool<{ fileHash: string }>("read_file", {
-        name,
-        pointer: "/version",
-      });
-      const checked = await tool<Review>("review_file", {
-        name,
-        fileHash: file.fileHash,
-      });
-      const snapshot = await tool<Snapshot>("apply_file", {
-        name,
-        fileHash: checked.fileHash,
-      });
-      hooks.accept(snapshot);
-      hooks.toast("已批准并应用");
-      review = null;
-      sheet = null;
-      renderSheet();
-      await refreshAgent();
-      break;
-    }
     case "clear-plan":
       await call({ op: "clear_plan" });
       break;
@@ -1378,63 +1658,6 @@ async function action(button: HTMLButtonElement) {
       await call({ op: "memory_delete", id: button.dataset.id });
       delete memoryEdits[button.dataset.id!];
       break;
-    case "export-plan":
-    case "export-backup": {
-      await tool(
-        button.dataset.agent === "export-plan"
-          ? "export_plan"
-          : "export_backup",
-        {
-          name: `${button.dataset.agent === "export-plan" ? "plan" : "backup"}-${Date.now()}.json`,
-        },
-      );
-      await refreshAgent();
-      break;
-    }
-    case "review": {
-      review = null;
-      reviewing = "正在校验…";
-      renderSheet();
-      try {
-        const file = await tool<{ fileHash: string }>("read_file", {
-          name,
-          pointer: "/version",
-        });
-        review = await tool<Review>("review_file", {
-          name,
-          fileHash: file.fileHash,
-        });
-      } finally {
-        reviewing = "";
-      }
-      // Refresh first: the sheet marks this file as reviewed-then-pending, and the
-      // status carries which files are waiting for approval.
-      await refreshAgent();
-      renderSheet();
-      break;
-    }
-    case "download": {
-      const file = await agentCall<{ content: unknown }>({
-        op: "download_file",
-        name,
-      });
-      downloadJson(file.content, name!);
-      break;
-    }
-    case "apply": {
-      if (!review) throw new Error("请先审阅这份文件");
-      const snapshot = await tool<Snapshot>("apply_file", {
-        name: review.name,
-        fileHash: review.fileHash,
-      });
-      review = null;
-      hooks.accept(snapshot);
-      hooks.toast("已应用");
-      sheet = null;
-      renderSheet();
-      await refreshAgent();
-      break;
-    }
   }
   update();
 }
