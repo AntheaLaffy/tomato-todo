@@ -170,7 +170,7 @@ Windows/macOS 桌面层与跨平台 CI 正在适配，Android 已加入核心编
 - **niri / Wayland**：程序优先使用原生 Wayland，让窗口 PID 和应用标识能被正确识别；即使启动终端设置了 `GDK_BACKEND=x11`，也不会误用 Xwayland 中转窗口。
 - **托盘**：需要 AppIndicator 运行库（Arch 的 `libappindicator-gtk3`，Debian 的 `libayatana-appindicator3-1`）及桌面上的 StatusNotifier 组件。没有托盘时正常显示窗口和退出，后台启动会等待桌面组件最多约 10 秒后显示窗口。
 - **自启动**：配置为 `$XDG_CONFIG_HOME/autostart/studio.tomato.todo.desktop`；niri 会话需启用 XDG 自启动目标。仅在本机保存的桌面偏好为 `$XDG_CONFIG_HOME/studio.tomato.todo/desktop.json`，不随任务备份导入到其他电脑。
-- **系统运行库**：依赖系统 GTK 3 和 WebKitGTK 4.1（Arch 为 `gtk3` / `webkit2gtk-4.1`，Debian / Ubuntu 为 `libgtk-3-0` / `libwebkit2gtk-4.1-0`）。
+- **系统运行库**：依赖系统 GTK 3、WebKitGTK 4.1 和 `pactl`（专注时抑制其他应用提示音；Arch 由 `libpulse` 提供，Debian / Ubuntu 为 `pulseaudio-utils`）。
 - **构建兼容性**：发布用 Debian 安装包在 CI 的 Ubuntu 22.04 上构建，以覆盖较旧的发行版；不保证所有发行版的旧版 glibc。
 
 ## 专注保护能做什么、不能做什么

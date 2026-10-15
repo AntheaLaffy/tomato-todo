@@ -447,3 +447,101 @@ test(
     }
   },
 );
+
+test("ambient recordings loop without silence and pending rain respects a later selection", async () => {
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+    args: ["--no-sandbox"],
+  });
+  try {
+    const page = await browser.newPage();
+    const code = await source("src/audio.ts");
+    const rain = [...(await readFile("public/audio/rain.ogg"))];
+    const results = await page.evaluate(
+      async ({ code, rain }) => {
+        const load = async (ctx) => {
+          window.AudioContext = function () {
+            return ctx;
+          };
+          return import(
+            URL.createObjectURL(new Blob([code], { type: "text/javascript" }))
+          );
+        };
+        const response = () => new Response(new Uint8Array(rain));
+        window.fetch = async () => response();
+        const results = [];
+        for (const kind of ["rain", "brown"]) {
+          const ctx = new OfflineAudioContext(1, 44100 * 65, 44100);
+          let playback;
+          const create = ctx.createBufferSource.bind(ctx);
+          ctx.createBufferSource = () => (playback = create());
+          const audio = await load(ctx);
+          if (!(await audio.setNoise(kind, 0.2)))
+            throw new Error("Sound did not start");
+          if (!playback.loop) throw new Error("Ambient source is not looping");
+          const duration = playback.buffer.duration;
+          const data = (await ctx.startRendering()).getChannelData(0);
+          const rms = (start, end) => {
+            const part = data.subarray(
+              Math.round(start * 44100),
+              Math.round(end * 44100),
+            );
+            return Math.sqrt(
+              part.reduce((sum, value) => sum + value * value, 0) / part.length,
+            );
+          };
+          let minimum = Infinity;
+          // Short windows straddling the real loop boundary catch gaps that a
+          // button-state check or a whole-track peak would miss.
+          for (let at = duration - 0.2; at < duration + 0.2; at += 0.01)
+            minimum = Math.min(minimum, rms(at, at + 0.01));
+          results.push({
+            kind,
+            duration,
+            minimum,
+            rms: rms(1, 2),
+            finite: data.every(Number.isFinite),
+          });
+        }
+        const ctx = new OfflineAudioContext(1, 44100, 44100);
+        const audio = await load(ctx);
+        let release;
+        window.fetch = () =>
+          new Promise((resolve) => {
+            release = resolve;
+          });
+        const pending = audio.setNoise("rain");
+        await audio.setNoise("off");
+        release(response());
+        if (await pending)
+          throw new Error("Late rain overrode quiet selection");
+        if (
+          !(await ctx.startRendering())
+            .getChannelData(0)
+            .every((value) => value === 0)
+        )
+          throw new Error("Cancelled rain produced audio");
+        const muted = new OfflineAudioContext(1, 44100, 44100);
+        const quiet = await load(muted);
+        await quiet.setNoise("brown");
+        quiet.setNoiseVolume(0);
+        if (
+          !(await muted.startRendering())
+            .getChannelData(0)
+            .every((value) => value === 0)
+        )
+          throw new Error("Background volume did not mute playback");
+        return results;
+      },
+      { code, rain },
+    );
+    for (const result of results) {
+      assert.ok(result.finite && result.rms > 0.005, JSON.stringify(result));
+      assert.ok(result.minimum > 0.001, JSON.stringify(result));
+      if (result.kind === "rain")
+        assert.ok(result.duration >= 59, JSON.stringify(result));
+    }
+  } finally {
+    await browser.close();
+  }
+});

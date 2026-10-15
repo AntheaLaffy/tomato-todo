@@ -21,6 +21,7 @@ Windows 目前只覆盖 x64：ARM64 宿主（`windows-11-arm`）上隔离桌面�
 | 桌面发布矩阵 | v0.8.4 发行 Linux 两架构 deb/压缩包和 Windows x64 NSIS；Windows ARM64 与 macOS 安装包延后；全部构建成功后发布；actionlint 通过；本机生产 deb 构建成功，包内二进制、Node、worker 和许可证已核对 | 远端实际构建、签名、安装与升级 |
 | Windows 窗口保护 | Win32 枚举/PID/标题、完整路径、后台线程回焦和输入队列恢复；同名不同目录、长路径、白名单与窗口失效已在独立 Wine/Openbox/Xvfb 上验证；Windows x64 原生 runner 的隔离桌面回归通过；封装应用优先 AUMID，旧 UWP 框架解析应用进程，Wine 回退到普通路径 | UWP/商店应用身份、真实桌面拒绝激活及整应用行为；ARM64 未验证，也不在 CI 与发布矩阵内 |
 | Linux 窗口保护 | 保留 niri IPC，新增原生 X11 EWMH；Openbox/Xvfb 的真实核心及 Tauri/WebKit 白名单、回焦、快速锁机、紧急恢复和 WM 失效严格释放测试通过；检测活跃 WM，不将 Xwayland 列表当成完整桌面 | GNOME、KDE Plasma、Xfce、Cinnamon、MATE、LXQt 各实际会话验收，以及其他 Wayland 合成器后端 |
+| 专注提示音抑制 | Linux 通过 PulseAudio/PipeWire 兼容接口监听通知角色和聊天应用播放流，暂停、结束及退出时恢复；解析与角色边界单测通过 | Windows/macOS 音频会话实现；微信、QQ 等实际 Linux 客户端及各桌面音频栈验收 |
 
 ## 桌面构建与发布
 

@@ -1,4 +1,4 @@
-use crate::{desktop, files, Shared};
+use crate::{desktop, files, focus_audio::FocusAudio, Shared};
 
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
@@ -130,6 +130,8 @@ pub fn run() {
             }
             let engine = Arc::new(Mutex::new(engine));
             app.manage(engine.clone());
+            let focus_audio = FocusAudio::new();
+            app.manage(focus_audio.clone());
             let action_engine = engine.clone();
             let action_handle = app.handle().clone();
             let wake_handle = app.handle().clone();
@@ -164,6 +166,7 @@ pub fn run() {
                     continue;
                 };
                 let _ = service.observe(&s);
+                focus_audio.set_active(s.data.timer.running && s.data.timer.mode == Mode::Focus);
                 let pending = s
                     .data
                     .pending_reminder()
@@ -284,6 +287,9 @@ pub fn run() {
         .expect("无法启动番茄 Todo")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                if let Some(focus_audio) = app.try_state::<FocusAudio>() {
+                    focus_audio.stop();
+                }
                 if let Some(service) = app.try_state::<Arc<tomato_agent::Agent>>() {
                     service.shutdown();
                 }

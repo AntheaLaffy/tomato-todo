@@ -8,6 +8,8 @@ mod desktop;
 #[cfg(not(target_os = "android"))]
 mod desktop_app;
 mod files;
+#[cfg(not(target_os = "android"))]
+mod focus_audio;
 #[cfg(target_os = "android")]
 mod mobile;
 
@@ -40,6 +42,13 @@ fn platform_kind() -> &'static str {
 
 #[cfg_attr(target_os = "android", tauri::mobile_entry_point)]
 pub fn run() {
+    // The direct WebAudio sink can run silently on Bluetooth/PipeWire while
+    // its clock and graph keep advancing. WebKit's shared mixer uses the
+    // working media output path (requires GStreamer's inter plugin).
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_GST_ENABLE_AUDIO_MIXER").is_none() {
+        std::env::set_var("WEBKIT_GST_ENABLE_AUDIO_MIXER", "1");
+    }
     #[cfg(target_os = "android")]
     mobile::run();
     #[cfg(not(target_os = "android"))]

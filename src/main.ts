@@ -3073,10 +3073,16 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (d.noise) {
-    noiseKind = d.noise;
     pauseBgm();
     bgmPlaying = false;
-    setNoise(noiseKind, backgroundVolume);
+    try {
+      if (!(await setNoise(d.noise, backgroundVolume))) return;
+      setNoiseVolume(backgroundVolume);
+      noiseKind = d.noise;
+    } catch (error) {
+      noiseKind = "off";
+      toast(error instanceof Error ? error.message : String(error));
+    }
     render();
     soundDialog();
     return;

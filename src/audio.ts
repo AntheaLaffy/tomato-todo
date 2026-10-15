@@ -62,6 +62,22 @@ let context: AudioContext | null = null;
 let noise: AudioBufferSourceNode | null = null;
 let volume: GainNode | null = null;
 const voices = new Map<OscillatorNode, GainNode>();
+let noiseRequest = 0;
+let rainBuffer: Promise<AudioBuffer> | undefined;
+
+function loadRain(ctx: AudioContext) {
+  rainBuffer ??= fetch("/audio/rain.ogg")
+    .then((response) => {
+      if (!response.ok) throw new Error("无法读取雨声，请重新启动应用后再试");
+      return response.arrayBuffer();
+    })
+    .then((bytes) => ctx.decodeAudioData(bytes))
+    .catch((error) => {
+      rainBuffer = undefined;
+      throw error;
+    });
+  return rainBuffer;
+}
 
 export function unlockAudio() {
   try {
@@ -125,35 +141,52 @@ export function playSound(cue: SoundCue, level: number) {
     osc.stop(start + duration);
   }
 }
-export function setNoise(kind: string, level = 0.2) {
+export async function setNoise(kind: string, level = 0.2) {
+  const request = ++noiseRequest;
   noise?.stop();
+  noise?.disconnect();
+  volume?.disconnect();
   noise = null;
   volume = null;
-  if (kind === "off") return;
+  if (kind === "off") return true;
   unlockAudio();
-  if (!context) return;
-  const buffer = context!.createBuffer(
-    1,
-    context!.sampleRate * 4,
-    context!.sampleRate,
-  );
-  const data = buffer.getChannelData(0);
-  let last = 0;
-  for (let i = 0; i < data.length; i++) {
-    const white = Math.random() * 2 - 1;
-    last = (last + 0.02 * white) / 1.02;
-    data[i] = kind === "brown" ? last * 3.5 : white * 0.3;
+  if (!context) return false;
+  const ctx = context;
+  let buffer: AudioBuffer;
+  if (kind === "rain") {
+    try {
+      buffer = await loadRain(ctx);
+    } catch (error) {
+      if (request !== noiseRequest) return false;
+      throw error;
+    }
+    // Selecting quiet/BGM or another sound during decoding cancels this play.
+    if (request !== noiseRequest) return false;
+  } else {
+    buffer = ctx.createBuffer(1, context!.sampleRate * 4, context!.sampleRate);
+    const data = buffer.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < data.length; i++) {
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      data[i] = last * 3.5;
+    }
   }
   noise = context!.createBufferSource();
   noise.buffer = buffer;
   noise.loop = true;
-  const filter = context!.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.frequency.value = kind === "rain" ? 1800 : 600;
   volume = context!.createGain();
   volume.gain.value = level;
-  noise.connect(filter).connect(volume).connect(context!.destination);
+  if (kind === "rain") noise.connect(volume);
+  else {
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 600;
+    noise.connect(filter).connect(volume);
+  }
+  volume.connect(ctx.destination);
   noise.start();
+  return true;
 }
 export function setNoiseVolume(level: number) {
   if (volume) volume.gain.value = level;

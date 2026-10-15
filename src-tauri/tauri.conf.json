@@ -30,13 +30,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "deb"
-    ],
+    "targets": ["deb"],
     "category": "Productivity",
     "linux": {
       "deb": {
-        "desktopTemplate": "tomato.desktop.hbs"
+        "desktopTemplate": "tomato.desktop.hbs",
+        "depends": ["pulseaudio-utils", "gstreamer1.0-plugins-bad"]
       }
     },
     "shortDescription": "\u4efb\u52a1\u4e0e\u756a\u8304\u949f\uff0c\u4e00\u4e2a\u5b89\u9759\u7684\u4e13\u6ce8\u7a7a\u95f4",
