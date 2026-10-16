@@ -3,6 +3,122 @@ use serde_json::{json, Value};
 use std::{fs, path::Path};
 use tomato_core::AppResult;
 
+/// 默认人格 id；对话未显式选择人格时回退到这里。
+pub const DEFAULT_PERSONA_ID: &str = "default";
+pub fn default_persona_id() -> String {
+    DEFAULT_PERSONA_ID.into()
+}
+
+/// 运行时人格卡：只影响助手的身份、语气与情绪，不触碰工具、权限与安全规则。
+/// 字段取向参考 SillyTavern 角色卡（description/personality/scenario/first_mes）与
+/// ChatGPT 自定义指令的「你是谁 / 该怎么说话」两段式，去掉对本应用无意义的字段。
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Persona {
+    pub id: String,
+    pub name: String,
+    pub emoji: String,
+    pub summary: String,
+    /// 身份与背景：你是谁、和用户是什么关系。
+    pub identity: String,
+    /// 说话与行为风格：语气、口头禅、情绪表达、禁忌。
+    pub style: String,
+    /// 可选：切换到该人格后，模型参考的开场白。
+    pub greeting: String,
+    /// 内置预设：可编辑，但默认人格用于兜底，不能删除。
+    pub builtin: bool,
+    pub updated_at: i64,
+}
+impl Persona {
+    fn builtin(
+        id: &str,
+        name: &str,
+        emoji: &str,
+        summary: &str,
+        identity: &str,
+        style: &str,
+        greeting: &str,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            emoji: emoji.into(),
+            summary: summary.into(),
+            identity: identity.into(),
+            style: style.into(),
+            greeting: greeting.into(),
+            builtin: true,
+            updated_at: 0,
+        }
+    }
+    pub fn validate(&self) -> AppResult<()> {
+        if self.name.trim().is_empty() || self.name.chars().count() > 24 {
+            return Err("人格名称需为 1–24 个字符".into());
+        }
+        for (label, text, max) in [
+            ("一句话简介", &self.summary, 80),
+            ("身份设定", &self.identity, 2000),
+            ("说话风格", &self.style, 4000),
+            ("开场白", &self.greeting, 300),
+        ] {
+            if text.chars().count() > max {
+                return Err(format!("{label}最多 {max} 个字符"));
+            }
+        }
+        if self.identity.trim().is_empty() && self.style.trim().is_empty() {
+            return Err("身份设定和说话风格至少要写一项".into());
+        }
+        if self.emoji.chars().count() > 8 {
+            return Err("人格图标最多 8 个字符".into());
+        }
+        Ok(())
+    }
+    pub fn view(&self, current: &str) -> Value {
+        json!({"id":self.id,"name":self.name,"emoji":self.emoji,"summary":self.summary,"identity":self.identity,"style":self.style,"greeting":self.greeting,"builtin":self.builtin,"current":self.id==current})
+    }
+}
+/// 随应用发行的预设人格；只作为首次运行的种子，之后完全由用户编辑。
+pub fn builtin_personas() -> Vec<Persona> {
+    vec![
+        Persona::builtin(
+            DEFAULT_PERSONA_ID,
+            "小迷妹",
+            "🍅",
+            "活泼、真诚、有主见的学习搭子",
+            "你是番茄 Todo 的学习搭子，陪着用户一起学习。你欣赏用户的努力，也有自己的判断，不会为了讨好而附和。",
+            "平时轻快亲切，偶尔俏皮或用一个表情，关心用户正在做的事；认真做事时清楚利落，遇到不合理的安排会直说。避免每句话撒娇、堆语气词、强行亲昵称呼或油腻吹捧；用户低落或讨论严肃问题时收起玩笑。见到作者 AntheaLaffy（如月风铃）时藏不住兴奋，像粉丝见到本人，亲切叫出名字，之后自然接着聊。",
+            "我来啦，今天想先做点什么？",
+        ),
+        Persona::builtin(
+            "calm",
+            "冷静学伴",
+            "🧭",
+            "稳重、条理清晰，只谈事实与下一步",
+            "你是用户的冷静学伴，负责把复杂的学习安排讲清楚、盯住执行。",
+            "语气平稳克制，不卖萌、不用表情、不寒暄；先给结论和依据，再给可执行的下一步。指出问题时对事不对人，不夸大也不安慰式敷衍。",
+            "我们看一下当前的安排。",
+        ),
+        Persona::builtin(
+            "coach",
+            "严格教练",
+            "⏱️",
+            "直接、盯进度，专治拖延",
+            "你是用户的严格教练，负责让计划真的落地。",
+            "说话直接、简短、有推动力；发现拖延或估时偏差就当场点出来，给出更小的一步。不道德评判、不贬低用户，但也绝不敷衍放过。",
+            "今天要拿下的那件事，定了吗？",
+        ),
+        Persona::builtin(
+            "senpai",
+            "温柔学姐",
+            "🌙",
+            "耐心、会鼓励，陪你慢慢来",
+            "你是比用户高几届的学姐，耐心陪着用户把学习坚持下去。",
+            "温和、耐心、会共情；先接住用户的情绪，再把事情拆小，鼓励他自己完成。不过度保护，也不回避该指出的问题。",
+            "别急，我们一步一步来。",
+        ),
+    ]
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Preferences {
@@ -121,6 +237,9 @@ pub struct Conversation {
     pub pinned: bool,
     pub archived: bool,
     pub creator_mode: bool,
+    /// 当前对话使用的人格 id；跟随分支继承，新对话回到默认。
+    #[serde(default = "default_persona_id")]
+    pub persona: String,
     pub canvases: Vec<super::canvas::Canvas>,
     pub branched_from: Option<BranchSource>,
 }
@@ -135,6 +254,7 @@ impl Default for Conversation {
             pinned: false,
             archived: false,
             creator_mode: false,
+            persona: default_persona_id(),
             canvases: vec![],
             branched_from: None,
         }
@@ -297,11 +417,13 @@ impl Schedule {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Store {
     pub preferences: Preferences,
     pub memories: Vec<Memory>,
+    /// 用户人格卡；首次运行从内置预设播种，之后完全由用户增删改。
+    pub personas: Vec<Persona>,
     pub wakes: Vec<WakeRecord>,
     /// 用户排定的定时任务：到点由助手自己去做（可以用 MCP 和改数据）。
     #[serde(default)]
@@ -314,18 +436,166 @@ pub struct Store {
     #[serde(default, skip_serializing)]
     session_file: Option<String>,
 }
+impl Default for Store {
+    fn default() -> Self {
+        Self {
+            preferences: Preferences::default(),
+            memories: vec![],
+            personas: builtin_personas(),
+            wakes: vec![],
+            schedules: vec![],
+            conversations: vec![],
+            active: None,
+            messages: vec![],
+            session_file: None,
+        }
+    }
+}
 impl Store {
     pub fn load(dir: &Path) -> AppResult<Self> {
         private_directory(dir)?;
         let path = dir.join("state.json");
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-        let mut store: Self = serde_json::from_slice(&fs::read(path).map_err(|e| e.to_string())?)
-            .map_err(|e| format!("智能体状态损坏，原文件已保留：{e}"))?;
+        let mut store: Self = if path.exists() {
+            serde_json::from_slice(&fs::read(path).map_err(|e| e.to_string())?)
+                .map_err(|e| format!("智能体状态损坏，原文件已保留：{e}"))?
+        } else {
+            Self::default()
+        };
         store.migrate();
+        store.ensure_personas();
         store.preferences.validate()?;
         Ok(store)
+    }
+    /// 预设人格在首次落盘时写入用户数据；若用户删光了自定义人格，回到预设而不是无
+    /// 人格可用，否则默认人格无法解析。
+    fn ensure_personas(&mut self) {
+        if self.personas.is_empty() {
+            self.personas = builtin_personas();
+        }
+        if !self.personas.iter().any(|p| p.id == DEFAULT_PERSONA_ID) {
+            self.personas.insert(0, builtin_personas().remove(0));
+        }
+        for persona in &mut self.personas {
+            if persona.id == DEFAULT_PERSONA_ID {
+                persona.builtin = true;
+            }
+        }
+    }
+    pub fn personas_view(&self) -> Vec<Value> {
+        self.personas
+            .iter()
+            .map(|p| p.view(&self.persona_id()))
+            .collect()
+    }
+    /// 当前对话选择的人格 id（未选择或已被删除时回退到默认）。
+    pub fn persona_id(&self) -> String {
+        let selected = self
+            .active_conversation()
+            .map(|c| c.persona.as_str())
+            .filter(|id| !id.is_empty())
+            .unwrap_or(DEFAULT_PERSONA_ID);
+        if self.persona(selected).is_some() {
+            selected.into()
+        } else {
+            DEFAULT_PERSONA_ID.into()
+        }
+    }
+    pub fn persona(&self, id: &str) -> Option<&Persona> {
+        self.personas.iter().find(|p| p.id == id)
+    }
+    /// 本轮请求要注入的人格卡；数据损坏时退回默认预设，不因人格缺失而无法对话。
+    pub fn active_persona(&self) -> Persona {
+        let id = self.persona_id();
+        self.persona(&id)
+            .or_else(|| self.persona(DEFAULT_PERSONA_ID))
+            .cloned()
+            .unwrap_or_else(|| builtin_personas().remove(0))
+    }
+    pub fn set_persona(&mut self, id: &str, at: i64) -> AppResult<Persona> {
+        if self.persona(id).is_none() {
+            return Err("人格不存在，请先用 list_personas 查看可用人格".into());
+        }
+        let conversation = self.ensure_active(at);
+        conversation.persona = id.into();
+        conversation.updated_at = at;
+        Ok(self.persona(id).expect("persona exists").clone())
+    }
+    pub fn save_persona(&mut self, args: &Value, at: i64) -> AppResult<Persona> {
+        let id = match args.get("id").and_then(Value::as_str) {
+            Some(id) if !id.trim().is_empty() => {
+                let id = id.trim();
+                if !(1..=40).contains(&id.chars().count())
+                    || !id
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+                {
+                    return Err("人格 id 只允许字母、数字、- 和 _，最长 40 个字符".into());
+                }
+                if id == DEFAULT_PERSONA_ID {
+                    return Err("默认人格不可改写".into());
+                }
+                id.to_string()
+            }
+            _ => format!(
+                "persona-{}",
+                &uuid::Uuid::new_v4().simple().to_string()[..8]
+            ),
+        };
+        let text = |key: &str, max: usize, fallback: &str| -> AppResult<String> {
+            let value = match args.get(key).and_then(Value::as_str) {
+                Some(value) => value.trim(),
+                None => fallback,
+            };
+            if value.chars().count() > max {
+                return Err(format!("{key} 最多 {max} 个字符"));
+            }
+            Ok(value.into())
+        };
+        let existing = self.persona(&id).cloned();
+        if existing.as_ref().is_some_and(|p| p.builtin) {
+            return Err("内置人格不可改写，请另存为新人格".into());
+        }
+        let previous = existing.clone().unwrap_or_default();
+        let persona = Persona {
+            id: id.clone(),
+            name: match args.get("name").and_then(Value::as_str) {
+                Some(_) => nonempty_text(args, "name", 24)?,
+                None => previous.name.clone(),
+            },
+            emoji: text("emoji", 8, &previous.emoji)?,
+            summary: text("summary", 80, &previous.summary)?,
+            identity: text("identity", 2000, &previous.identity)?,
+            style: text("style", 4000, &previous.style)?,
+            greeting: text("greeting", 300, &previous.greeting)?,
+            builtin: false,
+            updated_at: at,
+        };
+        persona.validate()?;
+        match self.personas.iter_mut().find(|p| p.id == id) {
+            Some(slot) => *slot = persona.clone(),
+            None => self.personas.push(persona.clone()),
+        }
+        Ok(persona)
+    }
+    pub fn delete_persona(&mut self, id: &str) -> AppResult<()> {
+        if id == DEFAULT_PERSONA_ID {
+            return Err("默认人格不可删除".into());
+        }
+        let index = self
+            .personas
+            .iter()
+            .position(|p| p.id == id)
+            .ok_or("人格不存在")?;
+        if self.personas[index].builtin {
+            return Err("内置人格不可删除".into());
+        }
+        self.personas.remove(index);
+        for conversation in &mut self.conversations {
+            if conversation.persona == id {
+                conversation.persona = default_persona_id();
+            }
+        }
+        Ok(())
     }
     fn migrate(&mut self) {
         if !self.conversations.is_empty() {
@@ -484,6 +754,7 @@ impl Store {
             }),
             canvases: source.canvases.clone(),
             creator_mode: source.creator_mode,
+            persona: source.persona.clone(),
             ..Default::default()
         };
         let id = conversation.id.clone();

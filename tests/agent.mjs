@@ -1312,6 +1312,53 @@ test(
         path: "artifacts/agent-chat.png",
         fullPage: true,
       });
+      // 运行时人格：切换只改当前对话，徽标与系统提示词注入一起跟随。
+      await page.locator('[data-agent="personas"]').click();
+      await expect(page.locator("#agent-persona-form")).toBeVisible();
+      await expect(page.locator(".agent-persona.current")).toContainText(
+        "小迷妹",
+      );
+      await page
+        .locator(
+          '.agent-persona:has-text("严格教练") [data-agent="switch-persona"]',
+        )
+        .click();
+      await expect(page.locator(".agent-persona-badge")).toContainText(
+        "严格教练",
+      );
+      assert.equal((await api({ op: "status" })).persona, "coach");
+      await page.locator("#agent-text").fill("人格注入检查");
+      await page.locator("#agent-text").press("Enter");
+      await idle("人格注入检查");
+      const system = requests.at(-1).messages.find((m) => m.role === "system");
+      const injected =
+        typeof system?.content === "string"
+          ? system.content
+          : JSON.stringify(system?.content ?? "");
+      assert.match(injected, /当前人格/);
+      assert.match(injected, /严格教练/);
+      await page.screenshot({
+        path: "artifacts/agent-personas.png",
+        fullPage: true,
+      });
+      // 新建并删除一张自定义人格；默认人格仍然是当前。
+      await page
+        .locator('#agent-persona-form input[name="name"]')
+        .fill("测试人格");
+      await page
+        .locator('#agent-persona-form textarea[name="identity"]')
+        .fill("你是测试用的临时人格。");
+      await page.locator('#agent-persona-form button[type="submit"]').click();
+      await expect(page.locator("#agent-personas")).toContainText("测试人格");
+      await page
+        .locator(
+          '.agent-persona:has-text("测试人格") [data-agent="delete-persona"]',
+        )
+        .click();
+      await expect(page.locator("#agent-personas")).not.toContainText(
+        "测试人格",
+      );
+      await page.locator('[data-agent="close-sheet"]').click();
       await expect(page.locator('[data-agent="cancel"]')).toBeHidden();
       const longHistory = {
         ...stopped,

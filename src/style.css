@@ -3895,6 +3895,47 @@ main {
 .agent-creator-badge > span {
   color: #ac782e;
 }
+.agent-persona-badge {
+  max-width: 44%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--secondary);
+}
+.agent-persona {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.agent-persona.current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.agent-persona-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-persona small {
+  color: var(--muted);
+}
+.agent-persona p {
+  margin: 6px 0;
+  font-size: 13px;
+  color: var(--secondary);
+}
+#agent-persona-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+#agent-persona-form textarea {
+  width: 100%;
+  resize: vertical;
+}
 .creator-entrance {
   position: fixed;
   inset: 0;

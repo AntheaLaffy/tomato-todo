@@ -125,6 +125,71 @@ fn creator_easter_egg_is_agent_selected_and_conversation_scoped() {
 }
 
 #[test]
+fn personas_are_seeded_switchable_and_builtins_are_protected() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    // 默认人格随状态播种，并注入本轮请求；人格工具只在用户主动对话出现。
+    let command = {
+        let mut inner = agent.inner.lock().unwrap();
+        inner.live.auth = json!({"deepseek":{"configured":true}});
+        inner.store.preferences.enabled = true;
+        agent
+            .prompt_command(&mut inner, "你好".into(), false, false, vec![], vec![])
+            .unwrap()
+    };
+    assert_eq!(command["persona"]["id"], "default");
+    assert_eq!(command["persona"]["name"], "小迷妹");
+    assert!(command["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|t| t["name"] == "switch_persona"));
+
+    // 新建一张自定义人格并切换；状态、落盘与新对话彼此独立。
+    let saved = agent
+        .call(
+            "save_persona",
+            &json!({"name":"傲娇学妹","emoji":"🎀","identity":"嘴上嫌弃、其实很热心的学妹。","style":"爱吐槽，但做事认真，不说空话。","greeting":"哼，又来了？"}),
+            false,
+        )
+        .unwrap();
+    let id = saved["persona"]["id"].as_str().unwrap().to_owned();
+    assert_eq!(saved["created"], true);
+    agent
+        .call("switch_persona", &json!({"id":id}), false)
+        .unwrap();
+    assert_eq!(agent.status().unwrap()["persona"], id);
+    assert_eq!(Store::load(dir.path()).unwrap().persona_id(), id);
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        inner.store.new_conversation(3);
+        inner.store.save(dir.path()).unwrap();
+    }
+    assert_eq!(agent.status().unwrap()["persona"], "default");
+    assert_eq!(
+        Store::load(dir.path()).unwrap().active_persona().id,
+        "default"
+    );
+
+    // 内置人格不可改写或删除；自定义人格可删除，使用它的对话回到默认。
+    assert!(agent
+        .call(
+            "save_persona",
+            &json!({"id":"default","name":"改了"}),
+            false
+        )
+        .is_err());
+    assert!(agent
+        .call("delete_persona", &json!({"id":"calm"}), false)
+        .is_err());
+    agent
+        .call("delete_persona", &json!({"id":id}), false)
+        .unwrap();
+    assert_eq!(agent.status().unwrap()["persona"], "default");
+    assert!(Store::load(dir.path()).unwrap().persona(&id).is_none());
+}
+
+#[test]
 fn canvas_versions_conflict_restore_and_branch_independently() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));

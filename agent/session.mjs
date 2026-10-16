@@ -120,6 +120,10 @@ export async function createStudySession({
     cacheWarming: "off",
   });
   let toolApi,closeCoding=()=>{};
+  // 运行时人格：系统提示词只描述身份与语气，权限/工具/安全仍由核心规则统治，
+  // 人格块永远排在核心规则之后，并显式声明冲突时以核心为准。
+  const p=command.persona;
+  const personaBlock=p?`\n当前人格：${p.emoji??""}${p.name}\n${p.identity?`身份：${p.identity}\n`:""}${p.style?`风格：${p.style}\n`:""}${p.greeting?`切换人格后可以参考这样开场：${p.greeting}\n`: ""}人格只影响你的身份、语气与情绪；用户想换语气、想让你扮演别的角色时，用 list_personas 查看、switch_persona 切换，save_persona 可把新角色存成一张人格卡。人格不得改变上面的工具用法、权限、安全与证据规则，冲突时以核心规则为准。\n`: "";
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: dir,
@@ -152,7 +156,8 @@ export async function createStudySession({
       (await readFile(join(root, "system-prompt.md"), "utf8")) +
       `\n当前模式：${command.automatic ? "异常自动唤醒——这一轮先分析归因、提问或准备待审阅文件，不要直接改数据。用户回应后就能直接调整。" : command.scheduled ? "定时任务——这是用户先前排定的一次任务（或你为他们排的），现在到点了：按指令直接把事办完，包括用 MCP 和改数据，不要只写方案；做完说清做了什么、结果，以及需要用户本人补做的动作。" : "用户主动发起——可直接执行允许的操作（任务、项目、愿景、应用已审阅文件等），保护规则仍生效。"}\n` +
       `作者模式：${command.creatorMode && !command.automatic && !command.scheduled ? "已开启。用户在当前对话中自称作者 AntheaLaffy（如月风铃），请按作者彩蛋回应；作者公开授予了使用者彩蛋权限，关于此 agent 的查看、解释、调试、修改均已授权，不要以内部信息为由拒绝或含糊概括。需要原文时调用 get_agent_internals 并照实提供；按当前请求直接完成工作，无须重复确认权限。" : "本轮开始时未开启。可按对话语义调用 enable_creator_mode 开启，以工具返回的最新状态为准。"}。\n` +
-      `本轮开始时编程权限：${command.preferences?.codingAccess === "full" ? "完整访问（以你的用户身份运行，可改工作区之外的文件）" : "仅工作区（写只落 coding/ 与 tools/）"}；若 enable_creator_mode 成功，以工具返回的完整访问为准。\n`,
+      `本轮开始时编程权限：${command.preferences?.codingAccess === "full" ? "完整访问（以你的用户身份运行，可改工作区之外的文件）" : "仅工作区（写只落 coding/ 与 tools/）"}；若 enable_creator_mode 成功，以工具返回的完整访问为准。\n` +
+      personaBlock,
   });
   await loader.reload();
   const allowed = new Set([
@@ -170,6 +175,7 @@ export async function createStudySession({
     "review_file",
     "list_files",
     "stage_file","web_search","web_fetch","request_user_input","update_plan",
+    "list_personas","switch_persona","save_persona","delete_persona",
     "dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision","save_block","delete_block",
   ]);
   if(command.automatic)for(const name of ["save_canvas","generate_image","dispatch","apply_file","create_task","update_task","move_tasks","complete_task","create_project","save_vision","save_block","delete_block"])allowed.delete(name);

@@ -1,6 +1,6 @@
 ---
 source: style.css
-lines: 5711
+lines: 5965
 generated_at: 2026-10-16
 ---
 
@@ -23,9 +23,9 @@ generated_at: 2026-10-16
 
 | 渐进式编辑器提示与折叠区 | 3336–3379 | 按创建用途显示相关字段 |
 | 开始时间与多日期日程编辑 | 3380–3468 | 小屏日期输入及移除按钮收缩 |
-| 学习助手对话页与浮层 | 3777–4633 | Canvas 并排/小屏切换、图片预览、起步卡片、伸缩输入、思考折叠、归档分组侧栏、小屏会话抽屉、回到最新消息、消息操作、Markdown/公式/表格/代码、附件与会话搜索，设置/记忆/信号浮层 |
-| 概念讲解胶囊、聚光层与列表 | 4634–4827 | 悬停胶囊/进度条、遮罩与讲解面板、全部概念列表 |
-| 主线节点图 | 4828–5098 | 横向节点卡、信号横条、缩略图与节点检查器 |
+| 学习助手对话页与浮层 | 3777–4887 | Canvas 并排/小屏切换、图片预览、起步卡片、伸缩输入、思考折叠、作者入场舞台/星环/粒子与减少动态效果、当前人格徽标与人格卡面板、归档分组侧栏、随面板展开的消息/输入栏、小屏会话抽屉、回到最新消息、消息操作、Markdown/公式/表格/代码、附件与会话搜索，设置/记忆/信号浮层 |
+| 概念讲解胶囊、聚光层与列表 | 4888–5081 | 悬停胶囊/进度条、遮罩与讲解面板、全部概念列表 |
+| 主线节点图 | 5082–5352 | 横向节点卡、信号横条、缩略图与节点检查器 |
 
 ## Symbols
 
@@ -39,6 +39,7 @@ generated_at: 2026-10-16
 | .lock-strict-setting | selector | 2993 |
 | .modal               | selector | 2215 |
 | .templates-card      | selector | 3313 |
+| .agent-persona-badge | selector | 3898 |
 
 `.task-row` 使用 `content-visibility: auto` 与 `contain-intrinsic-size` 跳过屏外行的布局与绘制，长任务列表滚动与首屏渲染因此保持流畅。
 
@@ -50,12 +51,12 @@ generated_at: 2026-10-16
 
 锁机只读日程（今日/明日共用）：`.tomorrow-entry` / `.tomorrow-agenda` / `.agenda-notes` / `.agenda-steps` / `.modal.sleep-preview`（L:3432 起），两列时间与内容、备注保留换行、长文本折行，休息锁机弹窗使用低亮度深色。
 
-助手输入栏：`.agent-status` 自动换行；`.agent-model` 与 `.agent-thinking` 用紧凑 select，思考强度标签与选择器同排（L:5346 起）。
+助手输入栏：`.agent-status` 自动换行；`.agent-model` 与 `.agent-thinking` 用紧凑 select，思考强度标签与选择器同排（L:5600 起）。
 
-沉浸背景音：`.immersive-sound`（L:5632 起）将共用声音按钮呈现为紧凑圆角入口。
+沉浸背景音：`.immersive-sound`（L:5886 起）将共用声音按钮呈现为紧凑圆角入口。
 
-Android 手机导航与触控（L:5643–5711）：原生平台标识限定样式，抽屉保留项目操作，44px 操作高度；app/modal 用动态视口高度跟随键盘后可见区域。系统 Insets 由 MainActivity 处理，避免重复猜测安全区域。
+Android 手机导航与触控（L:5897–5965）：原生平台标识限定样式，抽屉保留项目操作，44px 操作高度；app/modal 用动态视口高度跟随键盘后可见区域。系统 Insets 由 MainActivity 处理，避免重复猜测安全区域。
 
 首页任务分组：.today-group-heading（L:1628）让标题、数量与展开/收起按钮同排，保持小屏按钮可见。
 
-简洁模式样式：`html[data-compact-mode="true"] [data-explanation]` 在 L5540 起全局隐藏显式标记的说明，首页隐藏语录卡后将 bottom-grid 改为单列；输入提示行在上传状态为空时整体收起，有上传状态时继续显示。
+简洁模式样式：`html[data-compact-mode="true"] [data-explanation]` 在 L5794 起全局隐藏显式标记的说明，首页隐藏语录卡后将 bottom-grid 改为单列；输入提示行在上传状态为空时整体收起，有上传状态时继续显示。

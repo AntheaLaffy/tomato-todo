@@ -48,10 +48,23 @@ type Memory = {
   source: string;
   confirmed: boolean;
 };
+type Persona = {
+  id: string;
+  name: string;
+  emoji: string;
+  summary: string;
+  identity: string;
+  style: string;
+  greeting: string;
+  builtin: boolean;
+  current: boolean;
+};
 export type AgentStatus = {
   creatorMode?: boolean;
   creatorEntrance?: CreatorEntrance | null;
   preferences: Preferences;
+  personas?: Persona[];
+  persona?: string;
   memories: Memory[];
   messages: ChatMessage[];
   busy: boolean;
@@ -169,11 +182,14 @@ let questionsSignature = "";
 let handSerial = 0;
 /** 正在编辑的定时任务 id；null 表示新建。 */
 let editingSchedule: string | null = null;
+/** 正在编辑的人格 id；null 表示新建。 */
+let editingPersona: string | null = null;
+let personaDraft: Record<string, string> = {};
 let deedsSerial = 0;
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
-let sheet: "settings" | "memory" | "signals" | "schedules" | null =
+let sheet: "settings" | "memory" | "signals" | "schedules" | "personas" | null =
   null;
 let openedAuthUrl = "";
 type Usage = {
@@ -208,6 +224,8 @@ const esc = (value: unknown) =>
 const pretty = (value: unknown) => JSON.stringify(value, null, 2) ?? "—";
 const field = (name: string, fallback: string | boolean) =>
   configDraft[name] ?? fallback;
+const pfield = (name: string, fallback: string) =>
+  personaDraft[name] ?? fallback;
 const checked = (name: string, fallback: boolean) =>
   field(name, fallback) ? "checked" : "";
 
@@ -332,9 +350,10 @@ function renderChat() {
     `<div class="agent-state ${status.error ? "error" : status.busy ? "busy" : ""}">${status.busy ? `<i class="agent-spinner"></i>${esc(status.authenticating ? "正在登录…" : status.tool ? `正在调用：${status.tool}` : "正在分析…")}` : status.error ? esc(status.error) : "准备好了"}</div>`,
   );
   const current = status.conversations.find((c) => c.active);
+  const currentPersona = status.personas?.find((p) => p.current);
   replace(
     "agent-conversation-title",
-    `<span title="${esc(current?.title ?? "新对话")}">${esc(current?.title ?? "新对话")}</span>${status.creatorMode ? `<button type="button" class="button small agent-creator-badge" data-agent="exit-creator-mode" title="作者模式 · 完整访问；点击退出" ${busy ? "disabled" : ""}><span aria-hidden="true">✦</span> 作者模式 · 退出</button>` : ""}${current?.archived ? `<button type="button" class="button small" data-agent="archive-conversation" data-id="${esc(current.id)}">已归档 · 恢复</button>` : ""}`,
+    `<span title="${esc(current?.title ?? "新对话")}">${esc(current?.title ?? "新对话")}</span>${currentPersona ? `<button type="button" class="button small agent-persona-badge" data-agent="personas" title="当前人格：${esc(currentPersona.name)}；点击切换或新建" ${busy ? "disabled" : ""}><span aria-hidden="true">${esc(currentPersona.emoji || "🎭")}</span> ${esc(currentPersona.name)}</button>` : ""}${status.creatorMode ? `<button type="button" class="button small agent-creator-badge" data-agent="exit-creator-mode" title="作者模式 · 完整访问；点击退出" ${busy ? "disabled" : ""}><span aria-hidden="true">✦</span> 作者模式 · 退出</button>` : ""}${current?.archived ? `<button type="button" class="button small" data-agent="archive-conversation" data-id="${esc(current.id)}">已归档 · 恢复</button>` : ""}`,
   );
   const source = current?.branchedFrom;
   replace(
@@ -707,11 +726,13 @@ function sheetHtml(): string {
   const currentSheet = sheet;
   if (!s || !currentSheet) return "";
   const p = s.preferences;
+  const busy = s.busy || requestPending;
   const title: Record<string, string> = {
     settings: "设置",
     memory: "记忆",
     signals: "学情信号",
     schedules: "定时任务",
+    personas: "人格",
   };
   const body = () => {
     if (currentSheet === "settings")
@@ -739,6 +760,18 @@ function sheetHtml(): string {
           .join("") ||
         '<p class="agent-empty">还没有定时任务。<span data-explanation>让助手排一个，例如「每晚 21:50 用 seat MCP 约明天的座位，并建一条按时签到的任务」。</span></p>'
       }</div><form id="agent-schedule-new" data-id="${editingSchedule ? esc(editingSchedule) : ""}"><h3>${editing ? "编辑定时任务" : "新建定时任务"}</h3><label>名称<input name="name" maxlength="40" required placeholder="抢图书馆座位" value="${editing ? esc(editing.name) : ""}"></label><label>时间<input name="at" required placeholder="21:50 或 2026-10-12T21:50" value="${editing ? esc(editing.at) : ""}"></label><label>周期<select name="repeat"><option value="daily" ${editing?.repeat === "daily" ? "selected" : ""}>每天</option><option value="weekdays" ${editing?.repeat === "weekdays" ? "selected" : ""}>工作日</option><option value="once" ${editing?.repeat === "once" ? "selected" : ""}>只这一次（时间写全日期）</option></select></label><div class="form-grid"><label>提前提醒（分钟）<input name="remindMinutes" type="number" min="0" max="240" value="${editing ? editing.remindMinutes : 15}"></label><label>提前锁机（分钟，0=不锁）<input name="lockBeforeMinutes" type="number" min="0" max="120" value="${editing ? editing.lockBeforeMinutes : 0}"></label></div><label>要助手做什么<textarea name="instruction" rows="3" maxlength="2000" required placeholder="用 seat MCP 预约明天的座位，约到后建一条按时签到的任务并提醒我">${editing ? esc(editing.instruction) : ""}</textarea></label><label class="setting-row"><span><strong>启用</strong><small data-explanation>到点按上面的时间触发</small></span><input class="switch" name="enabled" type="checkbox" checked></label><div class="agent-actions"><button class="button primary small" type="submit">${editing ? "保存修改" : "保存定时任务"}</button>${editing ? '<button class="button small" type="button" data-agent="cancel-edit-schedule">取消编辑</button>' : ""}</div></form>`;
+    }
+    if (currentSheet === "personas") {
+      const list = s.personas ?? [];
+      const editing = list.find((p) => p.id === editingPersona) ?? null;
+      return `<p class="subtle small">人格只改助手的身份、语气与情绪，不碰权限、工具与安全规则。切换只对当前对话生效，分支会继承，新对话回到默认。想让助手自己切换，直接说「换个语气 / 从现在起你是……」即可。</p><div id="agent-personas">${
+        list
+          .map(
+            (p) =>
+              `<div class="agent-persona ${p.current ? "current" : ""}"><div class="agent-persona-head"><b>${esc(p.emoji || "🎭")} ${esc(p.name)}</b>${p.current ? '<span class="agent-tag confirmed">当前</span>' : ""}${p.builtin ? '<span class="agent-tag">内置</span>' : ""}</div>${p.summary ? `<small>${esc(p.summary)}</small>` : ""}<p>${esc(p.identity)}</p><div class="button-row"><button class="button small" data-agent="switch-persona" data-id="${esc(p.id)}" ${p.current || busy ? "disabled" : ""}>${p.current ? "使用中" : "使用"}</button>${p.builtin ? "" : `<button class="button small" data-agent="edit-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>编辑</button><button class="button small" data-agent="delete-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>删除</button>`}</div></div>`,
+          )
+          .join("") || '<p class="agent-empty">还没有人格卡。</p>'
+      }</div><form id="agent-persona-form" data-id="${editing ? esc(editing.id) : ""}"><h3>${editing ? `编辑「${esc(editing.name)}」` : "新建人格"}</h3><div class="form-grid"><label>名称<input name="name" maxlength="24" required placeholder="比如 傲娇学妹" value="${esc(pfield("name", editing?.name ?? ""))}"></label><label>图标<input name="emoji" maxlength="8" placeholder="🍅" value="${esc(pfield("emoji", editing?.emoji ?? ""))}"></label></div><label>一句话简介<input name="summary" maxlength="80" placeholder="在列表里显示" value="${esc(pfield("summary", editing?.summary ?? ""))}"></label><label>身份与背景<textarea name="identity" rows="3" maxlength="2000" placeholder="你是谁、和用户是什么关系">${esc(pfield("identity", editing?.identity ?? ""))}</textarea></label><label>说话与行为风格<textarea name="style" rows="4" maxlength="4000" placeholder="语气、口头禅、情绪表达、禁忌">${esc(pfield("style", editing?.style ?? ""))}</textarea></label><label>开场白（可选）<textarea name="greeting" rows="2" maxlength="300" placeholder="切换过去后可以参考这样开场">${esc(pfield("greeting", editing?.greeting ?? ""))}</textarea></label><div class="agent-actions"><button class="button primary small" type="submit">${editing ? "保存修改" : "保存人格"}</button>${editing ? '<button class="button small" type="button" data-agent="new-persona">取消编辑</button>' : ""}</div></form>`;
     }
     if (currentSheet === "memory")
       return `<div id="agent-memories">${
@@ -1035,6 +1068,8 @@ export function mountAgent() {
     const memoryForm = input.closest<HTMLFormElement>("[data-memory]");
     if (memoryForm?.dataset.memory)
       memoryEdits[memoryForm.dataset.memory] = input.value;
+    const personaForm = input.closest<HTMLFormElement>("#agent-persona-form");
+    if (personaForm) personaDraft[input.name] = input.value;
     if (input.closest("#agent-config-form")) {
       configDraft[input.name] =
         input.type === "checkbox" ? input.checked : input.value;
@@ -1267,6 +1302,21 @@ async function submit(form: HTMLFormElement) {
     form.reset();
     editingSchedule = null;
     hooks.toast(form.dataset.id ? "定时任务已更新" : "定时任务已保存");
+    await refreshAgent();
+  } else if (form.id === "agent-persona-form") {
+    const id = form.dataset.id;
+    await tool("save_persona", {
+      ...(id ? { id } : {}),
+      name: String(data.get("name") ?? "").trim(),
+      emoji: String(data.get("emoji") ?? "").trim(),
+      summary: String(data.get("summary") ?? "").trim(),
+      identity: String(data.get("identity") ?? "").trim(),
+      style: String(data.get("style") ?? "").trim(),
+      greeting: String(data.get("greeting") ?? "").trim(),
+    });
+    editingPersona = null;
+    personaDraft = {};
+    hooks.toast(id ? "人格已更新" : "人格已保存");
     await refreshAgent();
   } else if (form.id === "agent-memory-add") {
     await call({ op: "memory_save", text });
@@ -1516,6 +1566,7 @@ async function action(button: HTMLButtonElement) {
     case "memory":
     case "schedules":
     case "signals":
+    case "personas":
       openSheet(button.dataset.agent as NonNullable<typeof sheet>);
       break;
     // 会话列表是侧栏，不是浮层：再点一次收起来。
@@ -1666,7 +1717,40 @@ async function action(button: HTMLButtonElement) {
       await call({ op: "memory_delete", id: button.dataset.id });
       delete memoryEdits[button.dataset.id!];
       break;
-
+    case "switch-persona":
+      await tool("switch_persona", { id: button.dataset.id });
+      await refreshAgent();
+      hooks.toast("已切换人格");
+      break;
+    case "edit-persona": {
+      const persona = status?.personas?.find((p) => p.id === button.dataset.id);
+      if (!persona) break;
+      editingPersona = persona.id;
+      personaDraft = {
+        name: persona.name,
+        emoji: persona.emoji,
+        summary: persona.summary,
+        identity: persona.identity,
+        style: persona.style,
+        greeting: persona.greeting,
+      };
+      renderSheet();
+      break;
+    }
+    case "new-persona":
+      editingPersona = null;
+      personaDraft = {};
+      renderSheet();
+      break;
+    case "delete-persona":
+      await tool("delete_persona", { id: button.dataset.id });
+      if (editingPersona === button.dataset.id) {
+        editingPersona = null;
+        personaDraft = {};
+      }
+      await refreshAgent();
+      hooks.toast("人格已删除");
+      break;
   }
   update();
 }

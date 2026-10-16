@@ -26,11 +26,11 @@ generated_at: 2026-10-14
 | --- | --- | --- |
 | package.json | 构建 | 固定 Pi SDK 与 TypeBox 版本，构建由 scripts/build-agent.mjs 执行 |
 | worker.mjs | 对话 | 行协议、认证/用量、prompt 与流式文本/思考事件、Pi 节点/分支结果、取消及会话关闭 |
-| session.mjs | 对话 | Pi 会话加载、createBranchedSession 分支、工具允许集合、作者轮次实际提示词/工具定义读取、思考强度与 MCP 生命周期 |
-| coding.mjs | 工具 | Pi 编程工具、仅工作区文件访问与持久沙箱终端、完整访问的宿主文件读写与终端 |
+| session.mjs | 对话 | Pi 会话加载、createBranchedSession 分支、工具允许集合、运行时人格块注入、作者彩蛋同轮 Pi 原生注册完整编程工具与实际提示词读取、思考强度与 MCP 生命周期 |
+| coding.mjs | 工具 | Pi 编程工具、仅工作区文件访问与持久沙箱终端、完整访问的宿主文件读写与终端、按 Pi 会话生命周期清理终端 |
 | imagegen.mjs | 图像 | Pi Codex SSE 的 image_generation 声明与结果截取，参考图/私有保存桥接、账号/后端拒绝、原生取消与服务错误映射 |
 | web.mjs | 联网 | Exa 搜索、公开网页读取、地址边界与账号服务端搜索 |
 | codex-config.mjs | 联网 | 读取 Codex CLI 模型供应商、认证与第三方端点映射 |
 | mcp-config.mjs | 桥接 | MCP 配置读取、校验、增删与服务器视图 |
 | mcp.mjs | 桥接 | 外部 MCP stdio 客户端入口，连接应用的认证桥 |
-| system-prompt.md | 助手指导 | 当前学习助手机制、工具使用与证据/权限约定 |
+| system-prompt.md | 助手指导 | 当前学习助手机制、工具使用与证据/权限约定、人格由运行时注入的声明、作者语义识别与首次相认的惊喜语气 |

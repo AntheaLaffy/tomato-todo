@@ -151,6 +151,34 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             false,
         ));
         list.push(tool(
+            "list_personas",
+            "列出当前可用的人格卡与当前对话正在使用的人格。用户想换说话风格、想让你扮演某个角色、或要新建人格前先看这里。",
+            json!({}),
+            &[],
+            true,
+        ));
+        list.push(tool(
+            "switch_persona",
+            "把当前对话切换到你 id 对应的人格，之后各轮都按它说话；用户说「换个语气 / 你以后就是……」时用。切换后本轮就以新人格回应。",
+            json!({"id":{"type":"string","maxLength":40}}),
+            &["id"],
+            false,
+        ));
+        list.push(tool(
+            "save_persona",
+            "新建或修改一张人格卡（改 id 对应的人格）。只影响身份、语气与情绪，不涉及权限。改已有内置人格会被拒绝，请当作用户想另存一个新人格。",
+            json!({"id":{"type":"string","maxLength":40,"description":"省略则新建；填写则修改同名自定义人格"},"name":{"type":"string","maxLength":24},"emoji":{"type":"string","maxLength":8},"summary":{"type":"string","maxLength":80},"identity":{"type":"string","maxLength":2000},"style":{"type":"string","maxLength":4000},"greeting":{"type":"string","maxLength":300}}),
+            &["name"],
+            false,
+        ));
+        list.push(tool(
+            "delete_persona",
+            "删掉一张自定义人格卡（按 id）；默认人格与内置预设删不掉，使用了它们的对话会回到默认。",
+            json!({"id":{"type":"string","maxLength":40}}),
+            &["id"],
+            false,
+        ));
+        list.push(tool(
             "show_me",
             "在界面上演一遍给用户看：助手的手会移动、点击、打字，手边浮出你写的讲稿。steps 是一串动作，`kind` 取 move（target 选择器）/ click（target，默认真的点下去）/ type（target+text，浮出小键盘逐键敲进真实输入框）/ highlight（临时框出目标）/ say（lines，1–4 行讲稿，每行 ≤300 字，文字由你写）/ keyboard（on）/ wait（ms ≤8000）/ hide。演示要短：3–12 步、讲一两个点就够，看完用户是要自己动手的。",
             json!({"label":{"type":"string","maxLength":12,"description":"手名牌上的名字，默认「助手」"},"steps":{"type":"array","minItems":1,"maxItems":12,"items":{"type":"object","properties":{"kind":{"type":"string","enum":["move","click","type","highlight","say","keyboard","wait","hide"]},"target":{"type":"string","maxLength":200},"text":{"type":"string","maxLength":200},"lines":{"type":["string","array"],"items":{"type":"string","maxLength":300}},"ms":{"type":"integer","minimum":0,"maximum":8000},"on":{"type":"boolean"},"real":{"type":"boolean"},"hold":{"type":"boolean"}},"required":["kind"],"additionalProperties":false}}}),

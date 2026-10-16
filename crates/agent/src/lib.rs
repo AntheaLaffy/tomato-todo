@@ -508,6 +508,7 @@ impl Agent {
             definitions.push(creator::activation_tool());
             definitions.push(creator::tool());
         }
+        let persona = next.active_persona();
         next.save(&self.dir)?;
         inner.store = next;
         inner.live.busy = true;
@@ -521,7 +522,7 @@ impl Agent {
         inner.live.scheduled = scheduled;
         inner.live.job_id = uuid::Uuid::new_v4().to_string();
         Ok(
-            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"creatorMode":creator_mode,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":definitions}),
+            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"creatorMode":creator_mode,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"persona":persona,"sessionFile":inner.store.active_session(),"tools":definitions}),
         )
     }
     fn send_prompt(self: &Arc<Self>, command: Value) -> AppResult<()> {
@@ -701,7 +702,7 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"creatorEntrance":inner.live.creator_entrance,"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"creatorEntrance":inner.live.creator_entrance,"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"personas":inner.store.personas_view(),"persona":inner.store.persona_id(),"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -1022,6 +1023,48 @@ impl Agent {
             "clear_plan" => {
                 self.inner.lock().map_err(|e| e.to_string())?.live.plan = Value::Null;
                 Ok(json!({"cleared":true}))
+            }
+            "list_personas" => {
+                let inner = self.inner.lock().map_err(|e| e.to_string())?;
+                Ok(
+                    json!({"personas":inner.store.personas_view(),"current":inner.store.persona_id(),"note":"用 switch_persona 切换当前对话的人格；save_persona 新建或修改自定义人格。"}),
+                )
+            }
+            // 运行时人格：只改当前对话的人格与身份语气，不碰工具、权限与安全规则。
+            // 切换后本轮的系统提示词已经发过，工具结果里让模型立刻照新人格回应。
+            "switch_persona" => {
+                let id = nonempty_text(args, "id", 40)?;
+                let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                let mut next = inner.store.clone();
+                let persona = next.set_persona(&id, now())?;
+                next.save(&self.dir)?;
+                inner.store = next;
+                Ok(
+                    json!({"persona":persona.view(&persona.id),"note":format!("已切换为「{}」；从现在起就按这个人格回应，本轮也照它说。",persona.name)}),
+                )
+            }
+            "save_persona" => {
+                let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                let mut next = inner.store.clone();
+                let created = !next
+                    .personas
+                    .iter()
+                    .any(|p| Some(p.id.as_str()) == args["id"].as_str());
+                let persona = next.save_persona(args, now())?;
+                next.save(&self.dir)?;
+                inner.store = next;
+                Ok(
+                    json!({"persona":persona.view(&persona.id),"created":created,"note":if created {"人格已保存；用 switch_persona 切换过去。"} else {"人格已更新。"}}),
+                )
+            }
+            "delete_persona" => {
+                let id = nonempty_text(args, "id", 40)?;
+                let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                let mut next = inner.store.clone();
+                next.delete_persona(&id)?;
+                next.save(&self.dir)?;
+                inner.store = next;
+                Ok(json!({"deleted":true,"note":"人格已删除；原本用它的对话回到默认人格。"}))
             }
             "update_plan" => {
                 let plan = args["plan"].as_array().cloned().unwrap_or_default();
