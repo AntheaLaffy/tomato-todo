@@ -46,6 +46,28 @@ test("user installation preserves shell settings, validates launchers and is rep
     settings,
   );
   execFileSync("python3", args);
+  const installedHelper = join(
+    home,
+    ".local/lib/tomato-todo/install-desktop-integration.py",
+  );
+  const installedPlan = JSON.parse(
+    execFileSync("python3", [installedHelper, "--home", home, "--dry-run"], {
+      encoding: "utf8",
+    }),
+  );
+  assert.match(installedPlan.extension, /gnome-shell/);
+  assert.equal(
+    JSON.parse(
+      await readFile(
+        join(
+          home,
+          ".local/lib/tomato-todo/desktop-integrations/gnome/metadata.json",
+        ),
+        "utf8",
+      ),
+    ).uuid,
+    "tomato-guard@studio.tomato.todo",
+  );
   const first = JSON.parse(await readFile(join(config, "settings.json")));
   assert.equal(first.other, "keep");
   assert.equal(first.showDock, false);
@@ -77,4 +99,31 @@ test("user installation preserves shell settings, validates launchers and is rep
     execFileSync("desktop-file-validate", [path]);
     assert.match(await readFile(path, "utf8"), /%%/);
   }
+});
+
+test("GNOME integration installs without enabling extensions or changing another home", async () => {
+  const home = await mkdtemp(join(tmpdir(), "tomato-gnome-install-"));
+  const args = ["scripts/install-desktop-integration.py", "--home", home];
+  const plan = JSON.parse(
+    execFileSync("python3", [...args, "--dry-run"], { encoding: "utf8" }),
+  );
+  assert.deepEqual(await readdir(home), []);
+  execFileSync("python3", args);
+  const metadata = JSON.parse(
+    await readFile(join(plan.extension, "metadata.json"), "utf8"),
+  );
+  assert.equal(metadata.uuid, "tomato-guard@studio.tomato.todo");
+  assert.match(
+    await readFile(join(plan.extension, "extension.js"), "utf8"),
+    /ListWindows/,
+  );
+  execFileSync("python3", args);
+  await writeFile(
+    join(plan.extension, "metadata.json"),
+    JSON.stringify({ uuid: "someone-else" }),
+  );
+  assert.throws(
+    () => execFileSync("python3", args, { stdio: "pipe" }),
+    /Refusing to replace/,
+  );
 });

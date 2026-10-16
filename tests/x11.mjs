@@ -32,9 +32,12 @@ try {
     ...process.env,
     DISPLAY: display,
     XDG_SESSION_TYPE: "x11",
+    XDG_CURRENT_DESKTOP: "",
     TOMATO_X11_TEST_ISOLATED: "1",
   };
   delete env.NIRI_SOCKET;
+  delete env.SWAYSOCK;
+  delete env.HYPRLAND_INSTANCE_SIGNATURE;
   delete env.WAYLAND_DISPLAY;
   wm = spawn("openbox", [], { env, stdio: "inherit" });
   wm.on("error", (error) => {

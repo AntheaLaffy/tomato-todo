@@ -4251,6 +4251,7 @@ name = "tomato-core"
 version = "0.9.0"
 dependencies = [
  "chrono",
+ "gio",
  "rusqlite",
  "serde",
  "serde_json",

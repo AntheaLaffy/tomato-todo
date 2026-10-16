@@ -1,0 +1,7 @@
+{
+  "uuid": "tomato-guard@studio.tomato.todo",
+  "name": "番茄 Todo 窗口保护",
+  "description": "为番茄 Todo 提供原生 Wayland 窗口枚举与聚焦；扩展不自行锁机或修改任务。",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "version": 1
+}

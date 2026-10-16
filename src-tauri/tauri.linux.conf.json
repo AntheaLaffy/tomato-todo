@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "resources": {
+      "../scripts/install-desktop-integration.py": "install-desktop-integration.py",
+      "../desktop-integrations/gnome/extension.js": "desktop-integrations/gnome/extension.js",
+      "../desktop-integrations/gnome/metadata.json": "desktop-integrations/gnome/metadata.json"
+    }
+  }
+}

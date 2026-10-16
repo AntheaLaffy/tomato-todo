@@ -20,7 +20,7 @@ Windows 目前只覆盖 x64：ARM64 宿主（`windows-11-arm`）上隔离桌面�
 | 桌面系统集成 | GIO/AppIndicator 仅在 Linux 编译；Windows/macOS 使用原生自启动和托盘、Tauri 配置目录；登录通过 opener；Linux 编译、Clippy、自启动单测及隔离原生回归通过，Windows GNU 目标整应用 `cargo check` 通过 | Windows MSVC/macOS 目标构建与原生执行、通知和自启动行为 |
 | 桌面发布矩阵 | v0.8.4 发行 Linux 两架构 deb/压缩包和 Windows x64 NSIS；Windows ARM64 与 macOS 安装包延后；全部构建成功后发布；actionlint 通过；本机生产 deb 构建成功，包内二进制、Node、worker 和许可证已核对 | 远端实际构建、签名、安装与升级 |
 | Windows 窗口保护 | Win32 枚举/PID/标题、完整路径、后台线程回焦和输入队列恢复；同名不同目录、长路径、白名单与窗口失效已在独立 Wine/Openbox/Xvfb 上验证；Windows x64 原生 runner 的隔离桌面回归通过；封装应用优先 AUMID，旧 UWP 框架解析应用进程，Wine 回退到普通路径 | UWP/商店应用身份、真实桌面拒绝激活及整应用行为；ARM64 未验证，也不在 CI 与发布矩阵内 |
-| Linux 窗口保护 | 保留 niri IPC，新增原生 X11 EWMH；Openbox/Xvfb 的真实核心及 Tauri/WebKit 白名单、回焦、快速锁机、紧急恢复和 WM 失效严格释放测试通过；检测活跃 WM，不将 Xwayland 列表当成完整桌面 | GNOME、KDE Plasma、Xfce、Cinnamon、MATE、LXQt 各实际会话验收，以及其他 Wayland 合成器后端 |
+| Linux 窗口保护 | niri、X11 EWMH、Sway、Hyprland、GNOME Shell 扩展与 KDE KWin；niri/X11 整应用通过，Sway headless 真实窗口/白名单/聚焦通过，四个新增后端的私有 socket/D-Bus/脚本回归通过 | GNOME Shell 45–50、Plasma 5.27/6、Hyprland 真实会话，以及 GNOME/KDE/Xfce/Cinnamon/MATE/LXQt 等 X11 桌面各实际会话验收 |
 | 专注提示音抑制 | Linux 通过 PulseAudio/PipeWire 兼容接口监听通知角色和聊天应用播放流，暂停、结束及退出时恢复；解析与角色边界单测通过 | Windows/macOS 音频会话实现；微信、QQ 等实际 Linux 客户端及各桌面音频栈验收 |
 
 ## 桌面构建与发布
@@ -33,11 +33,33 @@ Linux 本机 `pnpm run test:native` 在嵌套 niri/私有 D-Bus 中通过：托�
 
 ## X11 窗口保护
 
-原生 X11 会话自动使用 EWMH 后端，支持窗口列表、前台窗口、`_NET_WM_PID`、`WM_CLASS` 应用类与标题。niri 会话继续优先使用 niri IPC；其他 Wayland 会话目前不会退到只可看到部分窗口的 Xwayland。
+原生 X11 会话自动使用 EWMH 后端，支持窗口列表、前台窗口、`_NET_WM_PID`、`WM_CLASS` 应用类与标题。Wayland 会话使用下述原生后端，未支持的合成器与后端故障均不会退到只可看到部分窗口的 Xwayland。
 
 核心协议测试：`pnpm run test:x11`。整应用测试：`pnpm run test:x11:app`。测试均由入口自动分配独立 Xvfb/Openbox 会话，整应用另开私有 D-Bus 和临时数据库；不能把用户当前桌面的 DISPLAY 传给测试执行器。
 
 X11 和 niri 的应用标识可能不同；切换桌面后应从保护页的真实应用列表重新选择白名单。X11 后端已经用 Openbox 验证，不能用这项证据代替 GNOME/KDE 等各实际会话的验收。
+
+## Linux Wayland 桌面保护
+
+后端由非空的 `NIRI_SOCKET`、`SWAYSOCK`、`HYPRLAND_INSTANCE_SIGNATURE` 选择；其余 Wayland 会话根据 `XDG_CURRENT_DESKTOP` 选择 GNOME 或 KDE。X11 会话使用 EWMH；未知 Wayland 明确不可用。
+
+- **Sway**：直接实现 i3 IPC 帧协议，递归读取普通/浮动窗口树；原生窗口用 app ID，Xwayland 窗口用 class；按容器 ID 激活并重新查询确认聚焦。
+- **Hyprland**：连接当前运行目录下 `hypr/<instance>/.socket.sock`，读取 clients/activewindow 并通过窗口地址激活；异常地址、协议错误与断连显式失败。
+- **GNOME Shell 45–50**：随 Linux 包提供 ES module 扩展，导出 `org.gnome.Shell` 的 `/studio/tomato/Guard`、`studio.tomato.Guard1` 接口。`ListWindows() -> s` 返回统一窗口 JSON，`FocusWindow(u) -> b` 按 Meta 稳定序号恢复最小化、切换工作区并聚焦；禁用扩展即取消导出。
+- **KDE Plasma 5.27 / 6**：通过 KWin 的 load/run/unload 脚本接口查询窗口；识别两代脚本对象路径与 workspace API。每次使用唯一回调路径，校验回调发送者是当前 KWin，完成或失败后卸载脚本。临时脚本只枚举或激活窗口，不修改 KWin 插件设置。依据：[KWin API](https://develop.kde.org/docs/plasma/kwin/api/)、[Plasma 5.27 脚本对象实现](https://invent.kde.org/plasma/kwin/-/blob/Plasma/5.27/src/scripting/scripting.cpp)。
+
+GNOME 源码安装：`python3 scripts/install-desktop-integration.py`。压缩包使用解压目录中的同名安装器；用户安装后位于 `~/.local/lib/tomato-todo/`；deb 位于 `/usr/lib/Tomato Todo/`。首次安装后注销并重新登录，再执行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器不连接或启用真实桌面扩展；更新启用中的扩展需重新登录。Shell 扩展机制见 [GNOME 文档](https://gjs.guide/extensions/overview/anatomy.html)。
+
+验证入口：
+
+```sh
+cargo test -p tomato-core --test guard_linux       # 私有 Sway/Hyprland socket
+pnpm run test:linux-desktops                     # 私有 D-Bus + GNOME 逻辑/KWin 生成脚本
+pnpm run test:wayland                            # 独立 headless Sway，需安装 sway
+pnpm run test:wayland --hyprland                 # Xvfb→niri→Hyprland，需 GPU/DMA-BUF v4
+```
+
+2026-10-16：Sway 1.12 headless 下真实 GTK 窗口、PID、白名单放行、非白名单切回和聚焦确认通过；niri 与 Openbox/X11 整应用回归通过。GNOME/KWin 目前是扩展逻辑、私有 D-Bus 与实际生成脚本的回归证据，未替代真实桌面验收。Hyprland 0.56.2 的协议回归通过，但本机没有 `/dev/dri`，嵌套 niri 软件渲染只提供 DMA-BUF v3，Hyprland 启动要求 v4，真实会话测试在窗口创建前失败；该项保持待验收，没有跳过或计为通过。
 
 ## Windows 窗口保护
 

@@ -2,6 +2,12 @@
 #[cfg(target_os = "macos")]
 #[path = "guard_macos.rs"]
 mod macos;
+#[cfg(target_os = "linux")]
+#[path = "guard_shell.rs"]
+mod shell;
+#[cfg(target_os = "linux")]
+#[path = "guard_wayland.rs"]
+mod wayland;
 #[cfg(target_os = "windows")]
 #[path = "guard_windows.rs"]
 mod win32;
@@ -68,26 +74,107 @@ pub fn windows() -> AppResult<Vec<Window>> {
     }
     #[cfg(target_os = "linux")]
     {
-        if std::env::var_os("NIRI_SOCKET").is_none() {
-            return x11::windows();
+        match linux_backend() {
+            LinuxBackend::Niri => {
+                let reply = request(json!("Windows"))?;
+                serde_json::from_value(reply["Windows"].clone()).map_err(|e| e.to_string())
+            }
+            LinuxBackend::Sway => wayland::sway_list(),
+            LinuxBackend::Hyprland => wayland::hypr_list(),
+            LinuxBackend::Gnome => shell::gnome_list(),
+            LinuxBackend::KWin => shell::kwin_list(),
+            LinuxBackend::X11 => x11::windows(),
+            LinuxBackend::Unsupported => Err(
+                "当前 Wayland 桌面尚无窗口接口，Xwayland 不能管控全部应用；已支持 niri、Sway、Hyprland、GNOME 扩展和 KDE KWin"
+                    .into(),
+            ),
         }
-        let reply = request(json!("Windows"))?;
-        serde_json::from_value(reply["Windows"].clone()).map_err(|e| e.to_string())
     }
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
         Err("当前平台尚未提供原生窗口保护接口".into())
     }
 }
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LinuxBackend {
+    Niri,
+    Sway,
+    Hyprland,
+    Gnome,
+    KWin,
+    X11,
+    Unsupported,
+}
+#[cfg(target_os = "linux")]
+fn linux_backend() -> LinuxBackend {
+    let present = |name| std::env::var_os(name).is_some_and(|value| !value.is_empty());
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
+    select_linux_backend(
+        present("NIRI_SOCKET"),
+        present("SWAYSOCK"),
+        present("HYPRLAND_INSTANCE_SIGNATURE"),
+        present("WAYLAND_DISPLAY")
+            || std::env::var("XDG_SESSION_TYPE").is_ok_and(|s| s.eq_ignore_ascii_case("wayland")),
+        &desktop,
+    )
+}
+#[cfg(target_os = "linux")]
+fn select_linux_backend(
+    niri: bool,
+    sway: bool,
+    hyprland: bool,
+    wayland: bool,
+    desktop: &str,
+) -> LinuxBackend {
+    if niri {
+        return LinuxBackend::Niri;
+    }
+    if sway {
+        return LinuxBackend::Sway;
+    }
+    if hyprland {
+        return LinuxBackend::Hyprland;
+    }
+    if !wayland {
+        return LinuxBackend::X11;
+    }
+    let desktop = desktop.to_ascii_lowercase();
+    if desktop
+        .split(':')
+        .any(|d| matches!(d, "gnome" | "gnome-classic" | "ubuntu"))
+    {
+        return LinuxBackend::Gnome;
+    }
+    if desktop.split(':').any(|d| matches!(d, "kde" | "plasma")) {
+        return LinuxBackend::KWin;
+    }
+    LinuxBackend::Unsupported
+}
 fn backend() -> &'static str {
-    if cfg!(target_os = "windows") {
+    #[cfg(target_os = "linux")]
+    {
+        match linux_backend() {
+            LinuxBackend::Niri => "niri / Wayland",
+            LinuxBackend::Sway => "Sway / Wayland",
+            LinuxBackend::Hyprland => "Hyprland / Wayland",
+            LinuxBackend::Gnome => "GNOME Shell / Wayland",
+            LinuxBackend::KWin => "KWin / Wayland",
+            LinuxBackend::X11 => "EWMH / X11",
+            LinuxBackend::Unsupported => "Wayland",
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
         "Win32 / Windows"
-    } else if cfg!(target_os = "macos") {
+    }
+    #[cfg(target_os = "macos")]
+    {
         "Quartz / macOS Accessibility"
-    } else if std::env::var_os("NIRI_SOCKET").is_some() {
-        "niri / Wayland"
-    } else {
-        "EWMH / X11"
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        "当前环境"
     }
 }
 pub fn info() -> GuardInfo {
@@ -100,7 +187,7 @@ pub fn info() -> GuardInfo {
         },
         Err(e) => GuardInfo {
             available: false,
-            backend: "当前环境".into(),
+            backend: backend().into(),
             message: format!("{e}。普通番茄计时仍可使用。"),
             windows: vec![],
         },
@@ -126,7 +213,7 @@ pub fn preflight(own_pid: u32) -> AppResult<()> {
     }
     Ok(())
 }
-/// Report a confirmed redirect; a deferred Windows activation leaves protection running.
+/// Deferred native activation leaves protection running for the next check.
 pub fn enforce(protection: &Protection, own_pid: u32) -> AppResult<bool> {
     if protection.mode == GuardMode::Off {
         return Ok(false);
@@ -154,11 +241,18 @@ fn focus_window(id: u64) -> AppResult<bool> {
     }
     #[cfg(target_os = "linux")]
     {
-        if std::env::var_os("NIRI_SOCKET").is_none() {
-            return x11::focus(id).map(|()| true);
+        match linux_backend() {
+            LinuxBackend::Niri => {
+                request(json!({"Action": {"FocusWindow": {"id": id}}}))?;
+                Ok(true)
+            }
+            LinuxBackend::Sway => wayland::sway_focus(id),
+            LinuxBackend::Hyprland => wayland::hypr_focus(id),
+            LinuxBackend::Gnome => shell::gnome_focus(id),
+            LinuxBackend::KWin => shell::kwin_focus(id),
+            LinuxBackend::X11 => x11::focus(id).map(|()| true),
+            LinuxBackend::Unsupported => Err("当前 Wayland 桌面尚无激活窗口接口".into()),
         }
-        request(json!({"Action": {"FocusWindow": {"id": id}}}))?;
-        Ok(true)
     }
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
@@ -215,5 +309,52 @@ mod tests {
             strict: false,
         };
         assert!(!allowed(&window("code", 200), 100, &p));
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod linux_tests {
+    use super::*;
+    #[test]
+    fn compositor_selection_does_not_treat_unknown_wayland_as_x11() {
+        assert_eq!(
+            select_linux_backend(true, false, false, true, "GNOME"),
+            LinuxBackend::Niri
+        );
+        assert_eq!(
+            select_linux_backend(false, true, false, true, "sway"),
+            LinuxBackend::Sway
+        );
+        assert_eq!(
+            select_linux_backend(false, false, true, true, "Hyprland"),
+            LinuxBackend::Hyprland
+        );
+        assert_eq!(
+            select_linux_backend(false, false, false, true, "ubuntu:GNOME"),
+            LinuxBackend::Gnome
+        );
+        assert_eq!(
+            select_linux_backend(false, false, false, true, "KDE"),
+            LinuxBackend::KWin
+        );
+        for desktop in [
+            "GNOME",
+            "KDE",
+            "XFCE",
+            "X-Cinnamon",
+            "MATE",
+            "LXQt",
+            "Unity",
+            "Budgie",
+        ] {
+            assert_eq!(
+                select_linux_backend(false, false, false, false, desktop),
+                LinuxBackend::X11
+            );
+        }
+        assert_eq!(
+            select_linux_backend(false, false, false, true, "unknown"),
+            LinuxBackend::Unsupported
+        );
     }
 }

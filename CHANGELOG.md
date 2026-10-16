@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+### 新增
+
+- Linux 专注保护增加 Sway、Hyprland 原生 IPC、GNOME Shell 45–50 可安装扩展和 KDE Plasma 5.27/6 KWin 脚本后端；X11 桌面继续共用 EWMH。GNOME 扩展与安装器随 Linux 包发行，用户自行启用。
+- 新增私有 socket/D-Bus、扩展逻辑与真实 headless Sway 回归；GNOME/KWin/Hyprland 实际会话的剩余验收单独记录。
+
 ## [0.9.0] - 2026-10-16
 
 ### 新增

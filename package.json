@@ -20,6 +20,8 @@
     "test:windows": "node tests/windows.mjs",
     "test:android": "node tests/android.mjs",
     "test:x11": "node tests/x11.mjs",
+    "test:linux-desktops": "node tests/linux-desktops.mjs",
+    "test:wayland": "node tests/wayland.mjs",
     "test:native": "pnpm run agent:build && pnpm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/native.mjs",
     "format": "cargo fmt --all && prettier --write src scripts tests package.json",
     "format:check": "cargo fmt --all --check && prettier --check \"src/**/*.{ts,css}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" package.json",

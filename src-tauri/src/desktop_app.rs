@@ -77,9 +77,10 @@ pub fn run() {
         tauri::utils::platform::resource_dir(context.package_info(), &tauri::utils::Env::default())
             .ok();
     tomato_agent::mcp_entry(resource_dir.as_deref());
-    // niri reports the native Wayland window's PID; Xwayland can report the
-    // satellite's PID instead, preventing protection from finding this window.
-    if std::env::var_os("NIRI_SOCKET").is_some() && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+    // Native Wayland backends need the application PID, rather than an
+    // Xwayland satellite PID, to find the focus window.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WAYLAND_DISPLAY").is_some_and(|v| !v.is_empty()) {
         std::env::set_var("GDK_BACKEND", "wayland,x11");
     }
     let background = std::env::args().any(|arg| arg == "--background");

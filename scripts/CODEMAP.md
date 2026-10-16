@@ -10,7 +10,8 @@ generated_at: 2026-10-09
 | File            | Domain | Function                                                                       |
 | --------------- | ------ | ------------------------------------------------------------------------------ |
 | dev.mjs         | 构建   | 启动 Rust 预览服务及 Vite 并处理退出                                           |
-| install.py      | 安装   | 安装二进制、图标、菜单/自启动入口；备份并更新 DMS 快捷栏                       |
+| install-desktop-integration.py | 桌面集成 | 安装 GNOME 扩展到用户 XDG 目录，提供启用命令而不自动启用，支持临时 home 和 dry-run |
+| install.py      | 安装   | 安装二进制、随包扩展/安装器、图标、菜单/自启动入口；备份并更新 DMS 快捷栏                       |
 | build-agent.mjs | 构建   | 打包固定版本 Pi SDK、按本机或显式 Rust 目标校验并内置 Node 运行时，生成 agent/bundle（不含私人数据与 npm 绝对路径 .bin 软链） |
 | agent-runtime.mjs | 构建 | Linux/Windows/macOS x64/ARM64 的固定 Node 版本、官方校验和与 Rust 目标选择，拒绝不兼容 ABI |
 | check-android-apk.py | 构建 | 校验 universal APK 的四个原生 ABI、ELF 架构和桌面 Node 资源排除；供本机原生测试和 CI 共用 |

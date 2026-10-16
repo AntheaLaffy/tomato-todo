@@ -24,6 +24,9 @@ pnpm test               # Rust 单元测试 + 构建 + 浏览器端到端测试
 pnpm run test:native    # niri 独立嵌套桌面上的原生保护测试
 pnpm run test:windows   # Windows 独立 CI runner / Linux 独立 Wine+Xvfb 的原生保护测试
 pnpm run test:android   # 新建临时 API 33 AVD，验证已构建的 debug APK
+pnpm run test:linux-desktops # 私有 D-Bus 的 GNOME/KWin 桥接与扩展逻辑回归
+pnpm run test:wayland   # 独立 headless Sway 的真实窗口回归（需 sway）
+pnpm run test:wayland --hyprland # 嵌套 Hyprland（需 niri、Xvfb、GPU/DMA-BUF v4）
 pnpm run test:x11       # 独立 Xvfb/Openbox 的核心 EWMH 保护测试
 pnpm run test:x11:app   # 同一独立 X11 会话中的 Tauri/WebKit 整应用保护测试
 pnpm run test:install   # 安装脚本验证
@@ -55,6 +58,8 @@ Android 使用 Java 17、Android SDK（工程中的 compileSdk）与 NDK 28.2.13
 原生保护测试（`pnpm run test:native`）需要 niri、Xvfb、tauri-driver、WebKitWebDriver 和 Python GObject/GTK。它会构建内置界面的独立测试程序，用私有 D-Bus、临时 XDG 配置和 StatusNotifier 测试宿主，验证白名单放行、非白名单回焦、拒绝关闭与暂停、全屏锁定、紧急恢复、真实托盘菜单、隐藏后计时、自启动开关、单实例恢复、无托盘回退。
 
 X11 测试由 `tests/x11.mjs` 使用 `Xvfb -displayfd` 自动分配独立显示，清除 niri/Wayland 环境；整应用测试另开私有 D-Bus、配置与数据目录。核心测试需要 Xvfb/Openbox，整应用测试额外需要 tauri-driver、WebKitWebDriver、xdotool/xprop 与 Python GObject/GTK；CI 在 Linux 上运行整应用测试。
+
+Linux 合成器协议回归使用临时 Unix socket 与私有 D-Bus，不接触用户窗口。`tests/wayland.mjs` 默认创建独立 headless Sway；`--hyprland` 另建 Xvfb 和父级 niri，Hyprland 只连接该嵌套显示。可用 `TOMATO_SWAY_BINARY` 指定临时解包的 Sway 程序，不必更改系统安装。GNOME/KWin 的私有服务与生成脚本回归不代表已通过实际 GNOME Shell/KWin 会话验收，见适配记录。
 
 Windows 保护测试在独立 GitHub runner 上执行；Linux 本机需要 Windows GNU Rust target、MinGW、Wine、Xvfb 与 Openbox。`tests/windows.mjs` 自动使用新显示与独立 Wine 前缀；不会复用用户的 Wine 配置或显示。Wine 只能验证其实现的 Win32 API；封装应用身份与原生 Windows 行为仍需独立 Windows 验收。
 

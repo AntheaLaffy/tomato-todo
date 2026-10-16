@@ -18,7 +18,7 @@ OUT = ROOT / "docs" / "HANDBOOK" / "95-测试索引.md"
 # 章节 → 背书该章事实的测试来源（人工映射，改动测试文件时同步）
 CHAPTER_TESTS = {
     "06-安全与隐私边界": ["tests/agent-workspace.mjs","crates/agent/src/state.rs", "tests/agent.mjs"],
-    "10-锁与专注保护": ["crates/core/src/guard.rs", "crates/core/tests/guard_x11.rs", "crates/core/tests/guard_windows.rs", "tests/native.mjs", "tests/x11-app.mjs"],
+    "10-锁与专注保护": ["crates/core/tests/guard_linux.rs", "tests/linux-desktops.mjs", "tests/wayland.mjs", "crates/core/src/guard.rs", "crates/core/tests/guard_x11.rs", "crates/core/tests/guard_windows.rs", "tests/native.mjs", "tests/x11-app.mjs"],
     "11-定时锁机": ["crates/core/src/lock.rs", "tests/integration.mjs", "tests/native.mjs", "tests/x11-app.mjs"],
     "12-课表与提醒": ["crates/core/src/blocks.rs", "crates/core/src/reminders.rs", "tests/integration.mjs"],
     "13-任务与列表": ["crates/core/src/tests.rs", "tests/integration.mjs"],

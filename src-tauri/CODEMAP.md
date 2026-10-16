@@ -29,6 +29,7 @@ Linux、Windows、macOS 桌面配置与 Android 原生应用工程。
 | build.rs | 构建 | Tauri 构建入口 |
 | tauri.conf.json | 桌面 | 窗口、CSP、图标、打包和开发服务配置 |
 | tomato.desktop.hbs | 桌面 | 独立设置中文启动器名称，软件包保留合法 ASCII 名称 |
+| tauri.linux.conf.json | 构建 | Linux 附加 GNOME 扩展和安装器资源，保留共享助手资源 |
 | tauri.windows.conf.json | 构建 | 自动合并的 Windows 配置，默认 NSIS 安装器 |
 | tauri.macos.conf.json | 构建 | 自动合并的 macOS 配置，默认 DMG 安装镜像 |
 | tauri.android.conf.json | 构建 | Android 可见主窗口、最低 API 24，排除 ABI 不兼容的桌面 Node 资源 |

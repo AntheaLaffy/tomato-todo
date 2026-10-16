@@ -23,5 +23,5 @@ GitHub 持续集成与标签发布。
 
 | File | Domain | Function |
 | --- | --- | --- |
-| workflows/ci.yml | 构建 | 默认运行 Linux 全量检查与隔离 X11 回归、四平台/架构桌面构建与 Windows x64 原生保护；仅手动勾选 android 时运行四 ABI、APK 架构/资源检查及 API 33/35 原生模拟器测试 |
-| workflows/release.yml | 构建 | v* 标签矩阵构建 Linux 两架构 deb/压缩包与 Windows x64 NSIS，校验随包 Node/Pi，全部完成后统一发布 Release |
+| workflows/ci.yml | 构建 | 默认运行 Linux 全量检查与隔离 X11 与私有 Linux 合成器协议回归、四平台/架构桌面构建与 Windows x64 原生保护；仅手动勾选 android 时运行四 ABI、APK 架构/资源检查及 API 33/35 原生模拟器测试 |
+| workflows/release.yml | 构建 | v* 标签矩阵构建 Linux 两架构 deb/含 GNOME 扩展安装器的压缩包与 Windows x64 NSIS，校验随包 Node/Pi，全部完成后统一发布 Release |

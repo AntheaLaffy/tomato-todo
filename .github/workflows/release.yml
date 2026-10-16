@@ -94,7 +94,8 @@ jobs:
           VERSION="${RELEASE_TAG#v}"
           mkdir -p dist/release/stage
           cp target/release/tomato-todo dist/release/stage/
-          cp scripts/install.py dist/release/stage/
+          cp scripts/install.py scripts/install-desktop-integration.py dist/release/stage/
+          cp -a desktop-integrations dist/release/stage/desktop-integrations
           cp README.md dist/release/stage/
           cp -a agent/bundle dist/release/stage/agent
           cp -a src-tauri/icons dist/release/stage/icons

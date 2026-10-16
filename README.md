@@ -95,7 +95,7 @@
 
 ### 专注保护与定时锁机
 
-在 **niri / Wayland** 上提供全屏锁定与应用白名单；每个项目可选配专属白名单，专注该项目的任务时替代通用白名单。独立的「小憩 / 定时锁机」页支持 1–720 分钟快速锁机、跨午夜的每周重复时段，到点从托盘唤回全屏休息界面，睡眠不计入学习时长。
+通过 Linux 原生窗口接口提供全屏锁定与应用白名单（各桌面配置与验证范围见下方适配表）；每个项目可选配专属白名单，专注该项目的任务时替代通用白名单。独立的「小憩 / 定时锁机」页支持 1–720 分钟快速锁机、跨午夜的每周重复时段，到点从托盘唤回全屏休息界面，睡眠不计入学习时长。
 
 ![定时锁机](assets/lock.png)
 
@@ -121,6 +121,16 @@
 为什么这样分、主线怎么裁定、模板怎么印刷，都在 [设计理念](docs/DESIGN.md)；具体数据字段见 [学习计划格式](docs/PLAN_FORMAT.md) 与 [备份格式](docs/BACKUP_FORMAT.md)。
 
 ## 安装
+
+### Arch Linux（AUR）
+
+可通过 AUR 安装 [tomato-todo-bin](https://aur.archlinux.org/packages/tomato-todo-bin)（目前支持 x86_64），例如使用 `yay`：
+
+```sh
+yay -S tomato-todo-bin
+```
+
+使用 `paru` 时运行 `paru -S tomato-todo-bin`。安装后可从应用列表打开「番茄 Todo」，或运行 `tomato-todo`。
 
 ### 下载安装
 
@@ -159,15 +169,22 @@ pnpm run desktop:deb    # 构建生产 .deb
 
 Windows/macOS 桌面层与跨平台 CI 正在适配，Android 已加入核心编译检查；当前证据和剩余验收项见 [跨平台适配记录](docs/CROSS_PLATFORM.md)。
 
-番茄 Todo 是 Linux 桌面应用，任务、番茄钟、统计、备份等主体功能在各主流桌面环境都可用。与桌面深度耦合的两项能力——**专注保护**和**定时锁机**——目前已实现 **niri / Wayland** 和原生 **X11 / EWMH** 后端，通过各自的窗口接口获取前台应用并把不允许的窗口切回番茄 Todo。X11 已使用 Openbox 隔离验证，其他窗口管理器仍需逐项验收。
+番茄 Todo 的任务、计时、统计与备份共用同一实现。专注保护和定时锁机按桌面选择原生窗口接口；接口不可用时明确提示，普通计时仍可使用。各桌面的实现与实际会话验收分开记录：
 
-| 桌面 / 会话                          | 任务、计时与统计 | 专注保护与定时锁机 | 托盘与自启动                        |
-| ------------------------------------ | ---------------- | ------------------ | ----------------------------------- |
-| **niri / Wayland**（主要验证环境）   | ✅               | ✅ 完整可用        | ✅                                  |
-| 其他 Wayland 合成器（GNOME、KDE 等） | ✅               | ⚠️ 按钮显示不可用  | ✅ 需 AppIndicator / StatusNotifier |
-| X11 / EWMH（Openbox 已隔离验证）      | ✅               | ✅ 已实现          | ✅ 需 AppIndicator / StatusNotifier |
+| 桌面 / 会话 | 窗口保护后端 | 当前验证 |
+| --- | --- | --- |
+| niri / Wayland | niri IPC | 隔离整应用通过 |
+| Sway / Wayland | 原生 i3 IPC | headless 真实 GTK 窗口与白名单/聚焦通过 |
+| Hyprland / Wayland | 原生 Hyprland socket | 协议回归通过；本机缺少 GPU，真实嵌套会话待验收 |
+| GNOME / Wayland | 随包 Shell 扩展（45–50） | 扩展逻辑与私有 D-Bus 通过；真实 Shell 会话待验收 |
+| KDE Plasma / Wayland | KWin 脚本接口（5.27 / 6） | 两代接口的私有 D-Bus/脚本回归通过；真实 KWin 会话待验收 |
+| GNOME、KDE、Xfce、Cinnamon、MATE、LXQt 等的 X11 会话 | EWMH | Openbox 核心及整应用通过；各桌面实际会话待验收 |
+| 其他 Wayland 合成器 | 尚无原生后端 | 普通计时可用，保护显示不可用 |
 
-- **niri / Wayland**：程序优先使用原生 Wayland，让窗口 PID 和应用标识能被正确识别；即使启动终端设置了 `GDK_BACKEND=x11`，也不会误用 Xwayland 中转窗口。
+- **Wayland 原生窗口**：程序优先使用原生 Wayland，让窗口 PID 和应用标识能被正确识别。后端故障不会退回只包含部分窗口的 Xwayland 列表。
+- **GNOME 扩展**：源码目录运行 `python3 scripts/install-desktop-integration.py`；压缩包中安装器位于解压目录，用户安装后也在 `~/.local/lib/tomato-todo/`；deb 安装器位于 `/usr/lib/Tomato Todo/`。首次安装后注销并重新登录，再运行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器只复制文件，不自动启用扩展或保护。
+- **KDE Plasma**：直接使用当前会话的 KWin 脚本接口，无需安装额外扩展；脚本执行完或发生错误后卸载，不修改用户的 KWin 插件设置。
+- **应用白名单**：各后端的应用标识可能不同，切换桌面后请从真实窗口列表重新选择；GNOME 通常返回 `.desktop` ID，KWin 优先桌面文件 ID，Sway/Hyprland 使用应用类或原生 app ID。
 - **托盘**：需要 AppIndicator 运行库（Arch 的 `libappindicator-gtk3`，Debian 的 `libayatana-appindicator3-1`）及桌面上的 StatusNotifier 组件。没有托盘时正常显示窗口和退出，后台启动会等待桌面组件最多约 10 秒后显示窗口。
 - **自启动**：配置为 `$XDG_CONFIG_HOME/autostart/studio.tomato.todo.desktop`；niri 会话需启用 XDG 自启动目标。仅在本机保存的桌面偏好为 `$XDG_CONFIG_HOME/studio.tomato.todo/desktop.json`，不随任务备份导入到其他电脑。
 - **系统运行库**：依赖系统 GTK 3、WebKitGTK 4.1 和 `pactl`（专注时抑制其他应用提示音；Arch 由 `libpulse` 提供，Debian / Ubuntu 为 `pulseaudio-utils`）。
@@ -175,7 +192,7 @@ Windows/macOS 桌面层与跨平台 CI 正在适配，Android 已加入核心编
 
 ## 专注保护能做什么、不能做什么
 
-程序通过 niri IPC 或 X11 EWMH 获取前台窗口并把不允许的应用切回番茄 Todo。白名单按精确应用标识匹配（niri 的 `app_id`、X11 的 `WM_CLASS` 应用类），可直接添加当前打开的应用。浏览器内的所有网站共用一个应用标识，因此允许浏览器也会允许其中的娱乐网站。
+程序通过当前桌面的原生窗口接口获取前台窗口并把不允许的应用切回番茄 Todo。白名单按精确应用标识匹配（niri 的 `app_id`、X11 的 `WM_CLASS` 应用类），可直接添加当前打开的应用。浏览器内的所有网站共用一个应用标识，因此允许浏览器也会允许其中的娱乐网站。
 
 这是**自律辅助功能**。它不会结束其他进程，不会暂停或修改其他应用；无法阻止系统快捷键、工作区总览、其他显示器的内容或外部结束进程。严格模式由 Rust 拒绝提前退出，而非只隐藏按钮；IPC 故障仍会解除当前保护并报错。尚未实现云同步、在线自习室、网站过滤或操作系统级安全锁屏。
 

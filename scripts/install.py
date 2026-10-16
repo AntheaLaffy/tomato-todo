@@ -122,6 +122,14 @@ def install(args):
         staging.rename(agent_target)
         if previous.exists():
             shutil.rmtree(previous)
+    integration_root = ROOT / "desktop-integrations"
+    if not integration_root.is_dir():
+        integration_root = source.parent / "desktop-integrations"
+    if integration_root.is_dir():
+        shutil.copytree(integration_root, binary.parent / "desktop-integrations", dirs_exist_ok=True)
+        installer = Path(__file__).parent / "install-desktop-integration.py"
+        if installer.is_file():
+            shutil.copy2(installer, binary.parent / installer.name)
     launcher.parent.mkdir(parents=True, exist_ok=True)
     if not launcher.is_symlink():
         launcher.symlink_to(binary)

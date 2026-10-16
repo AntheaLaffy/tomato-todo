@@ -45,6 +45,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、crates/core/src/guard_windows.rs、src-tauri/src/desktop_app.rs | crates/core/tests/guard_windows.rs、tests/windows.mjs、tests/native.mjs、src 的 guardPage |
 | 启动/打包/测试 | 构建 | README.md、CONTRIBUTING.md、package.json | src-tauri/tauri.conf.json、scripts/ |
 | 跨平台适配 | 构建 / 桌面 | docs/CROSS_PLATFORM.md、scripts/agent-runtime.mjs、src-tauri/CODEMAP.md | crates/core/src/guard.rs、crates/agent/、.github/workflows/ci.yml、src/ |
+| Linux Wayland 桌面保护 | 桌面 | crates/core/src/guard.rs、guard_wayland.rs、guard_shell.rs、desktop-integrations/CODEMAP.md | scripts/install-desktop-integration.py、tests/linux-desktops.mjs、tests/wayland.mjs、docs/CROSS_PLATFORM.md |
 | 安装/自启动/托盘/快捷栏 | 桌面 | src-tauri/src/desktop.rs、scripts/install.py | src/api.ts、src 的桌面设置、tests/native.mjs、tests/install.mjs |
 | 配置 CI/CD、发布版本 | 构建 | .github/CODEMAP.md | package.json、src-tauri/tauri.conf.json、README.md |
 | 发布到 AUR | 发布 | scripts/publish-aur.mjs、packaging/aur/ | .github/workflows/release.yml、scripts/build-agent.mjs |
@@ -56,6 +57,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | Dir | Domain | Depends On | Purpose |
 | --- | --- | --- | --- |
 | crates/ | 业务核心 | Rust 依赖 | 领域模型与本地预览服务 |
+| desktop-integrations/ | 桌面集成 | GNOME Shell | 可选原生窗口桥接扩展，随 Linux 包发行，由用户安装启用 |
 | agent/ | 智能体运行时 | Pi SDK、Node | 随包的 Pi 会话、工具集、技能、MCP 与联网实现 |
 | src-tauri/ | 原生宿主 | core、Tauri、Android SDK/NDK | 桌面/Android 入口、原生 IPC、窗口、通知与打包 |
 | src/ | 界面 | Tauri API、Lucide | TypeScript 与 CSS 界面 |
