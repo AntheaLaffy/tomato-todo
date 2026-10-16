@@ -38,6 +38,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 专注时拦截其他应用提示音 | 声音 / 桌面 | src-tauri/src/focus_audio.rs、desktop_app.rs | docs/HANDBOOK/24-界面手感与音效.md、README.md、Linux 打包依赖 |
 | 学习助手、异常诊断、联网与 MCP | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | docs/HANDBOOK/18-助手-权限与唤醒.md、docs/HANDBOOK/19-助手-文件工作区与MCP.md、agent/mcp-config.mjs 与 agent/session.mjs 的 MCP 加载、docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
 | 作者彩蛋、提示词原文与完整访问 | 智能体 | crates/agent/src/creator.rs、agent/session.mjs、agent/system-prompt.md | crates/agent/src/{lib.rs,state.rs}、src/agent.ts、tests/agent.mjs、docs/AGENT.md |
+| 角色头像、官方立绘与背景板 | 界面 / 契约 | src/agent.ts、src/main.ts 的 settingsPage/render/setupAgent、crates/core/src/lib.rs 的 Settings | public/personas/、src/types.ts、crates/agent/src/tools.rs 的 dispatch、tests/personas.mjs、docs/BACKUP_FORMAT.md |
 | 运行时人格与切换 | 智能体 | crates/agent/src/state.rs 的 Persona、crates/agent/src/tools.rs、agent/session.mjs | crates/agent/src/lib.rs 的 prompt_command/call、src/agent.ts 的 personas sheet、docs/AGENT.md、tests/agent.mjs |
 | Canvas 文档与 Codex ImageGen | 智能体 / 界面 | crates/agent/src/canvas.rs、src/agent-canvas.ts、agent/imagegen.mjs、src/agent-media.ts | agent/session.mjs、crates/agent/src/{lib.rs,state.rs,tools.rs}、src/agent.ts、tests/agent-workspace.mjs、docs/AGENT.md |
 | 对话历史搜索/归档、思考展示、编辑重试、分支、附件与 Markdown | 智能体 / 界面 | crates/agent/src/CODEMAP.md、agent/CODEMAP.md、src/agent.ts、src/agent-chat.ts、src/agent-markdown.ts | src/api.ts、src-tauri/src/files.rs、tests/agent.mjs、docs/AGENT.md |
@@ -68,7 +69,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
 | docs/ | 文件契约 / 领域设计 / 实现手册 | Rust core | 学习计划 v5 / 备份 v3 标准、Schema、通用示例，设计理念与节点语义实现记录；docs/HANDBOOK/ 按域记录实现事实与边界 |
 | assets/ | 展示 | — | Boundary only：README 截图，仅由 README 引用，不含代码 |
-| public/ | 资源 | Vite | Internals not indexed：本地图标、字体及字体许可证 |
+| public/ | 资源 | Vite | Internals not indexed：本地图标、内置角色头像及生成参考（personas/）、字体及字体许可证 |
 
 ## 文件
 

@@ -28,6 +28,7 @@ generated_at: 2026-10-10
 | 写作业 BGM 导入与播放 | 声音 | bgm.ts、main.ts 的 backgroundSoundButton/soundDialog/renderImmersive | tests/audio.mjs、tests/integration.mjs；至少 3600 秒，本机 IndexedDB 保存，不随备份导出 |
 | 关键节点音效与音量               | 声音/契约 | audio.ts、sound-events.ts、main.ts 的 accept/soundPreviewControls                                                           | types.ts、Rust Settings、备份契约、tests/audio.mjs                                                                   |
 | 侧栏项目排序与右键菜单           | 界面      | main.ts 的 showContextMenu/hideContextMenu/sortProjects 与捕获阶段的外部点击关闭                                            | tests/integration.mjs 的打开/排序/保存/关闭回归                                                                      |
+| 角色图像与背景板 | 界面/设置 | agent.ts 的 personaAvatar/personaIllustration/syncPersonaBackdrop、main.ts 的 settingsPage/render/setupAgent、style.css 的 #persona-backdrop | crates/core/src/lib.rs 的 Settings、src/types.ts、public/personas/、tests/personas.mjs、docs/BACKUP_FORMAT.md |
 | 学习助手界面                     | 界面/桥接 | agent.ts 的 agentPage/mountAgent/setupAgent/refreshAgent/thinkingSelectHtml/questionHtml/renderSessions（分组/归档侧栏）/sheetHtml 的 personas、focusSearch/resizeComposer（快捷键与输入）                                            | api.ts 的 agentCall、main.ts 的 revealAgent/轮询、style.css 的 agent-proposal/agent-option/agent-persona、docs/AGENT.md、scroll.ts、tests/agent.mjs |
 | 助手的「手」（动画演示层）        | 界面      | hand.ts 的 runHandScript/handStep/moveTo/typeInto/say、main.ts 的 installHand                                              | hand-demo.ts 的 blocksTour、style.css 的 #hand-layer/hand-keyboard、docs/AGENT.md、tests/integration.mjs             |
 | 概念讲解（思索）                 | 界面/引导 | ponder.ts 的 PONDER_TARGETS/initPonder/openPonderList                                                                       | main.ts 的 data-ponder 与 data-action="ponder-list"、style.css、tests/integration.mjs                                |
@@ -45,7 +46,7 @@ generated_at: 2026-10-10
 | bgm.ts          | 声音   | 本地长音频元数据校验、IndexedDB 持久化、循环播放/暂停与背景音量 |
 | audio.ts        | 声音   | 本地真实雨声解码/缓存与加载取消、棕噪音循环、11 种关键节点短音效、独立音量与安全音频激活；雨声及许可在 public/audio/ |
 | sound-events.ts | 声音   | 按已接受快照选择一次音效，共享提醒队列排序、静音/导入抑制与同时事件优先级           |
-| agent.ts        | 桥接   | 对话页与状态轮询、设置/记忆/信号/人格浮层（展开状态与滚动跨重绘保留）、登录、对话批准与自动唤醒切页；见 agent.ts.analysis.md |
+| agent.ts        | 桥接   | 对话页与状态轮询、设置/记忆/信号/人格浮层（展开状态与滚动跨重绘保留）、Q 版头像、官方完整立绘与跟随人格的背景板（public/personas/）、登录、对话批准与自动唤醒切页；见 agent.ts.analysis.md |
 | agent-canvas.ts | 文档工作区 | Canvas 编辑/选段草稿、版本读取/恢复、冲突保留、格式导出与隔离 HTML 预览；所有文本模型共用 |
 | agent-creator.ts | 作者彩蛋 | 一次入场事件去重、金色舞台/星环/粒子、名字揭幕、Esc/按钮收起与减少动态效果 |
 | agent-media.ts | 图片 | 私有图片预览加载、大图对话框、下载与继续编辑入口；账号能力由 agent.ts 检查 |

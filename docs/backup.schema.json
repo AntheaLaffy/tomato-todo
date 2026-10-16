@@ -552,6 +552,10 @@
             "system"
           ]
         },
+        "personaBackdrop": {
+          "type": "boolean",
+          "default": false
+        },
         "protection": {
           "$ref": "#/$defs/protection"
         },

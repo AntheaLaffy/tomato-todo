@@ -1,6 +1,6 @@
 ---
 source: style.css
-lines: 5965
+lines: 6099
 generated_at: 2026-10-16
 ---
 
@@ -13,50 +13,52 @@ generated_at: 2026-10-16
 | 页标题、指标与番茄钟基础       | 496–687   | 与对应视图结构共同生效 |
 | 专注卡与计时器                 | 688–965   | 与对应视图结构共同生效 |
 | 任务卡、趋势、筛选与统计       | 966–1743  | 与对应视图结构共同生效 |
-| 设置行与文字收缩/换行          | 1744–1899 | 与对应视图结构共同生效 |
-| 保护、白名单与沉浸             | 1900–2202 | 与对应视图结构共同生效 |
-| 弹窗、表单、搜索与声音         | 2203–2494 | 与对应视图结构共同生效 |
-| 屏幕适配与减少动画             | 2495–2968 | 与对应视图结构共同生效 |
-| 定时锁机与逐时段严格开关       | 2969–3054 | 与对应视图结构共同生效 |
-| 提醒卡与任务高亮               | 3279–3312 | 与对应视图结构共同生效 |
-| 模板目录、批次操作与固定保存栏 | 3313–3335 | 与对应视图结构共同生效 |
+| 设置行与文字收缩/换行          | 1799–1954 | 与对应视图结构共同生效 |
+| 保护、白名单与沉浸             | 1955–2257 | 与对应视图结构共同生效 |
+| 弹窗、表单、搜索与声音         | 2258–2549 | 与对应视图结构共同生效 |
+| 屏幕适配与减少动画             | 2550–3023 | 与对应视图结构共同生效 |
+| 定时锁机与逐时段严格开关       | 3024–3109 | 与对应视图结构共同生效 |
+| 提醒卡与任务高亮               | 3334–3367 | 与对应视图结构共同生效 |
+| 模板目录、批次操作与固定保存栏 | 3368–3390 | 与对应视图结构共同生效 |
 
-| 渐进式编辑器提示与折叠区 | 3336–3379 | 按创建用途显示相关字段 |
-| 开始时间与多日期日程编辑 | 3380–3468 | 小屏日期输入及移除按钮收缩 |
-| 学习助手对话页与浮层 | 3777–4887 | Canvas 并排/小屏切换、图片预览、起步卡片、伸缩输入、思考折叠、作者入场舞台/星环/粒子与减少动态效果、当前人格徽标与人格卡面板、归档分组侧栏、随面板展开的消息/输入栏、小屏会话抽屉、回到最新消息、消息操作、Markdown/公式/表格/代码、附件与会话搜索，设置/记忆/信号浮层 |
-| 概念讲解胶囊、聚光层与列表 | 4888–5081 | 悬停胶囊/进度条、遮罩与讲解面板、全部概念列表 |
-| 主线节点图 | 5082–5352 | 横向节点卡、信号横条、缩略图与节点检查器 |
+| 渐进式编辑器提示与折叠区 | 3391–3434 | 按创建用途显示相关字段 |
+| 开始时间与多日期日程编辑 | 3435–3523 | 小屏日期输入及移除按钮收缩 |
+| 学习助手对话页与浮层 | 3838–5021 | Canvas 并排/小屏切换、图片预览、起步卡片、伸缩输入、思考折叠、作者入场舞台/星环/粒子与减少动态效果、当前人格 Q 版头像徽标、官方原始完整立绘折叠区与人格卡面板（public/personas/）、归档分组侧栏、随面板展开的消息/输入栏、小屏会话抽屉、回到最新消息、消息操作、Markdown/公式/表格/代码、附件与会话搜索，设置/记忆/信号浮层 |
+| 概念讲解胶囊、聚光层与列表 | 5022–5215 | 悬停胶囊/进度条、遮罩与讲解面板、全部概念列表 |
+| 主线节点图 | 5216–5476 | 横向节点卡、信号横条、缩略图与节点检查器 |
 
 ## Symbols
 
 | Symbol               | Type     | Line |
 | -------------------- | -------- | ---- |
-| .sidebar             | selector | 183 |
-| .focus-grid          | selector | 688 |
-| .setting-row         | selector | 1766 |
-| .guard-strict-card   | selector | 1941 |
-| .guard-modes         | selector | 1948 |
-| .lock-strict-setting | selector | 2993 |
-| .modal               | selector | 2215 |
-| .templates-card      | selector | 3313 |
-| .agent-persona-badge | selector | 3898 |
+| .sidebar             | selector | 238 |
+| .focus-grid          | selector | 743 |
+| .setting-row         | selector | 1821 |
+| .guard-strict-card   | selector | 1996 |
+| .guard-modes         | selector | 2003 |
+| .lock-strict-setting | selector | 3048 |
+| .modal               | selector | 2270 |
+| .templates-card      | selector | 3368 |
+| .agent-persona-badge | selector | 3953 |
 
 `.task-row` 使用 `content-visibility: auto` 与 `contain-intrinsic-size` 跳过屏外行的布局与绘制，长任务列表滚动与首屏渲染因此保持流畅。
 
-渐进式编辑器的提示、可选 details 折叠区：`.editor-hint` / `.editor-details`，L:3336 起。
+渐进式编辑器的提示、可选 details 折叠区：`.editor-hint` / `.editor-details`，L:3391 起。
 
-主线节点、编辑表单、结果颜色、信号追溯与小屏日期输入：L:3158 起。`#goal-form .modal-actions` 固定保存操作区。
+主线节点、编辑表单、结果颜色、信号追溯与小屏日期输入：L:3443 起。`#goal-form .modal-actions` 固定保存操作区。
 
 偏好页 .settings-grid 使用 align-items: start，两列各自按卡片内容高度排列，避免左列被整列拉伸。
 
-锁机只读日程（今日/明日共用）：`.tomorrow-entry` / `.tomorrow-agenda` / `.agenda-notes` / `.agenda-steps` / `.modal.sleep-preview`（L:3432 起），两列时间与内容、备注保留换行、长文本折行，休息锁机弹窗使用低亮度深色。
+锁机只读日程（今日/明日共用）：`.tomorrow-entry` / `.tomorrow-agenda` / `.agenda-notes` / `.agenda-steps` / `.modal.sleep-preview`（L:3787 起），两列时间与内容、备注保留换行、长文本折行，休息锁机弹窗使用低亮度深色。
 
-助手输入栏：`.agent-status` 自动换行；`.agent-model` 与 `.agent-thinking` 用紧凑 select，思考强度标签与选择器同排（L:5600 起）。
+助手输入栏：`.agent-status` 自动换行；`.agent-model` 与 `.agent-thinking` 用紧凑 select，思考强度标签与选择器同排（L:5735 起）。
 
-沉浸背景音：`.immersive-sound`（L:5886 起）将共用声音按钮呈现为紧凑圆角入口。
+沉浸背景音：`.immersive-sound`（L:6020 起）将共用声音按钮呈现为紧凑圆角入口。
 
-Android 手机导航与触控（L:5897–5965）：原生平台标识限定样式，抽屉保留项目操作，44px 操作高度；app/modal 用动态视口高度跟随键盘后可见区域。系统 Insets 由 MainActivity 处理，避免重复猜测安全区域。
+Android 手机导航与触控（L:6031–6099）：原生平台标识限定样式，抽屉保留项目操作，44px 操作高度；app/modal 用动态视口高度跟随键盘后可见区域。系统 Insets 由 MainActivity 处理，避免重复猜测安全区域。
 
-首页任务分组：.today-group-heading（L:1628）让标题、数量与展开/收起按钮同排，保持小屏按钮可见。
+首页任务分组：.today-group-heading（L:1683）让标题、数量与展开/收起按钮同排，保持小屏按钮可见。
 
-简洁模式样式：`html[data-compact-mode="true"] [data-explanation]` 在 L5794 起全局隐藏显式标记的说明，首页隐藏语录卡后将 bottom-grid 改为单列；输入提示行在上传状态为空时整体收起，有上传状态时继续显示。
+简洁模式样式：`html[data-compact-mode="true"] [data-explanation]` 在 L5928 起全局隐藏显式标记的说明，首页隐藏语录卡后将 bottom-grid 改为单列；输入提示行在上传状态为空时整体收起，有上传状态时继续显示。
+
+角色背景板：`#persona-backdrop`（L:64 起）宽屏在内容右侧留出立绘位置，按原图比例 contain、不接收点击；只有显示时让 `#app` 的整页底色透明，窄屏作为淡化叠层，明暗分别调整透明度。开关与当前人格由 agent.ts 的 syncPersonaBackdrop 同步。

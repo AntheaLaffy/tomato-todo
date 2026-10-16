@@ -54,6 +54,7 @@
 - `autoBreak`、`autoFocus`、`sound`、`notifications`、`alwaysOnTop`：布尔值。
 - `soundVolume`：整数 0—100，默认 100；旧 v3 文件可省略。`sound` 控制所有关键节点音效，背景噪音单独调节。
 - `theme`：`light`、`dark`、`system`。
+- `personaBackdrop`：布尔值，缺省 `false`；在普通页面背景显示当前内置人格的完整立绘。沉浸与专注保护界面不显示，自定义人格没有内置立绘时隐藏。
 - `protection`：见下表；旧文件可省略，默认关闭。
 
 | `protection` 字段 | 含义                                                               | 旧文件默认值 |

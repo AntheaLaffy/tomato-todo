@@ -5,6 +5,32 @@ fn example_plan() -> plan::PlanFile {
 }
 
 #[test]
+fn persona_backdrop_defaults_off_and_survives_backup_and_restart() {
+    let mut old = serde_json::to_value(AppData::default()).unwrap();
+    old["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("personaBackdrop");
+    let old: AppData = serde_json::from_value(old).unwrap();
+    assert!(!old.settings.persona_backdrop);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("backdrop.sqlite3");
+    let mut e = Engine::open(&path).unwrap();
+    let mut settings = e.snapshot(1000).unwrap().data.settings;
+    assert!(!settings.persona_backdrop);
+    settings.persona_backdrop = true;
+    settings.focus_minutes = 31;
+    e.dispatch(Action::SaveSettings { settings }, 1000).unwrap();
+    let backup: AppData = serde_json::from_str(&e.export(1000).unwrap()).unwrap();
+    assert!(backup.settings.persona_backdrop);
+    drop(e);
+    let mut e = Engine::open(&path).unwrap();
+    let saved = e.snapshot(1000).unwrap().data.settings;
+    assert!(saved.persona_backdrop);
+    assert_eq!(saved.focus_minutes, 31);
+}
+
+#[test]
 fn sound_volume_defaults_for_old_backups_and_round_trips_with_range_validation() {
     let mut old = serde_json::to_value(AppData::default()).unwrap();
     old["settings"]

@@ -192,7 +192,7 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             &["name", "fileHash"],
             false,
         ));
-        list.push(tool("dispatch","直接执行软件 Action，适合单项操作。禁止 emergencyUnlock，核心保护/严格规则及原生能力预检仍生效。批量操作优先文件工作流。",json!({"action":{"type":"object","required":["type"],"properties":{"type":{"type":"string"}}}}),&["action"],false));
+        list.push(tool("dispatch","直接执行软件 Action，适合单项操作。用户要求开关角色背景板时，先 get_snapshot 读取完整 data.settings，保留其他字段，设置 personaBackdrop 为布尔值，再提交 {type:\"saveSettings\",settings:完整设置}。禁止 emergencyUnlock，核心保护/严格规则及原生能力预检仍生效。批量操作优先文件工作流。",json!({"action":{"type":"object","required":["type"],"properties":{"type":{"type":"string"}}}}),&["action"],false));
     }
     list
 }

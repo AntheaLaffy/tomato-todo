@@ -23,6 +23,7 @@
     "notifications": true,
     "alwaysOnTop": false,
     "theme": "light",
+    "personaBackdrop": false,
     "protection": {
       "mode": "off",
       "whitelist": [],

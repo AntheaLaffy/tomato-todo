@@ -216,6 +216,7 @@ let hooks: {
   wake: () => void;
   toast: (text: string) => void;
   accept: (s: Snapshot) => void;
+  backdrop: () => boolean;
 };
 const esc = (value: unknown) =>
   String(value ?? "").replace(
@@ -230,6 +231,54 @@ const field = (name: string, fallback: string | boolean) =>
   configDraft[name] ?? fallback;
 const pfield = (name: string, fallback: string) =>
   personaDraft[name] ?? fallback;
+const builtinPortraits = new Map([
+  ["default", "/personas/default.webp"],
+  ["calm", "/personas/calm.webp"],
+  ["coach", "/personas/coach.webp"],
+  ["senpai", "/personas/senpai.webp"],
+]);
+const builtinIllustrations = new Map([
+  ["default", "/personas/atri.png"],
+  ["calm", "/personas/natsuki.png"],
+  ["coach", "/personas/ryuji.png"],
+  ["senpai", "/personas/minamo.png"],
+]);
+export function syncPersonaBackdrop(enabled: boolean) {
+  const element = document.getElementById("persona-backdrop");
+  if (!element) return;
+  const persona = status?.personas?.find((p) => p.current);
+  const illustration = persona?.builtin
+    ? builtinIllustrations.get(persona.id)
+    : undefined;
+  element.hidden = !enabled || !illustration;
+  document.documentElement.toggleAttribute(
+    "data-persona-backdrop",
+    !element.hidden,
+  );
+  if (element.hidden) {
+    element.replaceChildren();
+  } else if (element.firstElementChild?.getAttribute("src") !== illustration) {
+    const img = document.createElement("img");
+    img.src = illustration!;
+    img.alt = "";
+    img.draggable = false;
+    element.replaceChildren(img);
+  }
+}
+function personaAvatar(persona: Persona): string {
+  const portrait = persona.builtin
+    ? builtinPortraits.get(persona.id)
+    : undefined;
+  return `<span class="agent-persona-avatar" aria-hidden="true">${portrait ? `<img src="${portrait}" alt="" width="72" height="72" draggable="false">` : esc(persona.emoji || "🎭")}</span>`;
+}
+function personaIllustration(persona: Persona): string {
+  const illustration = persona.builtin
+    ? builtinIllustrations.get(persona.id)
+    : undefined;
+  return illustration
+    ? `<details class="editor-details agent-persona-art" data-keep-open="persona-art:${esc(persona.id)}"><summary>查看完整立绘</summary><img src="${illustration}" alt="${esc(persona.name)}的全身立绘" loading="lazy" draggable="false"></details>`
+    : "";
+}
 const checked = (name: string, fallback: boolean) =>
   field(name, fallback) ? "checked" : "";
 
@@ -357,7 +406,7 @@ function renderChat() {
   const currentPersona = status.personas?.find((p) => p.current);
   replace(
     "agent-conversation-title",
-    `<span title="${esc(current?.title ?? "新对话")}">${esc(current?.title ?? "新对话")}</span>${currentPersona ? `<button type="button" class="button small agent-persona-badge" data-agent="personas" title="当前人格：${esc(currentPersona.name)}；点击切换或新建" ${busy ? "disabled" : ""}><span aria-hidden="true">${esc(currentPersona.emoji || "🎭")}</span> ${esc(currentPersona.name)}</button>` : ""}${status.creatorMode ? `<button type="button" class="button small agent-creator-badge" data-agent="exit-creator-mode" title="作者模式 · 完整访问；点击退出" ${busy ? "disabled" : ""}><span aria-hidden="true">✦</span> 作者模式 · 退出</button>` : ""}${current?.archived ? `<button type="button" class="button small" data-agent="archive-conversation" data-id="${esc(current.id)}">已归档 · 恢复</button>` : ""}`,
+    `<span title="${esc(current?.title ?? "新对话")}">${esc(current?.title ?? "新对话")}</span>${currentPersona ? `<button type="button" class="button small agent-persona-badge" data-agent="personas" title="当前人格：${esc(currentPersona.name)}；点击切换或新建" ${busy ? "disabled" : ""}>${personaAvatar(currentPersona)}<span class="agent-persona-badge-name">${esc(currentPersona.name)}</span></button>` : ""}${status.creatorMode ? `<button type="button" class="button small agent-creator-badge" data-agent="exit-creator-mode" title="作者模式 · 完整访问；点击退出" ${busy ? "disabled" : ""}><span aria-hidden="true">✦</span> 作者模式 · 退出</button>` : ""}${current?.archived ? `<button type="button" class="button small" data-agent="archive-conversation" data-id="${esc(current.id)}">已归档 · 恢复</button>` : ""}`,
   );
   const source = current?.branchedFrom;
   replace(
@@ -772,7 +821,7 @@ function sheetHtml(): string {
         list
           .map(
             (p) =>
-              `<div class="agent-persona ${p.current ? "current" : ""}" data-agent="switch-persona" data-id="${esc(p.id)}" role="button" tabindex="0" aria-pressed="${p.current}" aria-label="使用人格 ${esc(p.name)}"><div class="agent-persona-head"><b>${esc(p.emoji || "🎭")} ${esc(p.name)}</b>${p.current ? '<span class="agent-tag confirmed">当前</span>' : ""}${p.builtin ? '<span class="agent-tag">内置</span>' : ""}</div>${p.summary ? `<small>${esc(p.summary)}</small>` : ""}<p>${esc(p.identity)}</p>${p.shadow ? `<details class="editor-details agent-persona-shadow" data-keep-open="persona-shadow:${esc(p.id)}"><summary>另一面（平时收着）</summary><p>${esc(p.shadow)}</p></details>` : ""}${p.fantasy ? `<details class="editor-details agent-persona-awaken" data-keep-open="persona-awaken:${esc(p.id)}"><summary>超能力觉醒（触发：${esc(p.awaken || "看用户怎么逼")}）</summary><p>${esc(p.fantasy)}</p></details>` : ""}${p.builtin ? "" : `<div class="button-row"><button class="button small" data-agent="edit-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>编辑</button><button class="button small" data-agent="delete-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>删除</button></div>`}</div>`,
+              `<div class="agent-persona ${p.current ? "current" : ""}" data-agent="switch-persona" data-id="${esc(p.id)}" role="button" tabindex="0" aria-pressed="${p.current}" aria-label="使用人格 ${esc(p.name)}"><div class="agent-persona-head">${personaAvatar(p)}<div class="agent-persona-heading"><div class="agent-persona-name"><b>${esc(p.name)}</b>${p.current ? '<span class="agent-tag confirmed">当前</span>' : ""}${p.builtin ? '<span class="agent-tag">内置</span>' : ""}</div>${p.summary ? `<small>${esc(p.summary)}</small>` : ""}</div></div><p>${esc(p.identity)}</p>${personaIllustration(p)}${p.shadow ? `<details class="editor-details agent-persona-shadow" data-keep-open="persona-shadow:${esc(p.id)}"><summary>另一面（平时收着）</summary><p>${esc(p.shadow)}</p></details>` : ""}${p.fantasy ? `<details class="editor-details agent-persona-awaken" data-keep-open="persona-awaken:${esc(p.id)}"><summary>超能力觉醒（触发：${esc(p.awaken || "看用户怎么逼")}）</summary><p>${esc(p.fantasy)}</p></details>` : ""}${p.builtin ? "" : `<div class="button-row"><button class="button small" data-agent="edit-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>编辑</button><button class="button small" data-agent="delete-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>删除</button></div>`}</div>`,
           )
           .join("") || '<p class="agent-empty">还没有人格卡。</p>'
       }</div><form id="agent-persona-form" data-id="${editing ? esc(editing.id) : ""}"><h3>${editing ? `编辑「${esc(editing.name)}」` : "新建人格"}</h3><div class="form-grid"><label>名称<input name="name" maxlength="24" required placeholder="比如 傲娇学妹" value="${esc(pfield("name", editing?.name ?? ""))}"></label><label>图标<input name="emoji" maxlength="8" placeholder="🍅" value="${esc(pfield("emoji", editing?.emoji ?? ""))}"></label></div><label>一句话简介<input name="summary" maxlength="80" placeholder="在列表里显示" value="${esc(pfield("summary", editing?.summary ?? ""))}"></label><label>身份与背景<textarea name="identity" rows="3" maxlength="2000" placeholder="你是谁、和用户是什么关系">${esc(pfield("identity", editing?.identity ?? ""))}</textarea></label><label>说话与行为风格<textarea name="style" rows="4" maxlength="4000" placeholder="语气、口头禅、情绪表达、禁忌">${esc(pfield("style", editing?.style ?? ""))}</textarea></label><label>另一面 / 破防（可选）<textarea name="shadow" rows="4" maxlength="4000" placeholder="平时收着的另一面：什么会把它逼出来、它变成什么样、恢复由什么决定">${esc(pfield("shadow", editing?.shadow ?? ""))}</textarea></label><label>超能力觉醒触发（可选）<textarea name="awaken" rows="2" maxlength="400" placeholder="容易碰到的触发条件，例如用户第三次说「明天开始」">${esc(pfield("awaken", editing?.awaken ?? ""))}</textarea></label><label>觉醒世界（可选）<textarea name="fantasy" rows="4" maxlength="4000" placeholder="偏爱的幻想世界类型、可以成为其中任何角色、这一天怎么过；留空则没有觉醒机制">${esc(pfield("fantasy", editing?.fantasy ?? ""))}</textarea></label><label>开场白（可选）<textarea name="greeting" rows="2" maxlength="300" placeholder="切换过去后可以参考这样开场">${esc(pfield("greeting", editing?.greeting ?? ""))}</textarea></label><div class="agent-actions"><button class="button primary small" type="submit">${editing ? "保存修改" : "保存人格"}</button>${editing ? '<button class="button small" type="button" data-agent="new-persona">取消编辑</button>' : ""}</div></form>`;
@@ -852,6 +901,7 @@ function playDeeds() {
   void runHandScript({ steps, label: "助手" });
 }
 function update() {
+  syncPersonaBackdrop(hooks?.backdrop() ?? false);
   if (!hooks?.active() || !status) return;
   const nextKey = status.conversations.find((c) => c.active)?.id ?? "new";
   if (nextKey !== conversationKey) {
@@ -1134,8 +1184,13 @@ export function mountAgent() {
       renderSheet();
       return;
     }
-    // 展开人格卡的「另一面 / 超能力」只是看内容，不当作选中这张卡。
-    if (target.closest(".agent-persona-shadow, .agent-persona-awaken")) return;
+    // 展开人格卡的详情只是看内容，不当作选中这张卡。
+    if (
+      target.closest(
+        ".agent-persona-shadow, .agent-persona-awaken, .agent-persona-art",
+      )
+    )
+      return;
     const button = target.closest<HTMLButtonElement>("[data-agent]");
     if (!button) return;
     void action(button).catch((error) => hooks.toast(String(error)));

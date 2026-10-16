@@ -35,15 +35,15 @@ generated_at: 2026-10-10
 | AppData / Action | nodes.rs | 主线 | 时间配对、完成条件、不可逆裁定、局域阻断、信号防重/追溯、冻结配置 |
 | identities.rs | 标识符 | 跨实体类型唯一、删除与历史引用永久保留、原任务恢复校验、导入历史合并 |
 | node_tests.rs | 验证 | 主线配对/信号/阻断/检查/裁定/删除/重启/备份/历史 ID 与专注收尾；见 node_tests.rs.analysis.md |
-| Settings / AppData / Action | lib.rs | L:225 / L:345 / L:432 |
-| Engine | lib.rs | L:1829 |
+| Settings / AppData / Action | lib.rs | L:225 / L:348 / L:435 |
+| Engine | lib.rs | L:1832 |
 | guard | guard.rs | L:1 |
 
 ## 文件
 
 | File | Domain | Function |
 | --- | --- | --- |
-| lib.rs | 业务核心 | 备份 v3 数据模型、Action、计时、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（整条主线成败与逐日纵切面）、Engine 持久化 |
+| lib.rs | 业务核心 | 备份 v3 数据模型（含默认关闭的 personaBackdrop）、Action、计时、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（整条主线成败与逐日纵切面）、Engine 持久化 |
 | plan.rs | 文件契约 | v1/v2 转换与 v5 主线/课表 DTO、导出未完成任务、按 ID 更新配置与保留进度、`replace` 整份同步、稳定 ID 去重、番茄时长换算 |
 | blocks.rs | 课表占用 | 计划之外的每周固定占用（课程/实验）：星期与跨午夜时间段校验、按日期取时段、需专心分钟统计 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |

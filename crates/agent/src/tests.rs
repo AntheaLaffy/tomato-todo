@@ -763,6 +763,29 @@ fn agent_cannot_apply_or_dispatch_and_memories_need_confirmation() {
     assert!(info.get("apiKey").is_none());
 }
 #[test]
+fn a_user_can_toggle_persona_backdrop_through_existing_settings_dispatch() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let initial = agent.call("get_snapshot", &json!({}), false).unwrap();
+    let mut settings = initial["data"]["settings"].clone();
+    assert_eq!(settings["personaBackdrop"], false);
+    settings["personaBackdrop"] = json!(true);
+    let args = json!({"action":{"type":"saveSettings","settings":settings}});
+    assert!(agent.call("dispatch", &args, true).is_err());
+    let enabled = agent.call("dispatch", &args, false).unwrap();
+    assert_eq!(enabled["data"]["settings"], settings);
+    settings["personaBackdrop"] = json!(false);
+    let disabled = agent
+        .call(
+            "dispatch",
+            &json!({"action":{"type":"saveSettings","settings":settings}}),
+            false,
+        )
+        .unwrap();
+    assert_eq!(disabled["data"]["settings"], settings);
+}
+
+#[test]
 fn interactive_calls_can_configure_tasks_directly() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));

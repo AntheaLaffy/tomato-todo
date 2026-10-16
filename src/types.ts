@@ -213,6 +213,7 @@ export interface Settings {
   notifications: boolean;
   alwaysOnTop: boolean;
   theme: "light" | "dark" | "system";
+  personaBackdrop: boolean;
   protection: { mode: GuardMode; whitelist: string[]; strict: boolean };
 }
 export interface LockSchedule {

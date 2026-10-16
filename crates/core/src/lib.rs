@@ -237,6 +237,8 @@ pub struct Settings {
     pub always_on_top: bool,
     pub theme: String,
     #[serde(default)]
+    pub persona_backdrop: bool,
+    #[serde(default)]
     pub protection: Protection,
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -275,6 +277,7 @@ impl Default for Settings {
             notifications: true,
             always_on_top: false,
             theme: "light".into(),
+            persona_backdrop: false,
             protection: Protection::default(),
         }
     }
