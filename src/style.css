@@ -5543,6 +5543,10 @@ html[data-compact-mode="true"] [data-explanation] {
 html[data-compact-mode="true"] .bottom-grid {
   grid-template-columns: 1fr;
 }
+html[data-compact-mode="true"]
+  .agent-composer-hint:has(#agent-upload-status:empty) {
+  display: none;
+}
 
 /* 选择卡：点选一行（无线按钮/复选框），再按「确认选择」——和常见对话产品的选择卡一致。 */
 .agent-choices {

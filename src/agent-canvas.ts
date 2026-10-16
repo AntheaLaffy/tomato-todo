@@ -230,7 +230,7 @@ function render() {
     ${preview ? `<div class="canvas-preview">${previewHtml()}</div>` : `<textarea id="canvas-content" aria-label="文档正文" spellcheck="false" ${historical ? "readonly" : ""}>${esc(draft.content)}</textarea>`}
     <div class="canvas-selection-actions"><button type="button" class="button small" data-canvas="explain">解释选段</button><button type="button" class="button small" data-canvas="rewrite">修改选段</button></div>
     <footer>${historical ? `<button class="button primary small" type="button" data-can-write data-canvas="restore" ${disabled}>恢复为新版本</button>` : `<button class="button primary small" type="button" data-can-write data-canvas="save" ${disabled}>保存</button><button class="button small" type="button" data-can-write data-canvas="save-copy" ${disabled}>另存为新文档</button>`}<button class="button small" type="button" data-canvas="reload">载入最新版本</button><button class="button small" type="button" data-canvas="export">导出</button>${document ? `<button class="button small" type="button" data-can-write data-canvas="delete" ${disabled}>删除文档</button>` : ""}</footer>`
-        : `<div class="agent-empty">在这里编辑笔记、作文或代码。可从助手回答的「打开 Canvas」开始，也可以新建文档。</div>`
+        : `<div class="agent-empty">还没有打开文档。<span data-explanation>在这里编辑笔记、作文或代码。可从助手回答的「打开 Canvas」开始，也可以新建文档。</span></div>`
     }`;
 }
 async function save(copy = false) {

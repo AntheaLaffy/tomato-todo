@@ -1,7 +1,7 @@
 ---
 source: style.css
-lines: 5707
-generated_at: 2026-10-15
+lines: 5711
+generated_at: 2026-10-16
 ---
 
 ## 功能索引
@@ -52,10 +52,10 @@ generated_at: 2026-10-15
 
 助手输入栏：`.agent-status` 自动换行；`.agent-model` 与 `.agent-thinking` 用紧凑 select，思考强度标签与选择器同排（L:5346 起）。
 
-沉浸背景音：`.immersive-sound`（L:5628 起）将共用声音按钮呈现为紧凑圆角入口。
+沉浸背景音：`.immersive-sound`（L:5632 起）将共用声音按钮呈现为紧凑圆角入口。
 
-Android 手机导航与触控（L:5639–5707）：原生平台标识限定样式，抽屉保留项目操作，44px 操作高度；app/modal 用动态视口高度跟随键盘后可见区域。系统 Insets 由 MainActivity 处理，避免重复猜测安全区域。
+Android 手机导航与触控（L:5643–5711）：原生平台标识限定样式，抽屉保留项目操作，44px 操作高度；app/modal 用动态视口高度跟随键盘后可见区域。系统 Insets 由 MainActivity 处理，避免重复猜测安全区域。
 
 首页任务分组：.today-group-heading（L:1628）让标题、数量与展开/收起按钮同排，保持小屏按钮可见。
 
-简洁模式样式：`html[data-compact-mode="true"] [data-explanation]` 在 L5540 起全局隐藏显式标记的说明，首页隐藏语录卡后将 bottom-grid 改为单列。
+简洁模式样式：`html[data-compact-mode="true"] [data-explanation]` 在 L5540 起全局隐藏显式标记的说明，首页隐藏语录卡后将 bottom-grid 改为单列；输入提示行在上传状态为空时整体收起，有上传状态时继续显示。

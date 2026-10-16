@@ -83,4 +83,4 @@ Android 导航：setMobileNav（L:553）控制抽屉和工作区 inert；平台�
 
 首页待完成：focusPage 固定分为今日定时、待补、今日未定时、无日期；todayTaskGroup 控制待补全部显示与无日期默认折叠，展开状态在应用会话内保留；今日待办总数与待完成标签排除无日期任务。taskList 接受独立排序参数，compareTaskTime 为日期/提醒时间/创建顺序比较器；全部任务页继续使用用户选择的排序。
 
-简洁模式：compact.ts 保存本机开关并设置根元素 data-compact-mode；settingsPage 的无 name 开关由 bindForms 立即保存，不标记业务配置 dirty、不重建正在编辑的表单。说明按用途显式标记 data-explanation；日期、进度、错误、权限及保护后果不隐藏。ponderChip 改为灯泡图标，保留无障碍名称。
+简洁模式：compact.ts 保存本机开关并设置根元素 data-compact-mode；settingsPage 的无 name 开关由 bindForms 立即保存，不标记业务配置 dirty、不重建正在编辑的表单。说明按用途显式标记 data-explanation；日程拖动提示、节点编辑副标题和空状态建议同样隐藏，空状态与按钮仍保留。日期、进度、错误、权限及保护后果不隐藏。ponderChip 改为灯泡图标，保留无障碍名称。

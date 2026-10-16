@@ -10,7 +10,7 @@ generated_at: 2026-10-10
 | 任务                             | Domain    | Target                                                                                                                      | Also Check                                                                                                           |
 | -------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | 偏好布局与保存时机               | 界面      | main.ts 的 settingsPage/savePreferences/navigate、style.css 的 settings-grid                                                | tests/integration.mjs 的失焦/离页/手动/失败与布局检查                                                                |
-| 简洁模式与说明显隐 | 界面 | compact.ts、main.ts 的 settingsPage/bindForms/ponderChip、style.css 的 data-explanation | agent.ts 的输入提示、ponder.ts 的偏好讲解、tests/integration.mjs 的 compact mode、docs/DESIGN.md |
+| 简洁模式与说明显隐 | 界面 | compact.ts、main.ts 的 settingsPage/bindForms/ponderChip、style.css 的 data-explanation | agent.ts 的欢迎页/输入提示/定时空状态、agent-canvas.ts 的空状态、nodegraph.ts 的编辑提示、ponder.ts 的偏好讲解、tests/integration.mjs 的 compact mode、docs/DESIGN.md |
 | 调整页面布局                     | 界面      | main.ts.analysis.md、style.css.analysis.md                                                                                  | —                                                                                                                    |
 | 任务到点提醒                     | 界面      | main.ts 的 pendingReminder/reminderBanner/taskDialog                                                                        | Rust reminders.rs、桌面轮询                                                                                          |
 | 模板编辑、独立标签、自动预印与手动整批印刷 | 界面/契约 | main.ts 的 tasksPage/templateDialog/focusBudget/printDialog/templatesCard（临时 / 手动 / 自动渐进披露）、types.ts 的 Template | crates/core/src/templates.rs、plan.rs、docs/CODEMAP.md |
@@ -55,3 +55,5 @@ generated_at: 2026-10-10
 | ponder.ts       | 引导   | 概念登记表与讲解机制：悬停胶囊、长按 G 打开讲解面、全部概念列表                     |
 
 主线入口：main.ts 的 goalsTabContent/goalDialog 与 src/nodegraph.ts 的节点图，Snapshot.nodeProgress 为核心计算结果。成功/失败实例只读；删除配对任务可从组内恢复原实体；条件阻断分别针对成功与失败。
+
+新增界面说明时按用途添加 `data-explanation`，不要按字号或通用文字样式隐藏。说明与状态混排时只标记说明片段，不把操作按钮、进度、权限/后果提示或用户正文包进隐藏范围；简洁模式不新增文字展开入口。

@@ -73,6 +73,10 @@ test("compact mode: global hiding, local persistence and important information",
       page.getByText("休息结束后自动进入专注", { exact: true }),
     ).toBeVisible();
     await expect(page.locator("#settings-status")).toBeVisible();
+    await expect(
+      page.getByText(/导入时合并新任务，同 ID 的已有任务保留进度/),
+    ).toBeVisible();
+    await expect(page.getByText(/计划文件不含计时记录和设置/)).toBeVisible();
     assert.equal(
       await page.evaluate(() => localStorage.getItem("tomato.compactMode")),
       "1",
@@ -99,6 +103,13 @@ test("compact mode: global hiding, local persistence and important information",
     await expect(page.locator(".modal-heading p")).toBeHidden();
     await expect(page.locator("#duration-preview")).toBeVisible();
     await expect(page.locator("#creation-mode-hint")).toBeVisible();
+    await page.locator("#instance-more-dates").click();
+    await expect(page.locator("#template-calendar")).toBeVisible();
+    await expect(
+      page.getByText("一个开始时间对应多个日期；所有时段共用任务内容", {
+        exact: true,
+      }),
+    ).toBeHidden();
     await page.getByRole("button", { name: "关闭对话框", exact: true }).click();
     for (const name of ["tasks", "goals", "stats", "schedule"]) {
       await page.locator(`[data-page="${name}"]`).first().click();
@@ -118,17 +129,84 @@ test("compact mode: global hiding, local persistence and important information",
         await expect(task.locator(".task-meta")).toBeVisible();
         await expect(task.locator(".tomato-count")).toBeVisible();
       }
+      if (name === "goals") {
+        await page
+          .getByRole("button", { name: "新建目标", exact: true })
+          .click();
+        await page.locator(".node-add.tail").click();
+        await expect(page.locator(".node-inspector-hint")).toBeHidden();
+        await expect(
+          page.getByText("成功或失败都会报废配对实例，裁定不可撤销。", {
+            exact: true,
+          }),
+        ).toBeVisible();
+        await expect(page.locator('[data-node-field="start"]')).toBeVisible();
+        await page
+          .getByRole("button", { name: "关闭对话框", exact: true })
+          .click();
+      }
+      if (name === "schedule") {
+        await expect(page.locator(".calendar-resize-handle")).toBeVisible();
+        await expect(
+          page.locator(".calendar-resize-handle small"),
+        ).toBeHidden();
+        await expect(page.locator(".blocks-card > p")).toBeVisible();
+        assert.match(
+          await page.locator(".blocks-card > p").innerText(),
+          /排专注任务会提示冲突/,
+        );
+      }
     }
     // Restrictive actions keep their consequences visible; never enable protection.
     await page.locator('[data-page="guard"]').first().click();
     await expect(page.locator(".guard-intro")).toContainText("保护中无法暂停");
     await expect(page.getByText(/保护中无法暂停/)).toBeVisible();
     await page.locator('[data-page="agent"]').first().click();
+    await expect(page.locator(".agent-welcome p")).toBeHidden();
+    await expect(page.locator(".agent-welcome h2")).toBeVisible();
     await expect(
       page.locator(".agent-composer-hint [data-explanation]"),
     ).toBeHidden();
     await expect(page.locator('[data-agent="attach"]')).toBeVisible();
-    await page.locator('[data-agent="settings"]').click();
+    await expect(page.locator(".agent-composer-hint")).toBeHidden();
+    // An asynchronous upload status must remain visible even though shortcuts are hidden.
+    await page.locator("#agent-attachment-input").setInputFiles({
+      name: "notes.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("学习笔记"),
+    });
+    await expect(page.locator(".agent-attachment")).toContainText("notes.txt");
+    await expect(page.locator("#agent-upload-status")).toBeVisible();
+    await expect(
+      page.locator(".agent-composer-hint [data-explanation]"),
+    ).toBeHidden();
+    await page.locator('[data-agent="canvas"]').click();
+    await expect(page.locator("#agent-canvas .agent-empty")).toBeVisible();
+    await expect(
+      page.locator("#agent-canvas .agent-empty [data-explanation]"),
+    ).toBeHidden();
+    await page.locator('[data-canvas="new"]').click();
+    await page
+      .locator("#canvas-content")
+      .fill("# 我的笔记\n\n这段解释属于我的正文，必须保留。");
+    await expect(page.locator("#canvas-save-status")).toBeVisible();
+    await page.locator('[data-canvas="preview"]').click();
+    await expect(page.locator(".canvas-preview .agent-markdown")).toContainText(
+      "这段解释属于我的正文，必须保留。",
+    );
+    await page.screenshot({
+      path: join(dir, "compact-agent-canvas.png"),
+      fullPage: true,
+    });
+    await page.locator('[data-canvas="close"]').click();
+    await page.locator('[data-agent="schedules"]').click();
+    await expect(page.locator("#agent-schedules .agent-empty")).toBeVisible();
+    await expect(
+      page.locator("#agent-schedules .agent-empty [data-explanation]"),
+    ).toBeHidden();
+    await expect(page.getByText(/到点后助手拿到完整工具/)).toBeVisible();
+    await page.locator('[data-agent="close-sheet"]').click();
+    await page.getByRole("button", { name: "设置", exact: true }).click();
     await expect(page.getByText(/完整访问时以你的用户权限运行/)).toBeVisible();
     await page.keyboard.press("Escape");
     await page.reload();
@@ -153,6 +231,18 @@ test("compact mode: global hiding, local persistence and important information",
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.reload();
     await expect(page.locator(".brand small")).toBeVisible();
+    await page.locator('[data-page="agent"]').first().click();
+    await expect(page.locator(".agent-welcome p")).toBeVisible();
+    await page.locator('[data-agent="canvas"]').click();
+    await expect(
+      page.locator("#agent-canvas .agent-empty [data-explanation]"),
+    ).toBeVisible();
+    await page.locator('[data-canvas="close"]').click();
+    await page.locator('[data-agent="schedules"]').click();
+    await expect(
+      page.locator("#agent-schedules .agent-empty [data-explanation]"),
+    ).toBeVisible();
+    await page.locator('[data-agent="close-sheet"]').click();
     // A storage failure is reported, and must not pretend the preference was saved.
     await page.locator('[data-page="settings"]').click();
     await page.evaluate(() => {
@@ -2030,7 +2120,7 @@ test(
       // The same hint teaches each assistant setting in place, so a new user can
       // learn what a field means without leaving the form.
       await page.locator('[data-page="agent"]').click();
-      await page.locator('[data-agent="settings"]').click();
+      await page.getByRole("button", { name: "设置", exact: true }).click();
       await page
         .locator('#agent-config-form label:has(input[name="apiKey"])')
         .hover();
