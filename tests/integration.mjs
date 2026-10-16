@@ -2379,9 +2379,11 @@ test(
       await page.locator('[data-action="theme"]').click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
       await expect
-        .poll(async () =>
-          Math.abs((await scrollTop()) - Math.min(before, await maxScroll())) <=
-          5,
+        .poll(
+          async () =>
+            Math.abs(
+              (await scrollTop()) - Math.min(before, await maxScroll()),
+            ) <= 5,
         )
         .toBe(true);
       // 助手浮层：展开「MCP 与私有目录」后，2.5s 的状态轮询不能把它折叠。
