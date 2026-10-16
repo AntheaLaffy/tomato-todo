@@ -3913,6 +3913,17 @@ main {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+/* 整张卡就是「使用」按钮，不必再找一个两字按钮。 */
+.agent-persona[data-agent="switch-persona"] {
+  cursor: pointer;
+}
+.agent-persona[data-agent="switch-persona"]:hover {
+  border-color: var(--accent);
+}
+.agent-persona[data-agent="switch-persona"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .agent-persona-head {
   display: flex;
   align-items: center;
@@ -3925,6 +3936,21 @@ main {
   margin: 6px 0;
   font-size: 13px;
   color: var(--secondary);
+}
+.agent-persona-shadow,
+.agent-persona-awaken {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.agent-persona-shadow summary,
+.agent-persona-awaken summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.agent-persona-shadow p,
+.agent-persona-awaken p {
+  margin: 6px 0 0;
+  color: var(--muted);
 }
 #agent-persona-form {
   display: flex;

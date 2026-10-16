@@ -1,5 +1,6 @@
 import "./style.css";
 import { compactModeEnabled, setCompactMode } from "./compact";
+import { captureScroll, restoreScroll } from "./scroll";
 import { agentPage, mountAgent, prefillAgent, setupAgent } from "./agent";
 import {
   type IconNode,
@@ -575,6 +576,8 @@ function render() {
   const d = state.data,
     s = state.stats;
   const look = ensureDerived();
+  // 重绘会重建 `#app`，先记下标记过的滚动位置，渲染完再搬回去。
+  const scrollMemory = captureScroll();
   $("#app").innerHTML =
     `${mobile ? `<button class="mobile-nav-backdrop" data-action="close-navigation" aria-label="关闭导航"></button>` : ""}<aside class="sidebar" aria-label="空间导航">
     <button class="brand" data-page="focus"><span class="brand-mark">${logo}</span><span>番茄 <b>Todo</b><small data-explanation>让专注，成为日常</small></span></button>
@@ -596,7 +599,7 @@ function render() {
       )
       .join("")}</nav>
     <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
-    <nav class="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${look.activeByProject.get(p.id) ?? 0}</b></button>`).join("")}</nav>
+    <nav class="projects" data-keep-scroll="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${look.activeByProject.get(p.id) ?? 0}</b></button>`).join("")}</nav>
     <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p data-explanation>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
     <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.9.3</span></div></div>
   </aside>
@@ -609,6 +612,7 @@ function render() {
   updateClock();
   resizeCalendar();
   mountCalendarResize();
+  restoreScroll(scrollMemory);
 }
 // 每一页的思索条目：悬停整页不弹胶囊（整页都是它），所以在标题旁给一个
 // 明确的入口，点开就是这一页的「设计理念 + 怎么用」。
@@ -709,7 +713,7 @@ function focusPage() {
     <div class="focus-grid"><section class="card focus-card"><div class="card-heading"><h2>${icon("timer")} 我的番茄钟</h2><button class="icon-btn" data-action="immersive" aria-label="进入沉浸模式">${icon("maximize-2")}</button></div>${timerContent()}
     <div class="sound-bar">${backgroundSoundButton()}<button class="icon-btn" data-action="toggle-chime" aria-label="${state.data.settings.sound ? "关闭" : "开启"}关键节点音效">${icon(state.data.settings.sound ? "volume-2" : "volume-x")}</button></div></section>
     <section class="card today-card"><div class="card-heading"><h2>今日待办 <span class="count-label">${todayPendingCount}</span></h2><button class="text-button" data-page="tasks">全部任务 ${icon("arrow-up-right")}</button></div><div class="list-tabs"><button class="${filter === "active" ? "active" : ""}" data-filter="active">待完成 <span>${todayPendingCount}</span></button><button class="${filter === "completed" ? "active" : ""}" data-filter="completed">已完成 <span>${s.todayCompleted}</span></button><span class="list-tabs-line"></span><span class="subtle small" data-explanation>一步一步，来就好</span></div>
-    <div class="today-list">${
+    <div class="today-list" data-keep-scroll="today-list">${
       filter === "completed"
         ? taskList(
             state.data.tasks.filter(

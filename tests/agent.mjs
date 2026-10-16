@@ -1318,11 +1318,21 @@ test(
       await expect(page.locator(".agent-persona.current")).toContainText(
         "小迷妹",
       );
-      await page
-        .locator(
-          '.agent-persona:has-text("严格教练") [data-agent="switch-persona"]',
-        )
-        .click();
+      // 人格卡的「另一面」可以展开阅读，展开动作不会顺手选中这张卡。
+      const coach = page.locator('.agent-persona:has-text("严格教练")');
+      await coach.locator(".agent-persona-shadow summary").click();
+      await expect(coach.locator(".agent-persona-shadow")).toHaveAttribute(
+        "open",
+        "",
+      );
+      await coach.locator(".agent-persona-awaken summary").click();
+      await expect(coach.locator(".agent-persona-awaken")).toHaveAttribute(
+        "open",
+        "",
+      );
+      assert.equal((await api({ op: "status" })).persona, "default");
+      // 点人格卡片本身就切换，不再需要找「使用」按钮。
+      await coach.locator(".agent-persona-head").click();
       await expect(page.locator(".agent-persona-badge")).toContainText(
         "严格教练",
       );
@@ -1341,7 +1351,15 @@ test(
         path: "artifacts/agent-personas.png",
         fullPage: true,
       });
-      // 新建并删除一张自定义人格；默认人格仍然是当前。
+      // 新对话默认沿用最近选择的人格，而不是回到内置预设。
+      await page.locator('[data-agent="close-sheet"]').click();
+      await page.locator('[data-agent="new"]').first().click();
+      await expect(page.locator(".agent-persona-badge")).toContainText(
+        "严格教练",
+      );
+      assert.equal((await api({ op: "status" })).persona, "coach");
+      // 新建并删除一张自定义人格；当前人格不受影响。
+      await page.locator('[data-agent="personas"]').click();
       await page
         .locator('#agent-persona-form input[name="name"]')
         .fill("测试人格");

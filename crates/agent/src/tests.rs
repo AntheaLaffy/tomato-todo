@@ -160,16 +160,16 @@ fn personas_are_seeded_switchable_and_builtins_are_protected() {
         .unwrap();
     assert_eq!(agent.status().unwrap()["persona"], id);
     assert_eq!(Store::load(dir.path()).unwrap().persona_id(), id);
+    // 换过人格后，新对话默认沿用这一次选择，而不是回到内置预设。
     {
         let mut inner = agent.inner.lock().unwrap();
         inner.store.new_conversation(3);
         inner.store.save(dir.path()).unwrap();
     }
-    assert_eq!(agent.status().unwrap()["persona"], "default");
-    assert_eq!(
-        Store::load(dir.path()).unwrap().active_persona().id,
-        "default"
-    );
+    assert_eq!(agent.status().unwrap()["persona"], id);
+    let reopened = Store::load(dir.path()).unwrap();
+    assert_eq!(reopened.default_persona, id);
+    assert_eq!(reopened.active_persona().id, id);
 
     // 内置人格不可改写或删除；自定义人格可删除，使用它的对话回到默认。
     assert!(agent
@@ -1176,4 +1176,40 @@ fn the_model_can_cancel_its_own_plan() {
         true
     );
     assert!(agent.status().unwrap()["plan"].is_null());
+}
+
+#[test]
+fn builtin_persona_prompt_updates_reach_existing_state() {
+    let dir = tempfile::tempdir().unwrap();
+    Store::default().save(dir.path()).unwrap();
+    // 模拟旧版本落盘：内置人格带着过时的提示词。
+    let mut stale = Store::load(dir.path()).unwrap();
+    let slot = stale.personas.iter_mut().find(|p| p.id == "calm").unwrap();
+    slot.identity = "旧的提示词".into();
+    slot.style = "旧的风格".into();
+    stale.save(dir.path()).unwrap();
+    // 内置人格不可编辑，再加载时应被代码里的最新版本覆盖。
+    let reloaded = Store::load(dir.path()).unwrap();
+    let calm = reloaded.persona("calm").unwrap();
+    assert!(calm.builtin);
+    assert_ne!(calm.identity, "旧的提示词");
+    assert_ne!(calm.style, "旧的风格");
+    assert!(calm.identity.contains("合作者"));
+}
+
+#[test]
+fn builtin_personas_stay_within_limits() {
+    // 丰富内置人格时容易撞上 2000/4000 字上限；让测试替人盯住。
+    for persona in crate::state::builtin_personas() {
+        persona.validate().unwrap();
+        assert!(!persona.identity.is_empty() && !persona.style.is_empty());
+        // 每张预设都要有「另一面」与觉醒世界，否则这两套机制对这张卡是空的。
+        assert!(!persona.shadow.is_empty(), "{} missing shadow", persona.id);
+        assert!(!persona.awaken.is_empty(), "{} missing awaken", persona.id);
+        assert!(
+            !persona.fantasy.is_empty(),
+            "{} missing fantasy",
+            persona.id
+        );
+    }
 }

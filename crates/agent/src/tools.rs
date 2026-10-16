@@ -166,8 +166,8 @@ pub fn definitions(agent: bool) -> Vec<Value> {
         ));
         list.push(tool(
             "save_persona",
-            "新建或修改一张人格卡（改 id 对应的人格）。只影响身份、语气与情绪，不涉及权限。改已有内置人格会被拒绝，请当作用户想另存一个新人格。",
-            json!({"id":{"type":"string","maxLength":40,"description":"省略则新建；填写则修改同名自定义人格"},"name":{"type":"string","maxLength":24},"emoji":{"type":"string","maxLength":8},"summary":{"type":"string","maxLength":80},"identity":{"type":"string","maxLength":2000},"style":{"type":"string","maxLength":4000},"greeting":{"type":"string","maxLength":300}}),
+            "新建或修改一张人格卡（改 id 对应的人格）。只影响身份、语气与情绪，不涉及权限。改已有内置人格会被拒绝，请当作用户想另存一个新人格。用户想要「超能力/觉醒/另一个世界」时，先用 web_search 找一个合适的幻想文学世界观（童话、动画、小说、历史、奇幻、西幻、玄幻、科幻、第四天灾…），再写 awaken（容易触发的条件）与 fantasy（世界观方向、可以是其中任何角色、生活怎么具体写）。",
+            json!({"id":{"type":"string","maxLength":40,"description":"省略则新建；填写则修改同名自定义人格"},"name":{"type":"string","maxLength":24},"emoji":{"type":"string","maxLength":8},"summary":{"type":"string","maxLength":80},"identity":{"type":"string","maxLength":2000},"style":{"type":"string","maxLength":4000},"shadow":{"type":"string","maxLength":4000,"description":"平时收着的阴暗面，持续触到开关才启用"},"awaken":{"type":"string","maxLength":400,"description":"超能力觉醒的触发条件，写得容易碰上"},"fantasy":{"type":"string","maxLength":4000,"description":"觉醒后的世界方向：幻想文学类型、可以是其中任何角色、生活要具体"},"greeting":{"type":"string","maxLength":300}}),
             &["name"],
             false,
         ));

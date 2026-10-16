@@ -2321,3 +2321,70 @@ test(
     }
   },
 );
+
+test(
+  "re-renders keep the scroll offset and the expanded agent panel",
+  { timeout: 90_000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tomato-keep-scroll-"));
+    const url = "http://127.0.0.1:4327";
+    const server = spawn("target/debug/tomato-preview", [], {
+      env: {
+        ...process.env,
+        TOMATO_PORT: "4327",
+        TOMATO_DATA_PATH: join(dir, "keep.sqlite3"),
+      },
+      stdio: "pipe",
+    });
+    let browser;
+    try {
+      for (let i = 0; i < 100; i++) {
+        try {
+          if ((await fetch(`${url}/api/snapshot`)).ok) break;
+        } catch {}
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      browser = await chromium.launch({
+        executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+        headless: true,
+        args: ["--no-sandbox"],
+      });
+      const page = await browser.newPage({
+        viewport: { width: 1280, height: 1000 },
+      });
+      const errors = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      await page.goto(url);
+      // 足够多的今日任务，让今日待办出现内部滚动条。
+      for (let i = 0; i < 10; i++) {
+        await page.locator('[data-action="new-task"]').first().click();
+        await page.locator("#template-form [name=title]").fill(`滚动保持 ${i}`);
+        await page.locator("#create-from-editor").click();
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+      }
+      const list = page.locator(".today-list");
+      await list.evaluate((el) => (el.scrollTop = el.scrollHeight));
+      const before = await list.evaluate((el) => el.scrollTop);
+      assert.ok(before > 0, "today list should be scrollable");
+      // 改主题会触发一次整体重绘；滚到一半的位置必须被搬回去。
+      await page.locator('[data-action="theme"]').click();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+      await expect
+        .poll(() => page.locator(".today-list").evaluate((el) => el.scrollTop))
+        .toBeGreaterThan(before - 5);
+      // 助手浮层：展开「MCP 与私有目录」后，2.5s 的状态轮询不能把它折叠。
+      await page.locator('[data-page="agent"]').click();
+      await page.getByRole("button", { name: "设置", exact: true }).click();
+      const more = page.locator("details.agent-more");
+      await more.locator("summary").click();
+      await expect(more).toHaveAttribute("open", "");
+      await page.waitForTimeout(3200);
+      await expect(more).toHaveAttribute("open", "");
+      assert.deepEqual(errors, []);
+      console.log(`keep-scroll artifacts: ${dir}`);
+    } finally {
+      await browser?.close();
+      server.kill("SIGTERM");
+    }
+  },
+);

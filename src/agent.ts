@@ -13,6 +13,7 @@ import {
 } from "./agent-canvas";
 import { hydrateAgentImages, previewAgentImage } from "./agent-media";
 import { playCreatorEntrance, type CreatorEntrance } from "./agent-creator";
+import { captureScroll, restoreScroll } from "./scroll";
 import {
   attachmentHtml,
   messageHtml,
@@ -55,6 +56,9 @@ type Persona = {
   summary: string;
   identity: string;
   style: string;
+  shadow: string;
+  awaken: string;
+  fantasy: string;
   greeting: string;
   builtin: boolean;
   current: boolean;
@@ -747,7 +751,7 @@ function sheetHtml(): string {
       </div><div class="agent-checks"><label class="agent-check"><input type="checkbox" name="enabled" ${checked("enabled", p.enabled)}>启用</label><label class="agent-check"><input type="checkbox" name="automatic" ${checked("automatic", p.automatic)}>异常时自动唤醒</label></div>
       <div class="agent-actions"><button class="button primary" type="submit">保存</button><button class="button" type="button" data-agent="login">登录 Codex</button><button class="button" type="button" data-agent="logout">退出</button></div></form>
       <div id="agent-auth">${authHtml()}</div>
-      <details class="agent-more"><summary>MCP 与私有目录</summary><pre id="agent-mcp">${esc(pretty(s.mcpConfig))}</pre><p class="muted" id="agent-directory">${esc(s.dataDir)}</p></details>`;
+      <details class="agent-more" data-keep-open="mcp"${sheetOpenKeys.has("mcp") ? " open" : ""}><summary>MCP 与私有目录</summary><pre id="agent-mcp">${esc(pretty(s.mcpConfig))}</pre><p class="muted" id="agent-directory">${esc(s.dataDir)}</p></details>`;
     if (currentSheet === "schedules") {
       const list = s.schedules ?? [];
       const editing = list.find((x) => x.id === editingSchedule) ?? null;
@@ -764,14 +768,14 @@ function sheetHtml(): string {
     if (currentSheet === "personas") {
       const list = s.personas ?? [];
       const editing = list.find((p) => p.id === editingPersona) ?? null;
-      return `<p class="subtle small">人格只改助手的身份、语气与情绪，不碰权限、工具与安全规则。切换只对当前对话生效，分支会继承，新对话回到默认。想让助手自己切换，直接说「换个语气 / 从现在起你是……」即可。</p><div id="agent-personas">${
+      return `<p class="subtle small">人格只改助手的身份、语气与情绪，不碰权限、工具与安全规则。点一张卡即切换；只对当前对话生效，分支会继承，新对话默认沿用你最近选过的人格。想让助手自己切换，直接说「换个语气 / 从现在起你是……」即可。</p><div id="agent-personas">${
         list
           .map(
             (p) =>
-              `<div class="agent-persona ${p.current ? "current" : ""}"><div class="agent-persona-head"><b>${esc(p.emoji || "🎭")} ${esc(p.name)}</b>${p.current ? '<span class="agent-tag confirmed">当前</span>' : ""}${p.builtin ? '<span class="agent-tag">内置</span>' : ""}</div>${p.summary ? `<small>${esc(p.summary)}</small>` : ""}<p>${esc(p.identity)}</p><div class="button-row"><button class="button small" data-agent="switch-persona" data-id="${esc(p.id)}" ${p.current || busy ? "disabled" : ""}>${p.current ? "使用中" : "使用"}</button>${p.builtin ? "" : `<button class="button small" data-agent="edit-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>编辑</button><button class="button small" data-agent="delete-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>删除</button>`}</div></div>`,
+              `<div class="agent-persona ${p.current ? "current" : ""}" data-agent="switch-persona" data-id="${esc(p.id)}" role="button" tabindex="0" aria-pressed="${p.current}" aria-label="使用人格 ${esc(p.name)}"><div class="agent-persona-head"><b>${esc(p.emoji || "🎭")} ${esc(p.name)}</b>${p.current ? '<span class="agent-tag confirmed">当前</span>' : ""}${p.builtin ? '<span class="agent-tag">内置</span>' : ""}</div>${p.summary ? `<small>${esc(p.summary)}</small>` : ""}<p>${esc(p.identity)}</p>${p.shadow ? `<details class="editor-details agent-persona-shadow" data-keep-open="persona-shadow:${esc(p.id)}"><summary>另一面（平时收着）</summary><p>${esc(p.shadow)}</p></details>` : ""}${p.fantasy ? `<details class="editor-details agent-persona-awaken" data-keep-open="persona-awaken:${esc(p.id)}"><summary>超能力觉醒（触发：${esc(p.awaken || "看用户怎么逼")}）</summary><p>${esc(p.fantasy)}</p></details>` : ""}${p.builtin ? "" : `<div class="button-row"><button class="button small" data-agent="edit-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>编辑</button><button class="button small" data-agent="delete-persona" data-id="${esc(p.id)}" ${busy ? "disabled" : ""}>删除</button></div>`}</div>`,
           )
           .join("") || '<p class="agent-empty">还没有人格卡。</p>'
-      }</div><form id="agent-persona-form" data-id="${editing ? esc(editing.id) : ""}"><h3>${editing ? `编辑「${esc(editing.name)}」` : "新建人格"}</h3><div class="form-grid"><label>名称<input name="name" maxlength="24" required placeholder="比如 傲娇学妹" value="${esc(pfield("name", editing?.name ?? ""))}"></label><label>图标<input name="emoji" maxlength="8" placeholder="🍅" value="${esc(pfield("emoji", editing?.emoji ?? ""))}"></label></div><label>一句话简介<input name="summary" maxlength="80" placeholder="在列表里显示" value="${esc(pfield("summary", editing?.summary ?? ""))}"></label><label>身份与背景<textarea name="identity" rows="3" maxlength="2000" placeholder="你是谁、和用户是什么关系">${esc(pfield("identity", editing?.identity ?? ""))}</textarea></label><label>说话与行为风格<textarea name="style" rows="4" maxlength="4000" placeholder="语气、口头禅、情绪表达、禁忌">${esc(pfield("style", editing?.style ?? ""))}</textarea></label><label>开场白（可选）<textarea name="greeting" rows="2" maxlength="300" placeholder="切换过去后可以参考这样开场">${esc(pfield("greeting", editing?.greeting ?? ""))}</textarea></label><div class="agent-actions"><button class="button primary small" type="submit">${editing ? "保存修改" : "保存人格"}</button>${editing ? '<button class="button small" type="button" data-agent="new-persona">取消编辑</button>' : ""}</div></form>`;
+      }</div><form id="agent-persona-form" data-id="${editing ? esc(editing.id) : ""}"><h3>${editing ? `编辑「${esc(editing.name)}」` : "新建人格"}</h3><div class="form-grid"><label>名称<input name="name" maxlength="24" required placeholder="比如 傲娇学妹" value="${esc(pfield("name", editing?.name ?? ""))}"></label><label>图标<input name="emoji" maxlength="8" placeholder="🍅" value="${esc(pfield("emoji", editing?.emoji ?? ""))}"></label></div><label>一句话简介<input name="summary" maxlength="80" placeholder="在列表里显示" value="${esc(pfield("summary", editing?.summary ?? ""))}"></label><label>身份与背景<textarea name="identity" rows="3" maxlength="2000" placeholder="你是谁、和用户是什么关系">${esc(pfield("identity", editing?.identity ?? ""))}</textarea></label><label>说话与行为风格<textarea name="style" rows="4" maxlength="4000" placeholder="语气、口头禅、情绪表达、禁忌">${esc(pfield("style", editing?.style ?? ""))}</textarea></label><label>另一面 / 破防（可选）<textarea name="shadow" rows="4" maxlength="4000" placeholder="平时收着的另一面：什么会把它逼出来、它变成什么样、恢复由什么决定">${esc(pfield("shadow", editing?.shadow ?? ""))}</textarea></label><label>超能力觉醒触发（可选）<textarea name="awaken" rows="2" maxlength="400" placeholder="容易碰到的触发条件，例如用户第三次说「明天开始」">${esc(pfield("awaken", editing?.awaken ?? ""))}</textarea></label><label>觉醒世界（可选）<textarea name="fantasy" rows="4" maxlength="4000" placeholder="偏爱的幻想世界类型、可以成为其中任何角色、这一天怎么过；留空则没有觉醒机制">${esc(pfield("fantasy", editing?.fantasy ?? ""))}</textarea></label><label>开场白（可选）<textarea name="greeting" rows="2" maxlength="300" placeholder="切换过去后可以参考这样开场">${esc(pfield("greeting", editing?.greeting ?? ""))}</textarea></label><div class="agent-actions"><button class="button primary small" type="submit">${editing ? "保存修改" : "保存人格"}</button>${editing ? '<button class="button small" type="button" data-agent="new-persona">取消编辑</button>' : ""}</div></form>`;
     }
     if (currentSheet === "memory")
       return `<div id="agent-memories">${
@@ -787,13 +791,16 @@ function sheetHtml(): string {
       s.anomalies
         .map(
           (a) =>
-            `<details class="agent-signal"><summary>${esc(a.title)}</summary><p>${esc(a.question)}</p><pre>${esc(pretty(a.evidence))}</pre></details>`,
+            `<details class="agent-signal" data-keep-open="signal:${esc(a.key)}"${sheetOpenKeys.has(`signal:${a.key}`) ? " open" : ""}><summary>${esc(a.title)}</summary><p>${esc(a.question)}</p><pre>${esc(pretty(a.evidence))}</pre></details>`,
         )
         .join("") || `<p class="agent-empty">暂无异常。</p>`
     }</div>`;
   };
-  return `<section class="agent-sheet-card" role="dialog" aria-label="${esc(title[currentSheet])}"><header><h2>${esc(title[currentSheet])}</h2><button class="icon-btn" data-agent="close-sheet" aria-label="关闭">✕</button></header><div class="agent-sheet-body">${body()}</div></section>`;
+  return `<section class="agent-sheet-card" role="dialog" aria-label="${esc(title[currentSheet])}"><header><h2>${esc(title[currentSheet])}</h2><button class="icon-btn" data-agent="close-sheet" aria-label="关闭">✕</button></header><div class="agent-sheet-body" data-keep-scroll="agent-sheet:${currentSheet}">${body()}</div></section>`;
 }
+// 浮层里用户自己展开的 <details> 也是浏览器状态，重绘时一起搬走，
+// 否则只要展开过，生成的 HTML 就和当前 DOM 对不上，每次轮询都重建一遍。
+const sheetOpenKeys = new Set<string>();
 function renderSheet() {
   const element = document.getElementById("agent-sheet");
   if (!element) return;
@@ -803,7 +810,10 @@ function renderSheet() {
     return;
   }
   const html = sheetHtml();
-  if (element.innerHTML !== html) element.innerHTML = html;
+  if (element.innerHTML === html) return;
+  const scrollMemory = captureScroll(element);
+  element.innerHTML = html;
+  restoreScroll(scrollMemory, element);
 }
 /**
  * 演助手排好的演示脚本。只演一次（按 serial），而且只演新鲜的：用户可能过一会儿
@@ -1031,14 +1041,17 @@ export function mountAgent() {
     "toggle",
     (event) => {
       const details = event.target;
-      if (
-        !(details instanceof HTMLDetailsElement) ||
-        !details.dataset.thinkingId ||
-        !details.isConnected
-      )
+      if (!(details instanceof HTMLDetailsElement) || !details.isConnected)
         return;
-      if (details.open) expandedThinking.add(details.dataset.thinkingId);
-      else expandedThinking.delete(details.dataset.thinkingId);
+      if (details.dataset.thinkingId) {
+        if (details.open) expandedThinking.add(details.dataset.thinkingId);
+        else expandedThinking.delete(details.dataset.thinkingId);
+      }
+      const keepOpen = details.dataset.keepOpen;
+      if (keepOpen) {
+        if (details.open) sheetOpenKeys.add(keepOpen);
+        else sheetOpenKeys.delete(keepOpen);
+      }
     },
     { capture: true },
   );
@@ -1121,6 +1134,8 @@ export function mountAgent() {
       renderSheet();
       return;
     }
+    // 展开人格卡的「另一面 / 超能力」只是看内容，不当作选中这张卡。
+    if (target.closest(".agent-persona-shadow, .agent-persona-awaken")) return;
     const button = target.closest<HTMLButtonElement>("[data-agent]");
     if (!button) return;
     void action(button).catch((error) => hooks.toast(String(error)));
@@ -1128,6 +1143,16 @@ export function mountAgent() {
   panel.addEventListener("keydown", (event) => {
     if (event.code === "Space" && (event.target as Element).closest("summary"))
       event.stopPropagation();
+    // 卡片式按钮（人格条目）用键盘也能用：回车 / 空格等同于点一下。
+    if (
+      (event.key === "Enter" || event.key === " ") &&
+      event.target instanceof HTMLElement &&
+      event.target.matches('[data-agent][role="button"]')
+    ) {
+      event.preventDefault();
+      event.target.click();
+      return;
+    }
     if (
       event.target instanceof HTMLTextAreaElement &&
       event.target.id === "agent-text" &&
@@ -1312,6 +1337,9 @@ async function submit(form: HTMLFormElement) {
       summary: String(data.get("summary") ?? "").trim(),
       identity: String(data.get("identity") ?? "").trim(),
       style: String(data.get("style") ?? "").trim(),
+      shadow: String(data.get("shadow") ?? "").trim(),
+      awaken: String(data.get("awaken") ?? "").trim(),
+      fantasy: String(data.get("fantasy") ?? "").trim(),
       greeting: String(data.get("greeting") ?? "").trim(),
     });
     editingPersona = null;
@@ -1718,6 +1746,13 @@ async function action(button: HTMLButtonElement) {
       delete memoryEdits[button.dataset.id!];
       break;
     case "switch-persona":
+      // 点卡片即切换；当前人格或忙碌时不发无谓请求。
+      if (
+        button.dataset.id === status?.persona ||
+        status?.busy ||
+        requestPending
+      )
+        break;
       await tool("switch_persona", { id: button.dataset.id });
       await refreshAgent();
       hooks.toast("已切换人格");
@@ -1732,6 +1767,9 @@ async function action(button: HTMLButtonElement) {
         summary: persona.summary,
         identity: persona.identity,
         style: persona.style,
+        shadow: persona.shadow,
+        awaken: persona.awaken,
+        fantasy: persona.fantasy,
         greeting: persona.greeting,
       };
       renderSheet();
