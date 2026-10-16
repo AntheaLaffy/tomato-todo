@@ -2,7 +2,7 @@
 
 记录本项目的版本变更；版本号对应 Git 标签，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [未发布]
+## [0.9.3] - 2026-10-16
 
 ### 修复
 
