@@ -2363,15 +2363,27 @@ test(
         await expect(page.getByRole("dialog")).toHaveCount(0);
       }
       const list = page.locator(".today-list");
-      await list.evaluate((el) => (el.scrollTop = el.scrollHeight));
+      // 滚到中间而不是底部：布局略変化时不会被夹到新的底部。
+      await list.evaluate((el) => {
+        el.scrollTop = Math.floor((el.scrollHeight - el.clientHeight) * 0.6);
+      });
       const before = await list.evaluate((el) => el.scrollTop);
       assert.ok(before > 0, "today list should be scrollable");
-      // 改主题会触发一次整体重绘；滚到一半的位置必须被搬回去。
+      const scrollTop = () =>
+        page.locator(".today-list").evaluate((el) => el.scrollTop);
+      const maxScroll = () =>
+        page
+          .locator(".today-list")
+          .evaluate((el) => el.scrollHeight - el.clientHeight);
+      // 改主题会触发一次整体重绘；位置必须被搬回去（内容变矮时允许被夹到新的底部）。
       await page.locator('[data-action="theme"]').click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
       await expect
-        .poll(() => page.locator(".today-list").evaluate((el) => el.scrollTop))
-        .toBeGreaterThan(before - 5);
+        .poll(async () =>
+          Math.abs((await scrollTop()) - Math.min(before, await maxScroll())) <=
+          5,
+        )
+        .toBe(true);
       // 助手浮层：展开「MCP 与私有目录」后，2.5s 的状态轮询不能把它折叠。
       await page.locator('[data-page="agent"]').click();
       await page.getByRole("button", { name: "设置", exact: true }).click();
