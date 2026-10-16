@@ -14,7 +14,7 @@ generated_at: 2026-10-10
 | 验证本周日程布局     | 验证   | integration.mjs 的周历检查      | 物理分辨率与 125%/约 133%/150% 缩放、完整小时标签、短任务标题、滚动时比例不变、窗口拉伸；src/main.ts 的 resizeCalendar |
 | 验证侧栏排序菜单     | 验证   | integration.mjs 的项目排序     | src/main.ts 的菜单捕获阶段关闭与 sortProjects                                           |
 | 验证音效与静音       | 验证   | audio.mjs、integration.mjs     | src/audio.ts、src/sound-events.ts、native.mjs                                           |
-| 验证锁机只读明日日程 | 验证   | integration.mjs 的合成锁机快照 | 跨年/闰日、时间排序、备注/步骤、严格/普通、空日程、360/1280px、零写请求；不启用原生保护 |
+| 验证保护页只读日程日期切换 | 验证   | integration.mjs 的合成锁机快照 | 锁机前/开始瞬间/午夜/清晨、跨年/闰日、小憩/停用/星期过滤/无时段、入口与弹窗自动切换、时间排序、备注/步骤、严格/普通、空日程、360/1280px、零写请求；不启用原生保护 |
 | 验证概念讲解         | 验证   | integration.mjs 的 Ponder 用例 | src/ponder.ts、main.ts 的 data-ponder；悬停胶囊、长按 G、列表入口与 Esc 关闭            |
 | 验证助手手势清理     | 验证   | integration.mjs 的 Ponder 用例 | src/hand.ts；脚本结束/出错收起手势、讲稿与键盘，失败后队列恢复、减少动画模式 |
 | 验证白名单与全屏     | 验证   | native.mjs                     | fixtures/guard_window.py、crates/core/src/guard.rs                                      |

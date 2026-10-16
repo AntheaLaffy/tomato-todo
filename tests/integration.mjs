@@ -1300,11 +1300,23 @@ test(
       await page.route("**/api/snapshot", (route) =>
         route.fulfill({ json: preview }),
       );
+      preview.data.lock.schedules = [
+        {
+          id: "night",
+          name: "睡眠",
+          start: "23:00",
+          end: "07:00",
+          days: [1, 2, 3, 4, 5, 6, 7],
+          enabled: true,
+          strict: true,
+        },
+      ];
       for (const [today, tomorrow, strict, width] of [
         ["2028-12-31", "2029-01-01", true, 1280],
         ["2028-02-28", "2028-02-29", false, 360],
       ]) {
         preview.today = today;
+        preview.serverTime = new Date(`${today}T23:00:00`).getTime() / 1000;
         preview.data.lock.active = {
           name: "测试休息",
           strict,
@@ -1375,10 +1387,110 @@ test(
       await expect(page.getByRole("dialog")).toContainText(
         "明天暂无已安排的任务",
       );
+      await page.keyboard.press("Escape");
+      preview.data.tasks = [
+        { ...baseTask, id: "dec31", title: "年末安排", dueDate: "2028-12-31" },
+        { ...baseTask, id: "jan1", title: "元旦安排", dueDate: "2029-01-01" },
+        { ...baseTask, id: "jan2", title: "次日安排", dueDate: "2029-01-02" },
+      ].map((task) => ({
+        ...task,
+        completed: false,
+        goalId: null,
+        nodeId: null,
+        reminderPending: false,
+        reminderExpired: false,
+      }));
+      // A running focus session must switch without a lock-state mutation or reload.
+      preview.data.lock.active = null;
+      preview.data.timer.running = true;
+      preview.data.settings.protection.mode = "lock";
+      preview.data.settings.protection.strict = true;
+      preview.today = "2028-12-31";
+      preview.serverTime = new Date("2028-12-31T22:59:59").getTime() / 1000;
+      await page.reload();
+      await page.getByRole("button", { name: "查看今天日程" }).click();
+      const agenda = page.getByRole("dialog");
+      await expect(agenda.locator(".tomorrow-agenda h3")).toHaveText([
+        "年末安排",
+      ]);
+      preview.serverTime += 1;
+      await expect(
+        agenda.getByRole("heading", { name: "明天的日程" }),
+      ).toBeVisible();
+      await expect(agenda.locator(".tomorrow-agenda h3")).toHaveText([
+        "元旦安排",
+      ]);
+      preview.today = "2029-01-01";
+      preview.serverTime = new Date("2029-01-01T00:00:00").getTime() / 1000;
+      await expect(
+        agenda.getByRole("heading", { name: "今天的日程" }),
+      ).toBeVisible();
+      await expect(agenda.locator(".tomorrow-agenda h3")).toHaveText([
+        "元旦安排",
+      ]);
+      await page.keyboard.press("Escape");
+      // Morning, daytime naps, disabled and off-weekday windows all retain today.
+      for (const [clock, enabled, days, start, end, expectedDay, title] of [
+        [
+          "06:59:59",
+          true,
+          [1, 2, 3, 4, 5, 6, 7],
+          "23:00",
+          "07:00",
+          "今天",
+          "元旦安排",
+        ],
+        [
+          "07:00:00",
+          true,
+          [1, 2, 3, 4, 5, 6, 7],
+          "23:00",
+          "07:00",
+          "今天",
+          "元旦安排",
+        ],
+        [
+          "13:00:00",
+          true,
+          [1, 2, 3, 4, 5, 6, 7],
+          "12:30",
+          "14:00",
+          "今天",
+          "元旦安排",
+        ],
+        ["23:30:00", false, [1], "23:00", "07:00", "今天", "元旦安排"],
+        ["23:30:00", true, [2], "23:00", "07:00", "今天", "元旦安排"],
+        ["23:30:00", true, [1], "23:00", "07:00", "明天", "次日安排"],
+      ]) {
+        preview.serverTime = new Date(`2029-01-01T${clock}`).getTime() / 1000;
+        Object.assign(preview.data.lock.schedules[0], {
+          enabled,
+          days,
+          start,
+          end,
+        });
+        preview.data.lock.active = {
+          name: "小憩",
+          strict: false,
+          startedAt: preview.serverTime,
+          endsAt: preview.serverTime + 60,
+        };
+        await page.reload();
+        await page
+          .getByRole("button", { name: `查看${expectedDay}日程` })
+          .click();
+        await expect(agenda.locator(".tomorrow-agenda h3")).toHaveText([title]);
+        await page.keyboard.press("Escape");
+      }
+      preview.data.lock.schedules = [];
+      preview.data.tasks = [];
+      await page.reload();
+      await page.getByRole("button", { name: "查看今天日程" }).click();
+      await expect(agenda).toContainText("今天暂无已安排的任务");
       assert.deepEqual(
         requests,
         [],
-        "Viewing tomorrow must not dispatch any actions",
+        "Viewing the schedule must not dispatch any actions",
       );
       assert.deepEqual(errors, []);
       console.log(`schedule artifacts: ${dir}`);

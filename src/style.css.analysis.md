@@ -48,7 +48,7 @@ generated_at: 2026-10-16
 
 偏好页 .settings-grid 使用 align-items: start，两列各自按卡片内容高度排列，避免左列被整列拉伸。
 
-锁机明日日程：`.tomorrow-entry` / `.tomorrow-agenda` / `.agenda-notes` / `.agenda-steps` / `.modal.sleep-preview`（L:3432 起），两列时间与内容、备注保留换行、长文本折行，休息锁机弹窗使用低亮度深色。
+锁机只读日程（今日/明日共用）：`.tomorrow-entry` / `.tomorrow-agenda` / `.agenda-notes` / `.agenda-steps` / `.modal.sleep-preview`（L:3432 起），两列时间与内容、备注保留换行、长文本折行，休息锁机弹窗使用低亮度深色。
 
 助手输入栏：`.agent-status` 自动换行；`.agent-model` 与 `.agent-thinking` 用紧凑 select，思考强度标签与选择器同排（L:5346 起）。
 

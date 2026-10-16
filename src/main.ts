@@ -1608,12 +1608,24 @@ function lockDialog(id?: string) {
     await saveLockSchedule(schedule);
   });
 }
-function tomorrowScheduleDialog() {
+function focusSchedule() {
   const date = new Date(`${state.today}T12:00:00`);
-  date.setDate(date.getDate() + 1);
-  const tomorrow = isoDate(date);
+  const now = new Date(state.serverTime * 1000);
+  const clock = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const nextDay = state.data.lock.schedules.some(
+    (schedule) =>
+      schedule.enabled &&
+      schedule.end < schedule.start &&
+      schedule.days.includes(date.getDay() || 7) &&
+      clock >= schedule.start,
+  );
+  if (nextDay) date.setDate(date.getDate() + 1);
+  return { date, day: nextDay ? "明天" : "今天", dueDate: isoDate(date) };
+}
+function focusScheduleDialog() {
+  const { date, day, dueDate } = focusSchedule();
   const tasks = state.data.tasks
-    .filter((task) => task.dueDate === tomorrow && !isVoid(task))
+    .filter((task) => task.dueDate === dueDate && !isVoid(task))
     .sort(
       (a, b) =>
         (a.reminderTime || "99:99").localeCompare(b.reminderTime || "99:99") ||
@@ -1625,9 +1637,9 @@ function tomorrowScheduleDialog() {
     weekday: "long",
   });
   modal(
-    `${modalHeader("明天的日程", `${label} · ${tasks.length} 项安排`)}
-    <div class="tomorrow-schedule">
-      <p class="subtle small" data-explanation>看看明天要做什么，准备好需要带的资料。</p>
+    `${modalHeader(`${day}的日程`, `${label} · ${tasks.length} 项安排`)}
+    <div class="tomorrow-schedule" data-schedule-date="${dueDate}" data-schedule-day="${day}">
+      <p class="subtle small" data-explanation>看看${day}要做什么，准备好需要带的资料。</p>
       ${
         tasks.length
           ? `<ol class="tomorrow-agenda">${tasks
@@ -1636,7 +1648,7 @@ function tomorrowScheduleDialog() {
                 return `<li><time>${escape(task.reminderTime || "时间未定")}</time><div><h3>${escape(task.title)}${task.completed ? ' <span class="subtle small">已完成</span>' : ""}</h3>${project ? `<p class="subtle small">${escape(project.name)}</p>` : ""}${task.notes ? `<p class="agenda-notes">${escape(task.notes)}</p>` : ""}${task.subtasks.length ? `<ul class="agenda-steps">${task.subtasks.map((step) => `<li>${escape(step.title)}</li>`).join("")}</ul>` : ""}</div></li>`;
               })
               .join("")}</ol>`
-          : '<p class="small-empty">明天暂无已安排的任务<span data-explanation>，安心休息吧</span>。</p>'
+          : `<p class="small-empty">${day}暂无已安排的任务<span data-explanation>，安心休息吧</span>。</p>`
       }
     </div><div class="modal-actions"><button class="button secondary" data-action="close-modal">返回锁机页面</button></div>`,
     true,
@@ -1652,11 +1664,28 @@ function renderImmersive() {
     ? Math.max(0, rest.endsAt - state.serverTime)
     : state.remainingSecs;
   $("#app").innerHTML =
-    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow" data-explanation>${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div><button class="text-button tomorrow-entry" data-action="tomorrow-schedule">${icon("calendar-days")} 查看明天日程</button>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}${!rest ? `<div class="immersive-sound">${backgroundSoundButton()}</div>` : ""}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
+    `<div class="immersive ${locked ? "protected" : ""} ${rest ? "sleep-space" : ""}"><header><span class="brand"><span class="brand-mark">${logo}</span>番茄 Todo</span><span class="badge">${icon(rest ? "moon" : locked ? "shield-check" : "leaf")} ${rest ? "休息锁机中" : locked ? (p.mode === "lock" ? "界面锁定中" : "应用白名单保护中") : "沉浸专注"}</span>${!locked ? `<button class="icon-btn" data-action="immersive" aria-label="退出沉浸模式">${icon("minimize-2")}</button>` : "<span></span>"}</header><section><div class="eyebrow" data-explanation>${rest ? "REST IS PART OF THE PLAN" : "JUST YOU AND THIS MOMENT"}</div><h1>${rest ? "今天的努力，值得一场好眠。" : locked ? "此刻，只做这一件事。" : "让世界安静一会儿。"}</h1>${locked ? `<div class="protected-clock clock">${time(remaining)}</div><p>${escape(rest?.name || state.data.tasks.find((t) => t.id === state.data.timer.taskId)?.title || "自由专注")}</p><div class="protected-note">${icon("shield-check")} ${rest ? `预计 ${new Date(rest.endsAt * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} 自动解除 · 不计入专注时长` : p.mode === "lock" ? "其他应用会被自动切回这个专注空间" : `允许使用 ${p.whitelist.length} 个应用，其他应用会被切回`}</div><div class="subtle small" id="blocked-count">${blockedCount ? `已为你挡住 ${blockedCount} 次分心` : rest ? "放下屏幕，让眼睛和思绪一起休息。" : "你只需要照顾好眼前这一小段时间。"}</div><button class="text-button tomorrow-entry" data-action="focus-schedule">${icon("calendar-days")} 查看${focusSchedule().day}日程</button>${strictNow() ? '<p class="strict-status">严格执行中 · 到时自动解除</p>' : '<button class="text-button emergency" data-action="emergency">有急事，提前结束</button>'}` : timerContent()}${!rest ? `<div class="immersive-sound">${backgroundSoundButton()}</div>` : ""}</section><footer>${rest ? "晚安，明天再慢慢向前。" : "呼吸，放松肩膀。你正在向前走。"}</footer></div>`;
   icons();
   updateClock();
 }
 function updateClock() {
+  const scheduleEntry = document.querySelector(
+    '[data-action="focus-schedule"]',
+  );
+  const schedulePreview = document.querySelector<HTMLElement>(
+    "[data-schedule-date]",
+  );
+  if (scheduleEntry || schedulePreview) {
+    const { day, dueDate } = focusSchedule();
+    if (scheduleEntry && !scheduleEntry.textContent?.includes(day))
+      scheduleEntry.innerHTML = `${icon("calendar-days")} 查看${day}日程`;
+    if (
+      schedulePreview &&
+      (schedulePreview.dataset.scheduleDate !== dueDate ||
+        schedulePreview.dataset.scheduleDay !== day)
+    )
+      focusScheduleDialog();
+  }
   document
     .querySelectorAll(".clock")
     .forEach(
@@ -3204,8 +3233,8 @@ document.addEventListener("click", async (e) => {
     case "new-habit":
       templateDialog(undefined, true);
       break;
-    case "tomorrow-schedule":
-      tomorrowScheduleDialog();
+    case "focus-schedule":
+      focusScheduleDialog();
       break;
     case "close-modal":
       closeModal();

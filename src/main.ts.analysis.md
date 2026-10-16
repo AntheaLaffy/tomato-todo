@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3653
+lines: 3682
 generated_at: 2026-10-14
 ---
 
@@ -12,12 +12,12 @@ generated_at: 2026-10-14
 | 分发、快照、导航与提醒                              | 454–680 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 今日待办、本周日程日历、待补队列与静态实例列表      | 681–1007 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 任务、目标、习惯模板、愿景与统计设置                | 1008–1517 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 保护、定时锁机、沉浸与刷新                          | 1518–1731 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1732–2435 | 节点图在 src/nodegraph.ts                   |
-| 搜索、声音、紧急操作与表单绑定                      | 2436–2788 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 文件导入、模板动作与页面事件                        | 2789–3425 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 右键菜单、批量删除/移出、拖拽与快捷键               | 3426–3549 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动、概念讲解挂载与轮询                            | 3550–3653 | 概念目标与讲解内容在 src/ponder.ts          |
+| 保护、定时锁机、沉浸与刷新                          | 1518–1760 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1761–2464 | 节点图在 src/nodegraph.ts                   |
+| 搜索、声音、紧急操作与表单绑定                      | 2465–2817 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 文件导入、模板动作与页面事件                        | 2818–3454 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 右键菜单、批量删除/移出、拖拽与快捷键               | 3455–3578 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 启动、概念讲解挂载与轮询                            | 3579–3682 | 概念目标与讲解内容在 src/ponder.ts          |
 
 ## Symbols
 
@@ -44,18 +44,18 @@ generated_at: 2026-10-14
 | settingsPage         | function | 1464 |
 | projectWhitelistCard | function | 1478 |
 | guardPage            | function | 1518 |
-| templatesCard        | function | 1732 |
-| datesForPrinting     | function | 1743 |
-| printDialog          | function | 1771 |
-| templateDialog       | function | 1827 |
-| taskDialog           | function | 2221 |
-| goalDialog           | function | 2378 |
-| importPlan           | function | 2789 |
-| selectControls       | function | 3468 |
-| detachSelected       | function | 3473 |
-| deleteSelectedTasks  | function | 3483 |
-| sortProjects         | function | 3508 |
-| boot                 | function | 3575 |
+| templatesCard        | function | 1761 |
+| datesForPrinting     | function | 1772 |
+| printDialog          | function | 1800 |
+| templateDialog       | function | 1856 |
+| taskDialog           | function | 2250 |
+| goalDialog           | function | 2407 |
+| importPlan           | function | 2818 |
+| selectControls       | function | 3497 |
+| detachSelected       | function | 3502 |
+| deleteSelectedTasks  | function | 3512 |
+| sortProjects         | function | 3537 |
+| boot                 | function | 3604 |
 
 全部任务页用与待完成、已完成、全部同级的「模板」标签切换独立模板目录，避免模板被长任务列表推到页面底部；项目页仍在项目任务后显示本项目模板。模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通/目标待补呈现。
 
@@ -77,7 +77,7 @@ generated_at: 2026-10-14
 
 偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/备份。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。
 
-锁机日程：tomorrowScheduleDialog（L:1603）按 state.today 的本地日期取次日，时间排序、无时间排末尾，排除已报废实例。展示任务/项目/备注/步骤，无修改和计时入口；renderImmersive 在保护期间提供入口，严格模式可用，休息锁机使用深色弹窗。
+锁机日程：focusSchedule / focusScheduleDialog（L:1611 起）白天取 state.today；当天启用且星期匹配的跨夜锁机开始后取次日，午夜后继续显示这一天（改称今天）。午间小憩、停用时段和未安排跨夜锁机均显示今日；updateClock 在时间边界同步入口和已打开的弹窗。时间排序、无时间排末尾，排除已报废实例。展示任务/项目/备注/步骤，无修改和计时入口；renderImmersive 在保护期间提供入口，严格模式可用，休息锁机使用深色弹窗。
 
 Android 导航：setMobileNav（L:553）控制抽屉和工作区 inert；平台身份由原生 platform_kind 报告，boot 安装 tomatoBack 供 Kotlin 返回键处理。桌面专属偏好只在 desktop 为 true 时显示。
 
