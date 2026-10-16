@@ -69,10 +69,10 @@ pub fn definitions(agent: bool) -> Vec<Value> {
             ));
     list.push(tool(
                 "update_plan",
-                "更新任务计划：一串步骤，每步 pending / in_progress / completed，至多一个 in_progress。用于需要多步完成的事（核对数据、生成审阅文件等），让用户看到进度；简单任务不要用。步骤用中文短句。",
+                "更新任务计划：一串步骤，每步 pending / in_progress / completed，至多一个 in_progress。用于需要多步完成的事（核对数据、生成审阅文件等），让用户看到进度；简单任务不要用。步骤用中文短句。计划作废或不再需要时传空数组 `[]` 即可撤下。",
                 json!({
                     "explanation":{"type":"string","maxLength":200,"description":"可选，说明本次更新"},
-                    "plan":{"type":"array","minItems":1,"maxItems":12,"items":{
+                    "plan":{"type":"array","maxItems":12,"items":{
                         "type":"object",
                         "properties":{
                             "step":{"type":"string","maxLength":120,"description":"步骤文字"},

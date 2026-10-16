@@ -536,6 +536,9 @@ impl Agent {
         if let Ok(mut inner) = self.inner.lock() {
             inner.live.busy = false;
             inner.live.authentication = false;
+            // 计划描述的是「这一轮正在做的事」：轮次不再进行，就不能把
+            // 某个还在「进行中」的步骤留在界面上冒充活动状态。
+            inner.live.plan = Value::Null;
             inner.live.error = Some(error.into());
             for w in inner.store.wakes.iter_mut().rev().take(30) {
                 if w.status == "running" {
@@ -634,6 +637,9 @@ impl Agent {
                 inner.live.busy = false;
                 inner.live.authentication = false;
                 inner.live.tool.clear();
+                // 一轮结束就撤下计划，无论最后一步是否被标成完成：不能指望
+                // 模型每次都把清单收尾，残留的「进行中」比没有清单更误导。
+                inner.live.plan = Value::Null;
                 inner.live.auth_event = Value::Null;
                 let text = event["text"]
                     .as_str()
@@ -665,6 +671,7 @@ impl Agent {
                 inner.live.busy = false;
                 inner.live.authentication = false;
                 inner.live.tool.clear();
+                inner.live.plan = Value::Null;
                 if !inner.live.generated.is_empty() {
                     let images = std::mem::take(&mut inner.live.generated);
                     let text = std::mem::take(&mut inner.live.text);
@@ -1087,8 +1094,12 @@ impl Agent {
                 if running > 1 {
                     return Err("至多一个步骤处于进行中".into());
                 }
-                self.inner.lock().map_err(|e| e.to_string())?.live.plan = json!(plan);
-                Ok(json!({"updated":true}))
+                // 空清单是模型主动放弃计划：任务变简单、方向变了或不再需要步骤
+                // 时，它可以自己把面板收回去，不必等轮末自动撤下。
+                let cleared = plan.is_empty();
+                self.inner.lock().map_err(|e| e.to_string())?.live.plan =
+                    if cleared { Value::Null } else { json!(plan) };
+                Ok(json!({"updated":true,"cleared":cleared}))
             }
             // 让界面「演一遍」：脚本存在这里，界面按 serial 演一次（和 questions/plan 同一条通道）。
             "show_me" => {

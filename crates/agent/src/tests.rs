@@ -1126,3 +1126,54 @@ fn resource_dir_covers_a_system_install_where_the_agent_is_not_beside_the_binary
         resources_dir.join("agent")
     );
 }
+
+#[test]
+fn a_plan_is_dropped_once_the_turn_ends() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let plan = json!({"plan":[
+        {"step":"导出计划","status":"in_progress"},
+        {"step":"核对差异","status":"pending"},
+    ]});
+    agent.call("update_plan", &plan, true).unwrap();
+    assert_eq!(agent.status().unwrap()["plan"].as_array().unwrap().len(), 2);
+    // 正常结束：步骤没收尾也不能把「进行中」留在界面上。
+    agent.event(json!({"type":"done","text":"做完了"}));
+    assert!(agent.status().unwrap()["plan"].is_null());
+    // 报错与发送失败同样撤下，不留下已经停摆的进度。
+    agent.call("update_plan", &plan, true).unwrap();
+    agent.event(json!({"type":"error","message":"网络中断"}));
+    assert!(agent.status().unwrap()["plan"].is_null());
+    agent.call("update_plan", &plan, true).unwrap();
+    agent.failure("发送失败");
+    assert!(agent.status().unwrap()["plan"].is_null());
+}
+
+#[test]
+fn the_model_can_cancel_its_own_plan() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let schema = crate::tools::definitions(true)
+        .into_iter()
+        .find(|t| t["name"] == "update_plan")
+        .unwrap()["inputSchema"]
+        .clone();
+    // 空数组必须能通过契约校验，否则到不了处理器就没法撤下。
+    assert!(schema["properties"]["plan"].get("minItems").is_none());
+    agent
+        .call(
+            "update_plan",
+            &json!({"plan":[{"step":"看看情况","status":"in_progress"}]}),
+            true,
+        )
+        .unwrap();
+    assert_eq!(agent.status().unwrap()["plan"].as_array().unwrap().len(), 1);
+    // 模型判断计划作废时可以自己传空数组撤下，不必等轮末自动清除。
+    assert_eq!(
+        agent
+            .call("update_plan", &json!({"plan":[]}), true)
+            .unwrap()["cleared"],
+        true
+    );
+    assert!(agent.status().unwrap()["plan"].is_null());
+}
