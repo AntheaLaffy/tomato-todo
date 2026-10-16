@@ -29,6 +29,8 @@ Windows 目前只覆盖 x64：ARM64 宿主（`windows-11-arm`）上隔离桌面�
 
 Linux 本机 `pnpm run test:native` 在嵌套 niri/私有 D-Bus 中通过：托盘菜单、后台启动、自启动开关、关闭到托盘计时、单实例、无托盘回退，以及白名单/全屏/紧急释放。Windows GNU 的整应用 `cargo check` 在 Linux 交叉工具链上通过；它不代替 Windows MSVC 原生构建和运行。
 
+托盘菜单打开、重复启动、显示窗口命令与提醒共用原生激活路径：先恢复最小化并显示，再通过 niri/Win32 等窗口接口短暂重试。Windows 托盘左键打开窗口，右键保留菜单。Linux 在曾连接托盘宿主后持续检查隐藏窗口的托盘可用性，宿主退出时恢复窗口；首次后台启动仍保留等待桌面栏就绪的宽限期。`tests/native.mjs` 覆盖 niri 下的焦点确认、宿主退出恢复与重启重连；Windows 托盘鼠标行为仍须原生 Windows 整应用验收。
+
 ## X11 窗口保护
 
 原生 X11 会话自动使用 EWMH 后端，支持窗口列表、前台窗口、`_NET_WM_PID`、`WM_CLASS` 应用类与标题。niri 会话继续优先使用 niri IPC；其他 Wayland 会话目前不会退到只可看到部分窗口的 Xwayland。

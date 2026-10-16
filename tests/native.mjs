@@ -727,7 +727,9 @@ try {
   trayClick("打开番茄 Todo");
   await until(
     async () =>
-      (await niri("Windows")).Windows.some((w) => w.app_id === "tomato-todo"),
+      (await niri("Windows")).Windows.some(
+        (w) => w.app_id === "tomato-todo" && w.is_focused,
+      ),
     "Tray menu failed to restore the main window",
   );
   trayClick("暂停计时");
@@ -750,13 +752,45 @@ try {
   );
   await until(
     async () =>
-      (await niri("Windows")).Windows.some((w) => w.app_id === "tomato-todo"),
+      (await niri("Windows")).Windows.some(
+        (w) => w.app_id === "tomato-todo" && w.is_focused,
+      ),
     "Launcher should restore the existing instance",
   );
   await until(() => second.exitCode === 0, "Secondary instance did not exit");
   const pid = (await niri("Windows")).Windows.find(
     (w) => w.app_id === "tomato-todo",
   ).pid;
+  await invoke("hide_to_tray");
+  await until(
+    async () =>
+      !(await niri("Windows")).Windows.some((w) => w.app_id === "tomato-todo"),
+    "Window must be hidden before removing the tray host",
+  );
+  process.kill(-watcher.pid, "SIGTERM");
+  await until(
+    async () =>
+      (await niri("Windows")).Windows.some(
+        (w) => w.app_id === "tomato-todo" && w.is_focused,
+      ),
+    "Losing the tray host must restore and focus the hidden window",
+  );
+  assert.equal((await invoke("desktop_status")).value.trayAvailable, false);
+  assert.match((await invoke("hide_to_tray")).error, /没有可用托盘/);
+  const replacementHost = start(
+    "python3",
+    ["tests/fixtures/tray_bus.py", "watch"],
+    env,
+  );
+  await until(async () => {
+    try {
+      return (
+        (await invoke("desktop_status")).value.trayAvailable && trayLayout()
+      );
+    } catch {
+      return false;
+    }
+  }, "Tray must reconnect after its host restarts");
   trayClick("退出番茄 Todo");
   await until(() => {
     try {
@@ -770,7 +804,7 @@ try {
     await wd("", null, "DELETE");
   } catch {}
   session = undefined;
-  process.kill(-watcher.pid, "SIGTERM");
+  process.kill(-replacementHost.pid, "SIGTERM");
   const fallback = await wd("/session", {
     capabilities: {
       alwaysMatch: {

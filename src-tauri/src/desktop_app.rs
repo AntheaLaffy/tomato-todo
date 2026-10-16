@@ -6,19 +6,6 @@ use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 use tomato_core::{guard, now, Action, AppResult, Engine, GuardMode, Mode, Snapshot};
 
-/// Show the window and use the desktop activation interface. Retry briefly
-/// while the window maps, since plain focus requests may be ignored.
-fn refocus(handle: &tauri::AppHandle) {
-    desktop::show(handle);
-    std::thread::spawn(|| {
-        for _ in 0..8 {
-            if guard::focus_own(std::process::id()).is_ok() {
-                return;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(120));
-        }
-    });
-}
 #[tauri::command]
 fn snapshot(engine: State<Shared>) -> AppResult<Snapshot> {
     engine.lock().map_err(|e| e.to_string())?.snapshot(now())
@@ -101,10 +88,7 @@ pub fn run() {
             if args.iter().any(|arg| arg == "--background") {
                 return;
             }
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
+            desktop::activate(app);
         }));
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     let builder = builder.plugin(tauri_plugin_autostart::init(
@@ -147,7 +131,7 @@ pub fn run() {
                     apply_action(&action_handle, &action_engine, action, expected)
                 }),
                 Arc::new(move || {
-                    refocus(&wake_handle);
+                    desktop::activate(&wake_handle);
                     let _ = wake_handle.emit("agent-wake", ());
                 }),
             )
@@ -173,7 +157,7 @@ pub fn run() {
                     .map(|t| format!("{}/{:?}/{:?}", t.id, t.due_date, t.reminder_time));
                 if pending != reminded {
                     if let Some(t) = s.data.pending_reminder() {
-                        refocus(&handle);
+                        desktop::activate(&handle);
                         if s.data.settings.notifications {
                             let _ = handle
                                 .notification()
@@ -229,7 +213,7 @@ pub fn run() {
                     serial = s.data.timer.completion_serial;
                     // A finished focus or break is exactly when the next decision is
                     // made, so bring the window back instead of only notifying.
-                    refocus(&handle);
+                    desktop::activate(&handle);
                     let body = if s.data.timer.last_finished_mode == Some(Mode::Focus) {
                         "又完成了一个番茄。起身活动一下，休息也很重要。"
                     } else {

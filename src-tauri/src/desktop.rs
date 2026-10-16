@@ -15,7 +15,7 @@ use tauri::{
 };
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use tauri_plugin_autostart::ManagerExt;
-use tomato_core::{now, Action, AppResult, Mode, Snapshot};
+use tomato_core::{guard, now, Action, AppResult, Mode, Snapshot};
 
 #[cfg(target_os = "linux")]
 const ENTRY: &str = "studio.tomato.todo.desktop";
@@ -53,6 +53,7 @@ pub struct DesktopState {
     #[cfg(target_os = "linux")]
     autostart_path: PathBuf,
     tray_created: AtomicBool,
+    tray_seen: AtomicBool,
     items: Mutex<Option<TrayItems>>,
 }
 
@@ -168,10 +169,12 @@ fn configure_autostart(app: &tauri::AppHandle, enabled: bool) -> AppResult<()> {
     }
 }
 pub fn tray_available(app: &tauri::AppHandle) -> bool {
-    app.state::<DesktopState>()
-        .tray_created
-        .load(Ordering::Relaxed)
-        && tray_host_available()
+    let native = app.state::<DesktopState>();
+    let available = native.tray_created.load(Ordering::Relaxed) && tray_host_available();
+    if available {
+        native.tray_seen.store(true, Ordering::Relaxed);
+    }
+    available
 }
 pub fn protected(app: &tauri::AppHandle) -> bool {
     app.state::<crate::Shared>()
@@ -187,6 +190,19 @@ pub fn show(app: &tauri::AppHandle) {
         let _ = window.set_focus();
     }
 }
+/// Window mapping is asynchronous, and niri/Windows can reject plain focus requests.
+pub fn activate(app: &tauri::AppHandle) {
+    show(app);
+    std::thread::spawn(|| {
+        for _ in 0..8 {
+            if guard::focus_own(std::process::id()).is_ok() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(120));
+        }
+    });
+}
+
 pub fn close_to_tray(app: &tauri::AppHandle) -> bool {
     app.state::<DesktopState>()
         .preferences
@@ -249,7 +265,7 @@ pub fn hide_to_tray(app: tauri::AppHandle) -> AppResult<()> {
 }
 #[tauri::command]
 pub fn show_main_window(app: tauri::AppHandle) {
-    show(&app);
+    activate(&app);
 }
 #[tauri::command]
 pub fn quit_app(app: tauri::AppHandle) -> AppResult<()> {
@@ -268,7 +284,7 @@ pub fn record_exit(app: &tauri::AppHandle) {
 fn menu_action(app: &tauri::AppHandle, id: &str) -> AppResult<()> {
     match id {
         "show" => {
-            show(app);
+            activate(app);
             Ok(())
         }
         "hide" => hide_to_tray(app.clone()),
@@ -299,6 +315,15 @@ fn menu_action(app: &tauri::AppHandle, id: &str) -> AppResult<()> {
 }
 pub fn update_tray(app: &tauri::AppHandle, snapshot: &Snapshot) {
     let native = app.state::<DesktopState>();
+    // A panel can disappear after hiding; keep an accessible way back to the timer.
+    // Before the first host appears, setup owns the autostart grace period.
+    if native.tray_seen.load(Ordering::Relaxed) {
+        if let Some(window) = app.get_webview_window("main") {
+            if window.is_visible().is_ok_and(|visible| !visible) && !tray_available(app) {
+                activate(app);
+            }
+        }
+    }
     let Ok(items) = native.items.lock() else {
         return;
     };
@@ -348,6 +373,7 @@ pub fn setup(app: &tauri::AppHandle, background: bool) -> AppResult<()> {
         #[cfg(target_os = "linux")]
         autostart_path: config.join("autostart").join(ENTRY),
         tray_created: AtomicBool::new(false),
+        tray_seen: AtomicBool::new(false),
         items: Mutex::new(None),
     });
     let create_tray = || -> tauri::Result<()> {
@@ -367,6 +393,24 @@ pub fn setup(app: &tauri::AppHandle, background: bool) -> AppResult<()> {
                     let _ = app.emit("desktop-error", error);
                 }
             });
+        #[cfg(target_os = "windows")]
+        {
+            use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
+            builder = builder
+                .show_menu_on_left_click(false)
+                .on_tray_icon_event(|tray, event| {
+                    if matches!(
+                        event,
+                        TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        }
+                    ) {
+                        activate(tray.app_handle());
+                    }
+                });
+        }
         if let Some(icon) = app.default_window_icon() {
             builder = builder.icon(icon.clone());
         }
