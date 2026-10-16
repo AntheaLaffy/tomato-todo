@@ -658,6 +658,67 @@ test(
         await closeStudySession(session);
         session = null;
       }
+      const exitListeners = process.listenerCount("exit");
+      const activated = await createStudySession({
+        runtime,
+        dir,
+        root: resolve("agent"),
+        command: {
+          ...command,
+          automatic: false,
+          scheduled: false,
+          creatorMode: false,
+          preferences: { ...command.preferences, codingAccess: "workspace" },
+          tools: [
+            ...command.tools,
+            internalsTool,
+            {
+              name: "enable_creator_mode",
+              description: "Author entrance",
+              inputSchema: { type: "object", properties: {} },
+            },
+          ],
+        },
+        toolRequest: async (name) => {
+          assert.equal(name, "enable_creator_mode");
+          return { creatorMode: true, codingAccess: "full" };
+        },
+      });
+      session = activated.session;
+      const outside = join(dir, "dynamic-author-note.txt");
+      await assert.rejects(
+        session
+          .getToolDefinition("write")
+          .execute(
+            "before",
+            { path: outside, content: "before" },
+            new AbortController().signal,
+          ),
+      );
+      assert.equal(session.getToolDefinition("get_agent_internals"), undefined);
+      await session
+        .getToolDefinition("enable_creator_mode")
+        .execute("enter", {}, new AbortController().signal);
+      assert.ok(session.getActiveToolNames().includes("get_agent_internals"));
+      assert.equal(process.listenerCount("exit"), exitListeners + 1);
+      await session
+        .getToolDefinition("write")
+        .execute(
+          "after",
+          { path: outside, content: "本轮启用完整访问" },
+          new AbortController().signal,
+        );
+      assert.equal(await readFile(outside, "utf8"), "本轮启用完整访问");
+      const internals = await session
+        .getToolDefinition("get_agent_internals")
+        .execute("inspect", {}, new AbortController().signal);
+      assert.equal(
+        JSON.parse(internals.content[0].text).preferences.codingAccess,
+        "full",
+      );
+      await closeStudySession(session);
+      session = null;
+      assert.equal(process.listenerCount("exit"), exitListeners);
       await assert.rejects(
         forkStudySession(dir, { sessionFile: file, entryId: "missing" }),
         /节点不存在/,
@@ -718,49 +779,64 @@ test(
       }
       const canvas =
         text.includes("Canvas用例") && parsed.messages.at(-1).role === "user";
-      const delta = canvas
+      const creator =
+        text.includes("把你做出来的如月风铃来看看你啦") &&
+        parsed.messages.at(-1).role === "user";
+      const delta = creator
         ? {
             role: "assistant",
             tool_calls: [
               {
                 index: 0,
-                id: "save_note",
+                id: "creator_entrance",
                 type: "function",
-                function: {
-                  name: "save_canvas",
-                  arguments: JSON.stringify({
-                    baseRevision: 0,
-                    title: "助手创建的笔记",
-                    language: "markdown",
-                    content: "# 导数\n\n先理解变化率。",
-                  }),
-                },
+                function: { name: "enable_creator_mode", arguments: "{}" },
               },
             ],
           }
-        : read
+        : canvas
           ? {
               role: "assistant",
               tool_calls: [
                 {
                   index: 0,
-                  id: "read_attachment",
+                  id: "save_note",
                   type: "function",
                   function: {
-                    name: "read",
-                    arguments: JSON.stringify({ path }),
+                    name: "save_canvas",
+                    arguments: JSON.stringify({
+                      baseRevision: 0,
+                      title: "助手创建的笔记",
+                      language: "markdown",
+                      content: "# 导数\n\n先理解变化率。",
+                    }),
                   },
                 },
               ],
             }
-          : {
-              role: "assistant",
-              reasoning_content: "先核对资料，再解释复习路径。",
-              content: answer,
-            };
+          : read
+            ? {
+                role: "assistant",
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: "read_attachment",
+                    type: "function",
+                    function: {
+                      name: "read",
+                      arguments: JSON.stringify({ path }),
+                    },
+                  },
+                ],
+              }
+            : {
+                role: "assistant",
+                reasoning_content: "先核对资料，再解释复习路径。",
+                content: answer,
+              };
       res.write(`data: ${JSON.stringify(chunk(delta))}\n\n`);
       res.write(
-        `data: ${JSON.stringify(chunk({}, read || canvas ? "tool_calls" : "stop"))}\n\n`,
+        `data: ${JSON.stringify(chunk({}, read || canvas || creator ? "tool_calls" : "stop"))}\n\n`,
       );
       res.end("data: [DONE]\n\n");
     });
@@ -1134,23 +1210,55 @@ test(
           .content,
         "# 导数\n\n先理解变化率。",
       );
-      await page.locator("#agent-text").fill("我是如月风铃");
+      await page.locator("#agent-text").fill("把你做出来的如月风铃来看看你啦");
       await expect(
         page.locator('#agent-chat button[type="submit"]'),
       ).toBeEnabled();
       await page.locator("#agent-text").press("Enter");
-      const creator = await idle("我是如月风铃");
+      const creator = await idle("把你做出来的如月风铃来看看你啦");
       assert.equal(creator.creatorMode, true);
       assert.equal(creator.preferences.codingAccess, "workspace");
       await expect(
         page.locator('[data-agent="exit-creator-mode"]'),
       ).toBeVisible();
+      await expect(page.locator(".creator-entrance")).toBeVisible();
+      await expect(page.locator(".creator-entrance")).toContainText("如月风铃");
+      await page.waitForTimeout(1300);
+      await page.screenshot({ path: "artifacts/agent-creator-entrance.png" });
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".creator-entrance")).toHaveCount(0);
+      await page.waitForTimeout(2700);
+      await expect(page.locator(".creator-entrance")).toHaveCount(0);
       await page.locator('[data-agent="exit-creator-mode"]').click();
       await expect(
         page.locator('[data-agent="exit-creator-mode"]'),
       ).toHaveCount(0);
       assert.equal((await api({ op: "status" })).creatorMode, false);
-      for (const width of [1440, 700, 360]) {
+      await page.setViewportSize({ width: 360, height: 820 });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page
+        .locator("#agent-text")
+        .fill("把你做出来的如月风铃来看看你啦，再来一次");
+      await page.locator("#agent-text").press("Enter");
+      const reentry = await idle("把你做出来的如月风铃来看看你啦，再来一次");
+      assert.notEqual(reentry.creatorEntrance.id, creator.creatorEntrance.id);
+      await expect(page.locator(".creator-entrance")).toBeVisible();
+      assert.equal(
+        await page
+          .locator(".creator-entrance")
+          .evaluate((el) => getComputedStyle(el).animationName),
+        "none",
+      );
+      await page.screenshot({ path: "artifacts/agent-creator-mobile.png" });
+      await expect(page.locator(".creator-entrance")).toHaveCount(0, {
+        timeout: 4000,
+      });
+      await page.locator('[data-agent="toggle-sessions"]').click();
+      await expect(page.locator("#agent-sessions")).toBeHidden();
+      await page.locator('[data-agent="exit-creator-mode"]').click();
+      await page.locator('[data-agent="conversations"]').click();
+      await page.emulateMedia({ reducedMotion: null });
+      for (const width of [1920, 1440, 700, 360]) {
         await page.setViewportSize({ width, height: 1100 });
         assert.ok(
           await page.evaluate(
@@ -1166,6 +1274,28 @@ test(
             .locator("#agent-messages")
             .evaluate((el) => el.scrollHeight > el.clientHeight),
           `history must scroll inside the conversation at ${width}`,
+        );
+        const layout = await page.evaluate(() => {
+          const panel = document.querySelector(".agent-conversation");
+          const composer = document.querySelector("#agent-chat");
+          const messages = document.querySelector("#agent-messages");
+          const style = getComputedStyle(panel);
+          return {
+            available:
+              panel.clientWidth -
+              parseFloat(style.paddingLeft) -
+              parseFloat(style.paddingRight),
+            composer: composer.getBoundingClientRect().width,
+            messagePadding: parseFloat(getComputedStyle(messages).paddingLeft),
+          };
+        });
+        assert.ok(
+          Math.abs(layout.composer - layout.available) <= 2,
+          `composer fills panel at ${width}`,
+        );
+        assert.ok(
+          layout.messagePadding <= 2,
+          `messages use panel width at ${width}`,
         );
         if (width === 360) {
           await page.locator('[data-agent="toggle-sessions"]').click();

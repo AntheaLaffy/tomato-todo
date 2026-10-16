@@ -40,6 +40,8 @@ struct Live {
     tool: String,
     wake_serial: u64,
     automatic: bool,
+    scheduled: bool,
+    creator_entrance: Value,
     anomalies: Vec<Anomaly>,
     last_scan: i64,
     reviewed: std::collections::HashMap<String, String>,
@@ -496,20 +498,14 @@ impl Agent {
         let mut next = inner.store.clone();
         let message_id = next.message("user", displayed, now(), automatic);
         next.message_mut(&message_id).unwrap().attachments = attachments.clone();
-        if !automatic && !scheduled && creator::identifies_creator(&text) {
-            if let Some(c) = next
-                .conversations
-                .iter_mut()
-                .find(|c| Some(&c.id) == next.active.as_ref())
-            {
-                c.creator_mode = true;
-            }
-        }
         let creator_mode =
             !automatic && !scheduled && next.active_conversation().is_some_and(|c| c.creator_mode);
         let mut definitions = tools::definitions(automatic);
         if creator_mode {
             p.coding_access = "full".into();
+        }
+        if !automatic && !scheduled {
+            definitions.push(creator::activation_tool());
             definitions.push(creator::tool());
         }
         next.save(&self.dir)?;
@@ -522,6 +518,7 @@ impl Agent {
         inner.live.generated.clear();
         inner.live.error = None;
         inner.live.automatic = automatic && !scheduled;
+        inner.live.scheduled = scheduled;
         inner.live.job_id = uuid::Uuid::new_v4().to_string();
         Ok(
             json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"creatorMode":creator_mode,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"sessionFile":inner.store.active_session(),"tools":definitions}),
@@ -704,7 +701,7 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"creatorEntrance":inner.live.creator_entrance,"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -887,6 +884,33 @@ impl Agent {
             }
             inner.live.automatic
         };
+        if name == "enable_creator_mode" {
+            let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if inner.live.automatic
+                || inner.live.scheduled
+                || !inner.live.busy
+                || inner.live.job_id != job_id
+            {
+                return Err("作者彩蛋仅由当前用户主动对话开启".into());
+            }
+            let mut next = inner.store.clone();
+            let active = next.active.clone().ok_or("没有当前对话")?;
+            let conversation = next
+                .conversations
+                .iter_mut()
+                .find(|c| c.id == active)
+                .ok_or("没有当前对话")?;
+            let entered = !conversation.creator_mode;
+            conversation.creator_mode = true;
+            next.save(&self.dir)?;
+            inner.store = next;
+            if entered {
+                inner.live.creator_entrance = json!({"id":uuid::Uuid::new_v4().to_string(),"conversationId":active,"at":now()});
+            }
+            return Ok(
+                json!({"creatorMode":true,"codingAccess":"full","entered":entered,"note":"作者模式已开启，入场特效由界面播放。现在按当前人格自然地接住见到作者的彩蛋；完整编程访问与 get_agent_internals 本轮即可使用。"}),
+            );
+        }
         if matches!(name, "store_generated_image" | "image_reference") {
             if automatic {
                 return Err("自动唤醒不能生成或编辑图片".into());

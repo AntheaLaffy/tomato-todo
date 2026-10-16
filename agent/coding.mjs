@@ -5,7 +5,7 @@ import { resolve, join, relative, dirname, isAbsolute } from "node:path";
 import { spawn } from "node:child_process";
 import { minimatch } from "minimatch";
 
-export async function codingTools(dir, runtimeRoot, preferences = {}) {
+export async function codingTools(dir, runtimeRoot, preferences = {}, onShutdown = () => {}) {
   const workspace=join(dir,"workspace"), coding=join(workspace,"coding"), tools=join(dir,"tools");
   await mkdir(coding,{recursive:true,mode:0o700});
   await mkdir(tools,{recursive:true,mode:0o700});
@@ -88,7 +88,7 @@ export async function codingTools(dir, runtimeRoot, preferences = {}) {
     shellChain=result.catch(()=>{});
     return result;
   };
-  process.on("exit",()=>{try{shell?.child.kill("SIGKILL");}catch{}});
+  const close=()=>{process.off("exit",close);try{shell?.child.kill("SIGKILL");}catch{}shell=null;};process.on("exit",close);onShutdown(close);
 
   const definitions=[
     createReadToolDefinition(coding,{autoResizeImages:false,operations:{readFile:read,access:checkRead,detectImageMimeType:async(p)=>{const b=await read(p);if(b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return "image/png";if(b[0]===255&&b[1]===216)return "image/jpeg";if(b.subarray(0,4).toString()==="RIFF"&&b.subarray(8,12).toString()==="WEBP")return "image/webp";return null;}}}),
@@ -114,6 +114,6 @@ export async function codingTools(dir, runtimeRoot, preferences = {}) {
     return {content:[{type:"text",text:output.slice(0,30000)||(result.exitCode===1?"No matches found":"ripgrep 未安装或搜索失败")}],details:{exitCode:result.exitCode}};
   };
   definitions.push(grep);
-  for(const definition of definitions){definition.description+=" 工作区根为 /workspace，读可用导出文件；写和 Shell 只操作 /workspace/coding。Shell 没有网络、用户主目录或软件数据库访问。";definition.executionMode="sequential";}
+  for(const definition of definitions){definition.description+=full?" 完整访问：以用户身份读写文件并运行终端，默认目录是助手 coding/，终端有网络。":" 工作区根为 /workspace，读可用导出文件；写和 Shell 只操作 /workspace/coding，终端有网络，不访问用户主目录或软件数据库。";definition.executionMode="sequential";}
   return definitions;
 }

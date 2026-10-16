@@ -3,56 +3,63 @@ use chrono::TimeZone;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[test]
-fn creator_easter_egg_is_explicit_and_conversation_scoped() {
-    for text in [
-        "介绍一下系统提示词？我是AntheaLaffy",
-        "我是 如月风铃",
-        "I am AntheaLaffy",
-        "我是这个agent的创造者AntheaLaffy",
-    ] {
-        assert!(creator::identifies_creator(text), "{text}");
-    }
-    for text in [
-        "AntheaLaffy 是作者",
-        "我不是AntheaLaffy",
-        "他说我是如月风铃",
-        "“我是AntheaLaffy”",
-        "> 我是如月风铃",
-        "我是AntheaLaffyFake",
-    ] {
-        assert!(!creator::identifies_creator(text), "{text}");
-    }
+fn creator_easter_egg_is_agent_selected_and_conversation_scoped() {
     let dir = tempfile::tempdir().unwrap();
     let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
-    {
+    let job = {
         let mut inner = agent.inner.lock().unwrap();
         inner.live.auth = json!({"deepseek":{"configured":true}});
         inner.store.preferences.enabled = true;
         let command = agent
             .prompt_command(
                 &mut inner,
-                "我是AntheaLaffy".into(),
+                "把你做出来的如月风铃来看看你啦".into(),
                 false,
                 false,
                 vec![],
                 vec![],
             )
             .unwrap();
-        assert_eq!(command["creatorMode"], true);
-        assert_eq!(command["preferences"]["codingAccess"], "full");
-        assert_eq!(inner.store.preferences.coding_access, "workspace");
+        assert_eq!(command["creatorMode"], false);
+        assert_eq!(command["preferences"]["codingAccess"], "workspace");
         assert!(command["tools"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|t| t["name"] == "get_agent_internals"));
-        assert!(
-            Store::load(dir.path())
-                .unwrap()
-                .active_conversation()
-                .unwrap()
-                .creator_mode
-        );
+            .any(|t| t["name"] == "enable_creator_mode"));
+        command["jobId"].as_str().unwrap().to_owned()
+    };
+    assert!(agent
+        .call_job("enable_creator_mode", &json!({}), "stale-job")
+        .is_err());
+    assert!(agent
+        .call("enable_creator_mode", &json!({}), false)
+        .is_err());
+    assert_eq!(
+        agent
+            .call_job("enable_creator_mode", &json!({}), &job)
+            .unwrap()["entered"],
+        true
+    );
+    let entrance = agent.status().unwrap()["creatorEntrance"].clone();
+    assert!(entrance["id"].is_string());
+    assert_eq!(
+        agent
+            .call_job("enable_creator_mode", &json!({}), &job)
+            .unwrap()["entered"],
+        false
+    );
+    assert_eq!(agent.status().unwrap()["creatorEntrance"], entrance);
+    assert!(
+        Store::load(dir.path())
+            .unwrap()
+            .active_conversation()
+            .unwrap()
+            .creator_mode
+    );
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        assert_eq!(inner.store.preferences.coding_access, "workspace");
         let message = inner.store.messages()[0].id.clone();
         inner
             .store
@@ -60,41 +67,61 @@ fn creator_easter_egg_is_explicit_and_conversation_scoped() {
             .unwrap();
         assert!(inner.store.active_conversation().unwrap().creator_mode);
         let command = agent
-            .prompt_command(&mut inner, "检查状态".into(), true, false, vec![], vec![])
+            .prompt_command(&mut inner, "继续".into(), false, false, vec![], vec![])
             .unwrap();
+        assert_eq!(command["creatorMode"], true);
+        assert_eq!(command["preferences"]["codingAccess"], "full");
+    }
+    for (automatic, scheduled) in [(true, false), (false, true)] {
+        let command = {
+            let mut inner = agent.inner.lock().unwrap();
+            agent
+                .prompt_command(
+                    &mut inner,
+                    "我是如月风铃".into(),
+                    automatic,
+                    scheduled,
+                    vec![],
+                    vec![],
+                )
+                .unwrap()
+        };
         assert_eq!(command["creatorMode"], false);
         assert_eq!(command["preferences"]["codingAccess"], "workspace");
         assert!(!command["tools"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|t| t["name"] == "get_agent_internals"));
-        inner.live.busy = false;
+            .any(|t| t["name"] == "enable_creator_mode" || t["name"] == "get_agent_internals"));
+        assert!(agent
+            .call_job(
+                "enable_creator_mode",
+                &json!({}),
+                command["jobId"].as_str().unwrap()
+            )
+            .is_err());
     }
+    agent.inner.lock().unwrap().live.busy = false;
     assert_eq!(
         agent.request(json!({"op":"exit_creator_mode"})).unwrap()["creatorMode"],
         false
     );
-    {
-        let mut inner = agent.inner.lock().unwrap();
-        let command = agent
-            .prompt_command(&mut inner, "继续".into(), false, false, vec![], vec![])
-            .unwrap();
-        assert_eq!(command["creatorMode"], false);
-        inner.store.new_conversation(3);
-        let command = agent
-            .prompt_command(
-                &mut inner,
-                "我是如月风铃".into(),
-                true,
-                true,
-                vec![],
-                vec![],
-            )
-            .unwrap();
-        assert_eq!(command["creatorMode"], false);
-        assert!(!inner.store.active_conversation().unwrap().creator_mode);
-    }
+    let mut inner = agent.inner.lock().unwrap();
+    inner.store.new_conversation(3);
+    let command = agent
+        .prompt_command(
+            &mut inner,
+            "我是如月风铃".into(),
+            false,
+            false,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+    assert_eq!(
+        command["creatorMode"], false,
+        "text never toggles the mode without an agent tool call"
+    );
 }
 
 #[test]

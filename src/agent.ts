@@ -12,6 +12,7 @@ import {
   type CanvasSummary,
 } from "./agent-canvas";
 import { hydrateAgentImages, previewAgentImage } from "./agent-media";
+import { playCreatorEntrance, type CreatorEntrance } from "./agent-creator";
 import {
   attachmentHtml,
   messageHtml,
@@ -49,6 +50,7 @@ type Memory = {
 };
 export type AgentStatus = {
   creatorMode?: boolean;
+  creatorEntrance?: CreatorEntrance | null;
   preferences: Preferences;
   memories: Memory[];
   messages: ChatMessage[];
@@ -171,7 +173,8 @@ let deedsSerial = 0;
 const rendered = new Map<string, { element: HTMLElement; html: string }>();
 let refreshing = false;
 let serial = 0;
-let sheet: "settings" | "memory" | "signals" | "schedules" | null = null;
+let sheet: "settings" | "memory" | "signals" | "schedules" | null =
+  null;
 let openedAuthUrl = "";
 type Usage = {
   deepseek?: {
@@ -331,7 +334,7 @@ function renderChat() {
   const current = status.conversations.find((c) => c.active);
   replace(
     "agent-conversation-title",
-    `<span title="${esc(current?.title ?? "新对话")}">${esc(current?.title ?? "新对话")}</span>${status.creatorMode ? `<button type="button" class="button small" data-agent="exit-creator-mode" title="作者模式 · 完整访问；点击退出" ${busy ? "disabled" : ""}>作者模式 · 退出</button>` : ""}${current?.archived ? `<button type="button" class="button small" data-agent="archive-conversation" data-id="${esc(current.id)}">已归档 · 恢复</button>` : ""}`,
+    `<span title="${esc(current?.title ?? "新对话")}">${esc(current?.title ?? "新对话")}</span>${status.creatorMode ? `<button type="button" class="button small agent-creator-badge" data-agent="exit-creator-mode" title="作者模式 · 完整访问；点击退出" ${busy ? "disabled" : ""}><span aria-hidden="true">✦</span> 作者模式 · 退出</button>` : ""}${current?.archived ? `<button type="button" class="button small" data-agent="archive-conversation" data-id="${esc(current.id)}">已归档 · 恢复</button>` : ""}`,
   );
   const source = current?.branchedFrom;
   replace(
@@ -835,6 +838,11 @@ function update() {
   }
   renderChat();
   renderSessions();
+  playCreatorEntrance(
+    status.creatorEntrance,
+    conversationKey,
+    !!status.creatorMode,
+  );
   updateCanvas(
     conversationKey,
     status.canvases ?? [],
@@ -1658,6 +1666,7 @@ async function action(button: HTMLButtonElement) {
       await call({ op: "memory_delete", id: button.dataset.id });
       delete memoryEdits[button.dataset.id!];
       break;
+
   }
   update();
 }
