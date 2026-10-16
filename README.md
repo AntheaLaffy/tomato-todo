@@ -141,8 +141,9 @@ yay -S tomato-todo-bin
 - Windows x64：下载 `*x64-setup.exe`，运行 NSIS 安装程序（ARM64 安装包延后）。
 
 ```sh
-tar -xzf tomato-todo-*-x86_64-linux.tar.gz
-cd tomato-todo-* && python3 install.py
+mkdir -p tomato-todo
+tar -xzf tomato-todo-*-x86_64-linux.tar.gz -C tomato-todo
+python3 tomato-todo/install.py --binary tomato-todo/tomato-todo
 ```
 
 安装后程序位于 `~/.local/lib/tomato-todo/`，命令入口 `~/.local/bin/tomato-todo`，应用列表入口 `$XDG_DATA_HOME/applications/tomato-todo.desktop`（默认 `~/.local/share/applications/`）。`--autostart` 启用登录后后台启动；`--pin-dms` 为 DankMaterialShell 栏添加固定入口（改配置前会备份，重复安装不会重复添加）。
@@ -182,7 +183,7 @@ Windows/macOS 桌面层与跨平台 CI 正在适配，Android 已加入核心编
 | 其他 Wayland 合成器 | 尚无原生后端 | 普通计时可用，保护显示不可用 |
 
 - **Wayland 原生窗口**：程序优先使用原生 Wayland，让窗口 PID 和应用标识能被正确识别。后端故障不会退回只包含部分窗口的 Xwayland 列表。
-- **GNOME 扩展**：源码目录运行 `python3 scripts/install-desktop-integration.py`；压缩包中安装器位于解压目录，用户安装后也在 `~/.local/lib/tomato-todo/`；deb 安装器位于 `/usr/lib/Tomato Todo/`。首次安装后注销并重新登录，再运行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器只复制文件，不自动启用扩展或保护。
+- **GNOME 扩展**：源码目录运行 `python3 scripts/install-desktop-integration.py`；压缩包中安装器位于解压目录，用户安装后也在 `~/.local/lib/tomato-todo/`；deb / AUR 安装器位于 `/usr/lib/Tomato Todo/`。首次安装后注销并重新登录，再运行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器只复制文件，不自动启用扩展或保护。
 - **KDE Plasma**：直接使用当前会话的 KWin 脚本接口，无需安装额外扩展；脚本执行完或发生错误后卸载，不修改用户的 KWin 插件设置。
 - **应用白名单**：各后端的应用标识可能不同，切换桌面后请从真实窗口列表重新选择；GNOME 通常返回 `.desktop` ID，KWin 优先桌面文件 ID，Sway/Hyprland 使用应用类或原生 app ID。
 - **托盘**：需要 AppIndicator 运行库（Arch 的 `libappindicator-gtk3`，Debian 的 `libayatana-appindicator3-1`）及桌面上的 StatusNotifier 组件。没有托盘时正常显示窗口和退出，后台启动会等待桌面组件最多约 10 秒后显示窗口。

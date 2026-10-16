@@ -48,7 +48,7 @@ X11 和 niri 的应用标识可能不同；切换桌面后应从保护页的真�
 - **GNOME Shell 45–50**：随 Linux 包提供 ES module 扩展，导出 `org.gnome.Shell` 的 `/studio/tomato/Guard`、`studio.tomato.Guard1` 接口。`ListWindows() -> s` 返回统一窗口 JSON，`FocusWindow(u) -> b` 按 Meta 稳定序号恢复最小化、切换工作区并聚焦；禁用扩展即取消导出。
 - **KDE Plasma 5.27 / 6**：通过 KWin 的 load/run/unload 脚本接口查询窗口；识别两代脚本对象路径与 workspace API。每次使用唯一回调路径，校验回调发送者是当前 KWin，完成或失败后卸载脚本。临时脚本只枚举或激活窗口，不修改 KWin 插件设置。依据：[KWin API](https://develop.kde.org/docs/plasma/kwin/api/)、[Plasma 5.27 脚本对象实现](https://invent.kde.org/plasma/kwin/-/blob/Plasma/5.27/src/scripting/scripting.cpp)。
 
-GNOME 源码安装：`python3 scripts/install-desktop-integration.py`。压缩包使用解压目录中的同名安装器；用户安装后位于 `~/.local/lib/tomato-todo/`；deb 位于 `/usr/lib/Tomato Todo/`。首次安装后注销并重新登录，再执行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器不连接或启用真实桌面扩展；更新启用中的扩展需重新登录。Shell 扩展机制见 [GNOME 文档](https://gjs.guide/extensions/overview/anatomy.html)。
+GNOME 源码安装：`python3 scripts/install-desktop-integration.py`。压缩包使用解压目录中的同名安装器；用户安装后位于 `~/.local/lib/tomato-todo/`；deb / AUR 位于 `/usr/lib/Tomato Todo/`。首次安装后注销并重新登录，再执行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器不连接或启用真实桌面扩展；更新启用中的扩展需重新登录。Shell 扩展机制见 [GNOME 文档](https://gjs.guide/extensions/overview/anatomy.html)。
 
 验证入口：
 
