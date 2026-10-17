@@ -5603,6 +5603,13 @@ body.ponder-open #toast {
   margin-top: 8px;
   flex-wrap: wrap;
 }
+.agent-answer-submit {
+  justify-content: flex-end;
+}
+.agent-answer-submit small {
+  margin-right: auto;
+  color: var(--muted);
+}
 .agent-question-detail {
   color: var(--muted);
   font-size: 13px;

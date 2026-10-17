@@ -182,6 +182,8 @@ let configDraft: Record<string, string | boolean> = {};
 const memoryEdits: Record<string, string> = {};
 /** Multi-select drafts, keyed by question id; cleared when the questions change. */
 const answers: Record<string, string[]> = {};
+/** 「其他」自由输入草稿，和选项一起提交；问题变化时同样清空。 */
+const notes: Record<string, string> = {};
 let questionsSignature = "";
 let handSerial = 0;
 /** 正在编辑的定时任务 id；null 表示新建。 */
@@ -603,10 +605,21 @@ function questionHtml(): string {
   if (signature !== questionsSignature) {
     questionsSignature = signature;
     for (const key of Object.keys(answers)) delete answers[key];
+    for (const key of Object.keys(notes)) delete notes[key];
   }
   const other = (question: (typeof questions)[number]) =>
-    `<form class="agent-other" data-question="${esc(question.id)}"><input name="text" maxlength="2000" placeholder="其他想法…" aria-label="${esc(question.question)}的自定义回答"><button class="button small" type="submit">发送</button></form>`;
-  return questions
+    `<form class="agent-other" data-question="${esc(question.id)}"><input name="text" maxlength="2000" placeholder="其他想法…" value="${esc(notes[question.id] ?? "")}" aria-label="${esc(question.question)}的自定义回答"><button class="button small" type="submit">发送</button></form>`;
+  // 一组问题只能作为同一条消息回答：一旦发送，服务端就清空所有问题，分题提交
+  // 会让剩下的选择和问题一起消失。所以选项攒在一起发；只有一题时确认留在卡片
+  // 里，多题时收拢到页脚一个按钮。
+  const plain = questions.filter(
+    (question) => question.intent?.kind !== "plan-review",
+  );
+  const pickedCount = plain.reduce(
+    (count, question) => count + (answers[question.id]?.length ?? 0),
+    0,
+  );
+  const cards = questions
     .map((question) => {
       const picked = answers[question.id] ?? [];
       const review = question.intent?.kind === "plan-review";
@@ -638,9 +651,34 @@ function questionHtml(): string {
             "",
           )}${picked.length ? `<button class="button primary" type="button" data-agent="answer-choice" data-question="${esc(question.id)}">确认选择</button>` : ""}</div></section>`;
       }
-      return `<div class="agent-question"><div class="agent-question-head">${esc(question.header)}</div><p class="agent-question-title">${esc(question.question)}</p>${question.detail ? `<p class="agent-question-detail">${esc(question.detail)}</p>` : ""}<div class="agent-choices">${options}</div><div class="agent-question-foot"><button class="button primary agent-choice-confirm" type="button" data-agent="answer-choice" data-question="${esc(question.id)}" ${picked.length ? "" : "disabled"}>确认选择${picked.length ? `（${picked.length}）` : ""}</button>${question.multiSelect ? "" : ""}${other(question)}</div></div>`;
+      const confirm =
+        plain.length === 1
+          ? `<button class="button primary agent-choice-confirm" type="button" data-agent="answer-choice" data-question="${esc(question.id)}" ${picked.length ? "" : "disabled"}>确认选择${picked.length ? `（${picked.length}）` : ""}</button>`
+          : "";
+      return `<div class="agent-question"><div class="agent-question-head">${esc(question.header)}</div><p class="agent-question-title">${esc(question.question)}</p>${question.detail ? `<p class="agent-question-detail">${esc(question.detail)}</p>` : ""}<div class="agent-choices">${options}</div><div class="agent-question-foot">${confirm}${other(question)}</div></div>`;
     })
     .join("");
+  if (plain.length < 2) return cards;
+  return `${cards}<div class="agent-question-foot agent-answer-submit"><small>${plain.length} 个问题会一并发送</small><button class="button primary agent-choice-confirm" type="button" data-agent="answer-choice" ${pickedCount ? "" : "disabled"}>确认选择${pickedCount ? `（${pickedCount}）` : ""}</button></div>`;
+}
+/**
+ * 把整组问题的答案合成一条消息。Pi 的 request_user_input 只等一条回复：一旦
+ * 发送，服务端就清空所有问题，所以分题发送会让剩下的选择和问题一起消失。
+ */
+async function submitAnswers() {
+  const parts: string[] = [];
+  for (const question of status?.questions ?? []) {
+    const picked = answers[question.id] ?? [];
+    const note = notes[question.id]?.trim() ?? "";
+    if (!picked.length && !note) continue;
+    parts.push(
+      picked.length
+        ? `${question.header}：${picked.join("、")}${note ? `；补充：${note}` : ""}`
+        : `${question.header}：${note}`,
+    );
+  }
+  if (!parts.length) throw new Error("请先选一项或填写想法");
+  await call({ op: "send", text: parts.join("；") });
 }
 function authHtml() {
   const s = status;
@@ -1131,6 +1169,9 @@ export function mountAgent() {
     const memoryForm = input.closest<HTMLFormElement>("[data-memory]");
     if (memoryForm?.dataset.memory)
       memoryEdits[memoryForm.dataset.memory] = input.value;
+    const answerForm = input.closest<HTMLFormElement>(".agent-other");
+    if (answerForm?.dataset.question)
+      notes[answerForm.dataset.question] = input.value;
     const personaForm = input.closest<HTMLFormElement>("#agent-persona-form");
     if (personaForm) personaDraft[input.name] = input.value;
     if (input.closest("#agent-config-form")) {
@@ -1357,16 +1398,9 @@ async function submit(form: HTMLFormElement) {
     hooks.toast("已保存");
   } else if (form.id === "agent-login-answer")
     await call({ op: "login_answer", text });
-  // Free-text answer to one question ("其他"), alongside any multi-select picks.
+  // 自由输入和选项一样是整组问题的一次回答，和已选选项一起提交。
   else if (form.dataset.question) {
-    const id = form.dataset.question;
-    const question = status?.questions.find((item) => item.id === id);
-    if (!text) return;
-    const picked = answers[id] ?? [];
-    const text_ = picked.length
-      ? `${question?.header ?? "回答"}：${picked.join("、")}；补充：${text}`
-      : text;
-    await call({ op: "send", text: text_ });
+    await submitAnswers();
     form.reset();
   } else if (form.id === "agent-schedule-new") {
     await tool("save_schedule", {
@@ -1742,28 +1776,9 @@ async function action(button: HTMLButtonElement) {
       renderChat();
       break;
     }
-    case "answer-choice": {
-      const id = button.dataset.question!;
-      const question = status?.questions.find((item) => item.id === id);
-      const picked = answers[id] ?? [];
-      if (!question || !picked.length) throw new Error("请先选一项");
-      await call({
-        op: "send",
-        text: `${question.header}：${picked.join("、")}`,
-      });
+    case "answer-choice":
+      await submitAnswers();
       break;
-    }
-    case "answer-multi": {
-      const id = button.dataset.question!;
-      const question = status?.questions.find((item) => item.id === id);
-      const picked = answers[id] ?? [];
-      if (!question || !picked.length) throw new Error("请先选择至少一项");
-      await call({
-        op: "send",
-        text: `${question.header}：${picked.join("、")}`,
-      });
-      break;
-    }
     case "approve":
       if (button.dataset.text)
         await call({ op: "send", text: button.dataset.text });

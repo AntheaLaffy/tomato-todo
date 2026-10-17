@@ -1692,6 +1692,42 @@ test(
       await expect(asked.locator(".agent-choice.picked")).toHaveCount(2);
       await asked.locator('[data-agent="answer-choice"]').click();
       assert.deepEqual(sent, ["选科目：英语（推荐）、数学"]);
+      // 多个问题时确认收拢到页脚一个按钮：一次提交把整组答案当作一条消息发出去。
+      pending = [
+        {
+          id: "subjects",
+          header: "选科目",
+          question: "这周先补哪几科？",
+          multiSelect: true,
+          options: [
+            { label: "英语（推荐）", description: "进度最紧" },
+            { label: "数学", description: "高数还没开始" },
+          ],
+        },
+        {
+          id: "slot",
+          header: "选时段",
+          question: "哪天补？",
+          options: [
+            { label: "周三晚", description: "没课" },
+            { label: "周末", description: "整块时间" },
+          ],
+        },
+      ];
+      sent.length = 0;
+      await asked.reload();
+      await asked.locator('[data-page="agent"]').click();
+      await asked
+        .locator('[data-agent="choose"][data-label="英语（推荐）"]')
+        .click();
+      await asked.locator('[data-agent="choose"][data-label="周三晚"]').click();
+      await expect(
+        asked.locator('.agent-question [data-agent="answer-choice"]'),
+      ).toHaveCount(0);
+      await asked
+        .locator('.agent-answer-submit [data-agent="answer-choice"]')
+        .click();
+      assert.deepEqual(sent, ["选科目：英语（推荐）；选时段：周三晚"]);
       pending = [
         {
           id: "apply",
