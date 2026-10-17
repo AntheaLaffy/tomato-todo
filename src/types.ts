@@ -244,6 +244,7 @@ export interface Timer {
   deadline: number | null;
   startedAt: number | null;
   cycle: number;
+  cycleDate: string | null;
   completionSerial: number;
   lastFinishedMode: Mode | null;
 }

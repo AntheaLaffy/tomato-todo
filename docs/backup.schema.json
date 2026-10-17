@@ -667,6 +667,18 @@
           "minimum": 0,
           "maximum": 4294967295
         },
+        "cycleDate": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "completionSerial": {
           "type": "integer",
           "minimum": 0,
@@ -734,10 +746,12 @@
         "durationSecs": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 10800
+          "maximum": 10800,
+          "description": "实际专注秒数，提前完成番茄也不补足预计时长"
         },
         "completed": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "番茄到时或用户提前完成为 true；不表示任务已完成"
         }
       },
       "required": [

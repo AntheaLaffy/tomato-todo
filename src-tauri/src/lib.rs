@@ -20,7 +20,7 @@ fn preflight_action(current: &AppData, action: &Action) -> AppResult<()> {
             .map_err(|e| e.to_string())?,
         now(),
     )?;
-    if !matches!(action, Action::EmergencyUnlock)
+    if !matches!(action, Action::EmergencyUnlock | Action::CompleteFocus)
         && (proposed.protected()
             || proposed.lock.schedules.iter().any(|s| s.enabled)
             || (proposed.settings.protection.mode != GuardMode::Off

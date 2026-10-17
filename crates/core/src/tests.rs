@@ -111,6 +111,7 @@ fn strict_focus_rejects_every_early_exit_in_both_modes_and_recovers_at_deadline(
         e.dispatch(Action::StartTimer, 1000).unwrap();
         for action in [
             Action::EmergencyUnlock,
+            Action::CompleteFocus,
             Action::PauseTimer,
             Action::ResetTimer,
             Action::SkipTimer,
@@ -1261,6 +1262,300 @@ fn long_break_after_four_completed_focus_sessions() {
     assert_eq!(e.data.timer.mode, Mode::LongBreak);
     assert_eq!(e.data.sessions.len(), 4);
 }
+
+#[test]
+fn early_focus_completion_records_actual_time_and_leaves_task_unfinished() {
+    let mut e = engine();
+    let mut task = draft();
+    task.subtasks.push(Subtask {
+        id: id(),
+        title: "待办步骤".into(),
+        done: false,
+    });
+    let s = e.dispatch(Action::SaveTask { task }, 1000).unwrap();
+    let task_id = s.data.tasks[0].id.clone();
+    e.dispatch(
+        Action::SelectTask {
+            id: Some(task_id.clone()),
+        },
+        1000,
+    )
+    .unwrap();
+    e.dispatch(
+        Action::SaveSettings {
+            settings: Settings {
+                auto_break: true,
+                ..Settings::default()
+            },
+        },
+        1000,
+    )
+    .unwrap();
+    e.dispatch(Action::StartTimer, 1000).unwrap();
+    let s = e.dispatch(Action::CompleteFocus, 1600).unwrap();
+    assert_eq!(s.data.sessions.len(), 1);
+    assert_eq!(s.data.sessions[0].duration_secs, 600);
+    assert_eq!(s.data.sessions[0].ended_at, 1600);
+    assert!(s.data.sessions[0].completed);
+    assert_eq!(s.stats.today_seconds, 600);
+    assert_eq!(s.stats.today_pomodoros, 1);
+    assert_eq!(s.stats.today_completed, 0);
+    assert!(!s.data.tasks[0].completed);
+    assert_eq!(s.data.tasks[0].completed_at, None);
+    assert!(!s.data.tasks[0].subtasks[0].done);
+    assert_eq!(s.data.timer.task_id, Some(task_id));
+    assert_eq!(s.data.timer.cycle, 1);
+    assert_eq!(s.data.timer.completion_serial, 1);
+    assert_eq!(s.data.timer.last_finished_mode, Some(Mode::Focus));
+    assert_eq!(s.data.timer.mode, Mode::ShortBreak);
+    assert_eq!(s.remaining_secs, 300);
+    assert!(s.data.timer.running);
+    assert!(e.dispatch(Action::CompleteFocus, 1601).is_err());
+    assert_eq!(e.snapshot(2500).unwrap().data.sessions.len(), 1);
+}
+
+#[test]
+fn early_focus_completion_uses_daily_break_cycle() {
+    for (start, count, mode) in [
+        (friday(12, 0), 4, Mode::LongBreak),
+        (friday(9, 0) + 24 * 3600, 1, Mode::ShortBreak),
+    ] {
+        let mut e = engine();
+        complete_focus_sessions(&mut e, friday(9, 0), 3);
+        e.dispatch(Action::SetMode { mode: Mode::Focus }, start)
+            .unwrap();
+        e.dispatch(Action::StartTimer, start).unwrap();
+        let s = e.dispatch(Action::CompleteFocus, start + 60).unwrap();
+        assert_eq!(s.data.timer.cycle, count);
+        assert_eq!(s.data.timer.mode, mode);
+        assert!(!s.data.timer.running);
+        assert_eq!(s.data.sessions.last().unwrap().duration_secs, 60);
+    }
+}
+
+#[test]
+fn early_focus_completion_excludes_paused_time() {
+    let mut e = engine();
+    assert!(e.dispatch(Action::CompleteFocus, 1000).is_err());
+    e.dispatch(Action::StartTimer, 1000).unwrap();
+    assert!(e.dispatch(Action::CompleteFocus, 1000).is_err());
+    assert!(e.data.sessions.is_empty());
+    e.dispatch(Action::PauseTimer, 1100).unwrap();
+    let s = e.dispatch(Action::CompleteFocus, 2000).unwrap();
+    assert_eq!(s.data.sessions.len(), 1);
+    assert_eq!(s.data.sessions[0].duration_secs, 100);
+    assert!(s.data.sessions[0].completed);
+    assert_eq!(s.data.timer.mode, Mode::ShortBreak);
+    assert!(e.dispatch(Action::CompleteFocus, 2001).is_err());
+}
+
+#[test]
+fn early_focus_completion_releases_non_strict_focus_protection() {
+    for mode in [GuardMode::Lock, GuardMode::Whitelist] {
+        let mut e = engine();
+        e.dispatch(
+            Action::SaveSettings {
+                settings: Settings {
+                    protection: Protection {
+                        mode,
+                        strict: false,
+                        whitelist: vec![],
+                    },
+                    ..Settings::default()
+                },
+            },
+            1000,
+        )
+        .unwrap();
+        e.dispatch(Action::StartTimer, 1000).unwrap();
+        assert!(e.data.protected());
+        let s = e.dispatch(Action::CompleteFocus, 1100).unwrap();
+        assert!(!s.data.protected());
+        assert!(s.data.sessions[0].completed);
+        assert_eq!(s.data.timer.mode, Mode::ShortBreak);
+        assert_eq!(s.data.settings.protection.mode, mode);
+    }
+    let mut e = engine();
+    e.dispatch(
+        Action::StartQuickLock {
+            minutes: 10,
+            strict: false,
+        },
+        1000,
+    )
+    .unwrap();
+    assert!(e.dispatch(Action::CompleteFocus, 1100).is_err());
+    assert!(e.data.protected());
+    assert!(e.data.sessions.is_empty());
+}
+
+fn complete_focus_sessions(e: &mut Engine, at: i64, count: i64) {
+    for i in 0..count {
+        let start = at + i * 2000;
+        e.dispatch(Action::SetMode { mode: Mode::Focus }, start)
+            .unwrap();
+        e.dispatch(Action::StartTimer, start).unwrap();
+        e.snapshot(start + 1500).unwrap();
+    }
+}
+
+#[test]
+fn break_cycle_resets_at_local_midnight() {
+    let mut e = engine();
+    complete_focus_sessions(&mut e, friday(9, 0), 3);
+    assert_eq!(e.data.timer.cycle, 3);
+    let midnight = friday(0, 0) + 24 * 3600;
+    let s = e.snapshot(midnight).unwrap();
+    assert_eq!(s.data.timer.cycle, 0);
+    assert_eq!(s.data.timer.mode, Mode::Focus);
+    complete_focus_sessions(&mut e, midnight + 9 * 3600, 1);
+    assert_eq!(e.data.timer.cycle, 1);
+    assert_eq!(e.data.timer.mode, Mode::ShortBreak);
+    complete_focus_sessions(&mut e, midnight + 10 * 3600, 3);
+    assert_eq!(e.data.timer.cycle, 4);
+    assert_eq!(e.data.timer.mode, Mode::LongBreak);
+}
+
+#[test]
+fn break_cycle_survives_same_day_restart_but_resets_overnight() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("cycle.sqlite3");
+    let mut e = Engine::open(&path).unwrap();
+    complete_focus_sessions(&mut e, friday(9, 0), 3);
+    drop(e);
+    let mut e = Engine::open(&path).unwrap();
+    assert_eq!(e.snapshot(friday(12, 0)).unwrap().data.timer.cycle, 3);
+    complete_focus_sessions(&mut e, friday(12, 0), 1);
+    assert_eq!(e.data.timer.mode, Mode::LongBreak);
+    drop(e);
+    let mut e = Engine::open(&path).unwrap();
+    let morning = friday(9, 0) + 24 * 3600;
+    let s = e.snapshot(morning).unwrap();
+    assert_eq!(s.data.timer.cycle, 0);
+    assert_eq!(s.data.timer.mode, Mode::Focus);
+    complete_focus_sessions(&mut e, morning, 1);
+    assert_eq!(e.data.timer.cycle, 1);
+    assert_eq!(e.data.timer.mode, Mode::ShortBreak);
+}
+
+#[test]
+fn focus_crossing_midnight_counts_on_completion_date() {
+    let mut e = engine();
+    let settings = Settings {
+        auto_break: true,
+        ..Settings::default()
+    };
+    e.dispatch(Action::SaveSettings { settings }, friday(9, 0))
+        .unwrap();
+    complete_focus_sessions(&mut e, friday(9, 0), 3);
+    let start = friday(23, 50);
+    e.dispatch(Action::SetMode { mode: Mode::Focus }, start)
+        .unwrap();
+    e.dispatch(Action::StartTimer, start).unwrap();
+    let s = e.snapshot(start + 10 * 60).unwrap();
+    assert_eq!(s.data.timer.cycle, 0);
+    assert!(s.data.timer.running);
+    assert_eq!(s.data.timer.mode, Mode::Focus);
+    assert_eq!(s.remaining_secs, 15 * 60);
+    let s = e.snapshot(start + 25 * 60).unwrap();
+    assert_eq!(s.data.timer.cycle, 1);
+    assert_eq!(s.data.timer.mode, Mode::ShortBreak);
+    assert!(s.data.timer.running);
+    assert_eq!(s.stats.today_pomodoros, 1);
+    assert_eq!(s.stats.total_pomodoros, 4);
+}
+
+#[test]
+fn late_previous_day_completion_does_not_count_today() {
+    let mut e = engine();
+    complete_focus_sessions(&mut e, friday(9, 0), 3);
+    e.dispatch(Action::SetMode { mode: Mode::Focus }, friday(23, 0))
+        .unwrap();
+    e.dispatch(Action::StartTimer, friday(23, 0)).unwrap();
+    let morning = friday(9, 0) + 24 * 3600;
+    let s = e.snapshot(morning).unwrap();
+    assert_eq!(s.data.timer.cycle, 0);
+    assert_eq!(s.data.timer.mode, Mode::Focus);
+    assert!(!s.data.timer.running);
+    assert_eq!(s.stats.today_pomodoros, 0);
+    assert_eq!(s.stats.total_pomodoros, 4);
+    complete_focus_sessions(&mut e, morning, 1);
+    assert_eq!(e.data.timer.mode, Mode::ShortBreak);
+}
+
+#[test]
+fn break_cycle_rollover_preserves_running_and_paused_breaks() {
+    for mode in [Mode::ShortBreak, Mode::LongBreak] {
+        for paused in [false, true] {
+            let mut e = engine();
+            complete_focus_sessions(&mut e, friday(9, 0), 3);
+            let start = friday(23, 59);
+            e.dispatch(Action::SetMode { mode }, start).unwrap();
+            e.dispatch(Action::StartTimer, start).unwrap();
+            if paused {
+                e.dispatch(Action::PauseTimer, start + 10).unwrap();
+            }
+            let timer = e.data.timer.clone();
+            let s = e.snapshot(start + 60).unwrap();
+            assert_eq!(s.data.timer.cycle, 0);
+            assert_eq!(s.data.timer.mode, mode);
+            assert_eq!(s.data.timer.running, !paused);
+            assert_eq!(s.data.timer.started_at, timer.started_at);
+            assert_eq!(s.data.timer.deadline, timer.deadline);
+            assert_eq!(s.remaining_secs, timer.remaining(start + 60));
+        }
+    }
+}
+
+#[test]
+fn legacy_break_cycle_is_rebuilt_from_local_completed_sessions() {
+    let mut e = engine();
+    complete_focus_sessions(&mut e, friday(9, 0), 3);
+    let morning = friday(9, 0) + 24 * 3600;
+    complete_focus_sessions(&mut e, morning, 1);
+    e.dispatch(Action::SetMode { mode: Mode::Focus }, morning + 1600)
+        .unwrap();
+    e.dispatch(Action::StartTimer, morning + 1600).unwrap();
+    e.dispatch(Action::ResetTimer, morning + 1660).unwrap();
+    let mut old: serde_json::Value =
+        serde_json::from_str(&e.export(morning + 1660).unwrap()).unwrap();
+    old["timer"].as_object_mut().unwrap().remove("cycleDate");
+    old["timer"]["cycle"] = 99.into();
+    let data: AppData = serde_json::from_value(old).unwrap();
+    let mut restored = engine();
+    let s = restored
+        .dispatch(
+            Action::Import {
+                data: Box::new(data),
+            },
+            morning + 1660,
+        )
+        .unwrap();
+    assert_eq!(s.data.timer.cycle, 1);
+    assert_eq!(s.data.timer.cycle_date, Some(date_at(morning)));
+    complete_focus_sessions(&mut restored, morning + 2000, 1);
+    assert_eq!(restored.data.timer.cycle, 2);
+    assert_eq!(restored.data.timer.mode, Mode::ShortBreak);
+    let backup: AppData = serde_json::from_str(&restored.export(morning + 3500).unwrap()).unwrap();
+    assert_eq!(backup.timer.cycle_date, Some(date_at(morning)));
+}
+
+#[test]
+fn invalid_break_cycle_date_cannot_replace_existing_data() {
+    let mut e = engine();
+    let mut data = AppData::default();
+    data.timer.cycle_date = Some("2026-02-30".into());
+    assert!(e
+        .dispatch(
+            Action::Import {
+                data: Box::new(data),
+            },
+            friday(9, 0),
+        )
+        .is_err());
+    assert_ne!(e.data.timer.cycle_date.as_deref(), Some("2026-02-30"));
+}
+
 #[test]
 fn invalid_action_cannot_mutate_memory_or_database() {
     let mut e = engine();

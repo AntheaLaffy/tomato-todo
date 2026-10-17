@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3698
+lines: 3713
 generated_at: 2026-10-16
 ---
 
@@ -14,10 +14,10 @@ generated_at: 2026-10-16
 | 任务、目标、习惯模板、愿景与统计设置                | 1021–1531 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 保护、定时锁机、沉浸与刷新                          | 1532–1774 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 渐进创建、日程/周期印刷、只读实例记录与主线节点编辑 | 1775–2478 | 节点图在 src/nodegraph.ts                   |
-| 搜索、声音、紧急操作与表单绑定                      | 2479–2831 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 文件导入、模板动作与页面事件                        | 2832–3468 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 右键菜单、批量删除/移出、拖拽与快捷键               | 3469–3592 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动、概念讲解挂载与轮询                            | 3593–3698 | 概念目标与讲解内容在 src/ponder.ts          |
+| 搜索、声音、紧急操作与表单绑定                      | 2479–2846 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 文件导入、模板动作与页面事件                        | 2847–3483 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 右键菜单、批量删除/移出、拖拽与快捷键               | 3484–3607 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
+| 启动、概念讲解挂载与轮询                            | 3608–3713 | 概念目标与讲解内容在 src/ponder.ts          |
 
 ## Symbols
 
@@ -28,15 +28,15 @@ generated_at: 2026-10-16
 | compareTaskTime      | function | 781 |
 | isCatchUp            | function | 764 |
 | taskList             | function | 788 |
-| isoDate              | const    | 805 |
+| isoDate              | const    | 814 |
 | resizeCalendar       | function | 867 |
 | schedulePage         | function | 884 |
 | tasksPage            | function | 1021 |
 | goalsPage            | function | 1078 |
 | habitsTab            | function | 1135 |
 | visionDialog         | function | 1209 |
-| lineOutcomeLabel     | const    | 1260 |
-| spanLabel            | const    | 1275 |
+| lineOutcomeLabel     | const    | 1269 |
+| spanLabel            | const    | 1284 |
 | goalStatsCard        | function | 1286 |
 | crossSectionCard     | function | 1306 |
 | statsPage            | function | 1324 |
@@ -50,12 +50,12 @@ generated_at: 2026-10-16
 | templateDialog       | function | 1870 |
 | taskDialog           | function | 2264 |
 | goalDialog           | function | 2421 |
-| importPlan           | function | 2832 |
-| selectControls       | function | 3511 |
-| detachSelected       | function | 3516 |
-| deleteSelectedTasks  | function | 3526 |
-| sortProjects         | function | 3551 |
-| boot                 | function | 3618 |
+| importPlan           | function | 2847 |
+| selectControls       | function | 3526 |
+| detachSelected       | function | 3531 |
+| deleteSelectedTasks  | function | 3541 |
+| sortProjects         | function | 3566 |
+| boot                 | function | 3633 |
 
 全部任务页用与待完成、已完成、全部同级的「模板」标签切换独立模板目录，避免模板被长任务列表推到页面底部；项目页仍在项目任务后显示本项目模板。模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通/目标待补呈现。
 
@@ -75,7 +75,7 @@ generated_at: 2026-10-16
 
 背景音：backgroundSoundButton 在普通专注、沉浸与专注保护（含严格模式）界面共用入口；休息锁机不提供声音入口。soundDialog 调用 bgm.ts 导入并保存至少 1 小时的音频，手动循环播放/暂停/移除，与合成噪音互斥；雨声使用随包真实录音，异步解码期间后续选择可取消旧请求；boot 恢复保存文件，不自动播放。
 
-偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/备份。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。
+偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/备份。长休息间隔说明按当天完成的番茄累计，跨日重置由 Rust 核心负责。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。
 
 锁机日程：focusSchedule / focusScheduleDialog（L:1611 起）白天取 state.today；当天启用且星期匹配的跨夜锁机开始后取次日，午夜后继续显示这一天（改称今天）。午间小憩、停用时段和未安排跨夜锁机均显示今日；updateClock 在时间边界同步入口和已打开的弹窗。时间排序、无时间排末尾，排除已报废实例。展示任务/项目/备注/步骤，无修改和计时入口；renderImmersive 在保护期间提供入口，严格模式可用，休息锁机使用深色弹窗。
 

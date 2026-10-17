@@ -43,6 +43,8 @@
 
 历史记录包含 `id`、`taskId`（可空）、`taskTitle`、`projectName`、`startedAt`、`endedAt`、`durationSecs`（1—10800）、`completed`。开始和结束均为 Unix 秒，结束不能早于开始，ID 在历史中唯一。已删除任务可保留历史，故历史任务 ID 不强制要求仍在当前列表里。睡眠/小憩锁机不生成专注记录。
 
+历史的 `completed: true` 表示番茄到时完成或由用户「提前完成」，计入一次番茄；`durationSecs` 始终保存实际专注秒数，提前完成不会补足预计时长。重置、跳过和紧急退出记为 `completed: false`，只累计用时。番茄完成与任务勾选独立，自动到时和提前完成都不修改任务或步骤的完成状态。
+
 任务可带 `reminderTime`（HH:MM/null，非空需要日期）、`focusMinutes`（1—180/null）、`reminderFired` 和 `reminderPending`（布尔值，缺省 false）。旧备份缺失时间字段时默认不提醒、使用全局时长；任务仍为统一类型。提醒状态随备份保存；当天未处理提醒在空闲后显示，过期提醒在下次轮询清除。
 
 ## 设置与严格模式
@@ -108,7 +110,9 @@
 
 ## 计时器与恢复行为
 
-`timer` 包含 `mode`（`focus/shortBreak/longBreak`）、`running`、`taskId`、`durationSecs`、`remainingSecs`、`deadline`、`startedAt`、`cycle`、`completionSerial`、`lastFinishedMode`。秒数非负，持续时间 1—10800，剩余不得超过持续时间；`running` 必须与 `deadline` 是否存在一致。可空的时间字段用 Unix 秒。`taskId` 非空时必须引用当前任务；最后完成的阶段可为 null。
+`timer` 包含 `mode`（`focus/shortBreak/longBreak`）、`running`、`taskId`、`durationSecs`、`remainingSecs`、`deadline`、`startedAt`、`cycle`、`cycleDate`、`completionSerial`、`lastFinishedMode`。秒数非负，持续时间 1—10800，剩余不得超过持续时间；`running` 必须与 `deadline` 是否存在一致。可空的时间字段用 Unix 秒。`taskId` 非空时必须引用当前任务；最后完成的阶段可为 null。
+
+`cycle` 是 `cycleDate` 当天完整完成的番茄数，同一天跨任务累计；每累计 `longBreakEvery` 个安排长休息，其余安排短休息。`cycleDate` 是本机本地日期 `YYYY-MM-DD` 或 null，旧 v3 文件可省略。首次读取缺失日期的计数，或本地日期变化时，按专注历史的完成日期重建当天计数，因此昨日进度不会带到今早。跨午夜的专注计入结束日；延迟到次日才处理的昨日完成仍归昨日。日期变化不打断正在进行或已暂停的计时；若新一天尚无完成记录，昨日尚未开始的休息回到专注待机。
 
 导入先完整校验，再一次性替换数据；当前处于保护状态时不能恢复备份。确认框会说明替换范围。导入后：
 

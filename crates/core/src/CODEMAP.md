@@ -21,7 +21,7 @@ generated_at: 2026-10-10
 | 项目排序 | 业务核心 | lib.rs 的 Action::ReorderProjects | src/main.ts 的侧栏拖拽/sortProjects |
 | 批量删除/移出 | 业务核心 | lib.rs 的 Action::DetachTasks/DetachTarget | src/main.ts 的 selectControls/detachSelected |
 | 计划更新/整份同步/导出与文件校验 | 文件契约 | plan.rs（按 ID 更新配置、`replace` 剪除） | docs/CODEMAP.md、tests.rs、桌面/预览与 TypeScript 消费方 |
-| 修复倒计时与统计 | 业务核心 | lib.rs 的 tick/stats/Engine | tests.rs、桌面后台线程 |
+| 修复倒计时、当天休息周期与统计 | 业务核心 | lib.rs 的 tick/refresh_cycle/tick_timer/stats/Engine | tests.rs、src/types.ts、docs/BACKUP_FORMAT.md、docs/HANDBOOK/13-任务与列表.md、桌面后台线程 |
 | 主线统计与纵切面 | 业务核心 | lib.rs 的 stats/GoalStat/NodeStat/DayStat | node_tests.rs、src/main.ts 的 statsPage/goalStatsCard/crossSectionCard |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
 | 扩展桌面白名单 | 桌面保护 | guard.rs、guard_x11.rs、guard_wayland.rs、guard_shell.rs | src-tauri/src/desktop_app.rs、tests/native.mjs、tests/x11.mjs |
@@ -35,15 +35,15 @@ generated_at: 2026-10-10
 | AppData / Action | nodes.rs | 主线 | 时间配对、完成条件、不可逆裁定、局域阻断、信号防重/追溯、冻结配置 |
 | identities.rs | 标识符 | 跨实体类型唯一、删除与历史引用永久保留、原任务恢复校验、导入历史合并 |
 | node_tests.rs | 验证 | 主线配对/信号/阻断/检查/裁定/删除/重启/备份/历史 ID 与专注收尾；见 node_tests.rs.analysis.md |
-| Settings / AppData / Action | lib.rs | L:225 / L:348 / L:435 |
-| Engine | lib.rs | L:1832 |
+| Settings / AppData / Action | lib.rs | L:225 / L:351 / L:438 |
+| Engine | lib.rs | L:1883 |
 | guard | guard.rs | L:1 |
 
 ## 文件
 
 | File | Domain | Function |
 | --- | --- | --- |
-| lib.rs | 业务核心 | 备份 v3 数据模型（含默认关闭的 personaBackdrop）、Action、计时、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（整条主线成败与逐日纵切面）、Engine 持久化 |
+| lib.rs | 业务核心 | 备份 v3 数据模型（含默认关闭的 personaBackdrop 与当天休息周期 cycleDate）、Action、计时与跨日周期重建、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（整条主线成败与逐日纵切面）、Engine 持久化 |
 | plan.rs | 文件契约 | v1/v2 转换与 v5 主线/课表 DTO、导出未完成任务、按 ID 更新配置与保留进度、`replace` 整份同步、稳定 ID 去重、番茄时长换算 |
 | blocks.rs | 课表占用 | 计划之外的每周固定占用（课程/实验）：星期与跨午夜时间段校验、按日期取时段、需专心分钟统计 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
@@ -54,7 +54,7 @@ generated_at: 2026-10-10
 | guard_shell.rs | 桌面保护 | GNOME 扩展 D-Bus 与 KWin 临时脚本：枚举、精确标识与聚焦确认；KWin 唯一回调校验发送者，完成/失败均卸载脚本 |
 | guard_x11.rs | 桌面保护 | EWMH 活跃窗口管理器检测、窗口/PID/WM_CLASS/标题枚举与激活；拒绝把 Xwayland 当成完整 Wayland 管控 |
 | diagnostics.rs | 诊断 | 本地异常检测（需专心课内安排、时段重叠、计划超量/过少、习惯缺勤、主线停滞、深夜记录、投入下降）与证据字段，供学习助手唤醒 |
-| tests.rs | 验证 | 状态、持久化、保护与计划往返/失败原子性回归测试 |
+| tests.rs | 验证 | 状态、休息周期跨日/重启/旧备份重建、持久化、保护与计划往返/失败原子性回归测试 |
 | reminders.rs | 时间安排 | 日期/时间与单次时长校验、当天待处理队列、计时/锁机延后、跨日清理 |
 | templates.rs | 模板/印刷 | 形状与日程/周期分时校验、按日期防重、0–90 天滚动整周期预印、临时/手动批量、逾期/报废过滤、显式形状同步 |
 | template_tests.rs | 验证 | 一时段多日期/多单元、整周期/临时印刷、分组、防重/删除/重启、手动复用、预印遗漏、原子失败、重修/目标/习惯及文件往返 |

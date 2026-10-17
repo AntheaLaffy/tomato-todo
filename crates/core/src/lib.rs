@@ -302,6 +302,8 @@ pub struct Timer {
     pub deadline: Option<i64>,
     pub started_at: Option<i64>,
     pub cycle: u32,
+    #[serde(default)]
+    pub cycle_date: Option<String>,
     pub completion_serial: u64,
     pub last_finished_mode: Option<Mode>,
 }
@@ -316,6 +318,7 @@ impl Default for Timer {
             deadline: None,
             started_at: None,
             cycle: 0,
+            cycle_date: None,
             completion_serial: 0,
             last_finished_mode: None,
         }
@@ -551,6 +554,7 @@ pub enum Action {
         id: Option<String>,
     },
     StartTimer,
+    CompleteFocus,
     PauseTimer,
     ResetTimer,
     SkipTimer,
@@ -769,11 +773,34 @@ impl AppData {
             completed,
         });
     }
+    fn refresh_cycle(&mut self, at: i64) -> bool {
+        let date = date_at(at);
+        if self.timer.cycle_date.as_ref() == Some(&date) {
+            return false;
+        }
+        self.timer.cycle = self
+            .sessions
+            .iter()
+            .filter(|s| s.completed && date_at(s.ended_at) == date)
+            .count() as u32;
+        self.timer.cycle_date = Some(date);
+        true
+    }
     /// Advance at most one phase after downtime: never fabricate unattended focus sessions.
     pub fn tick(&mut self, at: i64) -> bool {
         let materialized = self.materialize_templates(at);
         let nodes_changed = self.tick_nodes(at);
         let changed = self.tick_with_lock(at) || materialized || nodes_changed;
+        let cycle_changed = self.refresh_cycle(at);
+        if cycle_changed
+            && self.timer.cycle == 0
+            && self.timer.mode != Mode::Focus
+            && !self.timer.running
+            && self.timer.started_at.is_none()
+            && self.timer.remaining_secs == self.timer.duration_secs
+        {
+            self.reset_to(Mode::Focus);
+        }
         let closed_selection = self.timer.task_id.as_ref().is_some_and(|id| {
             self.tasks
                 .iter()
@@ -790,7 +817,7 @@ impl AppData {
                 self.timer.task_id = None;
             }
         }
-        self.tick_reminders(at) || changed || closed_selection
+        self.tick_reminders(at) || changed || cycle_changed || closed_selection
     }
     fn tick_with_lock(&mut self, at: i64) -> bool {
         let previous = serde_json::to_value(&self.lock).ok();
@@ -824,7 +851,14 @@ impl AppData {
             return false;
         }
         let end = self.timer.deadline.unwrap_or(at);
+        self.finish_timer(end, at);
+        true
+    }
+    fn finish_timer(&mut self, end: i64, at: i64) {
         let finished = self.timer.mode;
+        if finished == Mode::Focus {
+            self.refresh_cycle(end);
+        }
         self.record(end, true);
         if finished == Mode::Focus {
             self.timer.cycle = self.timer.cycle.saturating_add(1);
@@ -854,15 +888,14 @@ impl AppData {
         if auto && at - end < 5 {
             self.start(at);
         }
-        true
     }
     pub fn apply(&mut self, action: Action, at: i64) -> AppResult<()> {
         self.tick(at);
         if self.strict_protected() {
             return Err("严格模式生效中，不能提前结束或修改；到时自动解除".into());
         }
-        if self.protected() && !matches!(action, Action::EmergencyUnlock) {
-            return Err("专注保护中，结束前不能修改任务或计时；如有急事请使用紧急退出".into());
+        if self.protected() && !matches!(action, Action::EmergencyUnlock | Action::CompleteFocus) {
+            return Err("专注保护中，结束前不能修改任务或计时；可提前完成番茄或紧急退出".into());
         }
         match action {
             Action::PrintInstances { shape, printing } => {
@@ -900,6 +933,18 @@ impl AppData {
                 self.record(at, false);
                 self.reset_to(Mode::Focus);
                 self.lock.release(at);
+            }
+            Action::CompleteFocus => {
+                if self.lock.active.is_some()
+                    || self.timer.mode != Mode::Focus
+                    || self.timer.started_at.is_none()
+                {
+                    return Err("当前没有可提前完成的专注".into());
+                }
+                if self.timer.remaining(at) == self.timer.duration_secs {
+                    return Err("尚无专注用时，请稍后再完成".into());
+                }
+                self.finish_timer(at, at);
             }
             Action::SaveLockSchedule { schedule } => {
                 if let Some(index) = self.lock.schedules.iter().position(|s| s.id == schedule.id) {
@@ -1621,6 +1666,12 @@ impl AppData {
             )?;
         }
         let t = &self.timer;
+        ensure(
+            t.cycle_date
+                .as_ref()
+                .is_none_or(|d| d.len() == 10 && NaiveDate::parse_from_str(d, "%Y-%m-%d").is_ok()),
+            "无效的番茄周期日期",
+        )?;
         ensure(
             (1..=10800).contains(&t.duration_secs)
                 && t.remaining_secs <= t.duration_secs

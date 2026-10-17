@@ -438,13 +438,16 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
         process: Mutex::new(None),
         apply: Arc::new(move |action, expected| {
             let mut engine = apply_engine.lock().map_err(|e| e.to_string())?;
-            let current = engine.snapshot(time())?;
+            // Mirror desktop apply_action(): the re-check and dispatch use the real clock,
+            // like the tool callers do. Using the fixed test clock here would make the
+            // fingerprint differ, because the snapshot stabilises today's cycle date.
+            let current = engine.snapshot(now())?;
             if let Some(expected) = expected {
                 if !current.data.reminder_idle() || files::fingerprint(&current.data)? != expected {
                     return Err("数据已变化或计时已启动，请重新审阅".into());
                 }
             }
-            engine.dispatch(action, time())
+            engine.dispatch(action, now())
         }),
         wake: Arc::new(move || {
             wakes.fetch_add(1, Ordering::SeqCst);
@@ -743,6 +746,14 @@ fn agent_cannot_apply_or_dispatch_and_memories_need_confirmation() {
         assert_eq!(
             agent.call(name, &json!({}), true).unwrap_err(),
             "工具未授权"
+        );
+    }
+    for kind in ["emergencyUnlock", "completeFocus"] {
+        assert_eq!(
+            agent
+                .call("dispatch", &json!({"action":{"type":kind}}), false)
+                .unwrap_err(),
+            "MCP 不能紧急解锁或提前完成专注"
         );
     }
     let memory = agent

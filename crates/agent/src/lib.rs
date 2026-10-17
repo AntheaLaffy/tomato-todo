@@ -1533,8 +1533,8 @@ impl Agent {
             "dispatch" => {
                 let action: Action =
                     serde_json::from_value(args["action"].clone()).map_err(|e| e.to_string())?;
-                if matches!(action, Action::EmergencyUnlock) {
-                    return Err("MCP 不能紧急解锁".into());
+                if matches!(action, Action::EmergencyUnlock | Action::CompleteFocus) {
+                    return Err("MCP 不能紧急解锁或提前完成专注".into());
                 }
                 // 兜底路径也要留下痕迹：按 Action 类型给一句人话，能定位就带上选择器。
                 let deed = match &action {

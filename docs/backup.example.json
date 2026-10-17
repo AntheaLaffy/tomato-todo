@@ -40,10 +40,22 @@
     "deadline": null,
     "startedAt": null,
     "cycle": 0,
+    "cycleDate": null,
     "completionSerial": 0,
     "lastFinishedMode": null
   },
-  "sessions": [],
+  "sessions": [
+    {
+      "id": "example-early-focus",
+      "taskId": null,
+      "taskTitle": "自由专注",
+      "projectName": "未分类",
+      "startedAt": 1792108800,
+      "endedAt": 1792110000,
+      "durationSecs": 1200,
+      "completed": true
+    }
+  ],
   "lock": {
     "schedules": [
       {

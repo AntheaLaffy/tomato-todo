@@ -434,6 +434,47 @@ try {
   const final = await invoke("snapshot");
   assert.equal(final.value.data.timer.running, false);
   assert.ok(final.value.data.sessions.every((s) => !s.completed));
+  const earlyTask = await invoke("dispatch", {
+    action: { type: "saveTask", task: { title: "提前完成番茄，任务手动勾选" } },
+  });
+  assert.equal(earlyTask.error, undefined);
+  const earlyTaskId = earlyTask.value.data.tasks.find(
+    (t) => t.title === "提前完成番茄，任务手动勾选",
+  ).id;
+  await invoke("dispatch", { action: { type: "selectTask", id: earlyTaskId } });
+  await click("[data-action=toggle-timer]");
+  await waitSelector(".protected-clock");
+  await until(async () => {
+    const { value } = await invoke("snapshot");
+    return value.remainingSecs < value.data.timer.durationSecs;
+  }, "Early completion needs actual focus time");
+  const beforeEarly = (await invoke("snapshot")).value.data;
+  await click("[data-action=emergency]");
+  await waitSelector("#complete-focus");
+  assert.equal(
+    await js('return document.querySelector("#emergency-confirm").disabled'),
+    true,
+  );
+  await writeFile(
+    "artifacts/native-complete-focus.png",
+    Buffer.from(await wd("/screenshot", null, "GET"), "base64"),
+  );
+  await click("#complete-focus");
+  await waitSelector(".sidebar");
+  const afterEarly = (await invoke("snapshot")).value.data;
+  assert.deepEqual(afterEarly.tasks, beforeEarly.tasks);
+  assert.equal(afterEarly.sessions.length, beforeEarly.sessions.length + 1);
+  const earlySession = afterEarly.sessions.at(-1);
+  assert.equal(earlySession.completed, true);
+  assert.ok(earlySession.durationSecs > 0);
+  assert.ok(earlySession.durationSecs < beforeEarly.timer.durationSecs);
+  assert.equal(afterEarly.timer.mode, "shortBreak");
+  assert.equal(afterEarly.timer.cycle, beforeEarly.timer.cycle + 1);
+  assert.equal(
+    afterEarly.timer.completionSerial,
+    beforeEarly.timer.completionSerial + 1,
+  );
+  await invoke("dispatch", { action: { type: "setMode", mode: "focus" } });
   await click("[data-page=guard]");
   await click("[data-guard-mode=off]");
   await until(
