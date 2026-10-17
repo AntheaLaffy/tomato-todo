@@ -5,6 +5,12 @@ import { resolve, join, relative, dirname, isAbsolute } from "node:path";
 import { spawn } from "node:child_process";
 import { minimatch } from "minimatch";
 
+// bwrap 的 --clearenv 拿掉了 TZ，也没挂 /etc/localtime，沙箱里的 date 会退回 UTC；
+// 把本机时区显式传进去，date、cargo test 里的本地时间才和 Rust 的 Local 一致。
+export function sandboxEnv() {
+  return ["--clearenv","--setenv","PATH","/tools/.cargo/bin:/tools/.npm/bin:/tools/npm-global/bin:/runtime/bin:/usr/bin:/bin","--setenv","HOME","/tools","--setenv","CARGO_HOME","/tools/.cargo","--setenv","RUSTUP_HOME","/tools/.rustup","--setenv","npm_config_cache","/tools/npm-cache","--setenv","npm_config_prefix","/tools/npm-global","--setenv","XDG_CACHE_HOME","/tools/cache","--setenv","XDG_CONFIG_HOME","/tools/config","--setenv","LANG","C.UTF-8","--setenv","TZ",Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC","--setenv","TERM","dumb"];
+}
+
 export async function codingTools(dir, runtimeRoot, preferences = {}, onShutdown = () => {}) {
   const workspace=join(dir,"workspace"), coding=join(workspace,"coding"), tools=join(dir,"tools");
   await mkdir(coding,{recursive:true,mode:0o700});
@@ -26,7 +32,7 @@ export async function codingTools(dir, runtimeRoot, preferences = {}, onShutdown
   const full=preferences.codingAccess==="full";
   const net=["--unshare-all","--share-net","--ro-bind-try","/etc/resolv.conf","/etc/resolv.conf","--ro-bind-try","/etc/hosts","/etc/hosts","--ro-bind-try","/etc/nsswitch.conf","/etc/nsswitch.conf","--ro-bind-try","/etc/ssl","/etc/ssl","--ro-bind-try","/etc/pki","/etc/pki","--ro-bind-try","/etc/ca-certificates","/etc/ca-certificates","--ro-bind-try","/etc/ca-certificates.conf","/etc/ca-certificates.conf","--ro-bind-try","/etc/passwd","/etc/passwd","--ro-bind-try","/etc/group","/etc/group","--ro-bind-try","/etc/gitconfig","/etc/gitconfig"];
   const mounts=["--ro-bind","/usr","/usr","--ro-bind-try","/lib","/lib","--ro-bind-try","/lib64","/lib64","--ro-bind-try","/bin","/bin","--ro-bind-try","/etc/ld.so.cache","/etc/ld.so.cache","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--ro-bind",workspace,"/workspace","--bind",coding,"/workspace/coding","--bind",tools,"/tools","--ro-bind",runtimeRoot,"/runtime"];
-  const env=["--clearenv","--setenv","PATH","/tools/.cargo/bin:/tools/.npm/bin:/tools/npm-global/bin:/runtime/bin:/usr/bin:/bin","--setenv","HOME","/tools","--setenv","CARGO_HOME","/tools/.cargo","--setenv","RUSTUP_HOME","/tools/.rustup","--setenv","npm_config_cache","/tools/npm-cache","--setenv","npm_config_prefix","/tools/npm-global","--setenv","XDG_CACHE_HOME","/tools/cache","--setenv","XDG_CONFIG_HOME","/tools/config","--setenv","LANG","C.UTF-8","--setenv","TERM","dumb"];
+  const env=sandboxEnv();
   // One long-lived bash per session keeps cwd, exported variables and background
   // processes across calls. A random sentinel line ends each command, so multi-line
   // input still works and the exit code comes back on a marker.

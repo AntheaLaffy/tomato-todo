@@ -29,6 +29,17 @@ import {
   normalizeCodexCredential,
   parseCodexConfig,
 } from "../agent/codex-config.mjs";
+import { sandboxEnv } from "../agent/coding.mjs";
+
+test("sandboxed shell keeps the app's local timezone", () => {
+  // bwrap 的 --clearenv 会清掉 TZ，必须在它之后显式补回本机时区，否则沙箱里的
+  // date 退回 UTC，模型据此排出的相对日期会错一天。
+  const env = sandboxEnv();
+  const tz = env.indexOf("TZ");
+  assert.notEqual(tz, -1, "sandbox env should set TZ");
+  assert.ok(env.indexOf("--clearenv") < tz, "TZ must come after --clearenv");
+  assert.equal(env[tz + 1], Intl.DateTimeFormat().resolvedOptions().timeZone);
+});
 
 test(
   "Rust worker starts packaged Node with HTTP proxy support",
@@ -1347,6 +1358,11 @@ test(
           : JSON.stringify(system?.content ?? "");
       assert.match(injected, /当前人格/);
       assert.match(injected, /严格教练/);
+      // 系统提示带上本轮本地时间，排日期不用模型猜「今天」。
+      assert.match(
+        injected,
+        /本轮开始时间：\d{4}-\d{2}-\d{2} 周[日一二三四五六] \d{2}:\d{2}（本地时间 UTC[+-]\d{2}:\d{2}）/,
+      );
       await page.screenshot({
         path: "artifacts/agent-personas.png",
         fullPage: true,

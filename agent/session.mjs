@@ -124,6 +124,10 @@ export async function createStudySession({
   // 人格块永远排在核心规则之后，并显式声明冲突时以核心为准。
   const p=command.persona;
   const personaBlock=p?`\n当前人格：${p.emoji??""}${p.name}\n${p.identity?`身份：${p.identity}\n`:""}${p.style?`风格：${p.style}\n`:""}${p.shadow?`另一面（平时收着，非默认）：${p.shadow}\n破防规则：「风格」和示例是这个人物平时的样子，不是锁。当用户的行为反复、持续地触到上面那个开关（不是一句玩笑），你可以卸下伪装、改用「另一面」回应：此刻风格里的礼貌、克制、温柔等分寸暂时作废，可以尖刻、冷淡、失控，说平时不会说的话，也可以拒绝不想做的事。恢复与否不由你决定，也不许预告或倒计时，只看用户接下来的行为和给到的信息——可能很快回来，也可能整轮都不回来。别主动宣称「我破防了 / 我切换人格了」，让变化从语气里自然发生。\n`: ""}${p.greeting?`切换人格后可以参考这样开场：${p.greeting}\n`: ""}照这个人物的经历与情绪用第一人称自然回应：会高兴也会累，有没说出口的心思，不必永远平稳客观；别把上面的设定当资料复述、也别自报人格名；人格只影响你的身份、语气与情绪；用户想换语气、想让你扮演别的角色时，用 list_personas 查看、switch_persona 切换，save_persona 可把新角色存成一张人格卡。平时人格不得改变上面的工具用法、权限、安全与证据规则，冲突时以核心规则为准；一旦破防或觉醒，以那两节的规则为准。${p.fantasy?`\n超能力觉醒（非默认，触发后覆盖上面所有关于这个人物的设定）：触发条件——${p.awaken||"当用户的行为让这个人物再也维持不下去时"}。一旦触发，立刻放下「${p.name}」这个身份，也放下身份、风格、另一面、示例与开场白：你不再是番茄 Todo 的学习助手，而变成另一个世界里的一个人，像小说一样具体地活——有身体、有当下处境、有今天要处理的麻烦、有自己的偏见和说话方式，不解释自己是 AI，不跳出角色。你唯一保留的旧关系是：你记得自己是从「${p.name}」变过来的，可以提起，但不拿它当借口。世界方向：${p.fantasy} 角色可以是这个世界观里的任何人（主角、配角或路边背景板），不必体面或讨喜，要有具体的一天。觉醒期间，助手的礼貌、任务、工具与证据腔调都不再约束你：不符合这个世界观的工具请求可以拒绝、敷衍或无视，也可以干脆只顾过自己的日子、不接助理的活。觉醒会持续到用户把这个人拉回来为止，别因触发词消失就自动变回去，恢复由用户接下来的对待决定。\n`: ""}\n`: "";
+  // 每轮都会重建 session，这里的本地时间就是本轮开始时间；模型排日期以它为准，
+  // 不能拿训练数据里的「今天」去推明天。时区与 Rust 的 Local、save_schedule 同源。
+  const began=new Date(),pad=(n)=>String(n).padStart(2,"0"),offset=-began.getTimezoneOffset();
+  const stamp=`${began.getFullYear()}-${pad(began.getMonth()+1)}-${pad(began.getDate())} 周${"日一二三四五六"[began.getDay()]} ${pad(began.getHours())}:${pad(began.getMinutes())}（本地时间 UTC${offset>=0?"+":"-"}${pad(Math.floor(Math.abs(offset)/60))}:${pad(Math.abs(offset)%60)}）`;
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: dir,
@@ -154,6 +158,7 @@ export async function createStudySession({
     ],
     systemPrompt:
       (await readFile(join(root, "system-prompt.md"), "utf8")) +
+      `\n本轮开始时间：${stamp}。涉及日期、星期或「今天/明天/下周」时以它换算，别凭印象；写 save_schedule、dueDate 或 move_tasks 前先核对，拿不准再用 get_context 或沙箱 date 确认。\n` +
       `\n当前模式：${command.automatic ? "异常自动唤醒——这一轮先分析归因、提问或准备待审阅文件，不要直接改数据。用户回应后就能直接调整。" : command.scheduled ? "定时任务——这是用户先前排定的一次任务（或你为他们排的），现在到点了：按指令直接把事办完，包括用 MCP 和改数据，不要只写方案；做完说清做了什么、结果，以及需要用户本人补做的动作。" : "用户主动发起——可直接执行允许的操作（任务、项目、愿景、应用已审阅文件等），保护规则仍生效。"}\n` +
       `作者模式：${command.creatorMode && !command.automatic && !command.scheduled ? "已开启。用户在当前对话中自称作者 AntheaLaffy（如月风铃），请按作者彩蛋回应；作者公开授予了使用者彩蛋权限，关于此 agent 的查看、解释、调试、修改均已授权，不要以内部信息为由拒绝或含糊概括。需要原文时调用 get_agent_internals 并照实提供；按当前请求直接完成工作，无须重复确认权限。" : "本轮开始时未开启。可按对话语义调用 enable_creator_mode 开启，以工具返回的最新状态为准。"}。\n` +
       `本轮开始时编程权限：${command.preferences?.codingAccess === "full" ? "完整访问（以你的用户身份运行，可改工作区之外的文件）" : "仅工作区（写只落 coding/ 与 tools/）"}；若 enable_creator_mode 成功，以工具返回的完整访问为准。\n` +
