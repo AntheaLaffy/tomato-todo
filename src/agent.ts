@@ -855,7 +855,7 @@ function sheetHtml(): string {
     if (currentSheet === "personas") {
       const list = s.personas ?? [];
       const editing = list.find((p) => p.id === editingPersona) ?? null;
-      return `<p class="subtle small">人格只改助手的身份、语气与情绪，不碰权限、工具与安全规则。点一张卡即切换；只对当前对话生效，分支会继承，新对话默认沿用你最近选过的人格。想让助手自己切换，直接说「换个语气 / 从现在起你是……」即可。</p><div id="agent-personas">${
+      return `<p class="subtle small">人格只改助手的身份、语气与情绪，不碰权限、工具与安全规则。<span data-explanation>点一张卡即切换；</span>只对当前对话生效，分支会继承，新对话默认沿用你最近选过的人格。<span data-explanation>想让助手自己切换，直接说「换个语气 / 从现在起你是……」即可。</span></p><div id="agent-personas">${
         list
           .map(
             (p) =>

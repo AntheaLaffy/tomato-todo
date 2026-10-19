@@ -42,6 +42,122 @@ test("compact mode: global hiding, local persistence and important information",
     });
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    const checkAdditionalCoverage = async (compact) => {
+      const explanation = async (locator) => {
+        await expect(locator).toHaveCount(1);
+        if (compact) await expect(locator).toBeHidden();
+        else await expect(locator).toBeVisible();
+      };
+      await page.locator('[data-page="tasks"]').first().click();
+      await page.locator(".task-row .task-body").first().click();
+      await explanation(page.locator(".modal-heading p"));
+      await explanation(
+        page.getByText("重复安排请在模板编辑器中设置。", { exact: true }),
+      );
+      await expect(
+        page.getByText(/普通实例在计划块结束后、当天内可重修/),
+      ).toBeVisible();
+      await expect(page.locator("#instance-duration-preview")).toBeVisible();
+      await page
+        .locator('#task-form [name="notes"]')
+        .fill("我的说明与备注必须保留");
+      await expect(page.locator('#task-form [name="notes"]')).toBeVisible();
+      await page
+        .getByRole("button", { name: "关闭对话框", exact: true })
+        .click();
+      await page.locator('[data-action="new-task"]').first().click();
+      for (const title of [
+        "备注、标签与步骤",
+        "项目、目标与优先级",
+        "专注时段与补做",
+      ]) {
+        const summary = page.locator("#template-form summary", {
+          hasText: title,
+        });
+        await expect(summary).toBeVisible();
+        await explanation(summary.locator("small"));
+      }
+      await page.locator('[name="creationMode"]').selectOption("automatic");
+      await expect(page.locator("#creation-mode-hint")).toBeVisible();
+      await explanation(page.locator("#printing-option-label"));
+      await explanation(
+        page.getByText("默认一周；一个开始时间对应多个星期单元，", {
+          exact: true,
+        }),
+      );
+      await expect(
+        page.getByText("每次印完完整周", { exact: false }).last(),
+      ).toBeVisible();
+      await expect(page.locator('[name="printAheadDays"]')).toBeVisible();
+      if (compact) {
+        await page.setViewportSize({ width: 360, height: 800 });
+        assert.ok(
+          await page
+            .locator(".modal")
+            .evaluate((node) => node.scrollWidth <= node.clientWidth),
+          "compact editor should fit a narrow viewport",
+        );
+        await expect(page.locator("#create-from-editor")).toBeVisible();
+      }
+      await page
+        .locator(".modal")
+        .screenshot({ path: join(dir, `coverage-editor-${compact}.png`) });
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page
+        .getByRole("button", { name: "关闭对话框", exact: true })
+        .click();
+      await page.locator('[data-page="stats"]').first().click();
+      await explanation(page.getByText("完整完成的专注周期", { exact: true }));
+      await explanation(page.locator(".history-card .card-heading > span"));
+      await expect(
+        page.getByText("近 28 天未完成的定时习惯", { exact: true }),
+      ).toBeVisible();
+      await expect(page.locator(".metric-value").first()).toBeVisible();
+      await page.locator('[data-page="guard"]').first().click();
+      await explanation(
+        page.getByText("先打开需要使用的软件，再从下方添加。", { exact: true }),
+      );
+      await expect(page.locator(".whitelist-tags > p")).toBeVisible();
+      await expect(page.getByText(/保护中无法暂停/)).toBeVisible();
+      await page.locator('[data-page="focus"]').first().click();
+      await page.locator('[data-action="sound"]').click();
+      await explanation(page.locator(".modal-heading p"));
+      await expect(page.getByText(/再次导入会替换原文件/)).toBeVisible();
+      await expect(page.locator("#noise-volume")).toBeVisible();
+      await page
+        .getByRole("button", { name: "关闭对话框", exact: true })
+        .click();
+      await page.locator('[data-action="help"]').click();
+      await explanation(
+        page.getByText("输入文字时不会触发计时快捷键。", { exact: true }),
+      );
+      await expect(page.getByText(/专注保护期间只开放紧急退出/)).toBeVisible();
+      await page
+        .getByRole("button", { name: "关闭对话框", exact: true })
+        .click();
+      await page.locator('[data-action="immersive"]').click();
+      await explanation(page.locator(".immersive footer"));
+      await expect(page.locator(".immersive .clock")).toBeVisible();
+      await expect(
+        page.locator('.immersive [data-action="sound"]'),
+      ).toBeVisible();
+      await page.locator('[data-action="immersive"]').click();
+      await page.locator('[data-page="agent"]').first().click();
+      await page.locator('[data-agent="personas"]').click();
+      await explanation(page.getByText("点一张卡即切换；", { exact: true }));
+      await explanation(page.getByText(/想让助手自己切换，直接说/));
+      await expect(page.getByText(/不碰权限、工具与安全规则/)).toBeVisible();
+      await expect(
+        page.getByText(/只对当前对话生效，分支会继承/),
+      ).toBeVisible();
+      await expect(page.locator(".agent-persona").first()).toBeVisible();
+      await expect(page.locator(".agent-persona > p").first()).toBeVisible();
+      await page.screenshot({
+        path: join(dir, `coverage-personas-${compact}.png`),
+        fullPage: true,
+      });
+      await page.locator('[data-agent="close-sheet"]').click();
+    };
     await page.goto(url);
     await expect(page.locator(".welcome-card")).toBeVisible();
     await expect(page.locator(".brand small")).toBeVisible();
@@ -209,6 +325,7 @@ test("compact mode: global hiding, local persistence and important information",
     await page.getByRole("button", { name: "设置", exact: true }).click();
     await expect(page.getByText(/完整访问时以你的用户权限运行/)).toBeVisible();
     await page.keyboard.press("Escape");
+    await checkAdditionalCoverage(true);
     await page.reload();
     await expect(page.locator(".brand small")).toBeHidden();
     await page.locator('[data-page="settings"]').click();
@@ -243,6 +360,7 @@ test("compact mode: global hiding, local persistence and important information",
       page.locator("#agent-schedules .agent-empty [data-explanation]"),
     ).toBeVisible();
     await page.locator('[data-agent="close-sheet"]').click();
+    await checkAdditionalCoverage(false);
     // A storage failure is reported, and must not pretend the preference was saved.
     await page.locator('[data-page="settings"]').click();
     await page.evaluate(() => {

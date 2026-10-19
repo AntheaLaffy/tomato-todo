@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3713
+lines: 3716
 generated_at: 2026-10-16
 ---
 
@@ -17,7 +17,7 @@ generated_at: 2026-10-16
 | 搜索、声音、紧急操作与表单绑定                      | 2479–2846 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 文件导入、模板动作与页面事件                        | 2847–3483 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
 | 右键菜单、批量删除/移出、拖拽与快捷键               | 3484–3607 | 接口改动核对共享 Rust 核心、桌面/预览适配层 |
-| 启动、概念讲解挂载与轮询                            | 3608–3713 | 概念目标与讲解内容在 src/ponder.ts          |
+| 启动、概念讲解挂载与轮询                            | 3608–3716 | 概念目标与讲解内容在 src/ponder.ts          |
 
 ## Symbols
 
@@ -83,6 +83,6 @@ Android 导航：setMobileNav（L:553）控制抽屉和工作区 inert；平台�
 
 首页待完成：focusPage 固定分为今日定时、待补、今日未定时、无日期；todayTaskGroup 控制待补全部显示与无日期默认折叠，展开状态在应用会话内保留；今日待办总数与待完成标签排除无日期任务。taskList 接受独立排序参数，compareTaskTime 为日期/提醒时间/创建顺序比较器；全部任务页继续使用用户选择的排序。
 
-简洁模式：compact.ts 保存本机开关并设置根元素 data-compact-mode；settingsPage 的无 name 开关由 bindForms 立即保存，不标记业务配置 dirty、不重建正在编辑的表单。说明按用途显式标记 data-explanation；日程拖动提示、节点编辑副标题和空状态建议同样隐藏，空状态与按钮仍保留。日期、进度、错误、权限及保护后果不隐藏。ponderChip 改为灯泡图标，保留无障碍名称。
+简洁模式：compact.ts 保存本机开关并设置根元素 data-compact-mode；settingsPage 的无 name 开关由 bindForms 立即保存，不标记业务配置 dirty、不重建正在编辑的表单。说明按用途显式标记 data-explanation；日程拖动提示、节点编辑副标题和空状态建议同样隐藏，空状态与按钮仍保留。模板可选/周期辅助提示、实例与声音弹窗副标题、统计口径介绍、白名单建议与沉浸鼓励语同样隐藏；创建方式、时长预览、整周印刷/重修后果、统计范围/截断数量/来源标签继续显示。blocked-count 只在零次时标记为说明，boot 的拦截事件更新先移除标记，避免真实次数被隐藏。日期、进度、错误、权限及保护后果不隐藏。ponderChip 改为灯泡图标，保留无障碍名称。
 
 角色背景板：settingsPage 的「体验与提醒」保存 settings.personaBackdrop（默认关闭）；render 与 setupAgent.backdrop 在普通页面允许显示，沉浸或专注保护时交给 syncPersonaBackdrop 隐藏。
