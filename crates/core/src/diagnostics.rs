@@ -228,7 +228,7 @@ pub fn diagnose(snapshot: &Snapshot, capacity_minutes: Option<u32>) -> Vec<Anoma
     let recent_sessions: Vec<_> = data
         .sessions
         .iter()
-        .filter(|s| s.ended_at >= at - 7 * 86400)
+        .filter(|s| s.source == crate::SessionSource::Timer && s.ended_at >= at - 7 * 86400)
         .collect();
     let late: Vec<_> = recent_sessions
         .iter()

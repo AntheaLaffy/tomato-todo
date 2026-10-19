@@ -1,6 +1,6 @@
 ---
 source: node_tests.rs
-lines: 585
+lines: 586
 generated_at: 2026-10-10
 ---
 
@@ -28,4 +28,4 @@ generated_at: 2026-10-10
 | ids_are_globally_unique_and_deleted_nodes_cannot_be_reused_even_after_backup_or_restart | 455–516 | 隔离内存/临时 SQLite 行为回归 |
 | deleted_task_id_is_reserved_and_undo_only_accepts_the_original_entity | 517–538 | 隔离内存/临时 SQLite 行为回归 |
 | node_decision_stops_its_active_focus_and_keeps_only_actual_partial_work | 539–557 | 隔离内存/临时 SQLite 行为回归 |
-| orphaned_historical_task_ids_stay_reserved_without_a_live_instance | 558–585 | 隔离内存/临时 SQLite 行为回归 |
+| orphaned_historical_task_ids_stay_reserved_without_a_live_instance | 558–586 | 隔离内存/临时 SQLite 行为回归 |

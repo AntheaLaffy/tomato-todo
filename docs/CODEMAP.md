@@ -16,7 +16,7 @@ generated_at: 2026-10-10
 | PLAN_FORMAT.md | 文件契约 | v5 主线配置、课表阻塞时段、模板/规则/印刷/实例、滚动预印/手动批次、报废/待补、旧 v1/v2 转换、按 ID 更新配置与 `replace` 整份同步 |
 | plan.schema.json | 文件契约 | JSON Schema 2020-12 结构、时间字段与单项范围校验 |
 | plan.example.json | 示例 | 通用可导入计划，不作为默认种子 |
-| BACKUP_FORMAT.md | 文件契约 | 完整备份 v3、节点裁定、配对、信号、ID 历史、音效开关/音量、角色背景板、当天休息周期 cycleDate 及严格模式/定时锁机字段和恢复时停用规则 |
+| BACKUP_FORMAT.md | 文件契约 | 完整备份 v3、节点裁定、配对、信号、ID 历史、专注历史 source（实际计时/任务完成按预计补足）、音效开关/音量、角色背景板、当天休息周期 cycleDate 及严格模式/定时锁机字段和恢复时停用规则 |
 | backup.schema.json | 文件契约 | 完整备份与旧文件缺省兼容的 JSON Schema |
 | backup.example.json | 示例 | 无私人数据、包含静态模板与停用锁机规则的备份示例 |
 | AGENT.md | 设计记录 | 学习助手的后端/登录、异常自动唤醒阈值、权限与记忆、导出→审阅→应用流程、作为客户端的 MCP 服务器接入（mcp.json/exposure/唤醒不加载）、对外提供的 MCP 桥接与隐私边界；联网工具免密钥 |

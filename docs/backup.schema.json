@@ -746,12 +746,20 @@
         "durationSecs": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 10800,
-          "description": "实际专注秒数，提前完成番茄也不补足预计时长"
+          "maximum": 1069200,
+          "description": "timer 为实际专注秒数（最多 10800）；taskEstimate 为按预计补足的差额（最多 99 × 180 × 60）"
         },
         "completed": {
           "type": "boolean",
           "description": "番茄到时或用户提前完成为 true；不表示任务已完成"
+        },
+        "source": {
+          "enum": [
+            "timer",
+            "taskEstimate"
+          ],
+          "default": "timer",
+          "description": "timer 为实际计时；taskEstimate 为完成任务时按预计用时补足的差额，缺省 timer"
         }
       },
       "required": [
@@ -762,6 +770,41 @@
         "endedAt",
         "durationSecs",
         "completed"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "const": "taskEstimate"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "taskId"
+            ],
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "completed": {
+                "const": false
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "durationSecs": {
+                "maximum": 10800
+              }
+            }
+          }
+        }
       ]
     },
     "lock": {

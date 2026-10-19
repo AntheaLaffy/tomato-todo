@@ -1233,6 +1233,224 @@ fn draft() -> TaskDraft {
         repeat: Repeat::None,
     }
 }
+
+#[test]
+fn task_completion_credits_the_greater_of_expected_and_actual_effort() {
+    for (rounds, partial, expected_total, supplement) in [
+        (0, 0, 3000, 3000),
+        (0, 1200, 3000, 1800),
+        (2, 0, 3000, 0),
+        (2, 1200, 4200, 0),
+    ] {
+        let mut e = engine();
+        let start = friday(9, 0);
+        let s = e
+            .dispatch(Action::SaveTask { task: draft() }, start)
+            .unwrap();
+        let id = s.data.tasks[0].id.clone();
+        e.dispatch(
+            Action::SelectTask {
+                id: Some(id.clone()),
+            },
+            start,
+        )
+        .unwrap();
+        let mut at = start;
+        for _ in 0..rounds {
+            e.dispatch(Action::SetMode { mode: Mode::Focus }, at)
+                .unwrap();
+            e.dispatch(Action::StartTimer, at).unwrap();
+            at += 1500;
+            e.snapshot(at).unwrap();
+        }
+        if partial > 0 {
+            e.dispatch(Action::SetMode { mode: Mode::Focus }, at)
+                .unwrap();
+            e.dispatch(Action::StartTimer, at).unwrap();
+            at += partial;
+            e.dispatch(Action::PauseTimer, at).unwrap();
+        }
+        let s = e
+            .dispatch(Action::ToggleTask { id: id.clone() }, at + 60)
+            .unwrap();
+        assert_eq!(s.stats.total_seconds, expected_total);
+        assert_eq!(s.stats.today_seconds, expected_total);
+        assert_eq!(s.stats.total_pomodoros, rounds);
+        assert_eq!(s.data.timer.cycle as usize, rounds);
+        assert!(s.data.timer.task_id.is_none());
+        let credited: u32 = s
+            .data
+            .sessions
+            .iter()
+            .filter(|s| s.source == SessionSource::TaskEstimate)
+            .map(|s| s.duration_secs)
+            .sum();
+        assert_eq!(credited, supplement);
+        assert_eq!(
+            e.snapshot(at + 10000).unwrap().stats.total_seconds,
+            expected_total
+        );
+        let s = e
+            .dispatch(Action::ToggleTask { id: id.clone() }, at + 10001)
+            .unwrap();
+        assert_eq!(
+            s.stats.total_seconds,
+            expected_total - u64::from(supplement)
+        );
+        let s = e.dispatch(Action::ToggleTask { id }, at + 10002).unwrap();
+        assert_eq!(s.stats.total_seconds, expected_total);
+    }
+}
+
+#[test]
+fn task_completion_settles_running_focus_without_affecting_other_tasks() {
+    let mut e = engine();
+    let at = friday(9, 0);
+    let a = e
+        .dispatch(Action::SaveTask { task: draft() }, at)
+        .unwrap()
+        .data
+        .tasks[0]
+        .id
+        .clone();
+    let mut other = draft();
+    other.focus_minutes = Some(10);
+    let b = e
+        .dispatch(Action::SaveTask { task: other }, at)
+        .unwrap()
+        .data
+        .tasks[1]
+        .id
+        .clone();
+    e.dispatch(
+        Action::SelectTask {
+            id: Some(a.clone()),
+        },
+        at,
+    )
+    .unwrap();
+    e.dispatch(Action::StartTimer, at).unwrap();
+    let s = e.dispatch(Action::ToggleTask { id: b }, at + 120).unwrap();
+    assert!(s.data.timer.running);
+    assert_eq!(s.stats.total_seconds, 1200);
+    let s = e.dispatch(Action::ToggleTask { id: a }, at + 600).unwrap();
+    assert!(!s.data.timer.running);
+    assert_eq!(s.stats.total_seconds, 4200);
+    assert_eq!(
+        s.data
+            .sessions
+            .iter()
+            .find(|s| s.source == SessionSource::Timer)
+            .unwrap()
+            .duration_secs,
+        600
+    );
+    assert_eq!(s.stats.total_pomodoros, 0);
+}
+
+#[test]
+fn estimated_completion_credit_survives_backup_restart_and_task_deletion() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("completion.sqlite3");
+    let at = friday(23, 0);
+    let mut e = Engine::open(&path).unwrap();
+    let mut task = draft();
+    task.focus_minutes = Some(180);
+    task.estimate = 99;
+    let id = e
+        .dispatch(Action::SaveTask { task }, at)
+        .unwrap()
+        .data
+        .tasks[0]
+        .id
+        .clone();
+    e.dispatch(Action::ToggleTask { id: id.clone() }, at)
+        .unwrap();
+    let backup: AppData = serde_json::from_str(&e.export(at).unwrap()).unwrap();
+    assert_eq!(backup.sessions[0].source, SessionSource::TaskEstimate);
+    let mut restored = engine();
+    let s = restored
+        .dispatch(
+            Action::Import {
+                data: Box::new(backup),
+            },
+            at,
+        )
+        .unwrap();
+    assert_eq!(s.stats.total_seconds, 99 * 180 * 60);
+    assert_eq!(s.stats.streak, 1);
+    assert_eq!(s.stats.total_pomodoros, 0);
+    drop(e);
+    let mut e = Engine::open(&path).unwrap();
+    let s = e.dispatch(Action::DeleteTask { id }, at + 1).unwrap();
+    assert_eq!(s.stats.total_seconds, 99 * 180 * 60);
+    assert_eq!(s.data.sessions.len(), 1);
+    assert!(s.data.tasks.is_empty());
+}
+
+#[test]
+fn completion_credit_is_assigned_to_completion_day_without_rewriting_actual_history() {
+    let mut e = engine();
+    let at = friday(12, 0);
+    let id = e
+        .dispatch(Action::SaveTask { task: draft() }, at)
+        .unwrap()
+        .data
+        .tasks[0]
+        .id
+        .clone();
+    e.dispatch(
+        Action::SelectTask {
+            id: Some(id.clone()),
+        },
+        at,
+    )
+    .unwrap();
+    e.dispatch(Action::StartTimer, at).unwrap();
+    e.dispatch(Action::ResetTimer, at + 600).unwrap();
+    let s = e.dispatch(Action::ToggleTask { id }, at + 86400).unwrap();
+    assert_eq!(s.stats.total_seconds, 3000);
+    assert_eq!(s.stats.today_seconds, 2400);
+    assert_eq!(s.stats.days[s.stats.days.len() - 2].seconds, 600);
+}
+
+#[test]
+fn old_timer_records_default_to_timer_and_estimates_cannot_claim_completed_pomodoros() {
+    let old = include_str!("../../../docs/backup.example.json");
+    let mut value: serde_json::Value = serde_json::from_str(old).unwrap();
+    for session in value["sessions"].as_array_mut().unwrap() {
+        session.as_object_mut().unwrap().remove("source");
+    }
+    let mut data: AppData = serde_json::from_value(value).unwrap();
+    data.validate().unwrap();
+    assert_eq!(data.sessions[0].source, SessionSource::Timer);
+    data.sessions[0].source = SessionSource::TaskEstimate;
+    assert!(data.validate().is_err());
+}
+
+#[test]
+fn completing_tasks_at_night_does_not_fabricate_late_focus_sessions() {
+    let mut e = engine();
+    let at = friday(23, 0);
+    for day in 0..3 {
+        let at = at + day * 86400;
+        let id = e
+            .dispatch(Action::SaveTask { task: draft() }, at)
+            .unwrap()
+            .data
+            .tasks
+            .last()
+            .unwrap()
+            .id
+            .clone();
+        e.dispatch(Action::ToggleTask { id }, at).unwrap();
+    }
+    let s = e.snapshot(at + 2 * 86400).unwrap();
+    assert!(!diagnostics::diagnose(&s, None)
+        .iter()
+        .any(|a| a.kind == "rhythmDrift"));
+}
+
 #[test]
 fn pause_resume_excludes_paused_time_and_counts_once() {
     let mut e = engine();

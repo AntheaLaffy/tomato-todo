@@ -53,7 +53,19 @@
       "startedAt": 1792108800,
       "endedAt": 1792110000,
       "durationSecs": 1200,
-      "completed": true
+      "completed": true,
+      "source": "timer"
+    },
+    {
+      "id": "example-estimated-completion",
+      "source": "taskEstimate",
+      "taskId": "example-deleted-task",
+      "taskTitle": "已完成的阅读练习",
+      "projectName": "自主学习",
+      "startedAt": 1792113600,
+      "endedAt": 1792113600,
+      "durationSecs": 1800,
+      "completed": false
     }
   ],
   "lock": {

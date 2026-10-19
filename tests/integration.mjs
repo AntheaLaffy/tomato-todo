@@ -872,7 +872,10 @@ test(
         .getByRole("button", { name: "切换明暗主题", exact: true })
         .click();
       await page.getByRole("button", { name: "数据统计", exact: true }).click();
-      await expect(page.locator(".history-row")).toHaveCount(2);
+      await expect(page.locator(".history-row")).toHaveCount(3);
+      await expect(
+        page.locator(".history-row .badge").filter({ hasText: "按预计补足" }),
+      ).toHaveCount(1);
       await page.getByRole("button", { name: "专注保护", exact: true }).click();
       await expect(page.locator("[data-guard-mode=lock]")).toBeDisabled();
       await expect(page.locator("#guard-strict")).toBeDisabled();
@@ -2402,3 +2405,84 @@ test(
     }
   },
 );
+
+test("task completion credits expected effort automatically without inflating pomodoros", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tomato-completion-"));
+  const url = "http://127.0.0.1:4328";
+  const server = spawn("target/debug/tomato-preview", [], {
+    env: {
+      ...process.env,
+      TOMATO_PORT: "4328",
+      TOMATO_DATA_PATH: join(dir, "test.sqlite3"),
+    },
+    stdio: "pipe",
+  });
+  let browser;
+  let output = "";
+  server.stderr.on("data", (data) => (output += data));
+  try {
+    let ready = false;
+    for (let i = 0; i < 100; i++) {
+      try {
+        if ((await fetch(`${url}/api/snapshot`)).ok) {
+          ready = true;
+          break;
+        }
+      } catch {}
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.ok(ready, `Rust server did not start: ${output}`);
+    browser = await chromium.launch({
+      executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
+      headless: true,
+      args: ["--no-sandbox"],
+    });
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 1000 },
+    });
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto(url);
+    await page.locator('[data-action="new-task"]').first().click();
+    await page.locator('#template-form [name="title"]').fill("线下完成的练习");
+    await page.locator('#template-form [name="durationMinutes"]').fill("50");
+    await page.locator("#create-from-editor").click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "完成任务 线下完成的练习", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "数据统计", exact: true }).click();
+    const snapshot = await (await fetch(`${url}/api/snapshot`)).json();
+    assert.equal(snapshot.stats.totalSeconds, 3000);
+    assert.equal(snapshot.stats.todaySeconds, 3000);
+    assert.equal(snapshot.stats.totalPomodoros, 0);
+    await expect(page.locator(".history-row")).toHaveCount(1);
+    await expect(page.locator(".history-row .badge")).toHaveText("按预计补足");
+    await expect(page.locator(".distribution-row")).toContainText("50 分钟");
+    await page.screenshot({
+      path: join(dir, "completion-stats.png"),
+      fullPage: true,
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "数据统计", exact: true }).click();
+    await expect(page.locator(".history-row .badge")).toHaveText("按预计补足");
+    await page.locator('nav [data-page="tasks"]').click();
+    await page.locator('[data-filter="completed"]').click();
+    await page
+      .getByRole("button", { name: "重新打开任务 线下完成的练习", exact: true })
+      .click();
+    await expect
+      .poll(
+        async () =>
+          (await (await fetch(`${url}/api/snapshot`)).json()).stats
+            .totalSeconds,
+      )
+      .toBe(0);
+    assert.deepEqual(errors, []);
+    console.log(`completion artifacts: ${dir}`);
+  } finally {
+    await browser?.close();
+    server.kill("SIGTERM");
+  }
+});

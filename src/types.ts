@@ -250,6 +250,7 @@ export interface Timer {
 }
 export interface Session {
   id: string;
+  source: "timer" | "taskEstimate";
   taskId: string | null;
   taskTitle: string;
   projectName: string;

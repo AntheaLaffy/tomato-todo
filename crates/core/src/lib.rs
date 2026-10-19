@@ -333,10 +333,20 @@ impl Timer {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionSource {
+    #[default]
+    Timer,
+    TaskEstimate,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
     pub id: String,
+    #[serde(default)]
+    pub source: SessionSource,
     pub task_id: Option<String>,
     pub task_title: String,
     pub project_name: String,
@@ -764,6 +774,7 @@ impl AppData {
             .and_then(|id| self.projects.iter().find(|p| &p.id == id));
         self.sessions.push(Session {
             id: id(),
+            source: SessionSource::Timer,
             task_id: self.timer.task_id.clone(),
             task_title: task.map(|t| t.title.clone()).unwrap_or("自由专注".into()),
             project_name: project.map(|p| p.name.clone()).unwrap_or("未分类".into()),
@@ -1055,11 +1066,59 @@ impl AppData {
                 {
                     return Err("作废实例不能完成".into());
                 }
-                let t = self
+                let task = self
                     .tasks
-                    .iter_mut()
+                    .iter()
                     .find(|t| t.id == task_id)
-                    .ok_or("任务不存在")?;
+                    .ok_or("任务不存在")?
+                    .clone();
+                // Close this task's live timer before comparing actual effort with
+                // its budget; otherwise its eventual record would count twice.
+                if !task.completed && self.timer.task_id.as_ref() == Some(&task_id) {
+                    let focusing = self.timer.mode == Mode::Focus;
+                    if focusing {
+                        self.record(at, false);
+                    }
+                    self.timer.task_id = None;
+                    if focusing {
+                        self.reset_to(Mode::Focus);
+                    }
+                }
+                self.sessions.retain(|s| {
+                    s.source != SessionSource::TaskEstimate || s.task_id.as_ref() != Some(&task_id)
+                });
+                if !task.completed {
+                    let actual: u64 = self
+                        .sessions
+                        .iter()
+                        .filter(|s| s.task_id.as_ref() == Some(&task_id))
+                        .map(|s| u64::from(s.duration_secs))
+                        .sum();
+                    let expected = u64::from(task.estimate)
+                        * u64::from(task.focus_minutes.unwrap_or(self.settings.focus_minutes))
+                        * 60;
+                    let missing = expected.saturating_sub(actual) as u32;
+                    if missing > 0 {
+                        let project = task
+                            .project_id
+                            .as_ref()
+                            .and_then(|id| self.projects.iter().find(|p| &p.id == id));
+                        self.sessions.push(Session {
+                            id: id(),
+                            source: SessionSource::TaskEstimate,
+                            task_id: Some(task_id.clone()),
+                            task_title: task.title.clone(),
+                            project_name: project
+                                .map(|p| p.name.clone())
+                                .unwrap_or("未分类".into()),
+                            started_at: at,
+                            ended_at: at,
+                            duration_secs: missing,
+                            completed: false,
+                        });
+                    }
+                }
+                let t = self.tasks.iter_mut().find(|t| t.id == task_id).unwrap();
                 t.completed = !t.completed;
                 t.completed_at = if t.completed { Some(at) } else { None };
             }
@@ -1683,12 +1742,23 @@ impl AppData {
             "计时器任务不存在",
         )?;
         let mut sessions = HashSet::new();
+        let mut estimated_tasks = HashSet::new();
         for s in &self.sessions {
+            let max_duration = match s.source {
+                SessionSource::Timer => 10800,
+                SessionSource::TaskEstimate => 99 * 180 * 60,
+            };
             ensure(
                 !s.id.is_empty()
                     && sessions.insert(&s.id)
                     && s.ended_at >= s.started_at
-                    && (1..=10800).contains(&s.duration_secs)
+                    && (1..=max_duration).contains(&s.duration_secs)
+                    && (s.source != SessionSource::TaskEstimate
+                        || (!s.completed
+                            && s.task_id
+                                .as_ref()
+                                .is_some_and(|id| !id.is_empty() && estimated_tasks.insert(id))
+                            && s.started_at == s.ended_at))
                     && s.task_title.chars().count() <= 200
                     && s.project_name.chars().count() <= 40,
                 "无效的专注记录",
@@ -1848,10 +1918,11 @@ impl AppData {
                 }
             })
             .collect();
-        let focused: HashSet<_> = by_day
+        let focused: HashSet<_> = self
+            .sessions
             .iter()
-            .filter(|(_, (_, count))| *count > 0)
-            .map(|(day, _)| day.clone())
+            .filter(|s| s.completed || s.source == SessionSource::TaskEstimate)
+            .map(|s| date_at(s.ended_at))
             .collect();
         let mut day = current;
         if !focused.contains(&today) {

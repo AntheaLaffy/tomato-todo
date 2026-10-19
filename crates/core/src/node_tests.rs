@@ -560,6 +560,7 @@ fn orphaned_historical_task_ids_stay_reserved_without_a_live_instance() {
     let mut backup = AppData::default();
     backup.sessions.push(Session {
         id: "old-session".into(),
+        source: SessionSource::Timer,
         task_id: Some("historical-task".into()),
         task_title: "历史任务".into(),
         project_name: "".into(),

@@ -1350,13 +1350,13 @@ function statsPage() {
           .join("")
       : '<div class="small-empty">暂无专注记录。<span data-explanation>完成第一段专注，<br>看看时间去了哪里。</span></div>'
   }</section></div>${goalStatsCard()}${crossSectionCard()}
-  <section class="card history-card"><div class="card-heading"><h2>专注足迹 <span class="count-label">${sessions.length}</span></h2><span class="subtle small">包含提前结束的实际专注时间</span></div>${
+  <section class="card history-card"><div class="card-heading"><h2>专注足迹 <span class="count-label">${sessions.length}</span></h2><span class="subtle small">任务完成后按预计用时补足，实际专注超出则按实际计算</span></div>${
     sessions.length
       ? `<div class="history-table"><div class="history-head"><span>任务 / 项目</span><span>日期</span><span>专注时长</span><span>状态</span></div>${sessions
           .slice(0, 100)
           .map(
             (s) =>
-              `<div class="history-row"><div><strong>${escape(s.taskTitle)}</strong><small>${escape(s.projectName)}</small></div><span>${new Date(s.endedAt * 1000).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><span>${duration(s.durationSecs)}</span><span class="badge ${s.completed ? "success" : ""}">${s.completed ? "已完成" : "提前结束"}</span></div>`,
+              `<div class="history-row"><div><strong>${escape(s.taskTitle)}</strong><small>${escape(s.projectName)}</small></div><span>${new Date(s.endedAt * 1000).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><span>${duration(s.durationSecs)}</span><span class="badge ${s.completed ? "success" : ""}">${s.source === "taskEstimate" ? "按预计补足" : s.completed ? "已完成" : "提前结束"}</span></div>`,
           )
           .join(
             "",
