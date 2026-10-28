@@ -9,11 +9,21 @@
 - 端到端：`tests/*.mjs` 里的 `test("…")` 名
 用法：python3 scripts/handbook-tests.py
 """
+import datetime
 import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "HANDBOOK" / "95-测试索引.md"
+
+
+def workspace_version() -> str:
+    try:
+        text = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+        m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+        return m.group(1) if m else "—"
+    except OSError:
+        return "—"
 
 # 章节 → 背书该章事实的测试来源（人工映射，改动测试文件时同步）
 CHAPTER_TESTS = {
@@ -124,7 +134,7 @@ def main() -> None:
     total = sum(len(v) for v in collected.values())
     body = f"""# 测试索引
 
-> 手册章节 ｜ 最后核对：v0.8.2（2026-10-12）｜ **由 `python3 scripts/handbook-tests.py` 生成**，不要手改。
+> 手册章节 ｜ 最后核对：v{workspace_version()}（{datetime.date.today().isoformat()}）｜ **由 `python3 scripts/handbook-tests.py` 生成**，不要手改。
 > 对应 Rust Reference 的做法：规则旁边给出背书它的测试；没有测试的地方由各章的 `F. 待补与更新点` 记着。
 
 **一句话**：这本手册里凡是写「不可逆」「原子」「不会重现」这类硬断言的地方，基本都能在这里找到对应测试。
