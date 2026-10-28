@@ -10,11 +10,8 @@ generated_at: 2026-10-10
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
 | 模板、自动预印与手动整批印刷 | 业务核心 | templates.rs 的 Printing/print_template/materialize_templates | template_tests.rs、src/main.ts 的 templateDialog/printDialog、plan.rs |
-| 主线信号与实例配对 | 业务核心 | nodes.rs；功能索引见 nodes.rs.analysis.md | node_tests.rs、lib.rs、reminders.rs、src/main.ts、docs/NODE_DESIGN.md |
-| ID 全局唯一及历史保留 | 持久化 | identities.rs 的 reconcile/validate、Engine | node_tests.rs、备份 v3、计划导入/任务恢复 |
 | 音效音量与旧备份兼容 | 契约 | lib.rs 的 Settings/default_sound_volume/validate | tests.rs、src/types.ts、src/sound-events.ts、docs/BACKUP_FORMAT.md 与 Schema |
-| 修改任务/重复规则 | 业务核心 | lib.rs 的 AppData::apply | tests.rs、src/types.ts |
-| 目标容器与待补 | 业务核心 | nodes.rs 的 bind_nodes/tick_nodes、lib.rs 的 Goal | src/main.ts 的 goalDialog/taskList、docs/BACKUP_FORMAT.md |
+| 修改任务/日期必填/重复规则 | 业务核心 | lib.rs 的 Task/AppData::apply、reminders.rs 的 validate | tests.rs、src/types.ts |
 | 过期习惯与缺勤统计 | 业务核心 | lib.rs 的 TaskKind/is_habit 与 stats/DayStat.missed、reminders.rs 的 tick_reminders | src/main.ts 的 isHabit/isCatchUp、docs/BACKUP_FORMAT.md |
 | 习惯分组与周期印刷 | 业务核心 | templates.rs 的 materialize_templates | src/main.ts 的 templateDialog/habitsTab、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 | lib.rs 的 Vision/SaveVision | src/main.ts 的 visionDialog/visionsTab、docs/BACKUP_FORMAT.md |
@@ -23,7 +20,6 @@ generated_at: 2026-10-10
 | 计划更新/整份同步/导出与文件校验 | 文件契约 | plan.rs（按 ID 更新配置、`replace` 剪除） | docs/CODEMAP.md、tests.rs、桌面/预览与 TypeScript 消费方 |
 | 修复倒计时、当天休息周期与统计 | 业务核心 | lib.rs 的 tick/refresh_cycle/tick_timer/stats/Engine | tests.rs、src/types.ts、docs/BACKUP_FORMAT.md、docs/HANDBOOK/13-任务与列表.md、桌面后台线程 |
 | 任务完成按预计用时补足投入 | 业务核心/契约 | lib.rs 的 Action::ToggleTask/SessionSource/stats | tests.rs、diagnostics.rs（深夜诊断排除补足）、src/types.ts、src/main.ts 的 statsPage、docs/BACKUP_FORMAT.md 与 backup.schema.json |
-| 主线统计与纵切面 | 业务核心 | lib.rs 的 stats/GoalStat/NodeStat/DayStat | node_tests.rs、src/main.ts 的 statsPage/goalStatsCard/crossSectionCard |
 | 定时锁机/严格执行 | 业务核心 | lock.rs、lib.rs 的 protected/strict_protected/tick/apply | 桌面后台线程、src 的 lockPage/guardPage、docs/BACKUP_FORMAT.md |
 | 扩展桌面白名单 | 桌面保护 | guard.rs、guard_x11.rs、guard_wayland.rs、guard_shell.rs | src-tauri/src/desktop_app.rs、tests/native.mjs、tests/x11.mjs |
 | 学习助手的异常诊断 | 诊断 | diagnostics.rs 的 diagnose/Anomaly | crates/agent 的唤醒排队、tests.rs、docs/AGENT.md |
@@ -33,10 +29,7 @@ generated_at: 2026-10-10
 
 | Symbol | Source | Line |
 | --- | --- | --- |
-| AppData / Action | nodes.rs | 主线 | 时间配对、完成条件、不可逆裁定、局域阻断、信号防重/追溯、冻结配置 |
-| identities.rs | 标识符 | 跨实体类型唯一、删除与历史引用永久保留、原任务恢复校验、导入历史合并 |
-| node_tests.rs | 验证 | 主线配对/信号/阻断/检查/裁定/删除/重启/备份/历史 ID 与专注收尾；见 node_tests.rs.analysis.md |
-| Settings / AppData / Action | lib.rs | L:225 / L:361 / L:448 |
+| Settings / AppData / Action | lib.rs | 见对应类型定义 |
 | Engine | lib.rs | 见 `pub struct Engine`，集中管理预检/提交/持久化/快照 |
 | guard | guard.rs | L:1 |
 
@@ -44,8 +37,10 @@ generated_at: 2026-10-10
 
 | File | Domain | Function |
 | --- | --- | --- |
-| lib.rs | 业务核心 | 备份 v3 数据模型（含 SessionSource 实际计时/任务完成按预计补足、默认关闭的 personaBackdrop 与当天休息周期 cycleDate）、Action、计时与跨日周期重建、静态实例、无自定义单位的目标、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（整条主线成败与逐日纵切面）、Engine 持久化 |
-| plan.rs | 文件契约 | v1/v2 转换与 v5 主线/课表 DTO、导出未完成任务、按 ID 更新配置与保留进度、`replace` 整份同步、稳定 ID 去重、番茄时长换算 |
+| education.rs | 教学核心 | 项目目录绑定元数据、资源与学期修订、45分钟课程、固定题目/评分标准、答卷/批改/复盘、持久化教学事件与跨项目约束 |
+| education_tests.rs | 验证 | 应试前置条件、课程时钟/缺课、冲突、发布不可变、固定评分与SQLite恢复 |
+| lib.rs | 业务核心 | 备份 v4 数据模型（含 SessionSource 实际计时/任务完成按预计补足、默认关闭的 personaBackdrop 与当天休息周期 cycleDate）、Action、计时与跨日周期重建、静态实例、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（逐日完成、缺勤与作废）、Engine 持久化 |
+| plan.rs | 文件契约 | v6 日期必填的任务/模板/课表 DTO、导出未完成任务、按 ID 更新配置与保留进度、`replace` 整份同步、稳定 ID 去重、番茄时长换算 |
 | blocks.rs | 课表占用 | 计划之外的每周固定占用（课程/实验）：星期与跨午夜时间段校验、按日期取时段、需专心分钟统计 |
 | lock.rs | 定时保护 | 锁机规则/执行状态、跨午夜本地周历、重叠检查与本轮抑制 |
 | guard.rs | 桌面保护 | niri/Sway/Hyprland/GNOME/KWin/X11/Win32/macOS 后端选择、能力检测、精确应用匹配和回焦；macOS 无窗口前台标记不满足本应用窗口预检 |
@@ -54,9 +49,11 @@ generated_at: 2026-10-10
 | guard_wayland.rs | 桌面保护 | Sway 原生 i3 IPC（递归浮动树与 Xwayland 类）、Hyprland 原生 socket（地址/PID/焦点与原生激活确认）；不执行 shell 命令 |
 | guard_shell.rs | 桌面保护 | GNOME 扩展 D-Bus 与 KWin 临时脚本：枚举、精确标识与聚焦确认；KWin 唯一回调校验发送者，完成/失败均卸载脚本 |
 | guard_x11.rs | 桌面保护 | EWMH 活跃窗口管理器检测、窗口/PID/WM_CLASS/标题枚举与激活；拒绝把 Xwayland 当成完整 Wayland 管控 |
-| diagnostics.rs | 诊断 | 本地异常检测（需专心课内安排、时段重叠、计划超量/过少、习惯缺勤、主线停滞、深夜记录、投入下降）与证据字段，供学习助手唤醒 |
+| diagnostics.rs | 诊断 | 本地异常检测（需专心课内安排、时段重叠、计划超量/过少、习惯缺勤、深夜记录、投入下降）与证据字段，供学习助手唤醒 |
 | tests.rs | 验证 | 状态、休息周期跨日/重启/旧备份重建、持久化、保护与计划往返/失败原子性回归测试 |
 | reminders.rs | 时间安排 | 日期/时间与单次时长校验、当天待处理队列、计时/锁机延后、跨日清理 |
 | templates.rs | 模板/印刷 | 形状与日程/周期分时校验、按日期防重、0–90 天滚动整周期预印、临时/手动批量、逾期/报废过滤、显式形状同步 |
-| template_tests.rs | 验证 | 一时段多日期/多单元、整周期/临时印刷、分组、防重/删除/重启、手动复用、预印遗漏、原子失败、重修/目标/习惯及文件往返 |
+| template_tests.rs | 验证 | 一时段多日期/多单元、整周期/临时印刷、分组、防重/删除/重启、手动复用、预印遗漏、原子失败、重修/日期/习惯及文件往返 |
+| identities.rs | 标识符 | 跨类型唯一、删除及历史引用永久保留、原任务恢复校验、导入历史合并 |
+| migration.rs | 持久化 | 仅本地 v3→v4 转换，移除目标主线状态并补齐日期；外部文件按当前版本严格校验 |
 | habits.rs | 习惯 | 习惯组名称校验；形状与印刷规则由 templates.rs 管理 |

@@ -173,3 +173,25 @@ pub async fn read_import(
     }
     Ok(None)
 }
+
+#[tauri::command]
+pub async fn choose_project_directory(app: tauri::AppHandle) -> AppResult<Option<String>> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = app;
+        Err("Android 尚不支持助手项目目录授权，请在桌面端设置".into())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let picker = app.dialog().file();
+        let path = tauri::async_runtime::spawn_blocking(move || picker.blocking_pick_folder())
+            .await
+            .map_err(|e| e.to_string())?;
+        path.map(|p| {
+            p.into_path()
+                .map(|p| p.to_string_lossy().into_owned())
+                .map_err(|e| e.to_string())
+        })
+        .transpose()
+    }
+}

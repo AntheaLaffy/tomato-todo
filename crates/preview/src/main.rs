@@ -40,6 +40,7 @@ async fn dispatch(
     Json(action): Json<Action>,
 ) -> ApiResult {
     check_origin(&headers)?;
+    tomato_core::check_user_action(&action).map_err(error)?;
     apply_preview(&engine, action, None)
         .map(Json)
         .map_err(error)

@@ -191,40 +191,6 @@ pub fn diagnose(snapshot: &Snapshot, capacity_minutes: Option<u32>) -> Vec<Anoma
                 "是时间安排不合适、任务太难、外部占用，还是已经不想继续这个习惯？先确认原因再改计划。"));
         }
     }
-    for goal in &data.goals {
-        let live_tasks: Vec<_> = data
-            .tasks
-            .iter()
-            .filter(|t| {
-                t.goal_id.as_deref() == Some(&goal.id) && !t.completed && !data.task_is_void(t, at)
-            })
-            .collect();
-        let has_active_node = goal.nodes.iter().any(|n| {
-            n.result.is_none()
-                && n.spec
-                    .start
-                    .get(..10)
-                    .is_some_and(|d| d <= snapshot.today.as_str())
-        });
-        let latest_session = data
-            .sessions
-            .iter()
-            .filter(|s| {
-                s.task_id.as_ref().is_some_and(|id| {
-                    data.tasks
-                        .iter()
-                        .any(|t| &t.id == id && t.goal_id.as_deref() == Some(&goal.id))
-                })
-            })
-            .map(|s| s.ended_at)
-            .max();
-        let older = live_tasks.iter().any(|t| t.created_at <= at - 7 * 86400);
-        if has_active_node && older && latest_session.is_none_or(|last| last < at - 7 * 86400) {
-            result.push(signal(format!("goal/{}/dormant",goal.id), "goalDormancy", "主线有待做任务但近期没有投入记录", "notice",
-                json!({"goalId":goal.id,"goalName":goal.name,"pendingTasks":live_tasks.len(),"lastRecordedFocusAt":latest_session,"noFocusDays":7}),
-                "这个目标仍然重要吗？是在等待外部条件，还是需要缩小下一步？没有记录也可能是线下学习，先核实。"));
-        }
-    }
     let recent_sessions: Vec<_> = data
         .sessions
         .iter()

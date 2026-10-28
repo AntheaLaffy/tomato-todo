@@ -15,14 +15,16 @@ export async function codingTools(dir, runtimeRoot, preferences = {}, onShutdown
   const workspace=join(dir,"workspace"), coding=join(workspace,"coding"), tools=join(dir,"tools");
   await mkdir(coding,{recursive:true,mode:0o700});
   await mkdir(tools,{recursive:true,mode:0o700});
+  const projectRoots=(preferences.projectMounts??[]).map(m=>resolve(m.directory));
   const inside=(root,path)=>path===root || (!relative(root,path).startsWith("..") && !isAbsolute(relative(root,path)));
   async function path(value,writing=false) {
     if(preferences.codingAccess==="full")return resolve(coding,value);
     const translated=value==="/workspace"||value.startsWith("/workspace/")?join(workspace,value.slice("/workspace".length)):value;
     const target=resolve(coding,translated);
-    if (!inside(writing?coding:workspace,target) || target.endsWith(".origin")) throw new Error(writing?"编程工具只写入工作区 coding/，软件数据通过 MCP 或审阅文件修改":"只能读取当前工作区；认证与数据库不在可读范围内");
+    const boundary=projectRoots.find(root=>inside(root,target))||(writing?coding:workspace);
+    if (!inside(boundary,target) || target.endsWith(".origin")) throw new Error(writing?"编程工具只写入工作区 coding/，软件数据通过 MCP 或审阅文件修改":"只能读取当前工作区；认证与数据库不在可读范围内");
     let ancestor=target;
-    while (true) {try {if ((await lstat(ancestor)).isSymbolicLink()) throw new Error("工作区不能访问符号链接"); const actual=await realpath(ancestor);if(!inside(writing?coding:workspace,actual)) throw new Error("路径离开工作区");break;}catch(error){if(error.code!=="ENOENT")throw error;ancestor=dirname(ancestor);}}
+    while (true) {try {if ((await lstat(ancestor)).isSymbolicLink()) throw new Error("工作区不能访问符号链接"); const actual=await realpath(ancestor);if(!inside(boundary,actual)) throw new Error("路径离开工作区");break;}catch(error){if(error.code!=="ENOENT")throw error;ancestor=dirname(ancestor);}}
     return target;
   }
   const read=async(p)=>{const safe=await path(p);if((await lstat(safe)).size>8*1024*1024)throw new Error("文件超过8MB，请使用分段 JSON 工具");return readFile(safe);};
@@ -32,6 +34,7 @@ export async function codingTools(dir, runtimeRoot, preferences = {}, onShutdown
   const full=preferences.codingAccess==="full";
   const net=["--unshare-all","--share-net","--ro-bind-try","/etc/resolv.conf","/etc/resolv.conf","--ro-bind-try","/etc/hosts","/etc/hosts","--ro-bind-try","/etc/nsswitch.conf","/etc/nsswitch.conf","--ro-bind-try","/etc/ssl","/etc/ssl","--ro-bind-try","/etc/pki","/etc/pki","--ro-bind-try","/etc/ca-certificates","/etc/ca-certificates","--ro-bind-try","/etc/ca-certificates.conf","/etc/ca-certificates.conf","--ro-bind-try","/etc/passwd","/etc/passwd","--ro-bind-try","/etc/group","/etc/group","--ro-bind-try","/etc/gitconfig","/etc/gitconfig"];
   const mounts=["--ro-bind","/usr","/usr","--ro-bind-try","/lib","/lib","--ro-bind-try","/lib64","/lib64","--ro-bind-try","/bin","/bin","--ro-bind-try","/etc/ld.so.cache","/etc/ld.so.cache","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--ro-bind",workspace,"/workspace","--bind",coding,"/workspace/coding","--bind",tools,"/tools","--ro-bind",runtimeRoot,"/runtime"];
+  for(const root of projectRoots)mounts.push("--bind",root,root);
   const env=sandboxEnv();
   // One long-lived bash per session keeps cwd, exported variables and background
   // processes across calls. A random sentinel line ends each command, so multi-line
@@ -111,7 +114,7 @@ export async function codingTools(dir, runtimeRoot, preferences = {}, onShutdown
   // Keep Pi's grep interface while running ripgrep in the same mount namespace.
   const grep=createGrepToolDefinition(coding);
   grep.execute=async(_id,args,signal)=>{
-    const safe=await path(args.path||coding);const virtual="/workspace/"+relative(workspace,safe);
+    const safe=await path(args.path||coding);const virtual=full||projectRoots.some(root=>inside(root,safe))?safe:"/workspace/"+relative(workspace,safe);
     const quote=(s)=>"'"+String(s).replaceAll("'","'\\''")+"'";
     const flags=["--no-messages","--line-number","--color=never","--max-count",String(Math.min(Math.max(args.limit||100,1),1000))];
     if(args.ignoreCase)flags.push("-i");if(args.literal)flags.push("-F");if(args.glob)flags.push("-g",args.glob);if(args.context)flags.push("-C",String(Math.min(args.context,20)));
@@ -120,6 +123,6 @@ export async function codingTools(dir, runtimeRoot, preferences = {}, onShutdown
     return {content:[{type:"text",text:output.slice(0,30000)||(result.exitCode===1?"No matches found":"ripgrep 未安装或搜索失败")}],details:{exitCode:result.exitCode}};
   };
   definitions.push(grep);
-  for(const definition of definitions){definition.description+=full?" 完整访问：以用户身份读写文件并运行终端，默认目录是助手 coding/，终端有网络。":" 工作区根为 /workspace，读可用导出文件；写和 Shell 只操作 /workspace/coding，终端有网络，不访问用户主目录或软件数据库。";definition.executionMode="sequential";}
+  for(const definition of definitions){definition.description+=full?" 完整访问：以用户身份读写文件并运行终端，默认目录是助手 coding/，终端有网络。":" 工作区根为 /workspace，读可用导出文件；写和 Shell 可操作 /workspace/coding 及本轮列出的用户已授权项目目录，终端有网络，不访问其他宿主目录或软件数据库。";definition.executionMode="sequential";}
   return definitions;
 }

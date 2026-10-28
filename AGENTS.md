@@ -5,8 +5,7 @@
 | 需要什么 | 去哪里 |
 | --- | --- |
 | 人用的贡献说明：环境、命令、架构、提交流程 | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| 产品设计取舍：任务/目标/习惯/项目/愿景、模板印刷 | [docs/DESIGN.md](docs/DESIGN.md) |
-| 主线与节点的完整语义 | [docs/NODE_DESIGN.md](docs/NODE_DESIGN.md) |
+| 产品设计取舍：任务/习惯/项目/愿景、模板印刷 | [docs/DESIGN.md](docs/DESIGN.md) |
 | 学习助手的后端、权限、唤醒与 MCP | [docs/AGENT.md](docs/AGENT.md) |
 | 给自己写一个 MCP 服务器 | [docs/MCP.md](docs/MCP.md) |
 | 读代码前的参考手册：事实、取舍理由、机制说明、语义规则与不变量、边界 | [docs/HANDBOOK/](docs/HANDBOOK/README.md)（找文件与阅读顺序看附录 [04-导航对照](docs/HANDBOOK/04-导航对照.md) 或 CODEMAP；自查：`pnpm run check:handbook`） |

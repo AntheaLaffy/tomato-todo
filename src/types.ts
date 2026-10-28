@@ -6,100 +6,6 @@ export interface Project {
   color: string;
   appWhitelist: string[] | null;
 }
-export type Verdict = "success" | "failure";
-export type SignalKind = Verdict | "check";
-export type BlockRule =
-  | "never"
-  | "always"
-  | "unpaired"
-  | "unfinishedTasks"
-  | "incomplete"
-  | "completed";
-export interface SignalSpec {
-  kind: SignalKind;
-  direction: "head" | "tail";
-  at: string;
-  condition: "always" | "completed" | "incomplete";
-}
-export interface NodeSpec {
-  id: string;
-  name: string;
-  start: string;
-  end: string;
-  requiredTasks: number;
-  confirmationRequired: boolean;
-  signal: SignalSpec | null;
-  blockSuccess: BlockRule;
-  blockFailure: BlockRule;
-}
-export interface MainlineNode {
-  spec: NodeSpec;
-  confirmed: boolean;
-  emitted: boolean;
-  result: { verdict: Verdict; at: number; signalId: string } | null;
-}
-export interface Goal {
-  id: string;
-  name: string;
-  nodes: MainlineNode[];
-}
-export interface NodeBinding {
-  taskId: string;
-  goalId: string;
-  nodeId: string;
-  completed: boolean;
-  boundAt: number;
-}
-export interface NodeProgress {
-  goalId: string;
-  nodeId: string;
-  pairedCount: number;
-  completedCount: number;
-  allTasksCompleted: boolean;
-  completed: boolean;
-}
-export type LineOutcome = "empty" | "pending" | "success" | "failure";
-export interface NodeStat {
-  id: string;
-  name: string;
-  start: string;
-  end: string;
-  verdict: Verdict | null;
-  decidedAt: number | null;
-  paired: number;
-  completed: number;
-  nodeCompleted: boolean;
-}
-export interface GoalStat {
-  id: string;
-  name: string;
-  outcome: LineOutcome;
-  start: string | null;
-  end: string | null;
-  decidedAt: number | null;
-  paired: number;
-  completed: number;
-  nodes: NodeStat[];
-}
-export interface SignalEvent {
-  id: string;
-  goalId: string;
-  sourceNodeId: string;
-  kind: SignalKind;
-  direction: "head" | "tail";
-  triggerAt: string;
-  emittedAt: number;
-  deliveries: {
-    nodeId: string;
-    blocked: boolean;
-    blockRule: BlockRule;
-    before: Verdict | null;
-    after: Verdict | null;
-    pairedCount: number;
-    completedCount: number;
-    completed: boolean;
-  }[];
-}
 export interface Identity {
   id: string;
   kind: string;
@@ -130,7 +36,6 @@ export interface Vision {
   name: string;
   notes: string;
   projectId: string | null;
-  goalId: string | null;
 }
 export interface PlanProject {
   id: string;
@@ -147,7 +52,6 @@ export interface TemplateShape {
   title: string;
   notes: string;
   projectId: string | null;
-  goalId: string | null;
   habitId: string | null;
   focusMinutes: number | null;
   scrapMinutes: number;
@@ -161,7 +65,7 @@ export interface CalendarSlot {
   time: string | null;
 }
 export type Printing =
-  | { kind: "once"; date: string | null; time: string | null }
+  | { kind: "once"; date: string; time: string | null }
   | { kind: "calendar"; slots: CalendarSlot[] }
   | { kind: "weekly"; slots: { days: number[]; time: string | null }[] };
 export interface Template {
@@ -173,20 +77,18 @@ export interface Template {
 }
 export interface PrintRecord {
   templateId: string;
-  date: string | null;
+  date: string;
 }
 export interface Task {
   id: string;
-  nodeId: string | null;
   templateId: string | null;
   recurring: boolean;
   scrapMinutes: number;
   title: string;
   notes: string;
   projectId: string | null;
-  goalId: string | null;
   habitId: string | null;
-  dueDate: string | null;
+  dueDate: string;
   reminderTime: string | null;
   focusMinutes: number | null;
   reminderFired: boolean;
@@ -260,16 +162,14 @@ export interface Session {
   completed: boolean;
 }
 export interface AppData {
+  education: import("./education").Education;
   identities: Identity[];
-  nodeBindings: NodeBinding[];
-  signalEvents: SignalEvent[];
   version: number;
   tasks: Task[];
   blocks: Block[];
   templates: Template[];
   prints: PrintRecord[];
   projects: Project[];
-  goals: Goal[];
   habits: Habit[];
   visions: Vision[];
   settings: Settings;
@@ -279,11 +179,10 @@ export interface AppData {
 }
 export interface PlanFile {
   format: "tomato-todo-plan";
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 6;
   blocks?: Block[];
   templates?: Template[];
   prints?: PrintRecord[];
-  goals?: { id: string; name: string; nodes: NodeSpec[] }[];
   habits?: Habit[];
   pomodoroMinutes: number;
   projects: PlanProject[];
@@ -291,25 +190,23 @@ export interface PlanFile {
     id: string;
     title: string;
     templateId?: string | null;
-    goalId?: string | null;
     habitId?: string | null;
     recurring?: boolean;
     scrapMinutes?: number;
     notes?: string;
     projectId?: string | null;
-    dueDate?: string | null;
+    dueDate: string;
     reminderTime?: string | null;
     focusMinutes?: number | null;
     priority?: number;
     estimate?: number;
     tags?: string[];
     subtasks?: { id: string; title: string }[];
-    repeat?: "none" | "daily" | "weekdays" | "weekly";
+    repeat?: "none";
   }[];
 }
-export type TaskKind = "ordinary" | "habit" | "goal";
+export type TaskKind = "ordinary" | "habit";
 export interface Snapshot {
-  nodeProgress: NodeProgress[];
   taskKinds: Record<string, TaskKind>;
   data: AppData;
   stats: {
@@ -319,7 +216,6 @@ export interface Snapshot {
     totalSeconds: number;
     totalPomodoros: number;
     streak: number;
-    goals: GoalStat[];
     days: {
       date: string;
       seconds: number;
@@ -327,9 +223,6 @@ export interface Snapshot {
       missed: number;
       completed: number;
       voided: number;
-      goalSuccess: number;
-      goalFailure: number;
-      goalVoided: number;
     }[];
   };
   remainingSecs: number;

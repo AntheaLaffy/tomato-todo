@@ -1,9 +1,8 @@
 //! Portable plans intentionally omit execution history and local preferences.
 use crate::{
-    templates::{PrintRecord, Printing, Shape, Template, TemplateSubtask},
-    AppData, AppResult, Goal, Habit, Project, Repeat, Subtask, Task,
+    templates::{PrintRecord, Template},
+    AppData, AppResult, Habit, Project, Repeat, Subtask, Task,
 };
-use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -23,41 +22,16 @@ pub struct PlanFile {
     #[serde(default)]
     pub prints: Vec<PrintRecord>,
     #[serde(default)]
-    pub goals: Vec<PlanGoal>,
-    #[serde(default)]
     pub habits: Vec<Habit>,
-    /// When true the file is the whole plan: incomplete instances, goals,
-    /// templates and habits it does not mention are removed. Progress and fixed
-    /// verdicts are never touched.
+    /// When true the file is the whole plan: incomplete instances,
+    /// templates and habits it does not mention are removed. Completed instances and history
+    /// are never touched.
     #[serde(default, skip_serializing_if = "is_false")]
     pub replace: bool,
 }
 
 fn is_false(value: &bool) -> bool {
     !*value
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PlanGoal {
-    pub id: String,
-    pub name: String,
-    #[serde(default)]
-    pub nodes: Vec<crate::nodes::NodeSpec>,
-}
-impl PlanGoal {
-    fn goal(&self) -> Goal {
-        Goal {
-            id: self.id.clone(),
-            name: self.name.clone(),
-            nodes: self
-                .nodes
-                .iter()
-                .cloned()
-                .map(crate::nodes::Node::new)
-                .collect(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,8 +53,6 @@ pub struct PlanTask {
     pub title: String,
     #[serde(default)]
     pub template_id: Option<String>,
-    #[serde(default)]
-    pub goal_id: Option<String>,
     #[serde(default)]
     pub habit_id: Option<String>,
     #[serde(default)]
@@ -120,13 +92,11 @@ impl PlanTask {
     fn task(&self, at: i64, estimate: u32) -> Task {
         Task {
             id: self.id.clone(),
-            node_id: None,
             template_id: self.template_id.clone(),
             recurring: self.recurring || self.repeat != Repeat::None,
             title: self.title.clone(),
             notes: self.notes.clone(),
             project_id: self.project_id.clone(),
-            goal_id: self.goal_id.clone(),
             habit_id: self.habit_id.clone(),
             due_date: self.due_date.clone(),
             reminder_time: self.reminder_time.clone(),
@@ -154,20 +124,16 @@ impl PlanTask {
     }
 
     /// Configuration comes from the file; progress and history stay local. The
-    /// reminder state and pairing survive only while the slot itself is unchanged.
+    /// reminder state survives only while the slot itself is unchanged.
     fn merge(&self, old: &Task, at: i64, estimate: u32) -> Task {
         let mut task = self.task(at, estimate);
         task.created_at = old.created_at;
         task.completed = old.completed;
         task.completed_at = old.completed_at;
-        if old.goal_id == self.goal_id
-            && old.due_date == self.due_date
-            && old.reminder_time == self.reminder_time
-        {
+        if old.due_date == self.due_date && old.reminder_time == self.reminder_time {
             task.reminder_fired = old.reminder_fired;
             task.reminder_pending = old.reminder_pending;
             task.reminder_expired = old.reminder_expired;
-            task.node_id = old.node_id.clone();
         }
         for sub in &mut task.subtasks {
             if let Some(prev) = old.subtasks.iter().find(|s| s.id == sub.id) {
@@ -180,40 +146,11 @@ impl PlanTask {
 
 impl PlanFile {
     pub fn validate(&self) -> AppResult<()> {
-        if self.version == 1
-            && self
-                .tasks
-                .iter()
-                .any(|t| t.focus_minutes.is_some() || t.reminder_time.is_some())
-        {
-            return Err("任务时间安排需要计划 v2".into());
+        if self.format != "tomato-todo-plan" || self.version != 6 {
+            return Err("仅支持计划 v6；旧计划请按新格式重新导出".into());
         }
-        if self.format != "tomato-todo-plan" || !matches!(self.version, 1..=5) {
-            return Err("不支持的计划格式或版本".into());
-        }
-        if self.version < 5 && !self.blocks.is_empty() {
-            return Err("课表阻塞时段需要计划 v5".into());
-        }
-        if self.version >= 3 && self.tasks.iter().any(|t| t.repeat != Repeat::None) {
-            return Err("v3+ 的实例不拥有重复规则，请使用模板".into());
-        }
-        if self.version < 4 && !self.goals.is_empty() {
-            return Err("主线节点需要计划 v4".into());
-        }
-        if self.version < 3
-            && (!self.templates.is_empty()
-                || !self.prints.is_empty()
-                || !self.goals.is_empty()
-                || !self.habits.is_empty()
-                || self.tasks.iter().any(|t| {
-                    t.template_id.is_some()
-                        || t.goal_id.is_some()
-                        || t.habit_id.is_some()
-                        || t.recurring
-                        || t.scrap_minutes != 0
-                }))
-        {
-            return Err("模板与管辖字段需要计划 v3".into());
+        if self.tasks.iter().any(|t| t.repeat != Repeat::None) {
+            return Err("实例不拥有重复规则，请使用周期模板".into());
         }
         if !(1..=180).contains(&self.pomodoro_minutes) {
             return Err("计划的番茄时长需为 1–180 分钟".into());
@@ -233,7 +170,6 @@ impl PlanFile {
             blocks: self.blocks.clone(),
             templates: self.templates.clone(),
             prints: self.prints.clone(),
-            goals: self.goals.iter().map(PlanGoal::goal).collect(),
             habits: self.habits.clone(),
             ..AppData::default()
         };
@@ -260,37 +196,6 @@ impl PlanFile {
                     color: plan_project.color.clone(),
                     app_whitelist: plan_project.app_whitelist.clone(),
                 });
-            }
-        }
-        for goal in &self.goals {
-            let incoming = goal.goal();
-            if let Some(existing) = next.goals.iter_mut().find(|g| g.id == incoming.id) {
-                existing.name = incoming.name;
-                // Merge nodes by id: update undecided specs, add new ones, and keep
-                // any node the file no longer lists so its history is not erased.
-                let mut merged: Vec<crate::nodes::Node> = Vec::new();
-                for spec in &incoming.nodes {
-                    if let Some(old) = existing.nodes.iter().find(|n| n.spec.id == spec.spec.id) {
-                        let mut kept = old.clone();
-                        if kept.result.is_some() || kept.emitted {
-                            kept.spec.name = spec.spec.name.clone();
-                        } else {
-                            kept.spec = spec.spec.clone();
-                        }
-                        merged.push(kept);
-                    } else {
-                        merged.push(spec.clone());
-                    }
-                }
-                for old in &existing.nodes {
-                    if !incoming.nodes.iter().any(|s| s.spec.id == old.spec.id) {
-                        merged.push(old.clone());
-                    }
-                }
-                merged.sort_by(|a, b| a.spec.start.cmp(&b.spec.start));
-                existing.nodes = merged;
-            } else {
-                next.goals.push(incoming);
             }
         }
         for habit in &self.habits {
@@ -333,44 +238,21 @@ impl PlanFile {
             }
         }
         // Existing instances take the file's configuration while keeping progress.
-        // An instance whose verdict is already fixed is history, so it is left alone.
         let incoming: HashMap<&str, &PlanTask> =
             self.tasks.iter().map(|t| (t.id.as_str(), t)).collect();
-        let mut released: Vec<String> = Vec::new();
         for task in &mut next.tasks {
             let Some(plan) = incoming.get(task.id.as_str()) else {
                 continue;
             };
-            if task
-                .node_id
-                .as_ref()
-                .is_some_and(|id| node_is_decided(&next.goals, id))
-            {
-                continue;
-            }
             let estimate = plan_estimate(plan, self.pomodoro_minutes, data.settings.focus_minutes)?;
             let old = task.clone();
             let merged = plan.merge(&old, at, estimate);
-            if old.goal_id != merged.goal_id
-                || old.due_date != merged.due_date
-                || old.reminder_time != merged.reminder_time
-            {
-                released.push(old.id.clone());
-            }
             *task = merged;
         }
         let local_ids: HashSet<String> = next.tasks.iter().map(|t| t.id.clone()).collect();
         for task in self.tasks.iter().filter(|t| !local_ids.contains(&t.id)) {
             let estimate = plan_estimate(task, self.pomodoro_minutes, data.settings.focus_minutes)?;
-            let mut instance = task.task(at, estimate);
-            if self.version < 3 {
-                let template = task.legacy_template(at, estimate);
-                instance.template_id = Some(template.id.clone());
-                instance.recurring = task.repeat != Repeat::None;
-                if !next.templates.iter().any(|t| t.id == template.id) {
-                    next.templates.push(template);
-                }
-            }
+            let instance = task.task(at, estimate);
             if let Some(id) = &instance.template_id {
                 if !next
                     .prints
@@ -385,71 +267,12 @@ impl PlanFile {
             }
             next.tasks.push(instance);
         }
-        next.node_bindings
-            .retain(|b| !released.contains(&b.task_id));
         if self.replace {
             // The file is the whole plan. Drop the incomplete things it no longer
-            // names, but never history: completed instances and fixed verdicts stay.
+            // names, but never history: completed instances stay.
             let planned_tasks: HashSet<&str> = self.tasks.iter().map(|t| t.id.as_str()).collect();
-            let decided: HashSet<String> = next
-                .goals
-                .iter()
-                .flat_map(|g| g.nodes.iter())
-                .filter(|n| n.result.is_some())
-                .map(|n| n.spec.id.clone())
-                .collect();
-            let mut removed_tasks: Vec<String> = Vec::new();
-            next.tasks.retain(|t| {
-                if planned_tasks.contains(t.id.as_str())
-                    || t.completed
-                    || t.node_id.as_ref().is_some_and(|id| decided.contains(id))
-                {
-                    return true;
-                }
-                removed_tasks.push(t.id.clone());
-                false
-            });
-            next.node_bindings
-                .retain(|b| !removed_tasks.contains(&b.task_id));
-            let planned_goals: HashSet<&str> = self.goals.iter().map(|g| g.id.as_str()).collect();
-            let removed_goals: Vec<String> = next
-                .goals
-                .iter()
-                .filter(|g| {
-                    !planned_goals.contains(g.id.as_str())
-                        && !g.nodes.iter().any(|n| n.result.is_some() || n.emitted)
-                        && !next.node_bindings.iter().any(|b| b.goal_id == g.id)
-                })
-                .map(|g| g.id.clone())
-                .collect();
-            if !removed_goals.is_empty() {
-                next.goals.retain(|g| !removed_goals.contains(&g.id));
-                for task in &mut next.tasks {
-                    if task
-                        .goal_id
-                        .as_ref()
-                        .is_some_and(|id| removed_goals.contains(id))
-                    {
-                        task.goal_id = None;
-                        task.node_id = None;
-                    }
-                }
-                for template in &mut next.templates {
-                    if template
-                        .shape
-                        .goal_id
-                        .as_ref()
-                        .is_some_and(|id| removed_goals.contains(id))
-                    {
-                        template.shape.goal_id = None;
-                    }
-                }
-                next.visions.retain(|v| {
-                    !v.goal_id
-                        .as_ref()
-                        .is_some_and(|id| removed_goals.contains(id))
-                });
-            }
+            next.tasks
+                .retain(|t| t.completed || planned_tasks.contains(t.id.as_str()));
             let planned_habits: HashSet<&str> = self.habits.iter().map(|h| h.id.as_str()).collect();
             let removed_habits: Vec<String> = next
                 .habits
@@ -508,7 +331,6 @@ impl AppData {
             .filter(|t| !t.completed)
             .map(|t| PlanTask {
                 template_id: t.template_id.clone(),
-                goal_id: t.goal_id.clone(),
                 habit_id: t.habit_id.clone(),
                 recurring: t.recurring,
                 scrap_minutes: t.scrap_minutes,
@@ -544,20 +366,11 @@ impl AppData {
             .collect();
         PlanFile {
             format: "tomato-todo-plan".into(),
-            version: 5,
+            version: 6,
             replace: false,
             blocks: self.blocks.clone(),
             templates: self.templates.clone(),
             prints: self.prints.clone(),
-            goals: self
-                .goals
-                .iter()
-                .map(|g| PlanGoal {
-                    id: g.id.clone(),
-                    name: g.name.clone(),
-                    nodes: g.nodes.iter().map(|n| n.spec.clone()).collect(),
-                })
-                .collect(),
             habits: self.habits.clone(),
             pomodoro_minutes: self.settings.focus_minutes,
             projects: self
@@ -591,14 +404,6 @@ fn plan_estimate(task: &PlanTask, pomodoro: u32, focus: u32) -> AppResult<u32> {
     Ok(estimate)
 }
 
-fn node_is_decided(goals: &[Goal], node_id: &str) -> bool {
-    goals.iter().any(|g| {
-        g.nodes
-            .iter()
-            .any(|n| n.spec.id == node_id && n.result.is_some())
-    })
-}
-
 fn converted_estimate(
     estimate: u32,
     focus: Option<u32>,
@@ -614,57 +419,4 @@ fn converted_estimate(
         return Err("换算后超过 99 个番茄，请先拆分模板".into());
     }
     Ok(estimate)
-}
-impl PlanTask {
-    fn legacy_template(&self, at: i64, estimate: u32) -> Template {
-        let printing = if self.repeat == Repeat::None {
-            Printing::Once {
-                date: self.due_date.clone(),
-                time: self.reminder_time.clone(),
-            }
-        } else {
-            let date = self.due_date.clone().unwrap_or_else(|| crate::date_at(at));
-            let weekday = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-                .unwrap()
-                .weekday()
-                .number_from_monday() as u8;
-            let days = match self.repeat {
-                Repeat::Daily => (1..=7).collect(),
-                Repeat::Weekdays => (1..=5).collect(),
-                _ => vec![weekday],
-            };
-            Printing::Weekly {
-                slots: vec![crate::templates::PrintSlot {
-                    days,
-                    time: self.reminder_time.clone(),
-                }],
-            }
-        };
-        Template {
-            id: format!("plan:{}", self.id),
-            automatic: self.repeat != Repeat::None,
-            print_ahead_days: 0,
-            printing,
-            shape: Shape {
-                title: self.title.clone(),
-                notes: self.notes.clone(),
-                project_id: self.project_id.clone(),
-                goal_id: None,
-                habit_id: None,
-                focus_minutes: self.focus_minutes,
-                scrap_minutes: 0,
-                priority: self.priority,
-                estimate,
-                tags: self.tags.clone(),
-                subtasks: self
-                    .subtasks
-                    .iter()
-                    .map(|s| TemplateSubtask {
-                        id: s.id.clone(),
-                        title: s.title.clone(),
-                    })
-                    .collect(),
-            },
-        }
-    }
 }

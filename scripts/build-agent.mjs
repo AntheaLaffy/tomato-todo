@@ -149,7 +149,6 @@ await mkdir(refs, { recursive: true });
 for (const name of [
   "BACKUP_FORMAT.md",
   "PLAN_FORMAT.md",
-  "NODE_DESIGN.md",
   "backup.schema.json",
   "plan.schema.json",
 ])

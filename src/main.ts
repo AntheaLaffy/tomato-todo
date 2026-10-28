@@ -1,4 +1,10 @@
 import "./style.css";
+import {
+  educationCard,
+  educationBanner,
+  mountEducation,
+  chooseProjectDirectory,
+} from "./education";
 import { compactModeEnabled, setCompactMode } from "./compact";
 import { captureScroll, restoreScroll } from "./scroll";
 import {
@@ -75,13 +81,13 @@ import {
   showHand,
 } from "./hand";
 import { blocksTour } from "./hand-demo";
-import { createNodeGraph } from "./nodegraph";
 import {
   desktop,
   native,
   mobile,
   initPlatform,
   dispatch,
+  agentCall,
   exportData,
   exportPlan,
   getGuard,
@@ -116,11 +122,6 @@ import type {
   AppData,
   DesktopStatus,
   GuardInfo,
-  Goal,
-  NodeProgress,
-  NodeSpec,
-  MainlineNode,
-  BlockRule,
   Habit,
   Block,
   Mode,
@@ -131,7 +132,6 @@ import type {
   Task,
   Template,
   LockSchedule,
-  LineOutcome,
 } from "./types";
 
 const iconSet = {
@@ -240,7 +240,7 @@ const logo = `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M
 let state: Snapshot;
 let page = "focus";
 let mobileNavOpen = false;
-let goalsTab = "goals";
+let collectionsTab = "habits";
 let selectMode = false;
 const selectedTaskIds = new Set<string>();
 let visibleTaskIds: string[] = [];
@@ -249,7 +249,6 @@ let filter = "active";
 let reminderSeen = "";
 let priority = "all";
 let sort = "time";
-let undatedExpanded = false;
 let search = "";
 let immersive = false;
 let noiseKind = "off";
@@ -306,7 +305,7 @@ const labels: Record<string, string> = {
   focus: "今日专注",
   tasks: "全部任务",
   templates: "印刷模板",
-  goals: "目标·习惯·愿景",
+  collections: "习惯·愿景",
   stats: "数据统计",
   schedule: "本周日程",
   guard: "专注保护",
@@ -329,14 +328,11 @@ const strictNow = () =>
     ? state.data.lock.active.strict
     : protectedNow() && state.data.settings.protection.strict;
 // Rendering a task list asks the same questions once per row ("which project?",
-// "which goal?", "how many pomodoros?"). Those linear scans turned a page with
+// "how many pomodoros?"). Those linear scans turned a page with
 // hundreds of tasks into hundreds of milliseconds, so build the lookups once per
 // snapshot and invalidate them when accept() swaps in a new object.
 interface Derived {
   projects: Map<string, Project>;
-  goals: Map<string, Goal>;
-  nodes: Map<string, Map<string, MainlineNode>>;
-  progress: Map<string, NodeProgress>;
   pomodoros: Map<string, number>;
   activeByProject: Map<string, number>;
   activeTotal: number;
@@ -347,15 +343,6 @@ function ensureDerived(): Derived {
   if (derivedSource === state) return derived;
   const projects = new Map<string, Project>();
   for (const p of state.data.projects) projects.set(p.id, p);
-  const goals = new Map<string, Goal>();
-  const nodes = new Map<string, Map<string, MainlineNode>>();
-  for (const g of state.data.goals) {
-    goals.set(g.id, g);
-    nodes.set(g.id, new Map(g.nodes.map((n) => [n.spec.id, n])));
-  }
-  const progress = new Map<string, NodeProgress>();
-  for (const p of state.nodeProgress)
-    progress.set(`${p.goalId}/${p.nodeId}`, p);
   const pomodoros = new Map<string, number>();
   for (const s of state.data.sessions)
     if (s.completed && s.taskId)
@@ -373,9 +360,6 @@ function ensureDerived(): Derived {
   }
   derived = {
     projects,
-    goals,
-    nodes,
-    progress,
     pomodoros,
     activeByProject,
     activeTotal,
@@ -398,30 +382,8 @@ const daysLabel = (days: number[]) => {
 };
 
 const isTimed = (task: Task) => !!task.reminderTime;
-const goalOf = (task: Task) => ensureDerived().goals.get(task.goalId ?? "");
-const nodeOf = (task: Task) =>
-  task.goalId && task.nodeId
-    ? ensureDerived().nodes.get(task.goalId)?.get(task.nodeId)
-    : undefined;
 const isVoid = (task: Task) =>
-  task.goalId
-    ? !!nodeOf(task)?.result
-    : !task.completed && isTimed(task) && task.reminderExpired;
-const nodeProgress = (goalId: string, nodeId: string) =>
-  ensureDerived().progress.get(`${goalId}/${nodeId}`)!;
-const verdictLabel = (verdict: string | null | undefined) =>
-  verdict === "success" ? "成功" : verdict === "failure" ? "失败" : "尚未裁定";
-const signalLabel = (kind: string) =>
-  kind === "check" ? "检查" : verdictLabel(kind);
-const nodeTimeLabel = (time: string) => time.replace("T", " ");
-const blockLabels: Record<BlockRule, string> = {
-  never: "不阻断",
-  always: "无条件阻断",
-  unpaired: "尚未配对时阻断",
-  unfinishedTasks: "配对任务仍未全部完成时阻断",
-  incomplete: "节点尚未完成时阻断",
-  completed: "节点已经完成时阻断",
-};
+  !task.completed && isTimed(task) && task.reminderExpired;
 const completedPomodoros = (task: Task) =>
   ensureDerived().pomodoros.get(task.id) ?? 0;
 const time = (seconds: number) =>
@@ -476,6 +438,15 @@ async function act(
   }
 }
 function accept(next: Snapshot, action?: Record<string, unknown>) {
+  const stopped =
+    state &&
+    next.data.education.assessments.find(
+      (a) =>
+        a.stoppedAt &&
+        state.data.education.assessments.some(
+          (old) => old.id === a.id && !old.stoppedAt,
+        ),
+    );
   snapshotRevision++;
   const cue = soundForTransition(state, next, action);
   const wasProtected = state ? protectedNow() : false;
@@ -524,6 +495,9 @@ function accept(next: Snapshot, action?: Record<string, unknown>) {
       );
   }
   updateClock();
+  if (stopped) {
+    toast(`考试结束，请立即停笔：${stopped.title}。拍照上传答题卡。`);
+  }
 }
 function applyTheme() {
   const theme = state.data.settings.theme;
@@ -595,7 +569,7 @@ function render() {
     <nav aria-label="主导航">${[
       ["focus", "sun"],
       ["tasks", "inbox"],
-      ["goals", "target"],
+      ["collections", "repeat"],
       ["stats", "chart-no-axes-combined"],
       ["schedule", "calendar-days"],
       ["agent", "sparkles"],
@@ -610,13 +584,23 @@ function render() {
     <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
     <nav class="projects" data-keep-scroll="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${look.activeByProject.get(p.id) ?? 0}</b></button>`).join("")}</nav>
     <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p data-explanation>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
-    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.9.8</span></div></div>
+    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.10.0</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar">${mobile ? `<button class="icon-btn mobile-menu" data-action="toggle-navigation" aria-label="打开导航" aria-expanded="${mobileNavOpen}">${icon("menu")}</button>` : ""}<div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="ponder-list" aria-label="概念讲解">${icon("lightbulb")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
-  <main data-ponder="${page.startsWith("project:") ? "project" : page}">${reminderBanner()}${page === "agent" ? agentPage() : page === "focus" ? focusPage() : page === "goals" ? goalsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span data-explanation>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  <main data-ponder="${page.startsWith("project:") ? "project" : page}">${reminderBanner()}${educationBanner(state)}${page === "agent" ? agentPage() : page === "focus" ? focusPage() : page === "collections" ? collectionsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span data-explanation>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
   setMobileNav(mobileNavOpen);
   bindForms();
   if (page === "agent") mountAgent();
+  mountEducation(state, {
+    accept,
+    toast,
+    ask: (text) => {
+      prefillAgent(text);
+      void navigate("agent");
+    },
+    modal,
+    close: closeModal,
+  });
   icons();
   updateClock();
   resizeCalendar();
@@ -628,7 +612,7 @@ function render() {
 const PONDER_OF_PAGE: Record<string, string> = {
   focus: "focus",
   tasks: "tasks",
-  goals: "goals",
+  collections: "habits",
   stats: "stats",
   schedule: "schedule",
   agent: "agent",
@@ -670,7 +654,7 @@ function reminderBanner() {
   return `<section class="reminder-banner" role="region" aria-label="任务时间提醒"><div><small>${escape(t.reminderTime)} · ${t.focusMinutes || state.data.settings.focusMinutes} 分钟专注</small><h2>${escape(t.title)}</h2><p data-explanation>到计划时间了，准备好就开始吧。</p></div><div class="reminder-actions"><button class="button primary" data-start-reminder="${escape(t.id)}">${icon("play")} 一键开始</button></div></section>`;
 }
 /**
- * 第一次打开：这个软件只有两件事需要你操心——当下和 AI。其余的（目标、愿景、
+ * 第一次打开：这个软件只有两件事需要你操心——当下和 AI。其余的（愿景、
  * 计划、模板）是给助手落笔的抽象配置，不该变成用户的日常负担。看过一次就不再出现，
  * 顶栏灯泡里随时能再看（思索的「设计理念」）。
  */
@@ -681,9 +665,9 @@ function welcomeCard(): string {
     <p class="subtle small">不靠意志力，靠环境——而环境由你和助手一起搭。规划半天不动手，是最常见的失败方式；所以先把注意力放在下面这两件事上。</p>
     <div class="welcome-pair">
       <div><span class="welcome-index">1</span><b>当下：今天做什么</b><p>这一页就是全部：选一件最重要的事，开一个番茄。待办、待补都在这里。</p><button class="button secondary small" data-action="welcome-tasks">看看待办</button></div>
-      <div><span class="welcome-index">2</span><b>AI：让它替你维护</b><p>目标、愿景、习惯、课表、模板都只是「任务的容器」，是给助手落笔用的。要改直接说一句「帮我把这学期课排进课表」。</p><button class="button secondary small" data-action="welcome-guide">跟助手说一声</button></div>
+      <div><span class="welcome-index">2</span><b>AI：让它替你维护</b><p>愿景、习惯、课表和模板用于记录方向与安排，交给助手维护。要改直接说一句「帮我把这学期课排进课表」。</p><button class="button secondary small" data-action="welcome-guide">跟助手说一声</button></div>
     </div>
-    <p class="subtle small">其余页面（目标·习惯·愿景、统计、模板、锁机…）绝大多数时间不用你去：它们是抽象配置，助手会维护；统计是回看用的，不是绩效评估。想看某一页为什么这么设计，把鼠标停在那一页上按住 <kbd>G</kbd>。</p>
+    <p class="subtle small">其余页面（习惯·愿景、统计、模板、锁机…）绝大多数时间不用你去：它们是抽象配置，助手会维护；统计是回看用的，不是绩效评估。想看某一页为什么这么设计，把鼠标停在那一页上按住 <kbd>G</kbd>。</p>
     <div class="welcome-actions"><button class="button primary" data-action="welcome-done">知道了，开始今天</button><button class="text-button" data-action="welcome-go">先跟助手聊聊</button></div>
   </section>`;
 }
@@ -701,20 +685,17 @@ function focusPage() {
     { month: "long", day: "numeric", weekday: "long" },
   );
   const todayTasks = state.data.tasks.filter(
-    (t) =>
-      !t.completed && (!t.dueDate || t.dueDate <= state.today) && !isVoid(t),
+    (t) => !t.completed && t.dueDate && t.dueDate <= state.today && !isVoid(t),
   );
-  const todayPendingCount = todayTasks.filter((t) => t.dueDate).length;
+  const todayPendingCount = todayTasks.length;
   const catchUpTasks = todayTasks.filter(isCatchUp);
   const regularTasks = todayTasks.filter((t) => !isCatchUp(t));
   const timedTasks = regularTasks.filter((t) => t.dueDate && t.reminderTime);
   const untimedTasks = regularTasks.filter((t) => t.dueDate && !t.reminderTime);
-  const undatedTasks = regularTasks.filter((t) => !t.dueDate);
   const activeList = todayTasks.length
     ? todayTaskGroup("今日定时", timedTasks, "time") +
       todayTaskGroup("待补队列", catchUpTasks, "time", "catch-up") +
-      todayTaskGroup("今日未定时", untimedTasks, "priority") +
-      todayTaskGroup("无日期任务", undatedTasks, "priority", "undated")
+      todayTaskGroup("今日未定时", untimedTasks, "priority")
     : taskList([], true);
   return `${heading("今天，也要慢慢向前。", `${weekday} <span data-explanation><span class="dot-separator">·</span> 专注当下，让每一小步都有回响。</span>`)}
     ${welcomeCard()}
@@ -737,20 +718,17 @@ function focusPage() {
           )
         : activeList
     }</div>
-    <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的小目标 <kbd>N</kbd></button><div class="list-footnote" data-explanation>${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
+    <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的任务 <kbd>N</kbd></button><div class="list-footnote" data-explanation>${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
     <div class="bottom-grid"><section class="card week-card"><div class="card-heading"><h2>这一周的专注节奏</h2><button class="text-button" data-page="stats">查看统计 ${icon("arrow-up-right")}</button></div>${weekChart(false)}</section><section class="quote-card" data-explanation><div class="quote-leaf">${icon("leaf")}</div><span class="eyebrow">ONE THING AT A TIME</span><h3>不求每一天都满分，<br>只求每一刻都投入。</h3><p>一个番茄，一点进步。</p><div class="quote-dots"><i></i><i></i><i></i></div></section></div>`;
 }
 function todayTaskGroup(
   title: string,
   tasks: Task[],
   order: "time" | "priority",
-  kind?: "catch-up" | "undated",
+  kind?: "catch-up",
 ) {
   if (!tasks.length) return "";
-  const expanded = kind !== "undated" || undatedExpanded;
-  const collapsible = kind === "undated";
-  const shown = expanded ? tasks : [];
-  return `<section class="today-task-group"><div class="today-group-heading"><h3 class="group-title" ${kind === "catch-up" ? 'data-ponder="catch-up"' : ""}>${title}<span>${tasks.length}</span></h3>${collapsible ? `<button class="text-button small" data-action="toggle-${kind}" aria-expanded="${expanded}" aria-controls="today-${kind}-tasks">${expanded ? "收起" : `查看全部 ${tasks.length} 项`}${icon(expanded ? "chevron-down" : "chevron-right")}</button>` : ""}</div><div ${kind ? `id="today-${kind}-tasks"` : ""} ${kind === "undated" && !expanded ? "hidden" : ""}>${shown.length ? taskList(shown, true, order) : ""}</div></section>`;
+  return `<section class="today-task-group"><div class="today-group-heading"><h3 class="group-title" ${kind === "catch-up" ? 'data-ponder="catch-up"' : ""}>${title}<span>${tasks.length}</span></h3></div><div ${kind ? `id="today-${kind}-tasks"` : ""}>${taskList(tasks, true, order)}</div></section>`;
 }
 function timerContent() {
   const t = state.data.timer,
@@ -763,7 +741,6 @@ function timerContent() {
 }
 function isCatchUp(task: Task) {
   if (task.completed || isVoid(task) || isHabit(task)) return false;
-  if (task.goalId && task.dueDate && task.dueDate < state.today) return true;
   if (task.dueDate !== state.today || !task.reminderTime) return false;
   const settings = state.data.settings;
   const sessions = Math.max(1, task.estimate);
@@ -803,10 +780,8 @@ function taskList(tasks: Task[], compact = false, order = sort) {
         selected = task.id === state.data.timer.taskId,
         picked = selectMode && selectedTaskIds.has(task.id),
         catchUp = isCatchUp(task),
-        goal = goalOf(task),
-        node = goal ? nodeOf(task) : undefined,
         voided = isVoid(task);
-      return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}" ${voided ? "disabled" : ""}>${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${goal ? `<span>${icon("target")}${escape(goal.name)}${node ? ` · ${escape(node.spec.name)}` : ""}${voided ? " · 已报废" : ""}</span>` : ""}${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed && !voided ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
+      return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}" ${voided ? "disabled" : ""}>${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed && !voided ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
     })
     .join("");
 }
@@ -921,6 +896,27 @@ function schedulePage() {
     const light = b.attention === "light";
     return `<span class="calendar-band ${light ? "light" : "required"}" style="top:${top}%;height:${height}%" title="${escape(`${b.title} ${b.start}–${b.end}`)}"><b>${escape(b.title)}</b></span>`;
   };
+  const teaching = days.map((day) =>
+    [
+      ...state.data.education.lessons.map((l) => ({ ...l, label: "课程" })),
+      ...state.data.education.assessments
+        .filter((a) => a.kind !== "homework")
+        .map((a) => ({ ...a, label: "考试" })),
+    ].filter(
+      (item) => isoDate(new Date(item.startsAt * 1000)) === isoDate(day),
+    ),
+  );
+  const teachingMarkup = (item: (typeof teaching)[number][number]) => {
+    const dt = new Date(item.startsAt * 1000),
+      minute = dt.getHours() * 60 + dt.getMinutes();
+    const top = Math.max(0, pct(minute)),
+      height = Math.max(
+        1,
+        Math.min(100 - top, ((item.endsAt - item.startsAt) / 60 / span) * 100),
+      );
+    const p = state.data.projects.find((p) => p.id === item.projectId);
+    return `<button class="calendar-block teaching-block" style="top:${top}%;height:${height}%;border-left-color:${escape(p?.color || "#849b7d")}" data-page="project:${escape(item.projectId)}" title="${escape(item.title)}"><b>${escape(item.label)} · ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}</b><span>${escape(item.title)}</span></button>`;
+  };
   const total = lists.reduce(
     (n, ts) => n + ts.reduce((m, t) => m + t.estimate, 0),
     0,
@@ -929,7 +925,7 @@ function schedulePage() {
   const hours = Array.from({ length: span / 60 + 1 }, (_, i) => start / 60 + i);
   const pct = (min: number) => ((min - start) / span) * 100;
   return `${heading("这一周的日程", "横轴星期、纵轴时间，方块就是任务。", "WEEK AT A GLANCE", false)}
-  <div class="week-nav"><button class="text-button" data-week-prev>${icon("arrow-left")} 上一周</button><span>${range} · 共 ${total} 番茄</span>${weekOffset === 0 ? "" : '<button class="text-button" data-week-now>回到本周</button>'}<button class="text-button" data-week-next>下一周 ${icon("arrow-right")}</button></div>
+  <div class="week-nav"><button class="text-button" data-week-prev>${icon("arrow-left")} 上一周</button><span>${range} · 共 ${total} 番茄 · ${teaching.flat().length} 节课程/考试</span>${weekOffset === 0 ? "" : '<button class="text-button" data-week-now>回到本周</button>'}<button class="text-button" data-week-next>下一周 ${icon("arrow-right")}</button></div>
   <section class="calendar">
     <div class="calendar-head"><span class="calendar-gutter"></span>${days
       .map((d, i) => {
@@ -942,7 +938,7 @@ function schedulePage() {
       ${days
         .map(
           (_, i) =>
-            `<div class="calendar-col">${hours.map((h) => `<i class="hour-line" style="top:${pct(h * 60)}%"></i>`).join("")}${bands[i].map(bandMarkup).join("")}${lists[
+            `<div class="calendar-col">${hours.map((h) => `<i class="hour-line" style="top:${pct(h * 60)}%"></i>`).join("")}${bands[i].map(bandMarkup).join("")}${teaching[i].map(teachingMarkup).join("")}${lists[
               i
             ]
               .map((t) => {
@@ -1060,7 +1056,7 @@ function tasksPage() {
   if (!project && filter === "templates")
     return `${pageHeading}${templatesCard(undefined, tabs)}`;
   return `${pageHeading}
-  ${project ? projectWhitelistCard(project) + projectVisionCard(project) : ""}
+  ${project ? educationCard(state, project) + projectWhitelistCard(project) + projectVisionCard(project) : ""}
   <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs">${tabs}</div><div class="toolbar-controls"><label class="inline-search">${icon("search")}<input id="task-search" aria-label="搜索任务" placeholder="搜索标题、标签或备注" value="${escape(search)}"></label><select id="priority-filter" aria-label="筛选优先级"><option value="all">全部优先级</option>${[
     [3, "高优先级"],
     [2, "中优先级"],
@@ -1075,63 +1071,12 @@ function tasksPage() {
       "",
     )}</select><select id="task-sort" aria-label="排序"><option value="time" ${sort === "time" ? "selected" : ""}>按时间</option><option value="priority" ${sort === "priority" ? "selected" : ""}>优先级</option><option value="created" ${sort === "created" ? "selected" : ""}>创建顺序</option></select>${selectControls()}</div></div><div id="tasks-results">${taskList(tasks)}</div><button class="quick-add" data-action="new-task">${icon("plus")} 添加任务 <kbd>N</kbd></button></section>${project ? templatesCard(project.id) : ""}`;
 }
-function goalsPage() {
-  const goals = state.data.goals;
+function collectionsPage() {
   const habits = state.data.tasks.filter((t) => isHabit(t) && !t.completed);
-  return `${heading("目标、习惯与愿景", "长期的事慢慢积累，日常的事一次做完，远方的事写下来。", "LONG GAMES, SMALL STEPS", false)}
-  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs"><button data-goals-tab="goals" class="${goalsTab === "goals" ? "active" : ""}">目标 <span>${goals.length}</span></button><button data-goals-tab="habits" class="${goalsTab === "habits" ? "active" : ""}">习惯 <span>${state.data.habits.length}</span></button><button data-goals-tab="visions" class="${goalsTab === "visions" ? "active" : ""}">愿景 <span>${state.data.visions.length}</span></button></div><div class="toolbar-controls">${
-    goalsTab === "habits"
-      ? `<button class="button secondary small-button" data-action="new-habit">${icon("plus")} 新建习惯</button>`
-      : goalsTab === "visions"
-        ? `<button class="button secondary small-button" data-new-vision="">${icon("plus")} 新建愿景</button>`
-        : `<button class="button secondary small-button" data-action="new-goal">${icon("plus")} 新建目标</button>`
-  }</div></div>
-  ${goalsTab === "habits" ? habitsTab(habits) : goalsTab === "visions" ? visionsTab() : goalsTabContent(goals)}
-  </section>`;
+  return `${heading("习惯与愿景", "日常的事慢慢积累，远方的事写下来。", "SMALL STEPS", false)}
+  <section class="card all-tasks-card"><div class="task-toolbar"><div class="list-tabs"><button data-collections-tab="habits" class="${collectionsTab === "habits" ? "active" : ""}">习惯 <span>${state.data.habits.length}</span></button><button data-collections-tab="visions" class="${collectionsTab === "visions" ? "active" : ""}">愿景 <span>${state.data.visions.length}</span></button></div><div class="toolbar-controls">${collectionsTab === "habits" ? `<button class="button secondary small-button" data-action="new-habit">${icon("plus")} 新建习惯</button>` : `<button class="button secondary small-button" data-new-vision="">${icon("plus")} 新建愿景</button>`}</div></div>
+  ${collectionsTab === "habits" ? habitsTab(habits) : visionsTab()}</section>`;
 }
-function goalsTabContent(goals: Goal[]) {
-  if (!goals.length)
-    return `<div class="empty-state"><div class="empty-illustration">${icon("target")}</div><h3>还没有目标组</h3><p data-explanation>为主线设置节点，再把不同任务按组标识与执行时间配对。</p><button class="text-button" data-action="new-goal">新建目标 →</button></div>`;
-  return goals
-    .map((g) => {
-      const tasks = state.data.tasks.filter((t) => t.goalId === g.id);
-      const nodes = g.nodes
-        .map((n) => {
-          const p = nodeProgress(g.id, n.spec.id);
-          const matched = tasks.filter((t) => t.nodeId === n.spec.id);
-          const deleted = state.data.nodeBindings.filter(
-            (b) =>
-              b.goalId === g.id &&
-              b.nodeId === n.spec.id &&
-              !tasks.some((t) => t.id === b.taskId),
-          );
-          const restore =
-            !n.result && deleted.length
-              ? `<p class="subtle small">${deleted.length} 条已删除的配对记录仍保留，删除不代表完成。</p>${deleted.map((b) => (state.data.identities.some((r) => r.id === b.taskId && r.retired && r.restoreTask) ? `<button class="text-button" data-restore-paired="${escape(b.taskId)}">恢复已删除${b.completed ? "已完成" : "未完成"}任务</button>` : "")).join("")}`
-              : "";
-          const status = n.result
-            ? verdictLabel(n.result.verdict)
-            : p.completed
-              ? "已完成，等待裁定"
-              : p.pairedCount
-                ? "进行中"
-                : "尚未配对";
-          return `<section class="mainline-node ${n.result?.verdict || "pending"}" data-mainline-node="${escape(n.spec.id)}"><div class="goal-head"><h4>${escape(n.spec.name)}</h4><span class="badge">${status}</span></div><p class="subtle small">${escape(nodeTimeLabel(n.spec.start))} 至 ${escape(nodeTimeLabel(n.spec.end))}（结束不含）</p><p class="small">已配对 ${p.pairedCount} 条 · 已完成 ${p.completedCount} 条${n.spec.requiredTasks > 1 ? ` · 至少需 ${n.spec.requiredTasks} 条` : ""}</p>${n.spec.signal ? `<p class="subtle small">${escape(nodeTimeLabel(n.spec.signal.at))} · 向${n.spec.signal.direction === "head" ? "头" : "尾"}发送${signalLabel(n.spec.signal.kind)}信号${n.emitted ? " · 已发出" : ""}</p>` : ""}${n.result ? `<p class="subtle small">节点已裁定，所有配对实例报废，历史保留。</p>` : n.spec.confirmationRequired ? `<button class="button secondary small-button" data-confirm-node="${escape(n.spec.id)}" data-node-goal="${escape(g.id)}" data-confirmed="${!n.confirmed}">${n.confirmed ? "撤回阶段确认" : "确认阶段要求已完成"}</button>` : ""}${matched.length ? taskList(matched) : ""}${restore}</section>`;
-        })
-        .join("");
-      const unmatched = tasks.filter((t) => !t.nodeId);
-      const events = state.data.signalEvents
-        .filter((e) => e.goalId === g.id)
-        .slice(-30)
-        .reverse();
-      const history = events.length
-        ? `<details class="editor-details signal-history"><summary>信号记录 <small>${events.length} 条最近记录</small></summary>${events.map((e) => `<section class="signal-event"><b>${escape(g.nodes.find((n) => n.spec.id === e.sourceNodeId)?.spec.name || "节点")} · ${signalLabel(e.kind)} · 向${e.direction === "head" ? "头" : "尾"}</b><p class="subtle small">${new Date(e.emittedAt * 1000).toLocaleString("zh-CN")}</p><ul>${e.deliveries.map((d) => `<li>${escape(g.nodes.find((n) => n.spec.id === d.nodeId)?.spec.name || "节点")}：${d.blocked ? `阻断（${blockLabels[d.blockRule]}）` : d.before ? `保持${verdictLabel(d.before)}` : d.after ? `裁定${verdictLabel(d.after)}` : "未完成，保持尚未裁定"} · ${d.completedCount}/${d.pairedCount} 条任务已完成</li>`).join("")}</ul></section>`).join("")}</details>`
-        : "";
-      return `<section class="goal-section" data-goal-id="${escape(g.id)}"><div class="goal-head"><h3>${icon("target")} ${escape(g.name)}</h3><button class="icon-btn" data-edit-goal="${escape(g.id)}" aria-label="编辑目标">${icon("pencil")}</button></div><p class="subtle small">${g.nodes.filter((n) => n.result?.verdict === "success").length} 个成功 · ${g.nodes.filter((n) => n.result?.verdict === "failure").length} 个失败 · ${g.nodes.filter((n) => !n.result).length} 个尚未裁定</p>${goalVisions(g)}${nodes || '<p class="subtle small">主线尚未设置节点。<span data-explanation>编辑目标组可添加阶段。</span></p>'}${unmatched.length ? `<h4>尚未配对节点的实例</h4>${taskList(unmatched)}` : ""}${history}</section>`;
-    })
-    .join("");
-}
-
 function habitsTab(habits: Task[]) {
   if (!state.data.habits.length && !habits.length)
     return `<div class="empty-state"><h3>还没有习惯</h3><p data-explanation>在一份模板中设置开始时间及其周期单元，按习惯组查看执行情况。</p><button class="text-button" data-action="new-habit">新建习惯 →</button></div>`;
@@ -1141,7 +1086,7 @@ function habitsTab(habits: Task[]) {
         (t) => t.shape.habitId === h.id,
       );
       const tasks = habits.filter((t) => t.habitId === h.id && !t.completed);
-      return `<section class="goal-section" data-habit-id="${escape(h.id)}"><div class="goal-head"><h3>${escape(h.name)}</h3><button class="text-button danger-text" data-delete-habit="${escape(h.id)}">删除习惯组</button></div>${templates.map((t) => `<div class="habit-template"><div class="goal-head"><b>${escape(t.shape.title)}</b><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑习惯模板">${icon("pencil")}</button></div><p class="habit-meta">${escape(printingLabel(t))}</p><button class="text-button" data-print-template="${escape(t.id)}">手动印刷整周期</button></div>`).join("") || '<p class="subtle small">模板已移除，已印实例与管辖记录仍保留。</p>'}${tasks.length ? taskList(tasks) : '<p class="subtle small">没有待完成实例。</p>'}</section>`;
+      return `<section class="group-section" data-habit-id="${escape(h.id)}"><div class="group-head"><h3>${escape(h.name)}</h3><button class="text-button danger-text" data-delete-habit="${escape(h.id)}">删除习惯组</button></div>${templates.map((t) => `<div class="habit-template"><div class="group-head"><b>${escape(t.shape.title)}</b><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑习惯模板">${icon("pencil")}</button></div><p class="habit-meta">${escape(printingLabel(t))}</p><button class="text-button" data-print-template="${escape(t.id)}">手动印刷整周期</button></div>`).join("") || '<p class="subtle small">模板已移除，已印实例与管辖记录仍保留。</p>'}${tasks.length ? taskList(tasks) : '<p class="subtle small">没有待完成实例。</p>'}</section>`;
     })
     .join("");
   const detached = habits.filter((t) => !t.habitId && !t.completed);
@@ -1160,34 +1105,23 @@ function calendarEntryHtml(dates: string[], time: string) {
   return `<section class="calendar-entry" data-calendar-entry><div class="calendar-slot-head"><label class="form-field"><span>开始时间（可选）</span><input type="time" value="${escape(time)}" aria-label="日程开始时间"></label><button type="button" class="icon-btn tiny" data-remove-calendar aria-label="移除时段">${icon("x")}</button></div><span class="subtle small" data-explanation>这个时段安排在哪些日期？</span><div class="calendar-dates">${dates.map(calendarDateHtml).join("")}</div><button type="button" class="text-button" data-add-date>＋ 添加日期</button></section>`;
 }
 
-function goalVisions(goal: Goal) {
-  return state.data.visions
-    .filter((v) => v.goalId === goal.id)
-    .map(
-      (v) =>
-        `<p class="vision-line">${icon("sparkles")} <b>${escape(v.name)}</b>${v.notes ? ` — ${escape(v.notes)}` : ""}</p>`,
-    )
-    .join("");
-}
 function visionCard(v: Vision) {
   const owner = v.projectId
     ? state.data.projects.find((p) => p.id === v.projectId)?.name || "项目"
-    : v.goalId
-      ? `目标 · ${state.data.goals.find((g) => g.id === v.goalId)?.name || ""}`
-      : "总愿景";
+    : "总愿景";
   return `<section class="vision-card"><div class="vision-head"><h3>${icon("sparkles")} ${escape(v.name)}</h3><button class="icon-btn" data-edit-vision="${v.id}" aria-label="编辑愿景">${icon("pencil")}</button></div><span class="vision-owner">${escape(owner)}</span>${v.notes ? `<p class="vision-notes">${escape(v.notes)}</p>` : ""}</section>`;
 }
 function visionsTab() {
   const all = state.data.visions;
   if (!all.length)
     return `<div class="empty-state"><div class="empty-illustration">${icon("sparkles")}</div><h3>还没有愿景</h3><p data-explanation>写下你真正想去的地方、想成为的样子。它不影响任务和进度，只写给你自己看。</p><button class="text-button" data-new-vision="">新建愿景 →</button></div>`;
-  const global = all.filter((v) => !v.projectId && !v.goalId);
-  const owned = all.filter((v) => v.projectId || v.goalId);
+  const global = all.filter((v) => !v.projectId);
+  const owned = all.filter((v) => v.projectId);
   return [
     ...global.map((v) => visionCard(v)),
     ...(owned.length
       ? [
-          `<h3 class="group-title">项目与目标的愿景<span>${owned.length}</span></h3>`,
+          `<h3 class="group-title">项目愿景<span>${owned.length}</span></h3>`,
           ...owned.map((v) => visionCard(v)),
         ]
       : []),
@@ -1211,19 +1145,13 @@ function visionDialog(id?: string, ownerArg?: string) {
   const owner = v
     ? v.projectId
       ? `project:${v.projectId}`
-      : v.goalId
-        ? `goal:${v.goalId}`
-        : ""
+      : ""
     : ownerArg || "";
   const options: [string, string][] = [
     ["", "总愿景（顶层）"],
     ...state.data.projects.map((p): [string, string] => [
       `project:${p.id}`,
       `项目 · ${p.name}`,
-    ]),
-    ...state.data.goals.map((g): [string, string] => [
-      `goal:${g.id}`,
-      `目标 · ${g.name}`,
     ]),
   ];
   modal(
@@ -1241,7 +1169,6 @@ function visionDialog(id?: string, ownerArg?: string) {
           name: f.get("name"),
           notes: f.get("notes"),
           projectId: chosen.startsWith("project:") ? chosen.slice(8) : null,
-          goalId: chosen.startsWith("goal:") ? chosen.slice(5) : null,
         },
         "愿景已保存",
       )
@@ -1266,60 +1193,9 @@ function weekChart(large: boolean) {
     max = Math.max(60 * 60, ...days.map((d) => d.seconds));
   return `<div class="week-chart ${large ? "large" : ""}"><div class="chart-axis"><span>${Math.ceil(max / 60)} 分</span><span>${Math.ceil(max / 120)} 分</span><span>0</span></div><div class="chart-plot"><div class="grid-lines"><i></i><i></i><i></i></div>${days.map((d, i) => `<div class="chart-column"><span class="bar-value">${Math.floor(d.seconds / 60)}<small> 分</small></span><div class="bar-slot"><div class="chart-bar ${i === 6 ? "today" : ""}" style="height:${Math.max(2, (d.seconds / max) * 100)}%" title="${d.date}：${duration(d.seconds)}"></div></div><span class="bar-label ${i === 6 ? "today" : ""}">${i === 6 ? "今天" : new Date(`${d.date}T12:00:00`).toLocaleDateString("zh-CN", { weekday: "short" })}</span></div>`).join("")}</div></div>`;
 }
-const lineOutcomeLabel: Record<LineOutcome, string> = {
-  empty: "尚未设置节点",
-  pending: "进行中",
-  success: "全线成功",
-  failure: "主线失败",
-};
-const stamp = (ts: number | null) =>
-  ts === null
-    ? ""
-    : new Date(ts * 1000).toLocaleString("zh-CN", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-const spanLabel = (start: string, end: string) =>
-  `${start.slice(5, 16).replace("T", " ")}\u2013${end.slice(11, 16)}`;
-function goalStatsCard() {
-  const goals = state.stats.goals;
-  return `<section class="card mainline-card"><div class="card-heading"><h2>主线</h2><span class="subtle small" data-explanation>整条线通过才算成功，失败与未完成更值得回看</span></div>${
-    goals.length
-      ? goals
-          .map((g) => {
-            const when = g.decidedAt
-              ? `${stamp(g.decidedAt)} ${g.outcome === "failure" ? "裁定失败" : "全线成功"}`
-              : "尚未裁定";
-            return `<div class="mainline-stat ${g.outcome}"><div class="mainline-stat-head"><b>${escape(g.name)}</b><span class="badge ${g.outcome}">${lineOutcomeLabel[g.outcome]}</span></div><p class="subtle small">${g.nodes.length} 个节点 · 配对 ${g.paired} · 完成 ${g.completed} · ${when}</p><div class="mainline-nodes">${g.nodes
-              .map(
-                (n) =>
-                  `<div class="mainline-node-stat ${n.verdict ?? "pending"}"><span>${escape(n.name)}</span><small>${escape(spanLabel(n.start, n.end))}</small><em class="badge ${n.verdict ?? "pending"}">${n.verdict === "success" ? "成功" : n.verdict === "failure" ? "失败" : n.nodeCompleted ? "已完成" : "未完成"}</em><small>${n.completed}/${n.paired}</small></div>`,
-              )
-              .join("")}</div></div>`;
-          })
-          .join("")
-      : '<div class="small-empty">还没有目标组。<span data-explanation>主线失败往往比成功更值得回看。</span></div>'
-  }</section>`;
-}
-function crossSectionCard() {
-  const days = state.stats.days
-    .slice(-14)
-    .filter(
-      (d) =>
-        d.goalFailure || d.goalSuccess || d.goalVoided || d.voided || d.missed,
-    );
-  return `<section class="card cross-section"><div class="card-heading"><h2>纵切面</h2><span class="subtle small" data-explanation>同一天的成败并排看，才看得见相互影响</span></div>${
-    days.length
-      ? `<div class="cross-table"><div class="cross-head"><span>日期</span><span>完成</span><span>缺勤</span><span>作废</span><span>主线成功</span><span>主线失败</span><span>主线报废</span></div>${days
-          .map(
-            (d) =>
-              `<div class="cross-row ${d.goalFailure ? "has-failure" : ""}"><span>${d.date.slice(5).replace("-", "/")}</span><span>${d.completed || "·"}</span><span>${d.missed || "·"}</span><span>${d.voided || "·"}</span><span>${d.goalSuccess || "·"}</span><span>${d.goalFailure ? `<b>${d.goalFailure}</b>` : "·"}</span><span>${d.goalVoided || "·"}</span></div>`,
-          )
-          .join("")}</div>`
-      : '<div class="small-empty">最近两周还没有可纵向对比的成败记录。</div>'
-  }</section>`;
+function activityCard() {
+  const days = state.stats.days.slice(-14);
+  return `<section class="card cross-section"><div class="card-heading"><h2>每日记录</h2></div><div class="cross-table"><div class="cross-head"><span>日期</span><span>完成</span><span>缺勤</span><span>作废</span></div>${days.map((d) => `<div class="cross-row"><span>${d.date.slice(5).replace("-", "/")}</span><span>${d.completed || "·"}</span><span>${d.missed || "·"}</span><span>${d.voided || "·"}</span></div>`).join("")}</div></section>`;
 }
 function statsPage() {
   const s = state.stats,
@@ -1349,7 +1225,7 @@ function statsPage() {
           )
           .join("")
       : '<div class="small-empty">暂无专注记录。<span data-explanation>完成第一段专注，<br>看看时间去了哪里。</span></div>'
-  }</section></div>${goalStatsCard()}${crossSectionCard()}
+  }</section></div>${activityCard()}
   <section class="card history-card"><div class="card-heading"><h2>专注足迹 <span class="count-label">${sessions.length}</span></h2><span class="subtle small" data-explanation>任务完成后按预计用时补足，实际专注超出则按实际计算</span></div>${
     sessions.length
       ? `<div class="history-table"><div class="history-head"><span>任务 / 项目</span><span>日期</span><span>专注时长</span><span>状态</span></div>${sessions
@@ -1683,6 +1559,15 @@ function renderImmersive() {
   updateClock();
 }
 function updateClock() {
+  document
+    .querySelectorAll(".teaching-local-clock")
+    .forEach(
+      (el) =>
+        (el.textContent = new Date(state.serverTime * 1000).toLocaleTimeString(
+          "zh-CN",
+          { hour: "2-digit", minute: "2-digit", hour12: false },
+        )),
+    );
   const scheduleEntry = document.querySelector(
     '[data-action="focus-schedule"]',
   );
@@ -1776,7 +1661,7 @@ function templatesCard(projectId?: string, tabs = "") {
   const templates = state.data.templates.filter(
     (t) => !projectId || t.shape.projectId === projectId,
   );
-  return `<section class="card templates-card${tabs ? " all-tasks-card" : ""}">${tabs ? `<div class="task-toolbar"><div class="list-tabs">${tabs}</div></div>` : ""}<div class="card-heading"><div><h2>印刷模板 <span class="count-label">${templates.length}</span></h2><p class="subtle small" data-explanation>模板保留形状，实例记录每一次执行。关闭自动印刷后可以随时手动使用。</p></div><button class="button secondary" data-action="new-template">${icon("plus")} 新建模板</button></div>${templates.map((t) => `<section class="goal-section" data-template-id="${escape(t.id)}"><div class="goal-head"><h3>${escape(t.shape.title)}</h3><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑模板 ${escape(t.shape.title)}">${icon("pencil")}</button></div><p class="subtle small">${escape(printingLabel(t))} · ${t.shape.goalId ? "目标组" : t.printing.kind === "weekly" && t.printing.slots.some((s) => s.time) ? "习惯组" : "普通组"}</p><div class="template-actions"><button class="button secondary small-button" data-print-template="${escape(t.id)}">手动印刷</button><button class="text-button" data-sync-template="${escape(t.id)}">同步到未完成实例</button><button class="text-button danger-text" data-delete-template="${escape(t.id)}">删除模板</button></div></section>`).join("") || '<p class="subtle">还没有模板。<span data-explanation>也可以在编辑器中直接创建一条实例。</span></p>'}</section>`;
+  return `<section class="card templates-card${tabs ? " all-tasks-card" : ""}">${tabs ? `<div class="task-toolbar"><div class="list-tabs">${tabs}</div></div>` : ""}<div class="card-heading"><div><h2>印刷模板 <span class="count-label">${templates.length}</span></h2><p class="subtle small" data-explanation>模板保留形状，实例记录每一次执行。关闭自动印刷后可以随时手动使用。</p></div><button class="button secondary" data-action="new-template">${icon("plus")} 新建模板</button></div>${templates.map((t) => `<section class="group-section" data-template-id="${escape(t.id)}"><div class="group-head"><h3>${escape(t.shape.title)}</h3><button class="icon-btn" data-edit-template="${escape(t.id)}" aria-label="编辑模板 ${escape(t.shape.title)}">${icon("pencil")}</button></div><p class="subtle small">${escape(printingLabel(t))} · ${t.printing.kind === "weekly" && t.printing.slots.some((s) => s.time) ? "习惯组" : "普通组"}</p><div class="template-actions"><button class="button secondary small-button" data-print-template="${escape(t.id)}">手动印刷</button><button class="text-button" data-sync-template="${escape(t.id)}">同步到未完成实例</button><button class="text-button danger-text" data-delete-template="${escape(t.id)}">删除模板</button></div></section>`).join("") || '<p class="subtle">还没有模板。<span data-explanation>也可以在编辑器中直接创建一条实例。</span></p>'}</section>`;
 }
 function shiftedDate(date: string, days: number) {
   const value = new Date(`${date}T12:00:00Z`);
@@ -1788,7 +1673,6 @@ function datesForPrinting(
   start: string | null,
   end: string | null,
 ) {
-  if (!start && !end && rule.kind === "once") return [null];
   if (!start || !end || end < start) throw new Error("请选择有效的起止日期");
   if (rule.kind === "calendar") {
     const dates = [
@@ -1815,14 +1699,14 @@ function printDialog(id: string) {
   const template = state.data.templates.find((t) => t.id === id);
   if (!template) return;
   modal(
-    `${modalHeader("手动印刷", template.shape.title)}<form id="print-form"><div class="form-grid"><label class="form-field"><span>起始日期</span><input type="date" name="start" value="${template.printing.kind === "calendar" ? template.printing.slots.flatMap((s) => s.dates).sort()[0] : state.today}"></label><label class="form-field"><span>结束日期</span><input type="date" name="end" value="${
+    `${modalHeader("手动印刷", template.shape.title)}<form id="print-form"><div class="form-grid"><label class="form-field"><span>起始日期</span><input type="date" name="start" required value="${template.printing.kind === "calendar" ? template.printing.slots.flatMap((s) => s.dates).sort()[0] : state.today}"></label><label class="form-field"><span>结束日期</span><input type="date" name="end" required value="${
       template.printing.kind === "calendar"
         ? template.printing.slots
             .flatMap((s) => s.dates)
             .sort()
             .at(-1)
         : state.today
-    }"></label></div><p class="subtle small">重复模板会印出所选日期涉及的完整周（周一至周日）；日程表印出范围内全部日程。单次模板可用于其他日期；不定时模板可留空，印出一个无日期实例。已印日期自动跳过。</p><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">取消</button><button class="button primary" type="submit">印刷全部实例</button></div></form>`,
+    }"></label></div><p class="subtle small">重复模板会印出所选日期涉及的完整周（周一至周日）；日程表印出范围内全部日程。单次模板可用于其他日期；每次印刷都必须指定日期。已印日期自动跳过。</p><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">取消</button><button class="button primary" type="submit">印刷全部实例</button></div></form>`,
   );
   $("#print-form").onsubmit = async (e) => {
     e.preventDefault();
@@ -1900,11 +1784,11 @@ function templateDialog(
     <label class="form-field"><span>这次想怎么创建？</span><select name="creationMode"><option value="instance" ${mode === "instance" ? "selected" : ""}>临时实例 · 只做这一次</option><option value="manual" ${mode === "manual" ? "selected" : ""}>手动模板 · 保留，以后再用</option><option value="automatic" ${mode === "automatic" ? "selected" : ""}>自动模板 · 按安排持续印刷</option></select></label><p id="creation-mode-hint" class="editor-hint"></p>
     <label class="form-field"><span>任务名称</span><input name="title" required maxlength="200" autofocus value="${escape(shape?.title)}" placeholder="你想完成什么？"></label>
     <label class="form-field"><span>预计用时（分钟）</span><input name="durationMinutes" type="number" min="1" max="17820" required value="${(shape?.estimate ?? 1) * (shape?.focusMinutes ?? state.data.settings.focusMinutes)}"><small id="duration-preview"></small></label>
-    <div id="template-once" class="form-grid"><label class="form-field" id="instance-date-field"><span id="instance-date-label">计划日期</span><input name="dueDate" type="date" value="${rule?.kind === "once" && rule.date ? rule.date : state.today}"></label><label class="form-field"><span>提醒时间（可选）</span><input name="reminderTime" type="time" value="${rule?.kind === "once" ? (rule.time ?? "") : ""}"></label></div>
+    <div id="template-once" class="form-grid"><label class="form-field" id="instance-date-field"><span id="instance-date-label">计划日期</span><input name="dueDate" type="date" required value="${rule?.kind === "once" && rule.date ? rule.date : state.today}"></label><label class="form-field"><span>提醒时间（可选）</span><input name="reminderTime" type="time" value="${rule?.kind === "once" ? (rule.time ?? "") : ""}"></label></div>
     <button type="button" id="instance-more-dates" class="text-button">＋ 添加更多具体日程</button>
     <div id="template-calendar" class="form-field"><span>具体日程 <small data-explanation>一个开始时间对应多个日期；所有时段共用任务内容</small></span><div id="calendar-entries">${calendar.map((e) => calendarEntryHtml(e.dates, e.time ?? "")).join("")}</div><button type="button" id="calendar-add" class="text-button">＋ 添加另一开始时间</button></div>
     <details class="editor-details" ${shape?.notes || shape?.tags.length || shape?.subtasks.length ? "open" : ""}><summary>备注、标签与步骤 <small data-explanation>可选</small></summary><label class="form-field"><span>备注</span><textarea name="notes" rows="2" maxlength="15000">${escape(shape?.notes)}</textarea></label><label class="form-field"><span>标签（逗号分隔）</span><input name="tags" value="${escape(shape?.tags.join(", "))}"></label><label class="form-field"><span>子任务（每行一步）</span><textarea name="subtasks" rows="3">${escape(shape?.subtasks.map((s) => s.title).join("\n"))}</textarea></label></details>
-    <details class="editor-details" ${shape?.projectId || shape?.goalId ? "open" : ""}><summary>项目、目标与优先级 <small data-explanation>可选</small></summary><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${p.id === (shape?.projectId || (page.startsWith("project:") ? page.slice(8) : "")) ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>所属目标</span><select name="goalId"><option value="">不属于目标</option>${state.data.goals.map((g) => `<option value="${g.id}" ${g.id === shape?.goalId ? "selected" : ""}>${escape(g.name)}</option>`).join("")}<option value="__new__">＋ 新建目标…</option></select></label><label class="form-field"><span>优先级</span><select name="priority">${[0, 1, 2, 3].map((v) => `<option value="${v}" ${v === (shape?.priority ?? 0) ? "selected" : ""}>${["无", "低", "中", "高"][v]}</option>`).join("")}</select></label></div><div id="template-goal-inline" class="inline-create" hidden><input name="newGoalName" maxlength="40" placeholder="目标名称"><button id="template-create-goal" type="button" class="button secondary">创建并选用</button></div></details>
+    <details class="editor-details" ${shape?.projectId ? "open" : ""}><summary>项目与优先级 <small data-explanation>可选</small></summary><div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${p.id === (shape?.projectId || (page.startsWith("project:") ? page.slice(8) : "")) ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>优先级</span><select name="priority">${[0, 1, 2, 3].map((v) => `<option value="${v}" ${v === (shape?.priority ?? 0) ? "selected" : ""}>${["无", "低", "中", "高"][v]}</option>`).join("")}</select></label></div></details>
     <details class="editor-details" ${shape?.focusMinutes || shape?.scrapMinutes ? "open" : ""}><summary>专注时段与补做 <small data-explanation>可选</small></summary><div class="form-grid"><label class="form-field"><span>每段专注时长（分钟）</span><input name="focusMinutes" type="number" min="1" max="180" value="${shape?.focusMinutes ?? ""}" placeholder="${state.data.settings.focusMinutes}，留空自动安排"></label><label class="form-field" id="repair-window-field"><span>重修窗口（分钟）</span><input name="scrapMinutes" type="number" min="0" max="10080" value="${shape?.scrapMinutes ?? 0}"><small>计划块结束后可补做的时间，仅当天有效。</small></label></div></details>
     <details class="editor-details" id="template-printing-options" ${mode === "automatic" || kind === "weekly" ? "open" : ""}><summary>印刷安排 <small id="printing-option-label" data-explanation>自动印刷时填写</small></summary><label class="form-field"><span>印刷规则</span><select name="printing"><option value="once" ${kind === "once" ? "selected" : ""}>不重复 · 按具体日期安排</option><option value="calendar" ${kind === "calendar" ? "selected" : ""}>不重复 · 分时日程表</option><option value="weekly" ${kind === "weekly" ? "selected" : ""}>重复 · 每周循环</option></select></label><div id="automatic-printing-options"><label class="form-field"><span>提前印出未来多少天？</span><input name="printAheadDays" type="number" min="0" max="90" value="${template?.printAheadDays ?? 7}"><small>默认提前 7 天；重复安排印完涉及的完整周。0 表示本周或当天日程，运行时补齐尚未报废的遗漏。</small></label></div><div id="template-weekly" class="form-field"><span>周期内时段 <small><span data-explanation>默认一周；一个开始时间对应多个星期单元，</span>每次印完完整周</small></span><div id="template-slots">${slots.map((s) => habitSlotHtml(s.days, s.time ?? "")).join("")}</div><button type="button" id="template-add-slot" class="text-button">${icon("plus")} 添加周期时段</button></div><div id="habit-group-field"><label class="form-field"><span>习惯分组</span><select name="habitId"><option value="">自动按任务名称创建</option>${state.data.habits.map((h) => `<option value="${escape(h.id)}" ${h.id === shape?.habitId ? "selected" : ""}>${escape(h.name)}</option>`).join("")}<option value="__new__">＋ 新建习惯组…</option></select></label><div id="habit-group-inline" class="inline-create" hidden><input name="newHabitName" maxlength="40" placeholder="习惯组名称"><button type="button" id="template-create-habit" class="button secondary">创建并选用</button></div></div></details>
     <div id="manual-printing-options"><label class="setting-row"><span><strong>保存时一起印刷</strong><small>关闭时只保留模板，需要时再手动印刷。</small></span><input name="printNow" class="switch" type="checkbox"></label><div class="form-grid" id="manual-print-range"><label class="form-field"><span>印刷起始日期</span><input name="printDate" type="date" value="${state.today}"></label><label class="form-field"><span>印刷结束日期</span><input name="printUntil" type="date" value="${state.today}"></label></div></div>
@@ -1926,7 +1810,6 @@ function templateDialog(
       print = mode === "manual" && input("printNow").checked;
     const weekly = retained && input("printing").value === "weekly";
     const calendar = input("printing").value === "calendar";
-    const goal = !!input("goalId").value;
     $("#creation-mode-hint").textContent =
       mode === "instance"
         ? "印出本次实例或整份日程，不保留模板。"
@@ -1937,12 +1820,12 @@ function templateDialog(
     $("#automatic-printing-options").hidden = !automatic;
     input("printAheadDays").disabled = !automatic;
     input("printing").disabled = false;
-    input("dueDate").disabled = mode === "manual" || calendar || weekly;
+    input("dueDate").disabled = calendar || weekly;
     input("printDate").disabled = !print || calendar;
     input("printUntil").disabled = !print || calendar;
     input("reminderTime").disabled = weekly || calendar;
     input("reminderTime").required = false;
-    input("dueDate").required = automatic && !weekly && !calendar;
+    input("dueDate").required = !weekly && !calendar;
     $("#template-calendar").hidden = !calendar;
     $("#instance-more-dates").hidden = retained || calendar;
     form
@@ -1962,19 +1845,11 @@ function templateDialog(
       ? "周期与预印"
       : "可选，批量使用时再填写";
     $("#template-weekly").hidden = !weekly;
-    $("#template-once").hidden =
-      weekly ||
-      calendar ||
-      (mode === "manual" &&
-        !print &&
-        !goal &&
-        !input("reminderTime").value &&
-        !$<HTMLDetailsElement>("#template-printing-options").open);
-    $("#instance-date-field").hidden = mode === "manual";
+    $("#template-once").hidden = weekly || calendar;
+    $("#instance-date-field").hidden = false;
     $("#instance-date-label").textContent = automatic
       ? "自动印刷日期"
       : "计划日期";
-    $("#template-goal-inline").hidden = input("goalId").value !== "__new__";
     const timed = weekly
       ? [
           ...form.querySelectorAll<HTMLInputElement>(
@@ -1992,15 +1867,13 @@ function templateDialog(
     $("#habit-group-field").hidden = !habit;
     input("habitId").disabled = !habit;
     $("#habit-group-inline").hidden = input("habitId").value !== "__new__";
-    $("#repair-window-field").hidden = goal || habit || !timed;
-    input("scrapMinutes").disabled = goal || habit;
-    $("#template-type").textContent = goal
-      ? "实例按组标识和执行日期配对主线节点，节点裁定后报废；可使用重复安排。"
-      : habit
-        ? "习惯漏做记缺勤，不补做。"
-        : timed
-          ? "超过计划块但还在重修窗口内时，会进入待补队列。"
-          : "";
+    $("#repair-window-field").hidden = habit || !timed;
+    input("scrapMinutes").disabled = habit;
+    $("#template-type").textContent = habit
+      ? "习惯漏做记缺勤，不补做。"
+      : timed
+        ? "超过计划块但还在重修窗口内时，会进入待补队列。"
+        : "";
     $("#save-template-only").hidden = mode !== "manual" || !print;
     $("#create-from-editor").textContent =
       mode === "instance"
@@ -2103,27 +1976,6 @@ function templateDialog(
       update();
     }
   });
-  $("#template-create-goal").onclick = async () => {
-    if (
-      await act(
-        {
-          type: "saveGoal",
-          id: null,
-          name: input("newGoalName").value,
-          nodes: [],
-        },
-        "目标已创建",
-      )
-    ) {
-      const goal = state.data.goals.at(-1)!;
-      input("goalId").insertAdjacentHTML(
-        "beforeend",
-        `<option value="${escape(goal.id)}">${escape(goal.name)}</option>`,
-      );
-      input("goalId").value = goal.id;
-      update();
-    }
-  };
   $("#template-create-habit").onclick = async () => {
     if (
       await act(
@@ -2173,7 +2025,6 @@ function templateDialog(
       title: input("title").value,
       notes: input("notes").value,
       projectId: input("projectId").value || null,
-      goalId: input("goalId").value || null,
       habitId:
         weekly && formSlots.some((s) => s.time)
           ? input("habitId").value || null
@@ -2210,7 +2061,7 @@ function templateDialog(
         ? { kind: "calendar", slots: calendarSlots }
         : {
             kind: "once",
-            date: mode === "manual" ? null : date,
+            date: input("dueDate").value,
             time: input("reminderTime").value || null,
           };
     if (mode === "instance") {
@@ -2263,21 +2114,14 @@ function templateDialog(
 
 function taskDialog(id?: string) {
   const task = state.data.tasks.find((t) => t.id === id);
-  if (task && nodeOf(task)?.result) {
-    const n = nodeOf(task)!;
-    modal(
-      `${modalHeader("实例记录", task.title)}<p>所属节点「${escape(n.spec.name)}」已裁定${verdictLabel(n.result!.verdict)}，本实例已报废。</p><p class="subtle">${task.completed ? "这条任务已完成，完成记录保留。" : "这条任务未完成，原完成状态保留。"}</p><p class="preserve-lines">${escape(task.notes)}</p><ul>${task.subtasks.map((s) => `<li>${s.done ? "已完成" : "未完成"} · ${escape(s.title)}</li>`).join("")}</ul><div class="modal-actions"><button class="button secondary" data-action="close-modal">关闭</button></div>`,
-    );
-    return;
-  }
   const subs = task?.subtasks.map((s) => ({ ...s })) || [];
   const projectId =
     task?.projectId || (page.startsWith("project:") ? page.slice(8) : "");
   modal(
     `${modalHeader(task ? "编辑实例" : "直接创建实例", "日期、完成状态和专注记录属于这一次执行。", true)}
     <form id="task-form"><label class="form-field"><span>任务名称</span><input name="title" maxlength="200" required autofocus value="${escape(task?.title)}"></label>
-    <div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${p.id === projectId ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>所属目标</span><select name="goalId"><option value="">不属于目标</option>${state.data.goals.map((g) => `<option value="${g.id}" ${g.id === task?.goalId ? "selected" : ""}>${escape(g.name)}</option>`).join("")}</select></label><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>提醒时间</span><input name="reminderTime" type="time" value="${escape(task?.reminderTime)}"></label><label class="form-field"><span>单次专注时长</span><input name="focusMinutes" type="number" min="1" max="180" value="${task?.focusMinutes ?? ""}" placeholder="${state.data.settings.focusMinutes}"></label><label class="form-field"><span>预计用时（分钟）</span><input name="durationMinutes" type="number" min="1" max="17820" required value="${(task?.estimate ?? 1) * (task?.focusMinutes ?? state.data.settings.focusMinutes)}"><small id="instance-duration-preview"></small></label><label class="form-field"><span>优先级</span><select name="priority">${[0, 1, 2, 3].map((v) => `<option value="${v}" ${v === (task?.priority ?? 0) ? "selected" : ""}>${["无", "低", "中", "高"][v]}</option>`).join("")}</select></label><label class="form-field"><span>重修窗口（分钟）</span><input name="scrapMinutes" type="number" min="0" max="10080" required value="${task?.scrapMinutes ?? 0}"></label></div>
-    <p class="subtle small">普通实例在计划块结束后、当天内可重修；目标实例由配对节点裁定报废，习惯不重修。<span data-explanation>重复安排请在模板编辑器中设置。</span></p><label class="form-field"><span>备注</span><textarea name="notes" rows="3" maxlength="15000">${escape(task?.notes)}</textarea></label><label class="form-field"><span>标签（逗号分隔）</span><input name="tags" value="${escape(task?.tags.join(", "))}"></label><div class="form-field"><span>子任务</span><div id="subtask-editor"></div><div class="subtask-add"><input id="subtask-input" maxlength="200" placeholder="添加一个子任务"><button type="button" class="icon-btn" id="add-subtask" aria-label="添加子任务">${icon("plus")}</button></div></div>
+    <div class="form-grid"><label class="form-field"><span>所属项目</span><select name="projectId"><option value="">不分类</option>${state.data.projects.map((p) => `<option value="${p.id}" ${p.id === projectId ? "selected" : ""}>${escape(p.name)}</option>`).join("")}</select></label><label class="form-field"><span>计划日期</span><input name="dueDate" type="date" required value="${task ? task.dueDate || "" : state.today}"></label><label class="form-field"><span>提醒时间</span><input name="reminderTime" type="time" value="${escape(task?.reminderTime)}"></label><label class="form-field"><span>单次专注时长</span><input name="focusMinutes" type="number" min="1" max="180" value="${task?.focusMinutes ?? ""}" placeholder="${state.data.settings.focusMinutes}"></label><label class="form-field"><span>预计用时（分钟）</span><input name="durationMinutes" type="number" min="1" max="17820" required value="${(task?.estimate ?? 1) * (task?.focusMinutes ?? state.data.settings.focusMinutes)}"><small id="instance-duration-preview"></small></label><label class="form-field"><span>优先级</span><select name="priority">${[0, 1, 2, 3].map((v) => `<option value="${v}" ${v === (task?.priority ?? 0) ? "selected" : ""}>${["无", "低", "中", "高"][v]}</option>`).join("")}</select></label><label class="form-field"><span>重修窗口（分钟）</span><input name="scrapMinutes" type="number" min="0" max="10080" required value="${task?.scrapMinutes ?? 0}"></label></div>
+    <p class="subtle small">普通实例在计划块结束后、当天内可重修；习惯不重修。<span data-explanation>重复安排请在模板编辑器中设置。</span></p><label class="form-field"><span>备注</span><textarea name="notes" rows="3" maxlength="15000">${escape(task?.notes)}</textarea></label><label class="form-field"><span>标签（逗号分隔）</span><input name="tags" value="${escape(task?.tags.join(", "))}"></label><div class="form-field"><span>子任务</span><div id="subtask-editor"></div><div class="subtask-add"><input id="subtask-input" maxlength="200" placeholder="添加一个子任务"><button type="button" class="icon-btn" id="add-subtask" aria-label="添加子任务">${icon("plus")}</button></div></div>
     <div class="modal-actions">${task ? `<button type="button" class="text-button danger-text" data-delete-task="${task.id}">删除任务</button>` : '<button type="button" class="text-button" data-action="new-task">使用模板编辑器</button>'}<div><button type="button" class="button secondary" data-action="close-modal">取消</button><button type="submit" class="button primary">${task ? "保存修改" : "创建任务"}</button></div></div></form>`,
     true,
   );
@@ -2362,7 +2206,6 @@ function taskDialog(id?: string) {
             title: f.get("title"),
             notes: f.get("notes"),
             projectId: f.get("projectId") || null,
-            goalId: f.get("goalId") || null,
             dueDate: f.get("dueDate") || null,
             reminderTime: f.get("reminderTime") || null,
             focusMinutes: budget.focusMinutes,
@@ -2387,11 +2230,35 @@ function projectDialog(id?: string) {
   const p = state.data.projects.find((p) => p.id === id),
     colors = ["#df7561", "#849b7d", "#d5a553", "#8b92b9", "#75a5ac", "#b787a3"];
   modal(
-    `${modalHeader(p ? "编辑项目" : "新建项目", "把相关的任务，放在一起。", true)}<form id="project-form"><label class="form-field"><span>项目名称</span><input name="name" maxlength="40" required autofocus value="${escape(p?.name)}" placeholder="例如：学习 Rust"></label><label class="form-field"><span>项目颜色</span><input name="color" type="color" value="${p?.color || colors[state.data.projects.length % colors.length]}"></label><div class="modal-actions">${p ? `<button type="button" class="text-button danger-text" id="delete-project">删除项目</button>` : "<span></span>"}<button type="submit" class="button primary">保存项目</button></div></form>`,
+    `${modalHeader(p ? "编辑项目" : "新建项目", "把相关的任务，放在一起。", true)}<form id="project-form"><label class="form-field"><span>项目名称</span><input name="name" maxlength="40" required autofocus value="${escape(p?.name)}" placeholder="例如：学习 Rust"></label><label class="form-field"><span>项目颜色</span><input name="color" type="color" value="${p?.color || colors[state.data.projects.length % colors.length]}"></label>${!p ? '<label class="form-field"><span>资料目录（必须授权已存在的专用目录）</span><input name="directory" id="project-directory" required placeholder="/home/用户名/study/项目"><button type="button" id="choose-project-directory" class="button secondary">选择目录</button></label>' : ""}<div class="modal-actions">${p ? `<button type="button" class="text-button danger-text" id="delete-project">删除项目</button>` : "<span></span>"}<button type="submit" class="button primary">保存项目</button></div></form>`,
   );
+  if (!p)
+    $("#choose-project-directory").onclick = async () => {
+      const directory = await chooseProjectDirectory();
+      if (directory)
+        ($("#project-directory") as HTMLInputElement).value = directory;
+    };
   $("#project-form").onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target as HTMLFormElement);
+    if (!p) {
+      try {
+        accept(
+          await agentCall<Snapshot>({
+            op: "authorize_project_directory",
+            name: f.get("name"),
+            color: f.get("color"),
+            directory: f.get("directory"),
+          }),
+        );
+        closeModal();
+        toast("项目和目录授权已保存");
+      } catch (error) {
+        toast(String(error));
+      }
+      return;
+    }
+
     if (
       await act(
         {
@@ -2414,63 +2281,6 @@ function projectDialog(id?: string) {
         async () => {
           page = "tasks";
           await act({ type: "deleteProject", id: p.id }, "项目已删除");
-        },
-        true,
-      );
-}
-function goalDialog(id?: string) {
-  const goal = state.data.goals.find((g) => g.id === id);
-  const specs = goal?.nodes.map((n) => structuredClone(n.spec)) ?? [];
-  modal(
-    `${modalHeader(goal ? "编辑目标组与主线" : "新建目标", "点节点编辑，拖拽调整顺序；主线负责裁定，实例仍由模板印刷。", true)}
-    <form id="goal-form"><label class="form-field"><span>任务组名称</span><input name="name" required maxlength="40" autofocus value="${escape(goal?.name)}" placeholder="例如：操作系统学习"></label>${goal ? `<details class="editor-details"><summary>永久配对标识符</summary><p class="identity-value">${escape(goal.id)}</p><p class="subtle small">改名和编辑主线都不会改变；删除后的 ID 也不能用于新建实体。</p></details>` : ""}<div id="node-graph-host"></div><p class="subtle small">按执行开始时间匹配，区间不重叠。到时未完成不会自行过期，只有信号能够裁定。</p><div class="modal-actions">${goal && !goal.nodes.some((n) => n.result || n.emitted) ? '<button type="button" class="text-button danger-text" id="delete-goal">删除目标组</button>' : "<span></span>"}<div><button type="button" class="button secondary" data-action="close-modal">取消</button><button type="submit" class="button primary">保存目标</button></div></div></form>`,
-    true,
-  );
-  const form = $<HTMLFormElement>("#goal-form");
-  const graph = createNodeGraph($("#node-graph-host"), {
-    specs,
-    goal,
-    icon,
-    escape,
-    progress: (nodeId) => nodeProgress(goal?.id ?? "", nodeId),
-    canDelete: (nodeId) => {
-      const node = goal?.nodes.find((n) => n.spec.id === nodeId);
-      if (!node || node.result || node.emitted) return false;
-      if (state.data.nodeBindings.some((b) => b.nodeId === nodeId))
-        return false;
-      return !state.data.signalEvents.some((e) =>
-        e.deliveries.some((d) => d.nodeId === nodeId),
-      );
-    },
-    verdict: verdictLabel,
-    signalLabel,
-    blockLabels,
-    shiftDate: shiftedDate,
-  });
-  form.onsubmit = async (event) => {
-    event.preventDefault();
-    if (
-      await act(
-        {
-          type: "saveGoal",
-          id: goal?.id ?? null,
-          name: form.querySelector<HTMLInputElement>("[name=name]")!.value,
-          nodes: graph.getSpecs(),
-        },
-        "目标组与主线已保存",
-      )
-    )
-      closeModal();
-  };
-  const deleteButton = form.querySelector<HTMLButtonElement>("#delete-goal");
-  if (deleteButton)
-    deleteButton.onclick = () =>
-      confirmDialog(
-        "删除目标组？",
-        "未裁定实例保留并移出任务组，组与节点的 ID 将永久保留，不能复用。",
-        "删除目标组",
-        async () => {
-          await act({ type: "deleteGoal", id: goal!.id }, "目标组已删除");
         },
         true,
       );
@@ -2850,12 +2660,12 @@ async function importPlan() {
     if (!plan) return;
     if (
       plan.format !== "tomato-todo-plan" ||
-      ![1, 2, 3, 4, 5].includes(plan.version) ||
+      plan.version !== 6 ||
       !Array.isArray(plan.tasks) ||
       !Array.isArray(plan.projects)
     ) {
       throw new Error(
-        "请选择 tomato-todo-plan v1–v5 计划文件；完整备份请使用“导入备份”。",
+        "请选择 tomato-todo-plan v6 计划文件；完整备份请使用“导入备份”。",
       );
     }
     const existing = new Set(state.data.tasks.map((t) => t.id));
@@ -2906,7 +2716,6 @@ document.addEventListener("click", async (e) => {
     const r = el.getBoundingClientRect();
     showContextMenu(r.left, r.bottom + 4, [
       ["移出所属项目", () => void detachSelected("project")],
-      ["移出所属目标", () => void detachSelected("goal")],
       ["移出所属习惯", () => void detachSelected("habit")],
     ]);
     return;
@@ -2972,8 +2781,8 @@ document.addEventListener("click", async (e) => {
       navigate("focus");
     return;
   }
-  if (d.goalsTab) {
-    goalsTab = d.goalsTab;
+  if (d.collectionsTab) {
+    collectionsTab = d.collectionsTab;
     render();
     return;
   }
@@ -3057,33 +2866,6 @@ document.addEventListener("click", async (e) => {
   }
   if (d.editProject) {
     projectDialog(d.editProject);
-    return;
-  }
-  if (d.restorePaired) {
-    const record = state.data.identities.find(
-      (r) => r.id === d.restorePaired && r.retired && r.restoreTask,
-    );
-    if (record?.restoreTask)
-      await act(
-        { type: "restoreTask", task: JSON.parse(record.restoreTask) },
-        "原配对任务已恢复",
-      );
-    return;
-  }
-  if (d.confirmNode) {
-    await act(
-      {
-        type: "confirmNode",
-        goalId: d.nodeGoal,
-        nodeId: d.confirmNode,
-        confirmed: d.confirmed === "true",
-      },
-      "阶段完成确认已保存",
-    );
-    return;
-  }
-  if (d.editGoal) {
-    goalDialog(d.editGoal);
     return;
   }
   if (d.editHabit) {
@@ -3256,9 +3038,6 @@ document.addEventListener("click", async (e) => {
       ]);
       break;
     }
-    case "new-goal":
-      goalDialog();
-      break;
     case "new-habit":
       templateDialog(undefined, true);
       break;
@@ -3317,10 +3096,6 @@ document.addEventListener("click", async (e) => {
       break;
     case "sound":
       soundDialog();
-      break;
-    case "toggle-undated":
-      undatedExpanded = !undatedExpanded;
-      render();
       break;
     case "toggle-chime":
       await act({
@@ -3528,7 +3303,7 @@ function selectControls() {
     ? `<button class="button secondary small-button" data-select-all="on">全选</button><button class="button secondary small-button" data-detach-selected="on" ${selectedTaskIds.size ? "" : "disabled"}>移出（${selectedTaskIds.size}）</button><button class="button danger small-button" data-delete-selected ${selectedTaskIds.size ? "" : "disabled"}>删除所选（${selectedTaskIds.size}）</button><button class="text-button" data-select-mode="off">退出选择</button>`
     : `<button class="button secondary small-button" data-select-mode="on">${icon("check-check")} 选择</button>`;
 }
-async function detachSelected(target: "project" | "goal" | "habit") {
+async function detachSelected(target: "project" | "habit") {
   const ids = [...selectedTaskIds];
   if (!ids.length) return;
   selectedTaskIds.clear();

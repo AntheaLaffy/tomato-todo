@@ -51,6 +51,11 @@ test("compact mode: global hiding, local persistence and important information",
       await page.locator('[data-page="tasks"]').first().click();
       await page.locator(".task-row .task-body").first().click();
       await explanation(page.locator(".modal-heading p"));
+      await expect(page.locator('#task-form [name="dueDate"]')).toHaveAttribute(
+        "required",
+        "",
+      );
+      await expect(page.locator('#task-form [name="goalId"]')).toHaveCount(0);
       await explanation(
         page.getByText("重复安排请在模板编辑器中设置。", { exact: true }),
       );
@@ -68,7 +73,7 @@ test("compact mode: global hiding, local persistence and important information",
       await page.locator('[data-action="new-task"]').first().click();
       for (const title of [
         "备注、标签与步骤",
-        "项目、目标与优先级",
+        "项目与优先级",
         "专注时段与补做",
       ]) {
         const summary = page.locator("#template-form summary", {
@@ -166,7 +171,19 @@ test("compact mode: global hiding, local persistence and important information",
     await page
       .locator('#template-form [name="title"]')
       .fill("简洁模式验证任务");
-    await page.locator('#template-form [name="dueDate"]').fill("2099-12-31");
+    const taskDate = page.locator('#template-form [name="dueDate"]');
+    await expect(taskDate).toHaveAttribute("required", "");
+    await expect(
+      page.locator('#template-form [name="reminderTime"]'),
+    ).not.toHaveAttribute("required", "");
+    await taskDate.fill("");
+    await page.locator("#create-from-editor").click();
+    await expect(page.locator("#template-form")).toBeVisible();
+    assert.equal(
+      await taskDate.evaluate((input) => input.validity.valueMissing),
+      true,
+    );
+    await taskDate.fill("2099-12-31");
     await page.locator('#template-form [name="reminderTime"]').fill("13:45");
     await page.locator("#create-from-editor").click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -227,7 +244,7 @@ test("compact mode: global hiding, local persistence and important information",
       }),
     ).toBeHidden();
     await page.getByRole("button", { name: "关闭对话框", exact: true }).click();
-    for (const name of ["tasks", "goals", "stats", "schedule"]) {
+    for (const name of ["tasks", "collections", "stats", "schedule"]) {
       await page.locator(`[data-page="${name}"]`).first().click();
       const visible = await page
         .locator("[data-explanation]")
@@ -244,22 +261,6 @@ test("compact mode: global hiding, local persistence and important information",
         await expect(task.locator(".task-meta")).toContainText("13:45");
         await expect(task.locator(".task-meta")).toBeVisible();
         await expect(task.locator(".tomato-count")).toBeVisible();
-      }
-      if (name === "goals") {
-        await page
-          .getByRole("button", { name: "新建目标", exact: true })
-          .click();
-        await page.locator(".node-add.tail").click();
-        await expect(page.locator(".node-inspector-hint")).toBeHidden();
-        await expect(
-          page.getByText("成功或失败都会报废配对实例，裁定不可撤销。", {
-            exact: true,
-          }),
-        ).toBeVisible();
-        await expect(page.locator('[data-node-field="start"]')).toBeVisible();
-        await page
-          .getByRole("button", { name: "关闭对话框", exact: true })
-          .click();
       }
       if (name === "schedule") {
         await expect(page.locator(".calendar-resize-handle")).toBeVisible();
@@ -286,6 +287,19 @@ test("compact mode: global hiding, local persistence and important information",
     await expect(page.locator('[data-agent="attach"]')).toBeVisible();
     await expect(page.locator(".agent-composer-hint")).toBeHidden();
     // An asynchronous upload status must remain visible even though shortcuts are hidden.
+    const materials = join(dir, "materials");
+    await mkdir(materials, { recursive: true });
+    const grant = await fetch(`${url}/api/agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        op: "authorize_project_directory",
+        name: "未分类",
+        color: "#849b7d",
+        directory: materials,
+      }),
+    });
+    assert.ok(grant.ok, await grant.text());
     await page.locator("#agent-attachment-input").setInputFiles({
       name: "notes.txt",
       mimeType: "text/plain",
@@ -382,7 +396,7 @@ test("compact mode: global hiding, local persistence and important information",
   }
 });
 
-test("today task groups: fixed order, full catch-up queue and undated collapse", async () => {
+test("today task groups: fixed order and full catch-up queue", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tomato-today-"));
   const url = "http://127.0.0.1:4325";
   const server = spawn("target/debug/tomato-preview", [], {
@@ -416,12 +430,10 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       id,
       title: id,
       notes: "",
-      nodeId: null,
       templateId: null,
       recurring: false,
       scrapMinutes: 1440,
       projectId: null,
-      goalId: null,
       habitId: null,
       dueDate: snapshot.today,
       reminderTime: null,
@@ -439,7 +451,6 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       ...fields,
     });
     snapshot.data.tasks = [
-      task("undated-low", { dueDate: null }),
       task("untimed-low"),
       task("timed-late", { reminderTime: "18:00" }),
       task("catch-4", { reminderTime: "10:00" }),
@@ -449,7 +460,6 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       task("timed-early", { reminderTime: "13:00", createdAt: 2 }),
       task("untimed-high-new", { priority: 3, createdAt: 3 }),
       task("untimed-high-old", { priority: 3, createdAt: 2 }),
-      task("undated-high", { dueDate: null, priority: 3 }),
       task("future", { dueDate: "9999-12-31" }),
       task("voided", { reminderTime: "06:00", reminderExpired: true }),
       task("completed", { completed: true, completedAt: snapshot.serverTime }),
@@ -477,7 +487,6 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       "今日定时2",
       "待补队列4",
       "今日未定时3",
-      "无日期任务2",
     ]);
     const initialIds = [
       "timed-early",
@@ -495,35 +504,15 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       page.locator('.today-card [data-filter="active"]'),
     ).toContainText("9");
     await expect(page.locator(".today-card .count-label")).toHaveText("9");
-    await expect(
-      page.locator('[data-action="toggle-undated"]'),
-    ).toHaveAttribute("aria-expanded", "false");
-    await expect(page.locator('[data-action="toggle-catch-up"]')).toHaveCount(
-      0,
-    );
     assert.deepEqual(await ids("#today-catch-up-tasks .task-row"), [
       "catch-1",
       "catch-2",
       "catch-3",
       "catch-4",
     ]);
-    await page.locator('[data-action="toggle-undated"]').click();
-    assert.deepEqual(await ids("#today-undated-tasks .task-row"), [
-      "undated-high",
-      "undated-low",
-    ]);
-    await expect(page.locator(".today-card .count-label")).toHaveText("9");
-    // A real snapshot refresh must preserve the user's expanded groups.
-    snapshot.data.tasks[0].notes = "refreshed";
-    await page.waitForResponse("**/api/snapshot");
-    await expect(
-      page.locator('[data-action="toggle-undated"]'),
-    ).toHaveAttribute("aria-expanded", "true");
     await page.locator('.today-card [data-filter="completed"]').click();
     assert.deepEqual(await ids(`${list} .task-row`), ["completed"]);
     await page.locator('.today-card [data-filter="active"]').click();
-    await expect(page.locator("#today-undated-tasks .task-row")).toHaveCount(2);
-    await page.locator('[data-action="toggle-undated"]').click();
     for (const order of ["created", "priority", "time"]) {
       await page.locator('nav [data-page="tasks"]').click();
       await page.locator("#task-sort").selectOption(order);
@@ -544,16 +533,6 @@ test("today task groups: fixed order, full catch-up queue and undated collapse",
       path: join(dir, "today-groups.png"),
       fullPage: true,
     });
-    snapshot.data.tasks = [task("only-undated", { dueDate: null })];
-    await page.reload();
-    await expect(page.locator(`${list} .group-title`)).toHaveText([
-      "无日期任务1",
-    ]);
-    await expect(page.locator(`${list} .empty-state`)).toHaveCount(0);
-    await expect(page.locator(".today-card .count-label")).toHaveText("0");
-    await expect(
-      page.locator('.today-card [data-filter="active"] span'),
-    ).toHaveText("0");
     snapshot.data.tasks = [];
     await page.reload();
     await expect(page.locator(`${list} .empty-state`)).toBeVisible();
@@ -620,7 +599,9 @@ test(
       await expect(page.locator(".welcome-card")).toContainText(
         "这里只有两件事值得你操心",
       );
-      await expect(page.locator(".welcome-card")).toContainText("任务的容器");
+      await expect(page.locator(".welcome-card")).toContainText(
+        "记录方向与安排",
+      );
       await page.locator('[data-action="welcome-done"]').click();
       await expect(page.locator(".welcome-card")).toHaveCount(0);
       await page.reload();
@@ -628,6 +609,33 @@ test(
         page.getByRole("heading", { name: "今天，也要慢慢向前。" }),
       ).toBeVisible();
       await expect(page.locator(".welcome-card")).toHaveCount(0);
+      await expect(page.locator('[data-page="goals"]')).toHaveCount(0);
+      await page.locator('[data-page="collections"]').first().click();
+      await expect(
+        page.locator(".list-tabs [data-collections-tab]"),
+      ).toHaveCount(2);
+      await expect(
+        page.getByRole("heading", { name: "还没有习惯", exact: true }),
+      ).toBeVisible();
+      await page.locator('[data-collections-tab="visions"]').click();
+      await page.locator("[data-new-vision]").first().click();
+      await page.locator('#vision-form [name="name"]').fill("保持好奇");
+      await page
+        .locator('#vision-form [name="notes"]')
+        .fill("给未来的自己留一句话。");
+      await expect(
+        page.locator('#vision-form [name="owner"] option', { hasText: "目标" }),
+      ).toHaveCount(0);
+      await page.getByRole("button", { name: "保存愿景", exact: true }).click();
+      await expect(page.locator(".vision-card")).toContainText("保持好奇");
+      await page.screenshot({
+        path: join(dir, "collections.png"),
+        fullPage: true,
+      });
+      await page.locator('[data-page="stats"]').first().click();
+      await expect(page.locator(".cross-head span")).toHaveCount(4);
+      await expect(page.locator(".mainline-card")).toHaveCount(0);
+      await page.locator('[data-page="focus"]').first().click();
       await page.locator('[data-action="sound"]').click();
       await expect(page.locator("#bgm-file")).toBeVisible();
       await page.locator("#bgm-file").setInputFiles({
@@ -728,10 +736,7 @@ test(
         .locator("summary")
         .filter({ hasText: "备注、标签与步骤" })
         .click();
-      await page
-        .locator("summary")
-        .filter({ hasText: "项目、目标与优先级" })
-        .click();
+      await page.locator("summary").filter({ hasText: "项目与优先级" }).click();
       await page.locator("summary").filter({ hasText: "印刷安排" }).click();
       await page.locator("[name=printNow]").check();
       await page.locator("[name=title]").fill("学习 Rust 的所有权");
@@ -809,29 +814,25 @@ test(
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "新建项目", exact: true }).click();
       await page.locator("[name=name]").fill("个人成长");
+      const materials = join(dir, "project-materials");
+      await mkdir(materials, { recursive: true });
+      await page.locator("#project-directory").fill(materials);
       await page.getByRole("button", { name: "保存项目", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(
         page.locator(".project-nav").filter({ hasText: "个人成长" }),
       ).toBeVisible();
-      await page.locator("[data-page=goals]").first().click();
-      await page.getByRole("button", { name: "新建目标", exact: true }).click();
-      await page.locator("#goal-form [name=name]").fill("OpenCamp");
-      await expect(page.locator("#goal-form [name=target]")).toHaveCount(0);
-      await expect(page.locator("#goal-form [name=unit]")).toHaveCount(0);
-      await page.getByRole("button", { name: "保存目标", exact: true }).click();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await page.locator("[data-page=collections]").first().click();
       await expect(
-        page.locator(".goal-section").filter({ hasText: "OpenCamp" }),
-      ).toBeVisible();
-      await page.locator("[data-goals-tab=habits]").click();
-      await expect(page.locator("[data-goals-tab=habits]")).toHaveClass(
+        page.getByRole("button", { name: "新建目标", exact: true }),
+      ).toHaveCount(0);
+      await page.locator("[data-collections-tab=habits]").click();
+      await expect(page.locator("[data-collections-tab=habits]")).toHaveClass(
         /active/,
       );
       await expect(
         page.getByRole("button", { name: "新建习惯", exact: true }),
       ).toBeVisible();
-      await page.locator("[data-goals-tab=goals]").click();
       await page.locator("[data-page=focus]").first().click();
       await page.getByRole("button", { name: "开始专注", exact: true }).click();
       await expect(
@@ -1163,8 +1164,8 @@ test(
       await page.reload();
       await expect(reminder).toHaveCount(0);
       // A weekly habit materializes today's occurrence from its schedule.
-      await page.locator("[data-page=goals]").first().click();
-      await page.locator("[data-goals-tab=habits]").click();
+      await page.locator("[data-page=collections]").first().click();
+      await page.locator("[data-collections-tab=habits]").click();
       await page.getByRole("button", { name: "新建习惯", exact: true }).click();
       await page.locator("#template-form [name=title]").fill("午饭");
       const slot = page.locator("[data-slot]").first();
@@ -1175,7 +1176,7 @@ test(
       await page.getByRole("button", { name: "保存模板", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       const habitSection = page
-        .locator(".goal-section")
+        .locator(".group-section")
         .filter({ hasText: "午饭" });
       await expect(habitSection).toBeVisible();
       const habitSnapshot = await (await fetch(`${url}/api/snapshot`)).json();
@@ -1185,7 +1186,7 @@ test(
         8 - habitWeekday,
       );
       // Visions are markers with no jurisdiction.
-      await page.locator("[data-goals-tab=visions]").click();
+      await page.locator("[data-collections-tab=visions]").click();
       await page.getByRole("button", { name: "新建愿景", exact: true }).click();
       await page.locator("#vision-form [name=name]").fill("考上北大");
       await page.locator("#vision-form [name=notes]").fill("研究生工资与未来");
@@ -1449,8 +1450,6 @@ test(
           title,
           dueDate,
           reminderTime: time,
-          goalId: null,
-          nodeId: null,
           projectId: null,
           reminderPending: false,
           reminderExpired: false,
@@ -1516,8 +1515,6 @@ test(
       ].map((task) => ({
         ...task,
         completed: false,
-        goalId: null,
-        nodeId: null,
         reminderPending: false,
         reminderExpired: false,
       }));
@@ -1752,8 +1749,8 @@ test(
       assert.ok(snapshot.data.tasks.every((t) => t.templateId === null));
       // Repeated templates preprint before their occurrence and do not depend on
       // completing the previous task; a weekday can have multiple precise times.
-      await page.locator("[data-page=goals]").first().click();
-      await page.locator("[data-goals-tab=habits]").click();
+      await page.locator("[data-page=collections]").first().click();
+      await page.locator("[data-collections-tab=habits]").click();
       await page.getByRole("button", { name: "新建习惯", exact: true }).click();
       await page.locator("#template-form [name=title]").fill("分时习惯");
       for (const day of [1, 2, 3, 4, 5, 6, 7])
@@ -1814,8 +1811,8 @@ test(
       await expect(
         page.locator(`[data-template-id="${automatic.id}"]`),
       ).toHaveCount(0);
-      await page.locator("[data-page=goals]").first().click();
-      await page.locator("[data-goals-tab=habits]").click();
+      await page.locator("[data-page=collections]").first().click();
+      await page.locator("[data-collections-tab=habits]").click();
       await page
         .locator(
           `[data-habit-id="${automatic.shape.habitId}"] [data-delete-habit]`,
@@ -2031,249 +2028,6 @@ test(
         }
       }
       assert.deepEqual(errors, []);
-    } finally {
-      await browser?.close();
-      server.kill("SIGTERM");
-    }
-  },
-);
-
-test(
-  "mainline nodes: pairing, completion, semantic blocking, immutable verdicts and editor layout",
-  { timeout: 90_000 },
-  async () => {
-    const dir = await mkdtemp(join(tmpdir(), "tomato-nodes-"));
-    const url = "http://127.0.0.1:4323";
-    const server = spawn("target/debug/tomato-preview", [], {
-      env: {
-        ...process.env,
-        TOMATO_PORT: "4323",
-        TOMATO_DATA_PATH: join(dir, "nodes.sqlite3"),
-      },
-      stdio: "pipe",
-    });
-    let browser;
-    try {
-      for (let i = 0; i < 100; i++) {
-        try {
-          if ((await fetch(`${url}/api/snapshot`)).ok) break;
-        } catch {}
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      browser = await chromium.launch({
-        executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
-        headless: true,
-        args: ["--no-sandbox"],
-      });
-      const page = await browser.newPage({
-        viewport: { width: 1280, height: 1000 },
-      });
-      const errors = [];
-      page.on("pageerror", (e) => errors.push(e.message));
-      await page.goto(url);
-      let snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      const date = (days) => {
-        const d = new Date(`${snapshot.today}T12:00:00Z`);
-        d.setUTCDate(d.getUTCDate() + days);
-        return d.toISOString().slice(0, 10);
-      };
-      const field = (key) =>
-        page.locator(`#node-inspector [data-node-field="${key}"]`);
-      await page.locator("[data-page=goals]").first().click();
-      await page.getByRole("button", { name: "新建目标", exact: true }).click();
-      await page.locator("#goal-form [name=name]").fill("节点验证组");
-      const addNode = () => page.locator(".node-add.tail").click();
-      await addNode();
-      await field("name").fill("独立前置");
-      await field("start").fill(`${date(0)}T00:00`);
-      await field("end").fill(`${date(0)}T08:00`);
-      await field("signalKind").selectOption("none");
-      await addNode();
-      await field("name").fill("导学");
-      await field("end").fill(`${date(1)}T00:00`);
-      await field("signalKind").selectOption("success");
-      await field("signalAt").fill(`${date(3)}T00:00`);
-      await page
-        .locator("#node-inspector summary")
-        .filter({ hasText: "阻断外来" })
-        .click();
-      await field("blockFailure").selectOption("completed");
-      await field("blockSuccess").selectOption("unpaired");
-      await addNode();
-      await field("name").fill("验收结束");
-      await field("end").fill(`${date(2)}T00:00`);
-      await field("signalKind").selectOption("failure");
-      await field("direction").selectOption("head");
-      await field("condition").selectOption("completed");
-      await field("signalAt").fill(`${date(-1)}T00:00`);
-      await page
-        .locator("#node-inspector summary")
-        .filter({ hasText: "阶段完成要求" })
-        .click();
-      await field("confirmationRequired").check();
-      await page.setViewportSize({ width: 360, height: 900 });
-      await page.screenshot({
-        path: join(dir, "node-editor-mobile.png"),
-        fullPage: true,
-      });
-      assert.ok(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= innerWidth + 1,
-        ),
-      );
-      await page.setViewportSize({ width: 1280, height: 1000 });
-      await page.getByRole("button", { name: "保存目标", exact: true }).click();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      const group = snapshot.data.goals[0];
-      const ids = group.nodes.map((n) => n.spec.id);
-      assert.equal(new Set(ids).size, 3);
-      assert.equal(snapshot.data.signalEvents.length, 0);
-      const create = async (title, day, time) => {
-        await page.locator("[data-page=focus]").first().click();
-        await page.locator("[data-action=new-task]").first().click();
-        await page.locator("[name=title]").fill(title);
-        await page.locator("[name=dueDate]").fill(day);
-        await page.locator("[name=reminderTime]").fill(time);
-        await page.locator("summary").filter({ hasText: "项目、目标" }).click();
-        await page.locator("[name=goalId]").selectOption(group.id);
-        await page
-          .getByRole("button", { name: "创建任务", exact: true })
-          .click();
-        await expect(page.getByRole("dialog")).toHaveCount(0);
-      };
-      await create("导学练习", date(0), "09:00");
-      await create("验收任务", date(1), "12:00");
-      await page.locator("[data-page=goals]").first().click();
-      const card = page.locator(`[data-goal-id="${group.id}"]`);
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      const originalTask = snapshot.data.tasks.find(
-        (t) => t.title === "导学练习",
-      );
-      const deletion = await fetch(`${url}/api/action`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ type: "deleteTask", id: originalTask.id }),
-      });
-      assert.equal(deletion.status, 200);
-      await page.reload();
-      await page.locator("[data-page=goals]").first().click();
-      await card.locator(`[data-restore-paired="${originalTask.id}"]`).click();
-      await expect(
-        card.getByRole("button", { name: "完成任务 导学练习", exact: true }),
-      ).toBeVisible();
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      assert.equal(
-        snapshot.data.tasks.find((t) => t.title === "导学练习").id,
-        originalTask.id,
-      );
-      assert.equal(
-        snapshot.data.nodeBindings.filter((b) => b.taskId === originalTask.id)
-          .length,
-        1,
-      );
-      await card
-        .getByRole("button", { name: "完成任务 导学练习", exact: true })
-        .click();
-      await card
-        .getByRole("button", { name: "完成任务 验收任务", exact: true })
-        .click();
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      assert.equal(snapshot.data.signalEvents.length, 0);
-      await card.locator(`[data-confirm-node="${ids[2]}"]`).click();
-      await expect(
-        card.locator(`[data-mainline-node="${ids[2]}"] .badge`),
-      ).toHaveText("失败");
-      await expect(
-        card.locator(`[data-mainline-node="${ids[1]}"] .badge`),
-      ).toHaveText("已完成，等待裁定");
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      const event = snapshot.data.signalEvents[0];
-      assert.equal(event.deliveries.length, 2);
-      assert.equal(event.deliveries[1].blocked, true);
-      assert.equal(event.deliveries[1].blockRule, "completed");
-      assert.equal(snapshot.data.goals[0].nodes[0].result, null);
-      await card.locator(".signal-history summary").click();
-      await page.screenshot({
-        path: join(dir, "node-signal-history.png"),
-        fullPage: true,
-      });
-      const settled = card.locator(`[data-mainline-node="${ids[2]}"]`);
-      await expect(settled.locator("[data-toggle-task]")).toBeDisabled();
-      await settled.locator(".task-more").click();
-      await expect(
-        page.getByRole("heading", { name: "实例记录", exact: true }),
-      ).toBeVisible();
-      await expect(page.locator("#task-form")).toHaveCount(0);
-      await page.getByRole("button", { name: "关闭", exact: true }).click();
-      await card.locator("[data-edit-goal]").click();
-      await page.locator("#goal-form [name=name]").fill("组改名");
-      await page.locator(`[data-node-row="${ids[2]}"]`).click();
-      await expect(field("start")).toBeDisabled();
-      await field("name").fill("节点改名");
-      await page.getByRole("button", { name: "保存目标", exact: true }).click();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      assert.equal(snapshot.data.goals[0].id, group.id);
-      assert.deepEqual(
-        snapshot.data.goals[0].nodes.map((n) => n.spec.id),
-        ids,
-      );
-      assert.equal(snapshot.data.goals[0].nodes[2].result.verdict, "failure");
-      await page.reload();
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      assert.equal(snapshot.data.signalEvents.length, 1);
-      // A separate terminal check remains non-blocking and can observe completion after its time.
-      await page.locator("[data-page=goals]").first().click();
-      await page.getByRole("button", { name: "新建目标", exact: true }).click();
-      await page.locator("#goal-form [name=name]").fill("末检查组");
-      await page.locator(".node-add.tail").click();
-      await field("name").fill("末节点");
-      await field("signalAt").fill(`${date(-1)}T00:00`);
-      await page.getByRole("button", { name: "保存目标", exact: true }).click();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      const checkGroup = snapshot.data.goals[1];
-      assert.equal(checkGroup.nodes[0].result, null);
-      const response = await fetch(`${url}/api/action`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          type: "printInstances",
-          shape: { title: "检查任务", goalId: checkGroup.id, estimate: 1 },
-          printing: { kind: "once", date: date(0), time: "12:00" },
-        }),
-      });
-      assert.equal(response.status, 200);
-      await page.reload();
-      await page.locator("[data-page=goals]").first().click();
-      await page
-        .getByRole("button", { name: "完成任务 检查任务", exact: true })
-        .click();
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      assert.equal(snapshot.data.goals[1].nodes[0].result.verdict, "success");
-      assert.equal(
-        snapshot.data.tasks.find((t) => t.title === "检查任务").completed,
-        true,
-      );
-      // The statistics judge the whole line and align it with other tasks by day.
-      snapshot = await (await fetch(`${url}/api/snapshot`)).json();
-      assert.equal(
-        snapshot.stats.goals.find((g) => g.id === group.id).outcome,
-        "failure",
-      );
-      assert.equal(
-        snapshot.stats.goals.find((g) => g.id === checkGroup.id).outcome,
-        "success",
-      );
-      assert.ok(snapshot.stats.days.some((d) => d.goalFailure > 0));
-      await page.locator("[data-page=stats]").first().click();
-      const mainline = page.locator(".mainline-card");
-      await expect(mainline).toContainText("主线失败");
-      await expect(mainline).toContainText("全线成功");
-      await expect(page.locator(".cross-row.has-failure")).not.toHaveCount(0);
-      assert.deepEqual(errors, []);
-      console.log(`node artifacts: ${dir}`);
     } finally {
       await browser?.close();
       server.kill("SIGTERM");

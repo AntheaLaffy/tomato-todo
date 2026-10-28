@@ -807,6 +807,13 @@ fn interactive_calls_can_configure_tasks_directly() {
             .unwrap_err(),
         "工具未授权"
     );
+    for args in [
+        json!({"title":"刷题"}),
+        json!({"title":"刷题","dueDate":null}),
+        json!({"title":"刷题","dueDate":""}),
+    ] {
+        assert!(agent.call("create_task", &args, false).is_err());
+    }
     let created = agent
         .call(
             "create_task",
@@ -1246,4 +1253,121 @@ fn builtin_personas_stay_within_limits() {
             persona.id
         );
     }
+}
+
+#[test]
+fn project_directories_need_local_grants_and_chat_uploads_are_project_resources() {
+    let dir = tempfile::tempdir().unwrap();
+    let materials = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    assert!(agent
+        .request(json!({"op":"upload_attachment","name":"notes.txt","data":"aGVsbG8="}))
+        .is_err());
+    assert!(agent
+        .call(
+            "authorize_project_directory",
+            &json!({"directory":materials.path()}),
+            false
+        )
+        .is_err());
+    let snapshot=agent.request(json!({"op":"authorize_project_directory","directory":materials.path(),"name":"未分类","color":"#849b7d"})).unwrap();
+    let profile = &snapshot["data"]["education"]["projects"][0];
+    let id = profile["projectId"].as_str().unwrap();
+    assert_eq!(agent.project_mounts().unwrap().as_array().unwrap().len(), 1);
+    let file = agent
+        .request(
+            json!({"op":"upload_attachment","projectId":id,"name":"notes.txt","data":"aGVsbG8="}),
+        )
+        .unwrap();
+    let snapshot = agent.engine.lock().unwrap().snapshot(now()).unwrap();
+    let resource = snapshot
+        .data
+        .education
+        .resources
+        .iter()
+        .find(|r| r.id == file["id"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(materials.path().join(&resource.path)).unwrap(),
+        "hello"
+    );
+    let mut classified = resource.clone();
+    classified.kind = tomato_core::education::ResourceKind::Book;
+    agent
+        .call(
+            "education",
+            &json!({"command":{"op":"saveResource","resource":classified}}),
+            false,
+        )
+        .unwrap();
+    assert_eq!(
+        agent
+            .engine
+            .lock()
+            .unwrap()
+            .snapshot(now())
+            .unwrap()
+            .data
+            .education
+            .resources[0]
+            .kind,
+        tomato_core::education::ResourceKind::Book
+    );
+
+    assert_eq!(
+        agent
+            .request(json!({"op":"download_attachment","id":file["id"]}))
+            .unwrap()["data"],
+        "aGVsbG8="
+    );
+    let mut changed = snapshot.data.education.projects[0].clone();
+    changed.directory = std::env::temp_dir()
+        .join("not-authorized")
+        .to_string_lossy()
+        .into_owned();
+    // A data-only configuration change is never a new host permission.
+    (agent.apply)(
+        Action::Education {
+            command: tomato_core::education::Command::SaveProject { project: changed },
+        },
+        None,
+    )
+    .unwrap();
+    assert!(agent
+        .project_mounts()
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(agent
+        .request(
+            json!({"op":"upload_attachment","projectId":id,"name":"outside.txt","data":"aGVsbG8="})
+        )
+        .is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn project_resources_reject_links_and_overlapping_authorizations() {
+    let dir = tempfile::tempdir().unwrap();
+    let materials = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let snapshot=agent.request(json!({"op":"authorize_project_directory","directory":materials.path(),"name":"资料","color":"#849b7d"})).unwrap();
+    let id = snapshot["data"]["education"]["projects"][0]["projectId"]
+        .as_str()
+        .unwrap();
+    assert!(agent.request(json!({"op":"authorize_project_directory","directory":materials.path(),"name":"另一项目","color":"#849b7d"})).is_err());
+    std::os::unix::fs::symlink(outside.path(), materials.path().join("escape")).unwrap();
+    let resource = tomato_core::education::Resource {
+        id: "linked-resource".into(),
+        project_id: id.into(),
+        title: "越界资料".into(),
+        kind: tomato_core::education::ResourceKind::Reference,
+        path: "escape/data.txt".into(),
+        source: String::new(),
+        edition: String::new(),
+        topics: vec![],
+    };
+    assert!(agent.register_resource(resource).is_err());
 }

@@ -1,6 +1,6 @@
 {
   "format": "tomato-todo-plan",
-  "version": 5,
+  "version": 6,
   "pomodoroMinutes": 25,
   "projects": [
     {
@@ -19,7 +19,7 @@
       "title": "完成一章练习并复盘",
       "notes": "先独立练习，再核对答案和记录错因。日期可按自己的安排填写。",
       "projectId": "example-self-study",
-      "dueDate": null,
+      "dueDate": "2026-10-12",
       "priority": 2,
       "estimate": 2,
       "tags": [
@@ -66,7 +66,7 @@
       },
       "printing": {
         "kind": "once",
-        "date": null,
+        "date": "2026-10-12",
         "time": null
       },
       "automatic": false,
@@ -76,7 +76,7 @@
   "prints": [
     {
       "templateId": "example-practice-template",
-      "date": null
+      "date": "2026-10-12"
     }
   ],
   "blocks": [
@@ -104,6 +104,5 @@
       "notes": "可以写作业"
     }
   ],
-  "goals": [],
   "habits": []
 }

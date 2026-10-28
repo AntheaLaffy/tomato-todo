@@ -9,14 +9,22 @@ use std::{
 use uuid::Uuid;
 pub mod blocks;
 pub mod diagnostics;
+pub mod education;
 pub mod guard;
 pub mod habits;
 pub mod identities;
 pub mod lock;
-pub mod nodes;
+pub mod migration;
 pub mod plan;
 pub mod reminders;
 pub mod templates;
+
+pub fn check_user_action(action: &Action) -> AppResult<()> {
+    if matches!(action, Action::Education { command } if command.assistant_only()) {
+        return Err("课程、作业、试卷和批改由学习助手生成，请在对话中提出要求".into());
+    }
+    Ok(())
+}
 
 pub type AppResult<T> = Result<T, String>;
 pub(crate) fn id() -> String {
@@ -46,16 +54,6 @@ pub struct Project {
     pub app_whitelist: Option<Vec<String>>,
 }
 
-/// A stable pairing identity and its independently edited mainline.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Goal {
-    pub id: String,
-    pub name: String,
-    #[serde(default)]
-    pub nodes: Vec<nodes::Node>,
-}
-
 /// One "weekdays at a time" band of a routine.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,11 +71,11 @@ pub struct Habit {
     pub name: String,
 }
 
-/// A motivational marker: a name plus some prose that can belong to a project, a
-/// goal, or stand on its own as the overall vision. It carries no jurisdiction —
+/// A motivational marker: a name plus some prose that can belong to a project
+/// or stand on its own as the overall vision. It carries no jurisdiction —
 /// no progress to catch up on, no failure, no missed days.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Vision {
     pub id: String,
     pub name: String,
@@ -85,8 +83,6 @@ pub struct Vision {
     pub notes: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub goal_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -98,11 +94,9 @@ pub struct Subtask {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Task {
     pub id: String,
-    #[serde(default)]
-    pub node_id: Option<String>,
     #[serde(default)]
     pub template_id: Option<String>,
     /// Frozen printing provenance; editing a template cannot reclassify history.
@@ -111,8 +105,6 @@ pub struct Task {
     pub title: String,
     pub notes: String,
     pub project_id: Option<String>,
-    #[serde(default)]
-    pub goal_id: Option<String>,
     #[serde(default)]
     pub habit_id: Option<String>,
     pub due_date: Option<String>,
@@ -131,7 +123,7 @@ pub struct Task {
     #[serde(default)]
     pub reminder_pending: bool,
     /// Set once the task's day has passed or its planned block is over. A
-    /// routine (timed, no goal) is spent from then on; it does not roll over.
+    /// routine (timed and recurring) is spent from then on; it does not roll over.
     #[serde(default)]
     pub reminder_expired: bool,
     pub completed: bool,
@@ -148,15 +140,12 @@ pub struct Task {
 pub enum TaskKind {
     Ordinary,
     Habit,
-    Goal,
 }
 
 impl Task {
     /// The single definition of a task's jurisdiction, read off the frozen fields.
     pub fn kind(&self) -> TaskKind {
-        if self.goal_id.is_some() {
-            TaskKind::Goal
-        } else if self.reminder_time.is_some() && (self.habit_id.is_some() || self.recurring) {
+        if self.reminder_time.is_some() && (self.habit_id.is_some() || self.recurring) {
             TaskKind::Habit
         } else {
             TaskKind::Ordinary
@@ -180,15 +169,13 @@ pub enum Repeat {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskDraft {
     pub id: Option<String>,
     pub title: String,
     #[serde(default)]
     pub notes: String,
     pub project_id: Option<String>,
-    #[serde(default)]
-    pub goal_id: Option<String>,
     pub due_date: Option<String>,
     #[serde(default)]
     pub reminder_time: Option<String>,
@@ -357,8 +344,10 @@ pub struct Session {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AppData {
+    #[serde(default)]
+    pub education: education::Education,
     pub version: u32,
     #[serde(default)]
     pub identities: Vec<identities::Identity>,
@@ -373,12 +362,6 @@ pub struct AppData {
     pub prints: Vec<templates::PrintRecord>,
     pub projects: Vec<Project>,
     #[serde(default)]
-    pub goals: Vec<Goal>,
-    #[serde(default)]
-    pub node_bindings: Vec<nodes::Binding>,
-    #[serde(default)]
-    pub signal_events: Vec<nodes::SignalEvent>,
-    #[serde(default)]
     pub habits: Vec<Habit>,
     #[serde(default)]
     pub visions: Vec<Vision>,
@@ -391,7 +374,8 @@ pub struct AppData {
 impl Default for AppData {
     fn default() -> Self {
         Self {
-            version: 3,
+            version: 4,
+            education: education::Education::default(),
             identities: vec![],
             tasks: vec![],
             blocks: vec![],
@@ -417,9 +401,6 @@ impl Default for AppData {
                     app_whitelist: None,
                 },
             ],
-            goals: vec![],
-            node_bindings: vec![],
-            signal_events: vec![],
             habits: vec![],
             visions: vec![],
             settings: Settings::default(),
@@ -435,7 +416,6 @@ impl Default for AppData {
 #[serde(rename_all = "camelCase")]
 pub enum DetachTarget {
     Project,
-    Goal,
     Habit,
 }
 
@@ -443,9 +423,13 @@ pub enum DetachTarget {
 #[serde(
     tag = "type",
     rename_all = "camelCase",
-    rename_all_fields = "camelCase"
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
 )]
 pub enum Action {
+    Education {
+        command: education::Command,
+    },
     PrintInstances {
         shape: templates::Shape,
         printing: templates::Printing,
@@ -488,6 +472,8 @@ pub enum Action {
         id: Option<String>,
         name: String,
         color: String,
+        #[serde(default)]
+        directory: Option<String>,
     },
     SetProjectWhitelist {
         id: String,
@@ -502,20 +488,6 @@ pub enum Action {
     DetachTasks {
         ids: Vec<String>,
         target: DetachTarget,
-    },
-    SaveGoal {
-        id: Option<String>,
-        name: String,
-        #[serde(default)]
-        nodes: Vec<nodes::NodeSpec>,
-    },
-    ConfirmNode {
-        goal_id: String,
-        node_id: String,
-        confirmed: bool,
-    },
-    DeleteGoal {
-        id: String,
     },
     SaveHabitGroup {
         id: Option<String>,
@@ -540,8 +512,6 @@ pub enum Action {
         notes: String,
         #[serde(default)]
         project_id: Option<String>,
-        #[serde(default)]
-        goal_id: Option<String>,
     },
     DeleteVision {
         id: String,
@@ -600,59 +570,12 @@ pub struct DayStat {
     pub date: String,
     pub seconds: u64,
     pub pomodoros: u32,
-    /// Routines (timed, no goal) whose day passed without being completed.
+    /// Routines (timed and recurring) whose day passed without being completed.
     pub missed: u32,
     /// Instances of any kind completed that day.
     pub completed: u32,
     /// Plain timed instances spent that day without being completed.
     pub voided: u32,
-    /// Mainline nodes that became success / failure that day.
-    pub goal_success: u32,
-    pub goal_failure: u32,
-    /// Instances voided because their node was decided that day.
-    pub goal_voided: u32,
-}
-
-/// Whole-line outcome. Every node has to pass for the line to succeed, so success
-/// is expected and a failure is the event worth studying.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum LineOutcome {
-    Empty,
-    Pending,
-    Success,
-    Failure,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NodeStat {
-    pub id: String,
-    pub name: String,
-    pub start: String,
-    pub end: String,
-    pub verdict: Option<nodes::Verdict>,
-    pub decided_at: Option<i64>,
-    pub paired: usize,
-    pub completed: usize,
-    pub node_completed: bool,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GoalStat {
-    pub id: String,
-    pub name: String,
-    pub outcome: LineOutcome,
-    /// Execution window covered by the nodes.
-    pub start: Option<String>,
-    pub end: Option<String>,
-    /// When the line's outcome became final: the failure if it failed, otherwise
-    /// the last success that carried every node.
-    pub decided_at: Option<i64>,
-    pub paired: usize,
-    pub completed: usize,
-    pub nodes: Vec<NodeStat>,
 }
 
 #[derive(Debug, Serialize)]
@@ -664,15 +587,11 @@ pub struct Stats {
     pub total_seconds: u64,
     pub total_pomodoros: usize,
     pub streak: u32,
-    /// Per-mainline outcome and node timing, so success/failure stops being a
-    /// per-instance question and becomes a property of the whole line.
-    pub goals: Vec<GoalStat>,
     pub days: Vec<DayStat>,
 }
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
-    pub node_progress: Vec<nodes::NodeProgress>,
     /// Frozen jurisdiction per instance so consumers read one definition instead of
     /// re-deriving it.
     pub task_kinds: HashMap<String, TaskKind>,
@@ -706,9 +625,6 @@ impl AppData {
         }
     }
     pub fn task_is_void(&self, task: &Task, _at: i64) -> bool {
-        if task.goal_id.is_some() {
-            return self.task_node(task).is_some_and(|n| n.result.is_some());
-        }
         !task.completed && task.reminder_time.is_some() && task.reminder_expired
     }
     pub fn strict_protected(&self) -> bool {
@@ -799,9 +715,9 @@ impl AppData {
     }
     /// Advance at most one phase after downtime: never fabricate unattended focus sessions.
     pub fn tick(&mut self, at: i64) -> bool {
-        let materialized = self.materialize_templates(at);
-        let nodes_changed = self.tick_nodes(at);
-        let changed = self.tick_with_lock(at) || materialized || nodes_changed;
+        let teaching_changed = self.education.tick(at);
+        let materialized = self.materialize_templates(at) || teaching_changed;
+        let changed = self.tick_with_lock(at) || materialized;
         let cycle_changed = self.refresh_cycle(at);
         if cycle_changed
             && self.timer.cycle == 0
@@ -812,23 +728,7 @@ impl AppData {
         {
             self.reset_to(Mode::Focus);
         }
-        let closed_selection = self.timer.task_id.as_ref().is_some_and(|id| {
-            self.tasks
-                .iter()
-                .any(|t| &t.id == id && t.goal_id.is_some() && self.task_is_void(t, at))
-        });
-        if closed_selection {
-            if self.timer.mode == Mode::Focus {
-                if self.timer.running || self.timer.started_at.is_some() {
-                    self.record(at, false);
-                }
-                self.timer.task_id = None;
-                self.reset_to(Mode::Focus);
-            } else {
-                self.timer.task_id = None;
-            }
-        }
-        self.tick_reminders(at) || changed || cycle_changed || closed_selection
+        self.tick_reminders(at) || changed || cycle_changed
     }
     fn tick_with_lock(&mut self, at: i64) -> bool {
         let previous = serde_json::to_value(&self.lock).ok();
@@ -909,6 +809,7 @@ impl AppData {
             return Err("专注保护中，结束前不能修改任务或计时；可提前完成番茄或紧急退出".into());
         }
         match action {
+            Action::Education { command } => self.education.apply(command, at)?,
             Action::PrintInstances { shape, printing } => {
                 self.print_instances(shape, printing, at)?
             }
@@ -987,19 +888,14 @@ impl AppData {
                 if d.id.is_some() && existing.is_none() {
                     return Err("任务不存在，可能已经被删除".into());
                 }
-                if let Some(index) = existing {
-                    self.ensure_task_unsettled(&self.tasks[index].id)?;
-                }
                 let old = existing.map(|i| &self.tasks[i]);
                 let task = Task {
-                    node_id: old.and_then(|t| t.node_id.clone()),
                     template_id: old.and_then(|t| t.template_id.clone()),
                     recurring: old.is_some_and(|t| t.recurring),
                     id: d.id.unwrap_or_else(id),
                     title: d.title.trim().into(),
                     notes: d.notes,
                     project_id: d.project_id,
-                    goal_id: d.goal_id,
                     habit_id: old.and_then(|t| t.habit_id.clone()),
                     reminder_fired: old.is_some_and(|t| {
                         t.due_date == d.due_date
@@ -1034,14 +930,6 @@ impl AppData {
                     subtasks: d.subtasks,
                 };
                 let mut task = task;
-                if old.is_some_and(|old| {
-                    old.goal_id != task.goal_id
-                        || old.due_date != task.due_date
-                        || old.reminder_time != task.reminder_time
-                }) {
-                    self.release_binding(&task.id);
-                    task.node_id = None;
-                }
                 if d.repeat != Repeat::None {
                     let template = templates::from_task(&task, d.repeat, at);
                     task.template_id = Some(template.id.clone());
@@ -1058,7 +946,6 @@ impl AppData {
                 }
             }
             Action::ToggleTask { id: task_id } => {
-                self.ensure_task_unsettled(&task_id)?;
                 if self
                     .tasks
                     .iter()
@@ -1152,14 +1039,6 @@ impl AppData {
                     task.template_id = None;
                 }
                 if task
-                    .goal_id
-                    .as_ref()
-                    .is_some_and(|id| !self.goals.iter().any(|g| &g.id == id))
-                {
-                    task.goal_id = None;
-                    task.node_id = None;
-                }
-                if task
                     .habit_id
                     .as_ref()
                     .is_some_and(|id| !self.habits.iter().any(|h| &h.id == id))
@@ -1174,7 +1053,6 @@ impl AppData {
                 task_id,
                 subtask_id,
             } => {
-                self.ensure_task_unsettled(&task_id)?;
                 let sub = self
                     .tasks
                     .iter_mut()
@@ -1187,6 +1065,7 @@ impl AppData {
                 id: pid,
                 name,
                 color,
+                directory,
             } => {
                 if let Some(pid) = pid {
                     let p = self
@@ -1197,8 +1076,23 @@ impl AppData {
                     p.name = name.trim().into();
                     p.color = color;
                 } else {
+                    let directory = directory
+                        .filter(|p| Path::new(p).is_absolute())
+                        .ok_or("新项目必须绑定资料目录；请在项目页选择目录并授权")?;
+                    let project_id = id();
+                    self.education.projects.push(education::ProjectStudy {
+                        project_id: project_id.clone(),
+                        directory,
+                        exam_mode: false,
+                        vision_id: None,
+                        target: String::new(),
+                        exam_date: None,
+                        syllabus_id: None,
+                        past_paper_ids: vec![],
+                        mock_paper_ids: vec![],
+                    });
                     self.projects.push(Project {
-                        id: id(),
+                        id: project_id,
                         name: name.trim().into(),
                         color,
                         app_whitelist: None,
@@ -1214,6 +1108,13 @@ impl AppData {
                 p.app_whitelist = whitelist;
             }
             Action::DeleteProject { id } => {
+                if self.education.semesters.iter().any(|s| s.project_id == id) {
+                    return Err(
+                        "项目已有教学历史，请保留记录并停用应试模式；资料目录不会被删除".into(),
+                    );
+                }
+                self.education.projects.retain(|p| p.project_id != id);
+                self.education.resources.retain(|p| p.project_id != id);
                 self.projects.retain(|p| p.id != id);
                 for task in &mut self.tasks {
                     if task.project_id.as_ref() == Some(&id) {
@@ -1242,55 +1143,14 @@ impl AppData {
                     .collect();
             }
             Action::DetachTasks { ids, target } => {
-                if target == DetachTarget::Goal {
-                    for id in &ids {
-                        self.ensure_task_unsettled(id)?;
-                        self.release_binding(id);
-                    }
-                }
                 for t in self.tasks.iter_mut() {
                     if ids.contains(&t.id) {
                         match target {
                             DetachTarget::Project => t.project_id = None,
-                            DetachTarget::Goal => {
-                                t.goal_id = None;
-                                t.node_id = None;
-                            }
                             DetachTarget::Habit => t.habit_id = None,
                         }
                     }
                 }
-            }
-            Action::SaveGoal { id, name, nodes } => self.save_goal(id, name, nodes)?,
-            Action::ConfirmNode {
-                goal_id,
-                node_id,
-                confirmed,
-            } => self.confirm_node(&goal_id, &node_id, confirmed)?,
-            Action::DeleteGoal { id } => {
-                if self
-                    .goals
-                    .iter()
-                    .any(|g| g.id == id && g.nodes.iter().any(|n| n.result.is_some() || n.emitted))
-                {
-                    return Err(
-                        "主线已有裁定或信号历史，不能删除；可创建新的任务组开始下一轮".into(),
-                    );
-                }
-                self.node_bindings.retain(|b| b.goal_id != id);
-                self.goals.retain(|g| g.id != id);
-                for task in &mut self.tasks {
-                    if task.goal_id.as_ref() == Some(&id) {
-                        task.goal_id = None;
-                        task.node_id = None;
-                    }
-                }
-                for template in &mut self.templates {
-                    if template.shape.goal_id.as_ref() == Some(&id) {
-                        template.shape.goal_id = None;
-                    }
-                }
-                self.visions.retain(|a| a.goal_id.as_ref() != Some(&id));
             }
             Action::SaveHabitGroup { id: hid, name } => {
                 if let Some(hid) = hid {
@@ -1339,7 +1199,6 @@ impl AppData {
                         title: name.trim().into(),
                         notes: String::new(),
                         project_id,
-                        goal_id: None,
                         habit_id: Some(hid),
                         focus_minutes,
                         scrap_minutes: 0,
@@ -1374,7 +1233,6 @@ impl AppData {
                 name,
                 notes,
                 project_id,
-                goal_id,
             } => {
                 if let Some(aid) = aid {
                     let a = self
@@ -1385,14 +1243,12 @@ impl AppData {
                     a.name = name.trim().into();
                     a.notes = notes;
                     a.project_id = project_id;
-                    a.goal_id = goal_id;
                 } else {
                     self.visions.push(Vision {
                         id: id(),
                         name: name.trim().into(),
                         notes,
                         project_id,
-                        goal_id,
                     });
                 }
             }
@@ -1489,7 +1345,6 @@ impl AppData {
             Action::Import { data } => {
                 data.validate()?;
                 let mut data = *data;
-                self.protect_decisions(&data)?;
                 // Restoring a file must not silently arm a scheduled desktop lock.
                 data.lock.active = None;
                 data.lock.suppressed_until = 0;
@@ -1529,12 +1384,10 @@ impl AppData {
                     self.tasks.push(Task {
                         id: id(),
                         template_id: None,
-                        node_id: None,
                         recurring: false,
                         title: title.into(),
                         notes: notes.into(),
                         project_id: self.projects.get(index).map(|p| p.id.clone()),
-                        goal_id: None,
                         habit_id: None,
                         due_date: Some(today.clone()),
                         reminder_time: None,
@@ -1554,16 +1407,13 @@ impl AppData {
                 }
             }
         }
-        self.bind_nodes(at);
-        self.validate()?;
-        self.tick_nodes(at);
         self.validate()
     }
 
     pub fn validate(&self) -> AppResult<()> {
+        education::validate(self)?;
         self.lock.validate()?;
         templates::validate(self)?;
-        nodes::validate(self)?;
         identities::validate(self)?;
         blocks::validate(self)?;
         fn ensure(ok: bool, message: &str) -> AppResult<()> {
@@ -1573,7 +1423,7 @@ impl AppData {
                 Err(message.into())
             }
         }
-        ensure(self.version == 3, "不支持此数据版本")?;
+        ensure(self.version == 4, "不支持此数据版本")?;
         ensure(
             self.tasks.len() <= 50_000
                 && self.sessions.len() <= 200_000
@@ -1613,18 +1463,6 @@ impl AppData {
                 "无效的项目应用白名单",
             )?;
         }
-        let mut goal_ids = HashSet::new();
-        ensure(self.goals.len() <= 500, "目标数量超出限制")?;
-        for g in &self.goals {
-            ensure(
-                !g.id.is_empty() && goal_ids.insert(&g.id),
-                "目标 ID 重复或为空",
-            )?;
-            ensure(
-                !g.name.trim().is_empty() && g.name.chars().count() <= 40,
-                "目标名称需为 1–40 个字符",
-            )?;
-        }
         let mut habit_ids = HashSet::new();
         ensure(self.habits.len() <= 500, "习惯数量超出限制")?;
         for h in &self.habits {
@@ -1647,16 +1485,8 @@ impl AppData {
             )?;
             ensure(a.notes.len() <= 50_000, "愿景内容过长")?;
             ensure(
-                !(a.project_id.is_some() && a.goal_id.is_some()),
-                "愿景只能属于一个项目或一个目标",
-            )?;
-            ensure(
                 a.project_id.as_ref().is_none_or(|p| ids.contains(p)),
                 "愿景引用了不存在的项目",
-            )?;
-            ensure(
-                a.goal_id.as_ref().is_none_or(|g| goal_ids.contains(g)),
-                "愿景引用了不存在的目标",
             )?;
         }
         let projects = ids;
@@ -1687,16 +1517,8 @@ impl AppData {
                 "任务引用了不存在的项目",
             )?;
             ensure(
-                t.goal_id.as_ref().is_none_or(|g| goal_ids.contains(g)),
-                "任务引用了不存在的目标",
-            )?;
-            ensure(
                 t.habit_id.as_ref().is_none_or(|h| habit_ids.contains(h)),
                 "任务引用了不存在的习惯",
-            )?;
-            ensure(
-                !(t.goal_id.is_some() && t.habit_id.is_some()),
-                "目标与习惯组不能同时管辖实例",
             )?;
             ensure(
                 t.habit_id.is_none() || t.reminder_time.is_some(),
@@ -1775,8 +1597,7 @@ impl AppData {
             entry.0 += session.duration_secs as u64;
             entry.1 += u32::from(session.completed);
         }
-        // One pass over the instances fills the daily cross-section: what finished,
-        // what lapsed on time, and how the mainlines around it resolved.
+        // One pass over the instances counts what finished and what lapsed on time.
         let mut completed_by_day: HashMap<String, u32> = HashMap::new();
         let mut voided_by_day: HashMap<String, u32> = HashMap::new();
         let mut missed_by_day: HashMap<String, u32> = HashMap::new();
@@ -1789,34 +1610,8 @@ impl AppData {
                     match t.kind() {
                         TaskKind::Habit => *missed_by_day.entry(date.clone()).or_default() += 1,
                         TaskKind::Ordinary => *voided_by_day.entry(date.clone()).or_default() += 1,
-                        TaskKind::Goal => {}
                     }
                 }
-            }
-        }
-        let mut goal_success_by_day: HashMap<String, u32> = HashMap::new();
-        let mut goal_failure_by_day: HashMap<String, u32> = HashMap::new();
-        let mut goal_voided_by_day: HashMap<String, u32> = HashMap::new();
-        for goal in &self.goals {
-            for node in &goal.nodes {
-                let Some(result) = &node.result else {
-                    continue;
-                };
-                let date = date_at(result.at);
-                match result.verdict {
-                    nodes::Verdict::Success => {
-                        *goal_success_by_day.entry(date.clone()).or_default() += 1
-                    }
-                    nodes::Verdict::Failure => {
-                        *goal_failure_by_day.entry(date.clone()).or_default() += 1
-                    }
-                }
-                let paired = self
-                    .node_bindings
-                    .iter()
-                    .filter(|b| b.goal_id == goal.id && b.node_id == node.spec.id)
-                    .count() as u32;
-                *goal_voided_by_day.entry(date).or_default() += paired;
             }
         }
         let count =
@@ -1832,89 +1627,7 @@ impl AppData {
                     missed: count(&missed_by_day, &date),
                     completed: count(&completed_by_day, &date),
                     voided: count(&voided_by_day, &date),
-                    goal_success: count(&goal_success_by_day, &date),
-                    goal_failure: count(&goal_failure_by_day, &date),
-                    goal_voided: count(&goal_voided_by_day, &date),
                     date,
-                }
-            })
-            .collect();
-        let goals: Vec<GoalStat> = self
-            .goals
-            .iter()
-            .map(|goal| {
-                let mut start: Option<String> = None;
-                let mut end: Option<String> = None;
-                let mut all_success = !goal.nodes.is_empty();
-                let mut failure_at: Option<i64> = None;
-                let mut success_at: Option<i64> = None;
-                let mut paired = 0usize;
-                let mut completed = 0usize;
-                let mut node_stats = Vec::with_capacity(goal.nodes.len());
-                for node in &goal.nodes {
-                    let spec_start = node.spec.start.clone();
-                    let spec_end = node.spec.end.clone();
-                    start = Some(match start {
-                        Some(s) => s.min(spec_start),
-                        None => spec_start,
-                    });
-                    end = Some(match end {
-                        Some(e) => e.max(spec_end),
-                        None => spec_end,
-                    });
-                    let progress = self.node_progress(&goal.id, node);
-                    paired += progress.paired_count;
-                    completed += progress.completed_count;
-                    match &node.result {
-                        Some(result) => match result.verdict {
-                            nodes::Verdict::Success => {
-                                success_at =
-                                    Some(success_at.map_or(result.at, |d| d.max(result.at)));
-                            }
-                            nodes::Verdict::Failure => {
-                                all_success = false;
-                                failure_at =
-                                    Some(failure_at.map_or(result.at, |d| d.min(result.at)));
-                            }
-                        },
-                        None => all_success = false,
-                    }
-                    node_stats.push(NodeStat {
-                        id: node.spec.id.clone(),
-                        name: node.spec.name.clone(),
-                        start: node.spec.start.clone(),
-                        end: node.spec.end.clone(),
-                        verdict: node.result.as_ref().map(|r| r.verdict),
-                        decided_at: node.result.as_ref().map(|r| r.at),
-                        paired: progress.paired_count,
-                        completed: progress.completed_count,
-                        node_completed: progress.completed,
-                    });
-                }
-                let outcome = if goal.nodes.is_empty() {
-                    LineOutcome::Empty
-                } else if failure_at.is_some() {
-                    LineOutcome::Failure
-                } else if all_success {
-                    LineOutcome::Success
-                } else {
-                    LineOutcome::Pending
-                };
-                let decided_at = match outcome {
-                    LineOutcome::Failure => failure_at,
-                    LineOutcome::Success => success_at,
-                    _ => None,
-                };
-                GoalStat {
-                    id: goal.id.clone(),
-                    name: goal.name.clone(),
-                    outcome,
-                    start,
-                    end,
-                    decided_at,
-                    paired,
-                    completed,
-                    nodes: node_stats,
                 }
             })
             .collect();
@@ -1945,7 +1658,6 @@ impl AppData {
             total_seconds: self.sessions.iter().map(|s| s.duration_secs as u64).sum(),
             total_pomodoros: self.sessions.iter().filter(|s| s.completed).count(),
             streak,
-            goals,
             days,
         }
     }
@@ -1980,7 +1692,7 @@ impl Engine {
             r.get::<_, String>(0)
         });
         let mut data = match raw {
-            Ok(raw) => serde_json::from_str::<AppData>(&raw)
+            Ok(raw) => migration::read_local(&raw)
                 .map_err(|e| format!("数据读取失败，原文件已保留：{e}"))?,
             Err(rusqlite::Error::QueryReturnedNoRows) => AppData::default(),
             Err(e) => return Err(e.to_string()),
@@ -2016,6 +1728,7 @@ impl Engine {
         };
         let mut next = self.data.clone();
         next.apply(action, at)?;
+        education::validate_transition(&self.data.education, &next.education)?;
         identities::reconcile(&self.data, &mut next, restore_id.as_deref())?;
         next.validate()?;
         Ok(next)
@@ -2037,7 +1750,6 @@ impl Engine {
             self.data = next.clone();
         }
         Ok(Snapshot {
-            node_progress: self.data.all_node_progress(),
             task_kinds: self
                 .data
                 .tasks
@@ -2062,6 +1774,3 @@ mod tests;
 
 #[cfg(test)]
 mod template_tests;
-
-#[cfg(test)]
-mod node_tests;

@@ -10,7 +10,7 @@
 | # | 事实 | 出处 |
 | --- | --- | --- |
 | 1 | 每级目录一份 `CODEMAP.md`；单文件超过 1000 行时配 `<文件名>.analysis.md` | `.agents/skills/codemap/SKILL.md` |
-| 2 | 现有分析索引：`src/main.ts.analysis.md`、`src/style.css.analysis.md`、`crates/core/src/nodes.rs.analysis.md`、`crates/core/src/node_tests.rs.analysis.md` | 仓库现状（4 个文件） |
+| 2 | 大文件通过 companion analysis 提供功能行段与符号入口；界面索引见 `src/main.ts.analysis.md` 与 `src/style.css.analysis.md` | 对应 `.analysis.md` |
 | 3 | 地图包含四段结构：Scope and Exclusions、任务指南（Target / Also Check）、子目录、文件 | 根 `CODEMAP.md` 与各级 `CODEMAP.md` |
 | 4 | 导航顺序由协议规定：先匹配任务指南的 Target，再按 Domain 下钻；大文件先看 Feature Index 的行段 | `AGENTS.md`「CODEMAP Navigation Protocol」 |
 | 5 | **每个纳入的文件在一个地图里恰好有一行归属**；地图与 companion analysis 本身不递归纳入 | `SKILL.md`「Inventory and scope」 |
@@ -37,7 +37,7 @@
 
 ## C. 机制（它怎么运转的）
 
-使用者带着一个任务进来，先在根地图的任务指南里找最接近的 Target，那一行给出初始阅读集合；只有当任务本身、目标代码里的证据或公开契约的影响把它牵出去时，才去看 Also Check。没有匹配项时，按 Domain 与子目录地图下钻，进入具体目录后再看该级的文件表。遇到上千行的文件，用它的分析索引按行段读，读到之后再回源码核对。改动落地后，受影响的那几张地图与手册章节要一起更新：文件增删改要修「文件」与「子目录」段，职责或接口变化要修任务指南与文档链接；地图与手册之间的章节对应关系由手册的 04 附录承载，并由检查脚本保证引用的文件真实存在。
+使用者带着一个任务进来，先在根地图的任务指南里找最接近的 Target，那一行给出初始阅读集合；只有当任务本身代码里的证据或公开契约的影响把它牵出去时，才去看 Also Check。没有匹配项时，按 Domain 与子目录地图下钻，进入具体目录后再看该级的文件表。遇到上千行的文件，用它的分析索引按行段读，读到之后再回源码核对。改动落地后，受影响的那几张地图与手册章节要一起更新：文件增删改要修「文件」与「子目录」段，职责或接口变化要修任务指南与文档链接；地图与手册之间的章节对应关系由手册的 04 附录承载，并由检查脚本保证引用的文件真实存在。
 
 ## D. 语义规则与不变量
 

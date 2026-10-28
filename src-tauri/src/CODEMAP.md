@@ -17,4 +17,4 @@ generated_at: 2026-10-10
 | files.rs | 文件桥接 | 系统选择器导入/导出计划与备份，以及保存助手附件/Markdown；阻塞线程池等待用户选择，桌面路径与 Android SAF URI 分别写入 |
 | mobile.rs | Android | 本地核心 IPC、SQLite 恢复与计时轮询；尚未接入系统保护、后台服务和 Pi 运行时，开启保护前明确失败 |
 
-共享核心接口核对：Action/Snapshot 直接序列化模板、印刷记录、静态实例；计划导出为 v4，完整备份为 v3，Snapshot 携带节点进度；新 Action 仍由通用桥接传递。新增学习助手 IPC 与 agent-wake 桌面事件；应用审阅文件时在 Engine 锁内复核来源指纹与空闲状态；原生保护与白名单循环未改。
+共享核心接口核对：Action/Snapshot携带普通任务和独立education教学记录；计划v6、备份v4。手动dispatch拒绝助手专属教学操作；目录选择通过原生选择器，实际授权由Agent私有存储管理。考试到点提醒与已有桌面通知共用宿主循环，不自动开启桌面保护。

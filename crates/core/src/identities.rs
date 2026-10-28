@@ -15,18 +15,12 @@ fn active(data: &AppData) -> AppResult<HashMap<String, String>> {
     let mut ids = HashMap::new();
     let mut add = |id: &str, kind: &str| -> AppResult<()> {
         if id.trim().is_empty() || id.len() > 200 || ids.insert(id.into(), kind.into()).is_some() {
-            return Err("独立实体 ID 为空、过长或重复（节点 ID 在不同任务组间也必须唯一）".into());
+            return Err("独立实体 ID 为空、过长或重复".into());
         }
         Ok(())
     };
     for x in &data.projects {
         add(&x.id, "project")?;
-    }
-    for x in &data.goals {
-        add(&x.id, "goal")?;
-        for n in &x.nodes {
-            add(&n.spec.id, "node")?;
-        }
     }
     for x in &data.habits {
         add(&x.id, "habit")?;
@@ -46,9 +40,28 @@ fn active(data: &AppData) -> AppResult<HashMap<String, String>> {
     for x in &data.sessions {
         add(&x.id, "session")?;
     }
-    for x in &data.signal_events {
-        add(&x.id, "signal")?;
+    for x in &data.education.resources {
+        add(&x.id, "resource")?;
     }
+    for x in &data.education.semesters {
+        add(&x.id, "semester")?;
+    }
+    for x in &data.education.lessons {
+        add(&x.id, "lesson")?;
+    }
+    for x in &data.education.assessments {
+        add(&x.id, "assessment")?;
+    }
+    for x in &data.education.submissions {
+        add(&x.id, "submission")?;
+    }
+    for x in &data.education.grades {
+        add(&x.id, "grade")?;
+    }
+    for x in &data.education.reviews {
+        add(&x.id, "review")?;
+    }
+
     Ok(ids)
 }
 pub(crate) fn reconcile(
@@ -81,14 +94,9 @@ pub(crate) fn reconcile(
             restore_task: None,
         });
     }
-    // Deleted tasks can already be visible only through historical sessions or bindings.
+    // Deleted tasks can already be visible only through historical sessions.
     for (data, live) in [(before, &old_active), (&*after, &new_active)] {
-        for task_id in data
-            .sessions
-            .iter()
-            .filter_map(|s| s.task_id.as_ref())
-            .chain(data.node_bindings.iter().map(|b| &b.task_id))
-        {
+        for task_id in data.sessions.iter().filter_map(|s| s.task_id.as_ref()) {
             if let Some(record) = entries.get(task_id) {
                 if record.kind != "task" {
                     return Err("历史任务引用的 ID 与其他实体冲突".into());
@@ -158,8 +166,20 @@ pub(crate) fn validate(data: &AppData) -> AppResult<()> {
             || record.id.len() > 200
             || seen.insert(&record.id, ()).is_some()
             || ![
-                "project", "goal", "node", "habit", "vision", "task", "template", "session",
-                "signal", "block",
+                "project",
+                "habit",
+                "vision",
+                "task",
+                "template",
+                "session",
+                "block",
+                "resource",
+                "semester",
+                "lesson",
+                "assessment",
+                "submission",
+                "grade",
+                "review",
             ]
             .contains(&record.kind.as_str())
         {

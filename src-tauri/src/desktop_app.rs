@@ -12,6 +12,7 @@ fn snapshot(engine: State<Shared>) -> AppResult<Snapshot> {
 }
 #[tauri::command]
 fn dispatch(action: Action, app: tauri::AppHandle, engine: State<Shared>) -> AppResult<Snapshot> {
+    tomato_core::check_user_action(&action)?;
     apply_action(&app, &engine, action, None)
 }
 pub(crate) fn apply_action(
@@ -144,6 +145,14 @@ pub fn run() {
             let mut reminded: Option<String> = None;
             let mut locked = false;
             let mut was_protected = false;
+            let mut stopped_exams = initial
+                .data
+                .education
+                .assessments
+                .iter()
+                .filter(|a| a.stopped_at.is_some())
+                .map(|a| a.id.clone())
+                .collect::<std::collections::HashSet<_>>();
             std::thread::spawn(move || loop {
                 std::thread::sleep(std::time::Duration::from_millis(600));
                 let snapshot = engine.lock().ok().and_then(|mut e| e.snapshot(now()).ok());
@@ -151,6 +160,35 @@ pub fn run() {
                     continue;
                 };
                 let _ = service.observe(&s);
+                for exam in s
+                    .data
+                    .education
+                    .assessments
+                    .iter()
+                    .filter(|a| a.stopped_at.is_some())
+                {
+                    if stopped_exams.insert(exam.id.clone()) {
+                        desktop::activate(&handle);
+                        if s.data.settings.notifications {
+                            let _ = handle
+                                .notification()
+                                .builder()
+                                .title(
+                                    if exam.kind == tomato_core::education::AssessmentKind::Homework
+                                    {
+                                        "晚间作业到时间了，请提交"
+                                    } else {
+                                        "考试结束，请立即停笔"
+                                    },
+                                )
+                                .body(format!(
+                                    "{}：拍照上传纸质答题卡，逐题完成时刻保留在答题卡上。",
+                                    exam.title
+                                ))
+                                .show();
+                        }
+                    }
+                }
                 focus_audio.set_active(s.data.timer.running && s.data.timer.mode == Mode::Focus);
                 let pending = s
                     .data
@@ -261,6 +299,7 @@ pub fn run() {
             files::export_data,
             files::read_import,
             files::save_agent_file,
+            files::choose_project_directory,
             crate::platform_kind,
             desktop::desktop_status,
             desktop::save_desktop_settings,

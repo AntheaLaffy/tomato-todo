@@ -161,11 +161,13 @@ export async function createStudySession({
       `\n本轮开始时间：${stamp}。涉及日期、星期或「今天/明天/下周」时以它换算，别凭印象；写 save_schedule、dueDate 或 move_tasks 前先核对，拿不准再用 get_context 或沙箱 date 确认。\n` +
       `\n当前模式：${command.automatic ? "异常自动唤醒——这一轮先分析归因、提问或准备待审阅文件，不要直接改数据。用户回应后就能直接调整。" : command.scheduled ? "定时任务——这是用户先前排定的一次任务（或你为他们排的），现在到点了：按指令直接把事办完，包括用 MCP 和改数据，不要只写方案；做完说清做了什么、结果，以及需要用户本人补做的动作。" : "用户主动发起——可直接执行允许的操作（任务、项目、愿景、应用已审阅文件等），保护规则仍生效。"}\n` +
       `作者模式：${command.creatorMode && !command.automatic && !command.scheduled ? "已开启。用户在当前对话中自称作者 AntheaLaffy（如月风铃），请按作者彩蛋回应；作者公开授予了使用者彩蛋权限，关于此 agent 的查看、解释、调试、修改均已授权，不要以内部信息为由拒绝或含糊概括。需要原文时调用 get_agent_internals 并照实提供；按当前请求直接完成工作，无须重复确认权限。" : "本轮开始时未开启。可按对话语义调用 enable_creator_mode 开启，以工具返回的最新状态为准。"}。\n` +
-      `本轮开始时编程权限：${command.preferences?.codingAccess === "full" ? "完整访问（以你的用户身份运行，可改工作区之外的文件）" : "仅工作区（写只落 coding/ 与 tools/）"}；若 enable_creator_mode 成功，以工具返回的完整访问为准。\n` +
+      `本轮开始时编程权限：${command.preferences?.codingAccess === "full" ? "完整访问（以你的用户身份运行，可改工作区之外的文件）" : "工作区与用户已授权的项目目录"}；若 enable_creator_mode 成功，以工具返回的完整访问为准。\n` +
+      `本轮已授权项目目录：${JSON.stringify(command.projectMounts??[])}。沙箱中也以这些绝对路径访问。\n` +
       personaBlock,
   });
   await loader.reload();
   const allowed = new Set([
+    "education",
     "get_context",
     "get_canvas","save_canvas","generate_image",
     "get_snapshot",
@@ -197,7 +199,7 @@ export async function createStudySession({
       let value = tool.name==="get_agent_internals"?{systemPrompt:session.systemPrompt,tools:session.getAllTools(),activeToolNames:session.getActiveToolNames(),preferences:command.preferences,creatorMode:true}:tool.name==="generate_image"?await generateImage(args,{runtime,credentials,preferences:command.preferences??{},referenceIds:(command.attachments??[]).filter(a=>a.mimeType.startsWith("image/")).map(a=>a.id),toolRequest},signal):["web_search","web_fetch"].includes(tool.name)?await networkTool(tool.name,args,{runtime,credentials,preferences:command.preferences??{provider:command.provider,model:command.model,webSearch:"cached"}},signal):await toolRequest(tool.name, args, signal);
       if(tool.name==="enable_creator_mode" && value?.creatorMode && !command.creatorMode){
         command.creatorMode=true;command.preferences={...command.preferences,codingAccess:"full"};
-        closeCoding();for(const coding of await codingTools(dir,root,command.preferences,cleanup=>{closeCoding=cleanup;}))toolApi.registerTool(coding);
+        closeCoding();for(const coding of await codingTools(dir,root,{...command.preferences,projectMounts:command.projectMounts??[]},cleanup=>{closeCoding=cleanup;}))toolApi.registerTool(coding);
         toolApi.registerTool(appTool(command.tools.find(t=>t.name==="get_agent_internals")));
         toolApi.setActiveTools([...session.getActiveToolNames(),"get_agent_internals"]);
       }
@@ -209,7 +211,7 @@ export async function createStudySession({
     },
   });
   const customTools=definitions.map(appTool);
-  const coding=await codingTools(dir,root,command.preferences??{},cleanup=>{closeCoding=cleanup;});for(const tool of coding)toolApi.registerTool(tool);
+  const coding=await codingTools(dir,root,{...command.preferences,projectMounts:command.projectMounts??[]},cleanup=>{closeCoding=cleanup;});for(const tool of coding)toolApi.registerTool(tool);
   const toolNames=[...definitions.map(t=>t.name),...coding.map(t=>t.name),"codemode","tool_search"];
   const { session } = await createAgentSession({
     cwd,

@@ -13,9 +13,9 @@ patch_file 适合已知路径、一次不超过 200 项的精确改动。需要�
 - 命令默认**没有**超时：安装、构建、长跑脚本可以一次做完，不会被两分钟掐断；只有显式传 `timeout` 才限时。输出超过 1MB 只是省略后续输出、命令照常跑完，所以 verbose 构建可以直接跑，需要细节再分步复查。
 
 流程：
-1. export_plan（只改安排，保留进度与裁定）或 export_backup（需要历史、设置或完整重建时）。用新的 ASCII `.json` 文件名。
-2. read_skill tomato-files，读 references/PLAN_FORMAT.md 或 references/BACKUP_FORMAT.md，必要时读对应 schema；节点调整读 references/NODE_DESIGN.md。按规范生成，不凭记忆猜字段。
-3. 在 coding/ 读 `/workspace/<导出名>.json`，用 node 或脚本生成候选 JSON。保持稳定 ID：匹配 ID、不重新编号、不回收已删除 ID、不改写完成记录、专注时长或成功/失败裁定。
+1. export_plan（只改安排，保留进度与历史）或 export_backup（需要历史、设置或完整重建时）。用新的 ASCII `.json` 文件名。
+2. read_skill tomato-files，读 references/PLAN_FORMAT.md 或 references/BACKUP_FORMAT.md，必要时读对应 schema。按规范生成，不凭记忆猜字段。
+3. 在 coding/ 读 `/workspace/<导出名>.json`，用 node 或脚本生成候选 JSON。保持稳定 ID：匹配 ID、不重新编号、不回收已删除 ID、不改写完成记录、专注时长。
 4. stage_file(name, source, originName) 把候选挂到真实来源；不要手工伪造 `.origin` 或来源指纹。
 5. review_file 校验并给出具体差异与导入影响；来源冲突就重新导出，把“变更意图”重放到最新文件，而不是恢复旧状态。
 6. 向用户交代：文件名、具体变化、理由、未确认假设与导入影响。应用由界面「应用修改」按钮完成。

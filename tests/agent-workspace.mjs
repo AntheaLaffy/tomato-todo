@@ -374,6 +374,14 @@ test(
           `Canvas overflow at ${width}`,
         );
       }
+      const projectDirectory = join(dir, "project-materials");
+      await mkdir(projectDirectory, { recursive: true });
+      await api({
+        op: "authorize_project_directory",
+        name: "未分类",
+        color: "#849b7d",
+        directory: projectDirectory,
+      });
       const file = await api({
         op: "upload_attachment",
         name: "preview.png",

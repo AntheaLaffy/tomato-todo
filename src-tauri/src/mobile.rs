@@ -15,6 +15,7 @@ fn dispatch(action: Action, engine: State<Shared>) -> AppResult<Snapshot> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     let current = engine.snapshot(now())?;
     crate::preflight_action(&current.data, &action)?;
+    tomato_core::check_user_action(&action)?;
     engine.dispatch(action, now())
 }
 
@@ -68,6 +69,7 @@ pub fn run() {
             files::export_data,
             files::read_import,
             files::save_agent_file,
+            files::choose_project_directory,
             crate::platform_kind
         ])
         .run(tauri::generate_context!())

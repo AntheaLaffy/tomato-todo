@@ -20,8 +20,6 @@ pub struct Shape {
     #[serde(default)]
     pub project_id: Option<String>,
     #[serde(default)]
-    pub goal_id: Option<String>,
-    #[serde(default)]
     pub habit_id: Option<String>,
     #[serde(default)]
     pub focus_minutes: Option<u32>,
@@ -87,7 +85,6 @@ pub struct Template {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PrintRecord {
     pub template_id: String,
-    /// None identifies an undated one-off printing.
     pub date: Option<String>,
 }
 
@@ -111,7 +108,7 @@ impl Template {
         matches!(self.printing, Printing::Weekly { .. })
     }
     fn times(&self, date: &Option<String>) -> AppResult<Vec<Option<String>>> {
-        if date.as_ref().is_some_and(|d| !valid_date(d)) {
+        if date.as_ref().is_none_or(|d| !valid_date(d)) {
             return Err("无效的印刷日期".into());
         }
         match &self.printing {
@@ -157,13 +154,11 @@ impl Template {
     pub(crate) fn instance(&self, date: Option<String>, time: Option<String>, at: i64) -> Task {
         let mut task = Task {
             id: crate::id(),
-            node_id: None,
             template_id: Some(self.id.clone()),
             recurring: self.recurring(),
             title: String::new(),
             notes: String::new(),
             project_id: None,
-            goal_id: None,
             habit_id: None,
             due_date: date,
             reminder_time: time,
@@ -188,14 +183,9 @@ impl Template {
         task.title = s.title.clone();
         task.notes = s.notes.clone();
         task.project_id = s.project_id.clone();
-        task.goal_id = s.goal_id.clone();
         task.habit_id = s.habit_id.clone();
         task.focus_minutes = s.focus_minutes;
-        task.scrap_minutes = if task.is_habit() || task.goal_id.is_some() {
-            0
-        } else {
-            s.scrap_minutes
-        };
+        task.scrap_minutes = if task.is_habit() { 0 } else { s.scrap_minutes };
         task.priority = s.priority;
         task.estimate = s.estimate;
         task.tags = s.tags.clone();
@@ -251,27 +241,18 @@ pub fn validate(data: &AppData) -> AppResult<()> {
         if s.project_id
             .as_ref()
             .is_some_and(|id| !data.projects.iter().any(|p| &p.id == id))
-            || s.goal_id
-                .as_ref()
-                .is_some_and(|id| !data.goals.iter().any(|g| &g.id == id))
             || s.habit_id
                 .as_ref()
                 .is_some_and(|id| !data.habits.iter().any(|h| &h.id == id))
         {
             return Err("模板引用了不存在的容器".into());
         }
-        if s.goal_id.is_some() && s.habit_id.is_some() {
-            return Err("目标与习惯组不能同时管辖模板".into());
-        }
         match &t.printing {
             Printing::Once { date, time } => {
-                if date.as_ref().is_some_and(|d| !valid_date(d))
+                if date.as_ref().is_none_or(|d| !valid_date(d))
                     || time.as_ref().is_some_and(|time| !valid_time(time))
                 {
                     return Err("无效的一次印刷日期或时间".into());
-                }
-                if t.automatic && date.is_none() {
-                    return Err("自动一次印刷需要指定日期".into());
                 }
                 if s.habit_id.is_some() {
                     return Err("习惯模板必须重复印刷".into());
@@ -328,7 +309,7 @@ pub fn validate(data: &AppData) -> AppResult<()> {
     let mut prints = HashSet::new();
     for p in &data.prints {
         if !ids.contains(&p.template_id)
-            || p.date.as_ref().is_some_and(|d| !valid_date(d))
+            || p.date.as_ref().is_none_or(|d| !valid_date(d))
             || !prints.insert((&p.template_id, &p.date))
         {
             return Err("无效或重复的印刷记录".into());
@@ -381,7 +362,6 @@ impl AppData {
     pub(crate) fn save_template(&mut self, mut template: Template) -> AppResult<()> {
         template.shape.title = template.shape.title.trim().into();
         if template.shape.habit_id.is_none()
-            && template.shape.goal_id.is_none()
             && matches!(&template.printing, Printing::Weekly { slots } if slots.iter().all(|s| s.time.is_some()))
         {
             let existing_habit = self
@@ -491,9 +471,6 @@ impl AppData {
         Ok(())
     }
     fn printing_expired(&self, task: &Task, at: i64) -> bool {
-        if task.goal_id.is_some() {
-            return false;
-        }
         let Some(time) = task.reminder_time.as_ref() else {
             return false;
         };
@@ -537,7 +514,6 @@ impl AppData {
             {
                 // Sync only shape, never schedule, jurisdiction or execution history.
                 let mut shape = template.clone();
-                shape.shape.goal_id = task.goal_id.clone();
                 shape.shape.habit_id = task.habit_id.clone();
                 shape.copy_shape(task);
             }
@@ -644,7 +620,6 @@ pub(crate) fn from_task(task: &Task, repeat: Repeat, at: i64) -> Template {
             title: task.title.clone(),
             notes: task.notes.clone(),
             project_id: task.project_id.clone(),
-            goal_id: task.goal_id.clone(),
             habit_id: task.habit_id.clone(),
             focus_minutes: task.focus_minutes,
             scrap_minutes: task.scrap_minutes,

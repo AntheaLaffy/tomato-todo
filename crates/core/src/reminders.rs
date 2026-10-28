@@ -3,6 +3,11 @@ use crate::{date_at, AppData, AppResult, Task};
 use chrono::{Local, TimeZone, Timelike};
 
 pub fn validate(task: &Task) -> AppResult<()> {
+    if task.due_date.as_ref().is_none_or(|date| {
+        date.len() != 10 || chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err()
+    }) {
+        return Err("任务必须指定有效的计划日期".into());
+    }
     if task.focus_minutes.is_some_and(|m| !(1..=180).contains(&m)) {
         return Err("单次专注时长需为1—180分钟".into());
     }
@@ -71,12 +76,6 @@ impl AppData {
         let now = Local.timestamp_opt(at, 0).single().unwrap();
         let now_minutes = i64::from(now.hour() * 60 + now.minute());
         let now_seconds = now_minutes * 60 + i64::from(now.second());
-        let void_goal_tasks: std::collections::HashSet<_> = self
-            .tasks
-            .iter()
-            .filter(|t| t.goal_id.is_some() && self.task_is_void(t, at))
-            .map(|t| t.id.clone())
-            .collect();
         let settings = &self.settings;
         let mut changed = false;
         for t in &mut self.tasks {
@@ -86,22 +85,17 @@ impl AppData {
             // A timed task is spent once its day has passed, or once its planned
             // block is over today; from then on it neither fires nor rolls over.
             let expired = !t.completed
-                && (void_goal_tasks.contains(&t.id)
-                    || match start {
-                        Some(s) if !t.completed => {
-                            // A plain task may be repaired for its static grace window
-                            // after the planned block; habits carry 0 and are spent then.
-                            let spent_at = s
-                                + window_minutes(t, settings)
-                                + i64::from(if t.is_habit() || t.goal_id.is_some() {
-                                    0
-                                } else {
-                                    t.scrap_minutes
-                                });
-                            past || (today && now_seconds >= spent_at * 60)
-                        }
-                        _ => false,
-                    });
+                && (match start {
+                    Some(s) if !t.completed => {
+                        // A plain task may be repaired for its static grace window
+                        // after the planned block; habits carry 0 and are spent then.
+                        let spent_at = s
+                            + window_minutes(t, settings)
+                            + i64::from(if t.is_habit() { 0 } else { t.scrap_minutes });
+                        past || (today && now_seconds >= spent_at * 60)
+                    }
+                    _ => false,
+                });
             if expired && !t.reminder_expired {
                 t.reminder_expired = true;
                 changed = true;

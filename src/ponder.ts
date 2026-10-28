@@ -20,7 +20,7 @@ export type PonderTarget = {
 };
 
 const FOCUS = "今日专注";
-const CONTAINER = "目标 · 习惯 · 愿景";
+const CONTAINER = "习惯 · 愿景";
 const PROTECT = "专注与锁机";
 const FILES = "计划与备份";
 const ASSISTANT = "学习助手";
@@ -35,7 +35,7 @@ export const PONDER_TARGETS: PonderTarget[] = [
     sections: [
       {
         heading: "设计理念",
-        text: "这一页就是全部：目标是抽象，任务是当下。不必先想清楚整学期，选一件最重要的事开一个番茄就算开始。",
+        text: "从今天的一项任务开始。不必先想清楚整学期，选一件最重要的事开一个番茄就算开始。",
       },
       {
         text: "这里只放今天该做的事，以及一个可以随时开始的番茄钟。不选任务也能「自由专注」。",
@@ -89,15 +89,15 @@ export const PONDER_TARGETS: PonderTarget[] = [
         text: "计划块结束了但还没做完时，普通组若仍在「重修窗口」内，就会进入待补队列，重新出现在今日专注里。",
       },
       {
-        heading: "目标组不一样",
-        text: "目标实例是否待补由配对节点的信号裁定决定：节点裁定后实例报废，不再补做。习惯过期后直接从今日待办移出并计一次缺勤。",
+        heading: "习惯漏做记缺勤",
+        text: "习惯过期后直接从今日待办移出并计一次缺勤。",
       },
       {
         heading: "超过窗口就报废",
-        text: "超过重修窗口或节点已裁定，实例作废、不再提醒。跨日不补。",
+        text: "超过重修窗口，实例作废、不再提醒。跨日不补。",
       },
     ],
-    related: ["focus", "mainline", "habits"],
+    related: ["focus", "habits"],
   },
   {
     id: "tasks",
@@ -108,21 +108,21 @@ export const PONDER_TARGETS: PonderTarget[] = [
     sections: [
       {
         heading: "设计理念",
-        text: "全部任务只是清单：分类（目标/习惯/普通）由管辖与时间推导，不用手填。事情都丢这儿，今天做哪件由你决定。",
+        text: "全部任务只是清单：分类（习惯/普通）由管辖与时间推导，不用手填。每条任务都要安排日期，精确时间可以不填。",
       },
       {
-        text: "任务有优先级、截止日期、标签、备注和子步骤；点任务正文进编辑弹窗。",
+        text: "任务有优先级、计划日期、标签、备注和子步骤；点任务正文进编辑弹窗。",
       },
       {
         heading: "批量只适合粗调",
-        text: "多选后可以整批「删除任务」或「移出」——移出只是把任务从项目/目标/习惯里摘掉，任务本身保留。一次改多个字段请进编辑弹窗。",
+        text: "多选后可以整批「删除任务」或「移出」——移出只是把任务从项目/习惯里摘掉，任务本身保留。一次改多个字段请进编辑弹窗。",
       },
       {
         heading: "类别是推导出来的",
-        text: "属于目标＝主线管辖；不属目标、有提醒时间且重复＝习惯；其余＝普通番茄钟。类别不用手填。",
+        text: "有提醒时间且重复＝习惯；其余＝普通番茄钟。类别不用手填。",
       },
     ],
-    related: ["recurring", "goals", "projects"],
+    related: ["recurring", "projects"],
   },
   {
     id: "projects",
@@ -139,15 +139,15 @@ export const PONDER_TARGETS: PonderTarget[] = [
         text: "项目回答的是「做这件事时该处在什么环境里」：专属应用白名单挂在项目上，专注该项目的任务时替代通用白名单。",
       },
       {
-        heading: "和目标、习惯是正交的",
-        text: "目标/习惯管执行语义（漏了怎么办），项目管环境。一个任务可以同时属于某个项目和某个目标/习惯。",
+        heading: "与习惯独立",
+        text: "习惯记录周期执行，项目提供环境；一个任务可以同时属于项目和习惯组。",
       },
       {
         heading: "排序与菜单",
         text: "侧栏的项目可以拖拽排序，也可以点排序按钮；右键项目名可以重命名或删除。删除项目时任务会移到收件箱。",
       },
     ],
-    related: ["tasks", "goals", "whitelist"],
+    related: ["tasks", "whitelist"],
   },
   {
     id: "recurring",
@@ -174,63 +174,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
     related: ["tasks", "templates"],
   },
   {
-    id: "goals",
-    title: "目标",
-    category: CONTAINER,
-    page: true,
-    selectors: ['main[data-ponder="goals"]'],
-    sections: [
-      {
-        heading: "设计理念",
-        text: "目标是「任务的容器」，回答「漏了怎么办、往哪个方向走」，不是每天的功课。日常别来这里打理，让助手改；只在想看方向时来。",
-      },
-      {
-        text: "目标把长期的事（例如一门课）收在一起，组内的听课、练习、实验等任务按「数量」或「时长」累计进度。",
-      },
-      {
-        heading: "目标承载主线",
-        text: "目标组里可以编辑主线节点；节点按实例的组标识与执行开始时间配对。目标的成败最终由信号裁定。",
-      },
-      {
-        heading: "漏做会待补",
-        text: "漏做的目标任务会作为「待补」出现在今日专注，直到补完或节点裁定。",
-      },
-    ],
-    related: ["mainline", "habits", "vision"],
-  },
-  {
-    id: "mainline",
-    title: "主线节点与裁定",
-    category: CONTAINER,
-    selectors: [".mainline-card", ".goal-section", ".cross-section"],
-    sections: [
-      {
-        heading: "设计理念",
-        text: "主线是目标的时间骨架：只回答「这一阶段算不算过去」，不衡量你每天的努力。",
-      },
-      {
-        text: "主线是目标组内按时间排列、互不重叠的节点。默认要求至少配对一条任务，且配对任务全部完成；没有实例不算完成。",
-      },
-      {
-        heading: "完成 ≠ 成功",
-        text: "完成只是过程信息。成功/失败由信号裁定：有权限的节点可以按时间或完成情况发出信号，方向可向头或向尾。裁定不可撤销。",
-      },
-      {
-        heading: "阻断与检查",
-        text: "有发信号权限的节点可以设置阻断，拒绝时传播停止。末节点的检查信号固定向头传播、不可阻断，把已完成且未裁定的节点判为成功。",
-      },
-      {
-        heading: "裁定之后",
-        text: "节点成功或失败后，所有配对实例都报废；已完成的记录保留，正在进行的专注会停止并记录实际用时。",
-      },
-    ],
-    related: ["goals", "stats", "catch-up"],
-  },
-  {
     id: "habits",
     title: "习惯",
     category: CONTAINER,
-    selectors: ['main[data-ponder="goals"] .list-tabs'],
+    selectors: ['main[data-ponder="collections"] .list-tabs'],
     sections: [
       {
         heading: "设计理念",
@@ -241,10 +188,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
       },
       {
         heading: "过期即缺勤",
-        text: "过期未做会从今日待办移出并计一次缺勤；习惯不重修，也不参与目标主线。目标组与习惯组互斥。",
+        text: "过期未做会从今日待办移出并计一次缺勤；习惯不重修。",
       },
     ],
-    related: ["goals", "templates", "catch-up"],
+    related: ["templates", "catch-up"],
   },
   {
     id: "vision",
@@ -261,10 +208,10 @@ export const PONDER_TARGETS: PonderTarget[] = [
       },
       {
         heading: "挂在哪里都行",
-        text: "可以挂在项目下（英语一 → 80 分）、目标下（OpenCamp → 拿证），也可以放顶层当总愿景。",
+        text: "可以挂在项目下（英语一 → 80 分），也可以放顶层当总愿景。",
       },
     ],
-    related: ["goals", "projects"],
+    related: ["projects"],
   },
   {
     id: "schedule",
@@ -310,7 +257,7 @@ export const PONDER_TARGETS: PonderTarget[] = [
       },
       {
         heading: "怎么开始",
-        text: "日程页「添加时段」填名称、星期、起止时间即可，跨午夜也支持（结束早于开始即跨天）。嫌麻烦就把课表整段发给学习助手，它按此补全阻塞时段——同样的数据也能随学习计划 v5 导出、改完再导入。",
+        text: "日程页「添加时段」填名称、星期、起止时间即可，跨午夜也支持（结束早于开始即跨天）。嫌麻烦就把课表整段发给学习助手，它按此补全阻塞时段——同样的数据也能随学习计划 v6 导出、改完再导入。",
       },
       {
         heading: "周次限制要自己记",
@@ -359,14 +306,14 @@ export const PONDER_TARGETS: PonderTarget[] = [
       },
       {
         heading: "两块围绕成败的视图",
-        text: "「主线」按整条线全部节点成功才算成功、任一失败即失败，给出每个目标组的结果与逐节点时序；「纵切面」把近两周每天的完成、缺勤、作废与主线结果并排。",
+        text: "每日记录展示近两周的完成、缺勤与作废数量。",
       },
       {
         heading: "成功很少见",
         text: "成功要求全线通过，所以更值得回看的是失败与未完成——它们通常指向估时或环境问题。",
       },
     ],
-    related: ["mainline", "goals", "timer"],
+    related: ["timer"],
   },
   {
     id: "templates",
@@ -484,20 +431,20 @@ export const PONDER_TARGETS: PonderTarget[] = [
   },
   {
     id: "plan-file",
-    title: "学习计划文件 v5",
+    title: "学习计划文件 v6",
     category: FILES,
     selectors: ['[data-ponder="plan-file"]', '[data-action="export-plan"]'],
     sections: [
       {
         heading: "设计理念",
-        text: "计划文件让助手和外部编辑器能改你的安排：配置可交换，进度与裁定留在本机。",
+        text: "计划文件让助手和外部编辑器能改你的安排：配置可交换，进度与历史留在本机。",
       },
       {
-        text: "导出未完成实例、模板、主线、项目与课表阻塞时段，方便编辑或交给 AI 维护。",
+        text: "导出未完成实例、模板、项目与课表阻塞时段，方便编辑或交给 AI 维护。",
       },
       {
         heading: "导入是以文件为准的配置更新",
-        text: "相同 ID 的任务、节点、模板、项目与阻塞时段按文件更新，完成进度、专注历史与节点裁定一律保留。文件没提到的实体默认不动。",
+        text: "相同 ID 的任务、模板、项目与阻塞时段按文件更新，完成进度、专注历史一律保留。文件没提到的实体默认不动。",
       },
       {
         heading: "整份同步要显式声明",
@@ -508,16 +455,16 @@ export const PONDER_TARGETS: PonderTarget[] = [
   },
   {
     id: "backup",
-    title: "完整备份 v3",
+    title: "完整备份 v4",
     category: FILES,
     selectors: ['[data-ponder="backup"]', '[data-action="export"]'],
     sections: [
       {
         heading: "设计理念",
-        text: "完整备份是搬家与后悔用的：历史、状态、裁定都在里面，日常不用管它。",
+        text: "完整备份是搬家与后悔用的：历史、状态都在里面，日常不用管它。",
       },
       {
-        text: "包含任务、设置、专注记录、模板、印刷记录、节点裁定、配对与永久 ID 历史，以及严格模式与锁机字段。",
+        text: "包含任务、设置、专注记录、模板、印刷记录与永久 ID 历史，以及严格模式与锁机字段。",
       },
       {
         heading: "导入会替换当前数据",
@@ -584,14 +531,14 @@ export const PONDER_TARGETS: PonderTarget[] = [
     sections: [
       {
         heading: "设计理念",
-        text: "助手是唯一需要你常打交道的「配置入口」：目标、课表、模板、白名单都由它改。你只说想要什么，配置的事交给它。",
+        text: "助手是唯一需要你常打交道的「配置入口」：任务、课表、模板、白名单都由它改。你只说想要什么，配置的事交给它。",
       },
       {
         text: "默认用 DeepSeek API，也可以登录 Codex 账号。运行框架随应用打包，不需要另装 Node/Pi，也不读取你全局 Pi 的认证文件。",
       },
       {
         heading: "自动唤醒只在异常时发生",
-        text: "本地检测计划超量/过松、习惯缺勤、主线停滞、深夜记录与投入下降等信号，受冷却、每日上限与安静时段约束。自动唤醒只分析、追问并生成待审阅文件。",
+        text: "本地检测计划超量/过松、习惯缺勤停滞、深夜记录与投入下降等信号，受冷却、每日上限与安静时段约束。自动唤醒只分析、追问并生成待审阅文件。",
       },
       {
         heading: "它碰不到你的数据",

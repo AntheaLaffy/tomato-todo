@@ -1,10 +1,11 @@
-//! App-owned Pi orchestration. The embedded agent cannot dispatch app mutations.
+//! App-owned Pi orchestration; automatic diagnostic wakes remain read-only.
 mod attachments;
 mod bridge;
 mod canvas;
 mod conversations;
 mod creator;
 pub mod files;
+mod projects;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -186,8 +187,21 @@ impl Agent {
     }
     pub fn request(self: &Arc<Self>, args: Value) -> AppResult<Value> {
         let op = args["op"].as_str().ok_or("缺少 Agent 操作")?;
+        if op == "send" {
+            let snapshot = self
+                .engine
+                .lock()
+                .map_err(|e| e.to_string())?
+                .snapshot(now())?;
+            if snapshot.data.education.assessments.iter().any(|a| {
+                a.started_at.is_some() && a.stopped_at.is_none() && snapshot.server_time < a.ends_at
+            }) {
+                return Err("考试进行中，请独立完成纸质试卷；到点停笔交卷后再使用学习助手".into());
+            }
+        }
         match op {
             "status" => self.status(),
+            "authorize_project_directory" => self.authorize_project(&args),
             "exit_creator_mode" => {
                 let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
                 if inner.live.busy {
@@ -291,8 +305,7 @@ impl Agent {
                 }
                 self.status()
             }
-            "upload_attachment" => serde_json::to_value(attachments::upload(&self.dir, &args)?)
-                .map_err(|e| e.to_string()),
+            "upload_attachment" => self.upload_project_attachment(&args),
             "download_attachment" => {
                 attachments::download(&self.dir, &nonempty_text(&args, "id", 100)?)
             }
@@ -414,11 +427,19 @@ impl Agent {
                 }
                 self.status()
             }
-            "tool" => self.call(
-                args["name"].as_str().ok_or("缺少工具名")?,
-                &args["arguments"],
-                false,
-            ),
+            "tool" => {
+                let name = args["name"].as_str().ok_or("缺少工具名")?;
+                if name == "education" {
+                    let command = serde_json::from_value(args["arguments"]["command"].clone())
+                        .map_err(|e| e.to_string())?;
+                    tomato_core::check_user_action(&Action::Education { command })?;
+                } else if name == "dispatch" {
+                    let action = serde_json::from_value(args["arguments"]["action"].clone())
+                        .map_err(|e| e.to_string())?;
+                    tomato_core::check_user_action(&action)?;
+                }
+                self.call(name, &args["arguments"], false)
+            }
             _ => Err("未知 Agent 操作".into()),
         }
     }
@@ -522,7 +543,7 @@ impl Agent {
         inner.live.scheduled = scheduled;
         inner.live.job_id = uuid::Uuid::new_v4().to_string();
         Ok(
-            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"creatorMode":creator_mode,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"persona":persona,"sessionFile":inner.store.active_session(),"tools":definitions}),
+            json!({"op":"prompt","automatic":automatic,"scheduled":scheduled,"creatorMode":creator_mode,"jobId":inner.live.job_id,"userMessageId":message_id,"text":text,"images":images,"attachments":attachments,"provider":p.provider,"model":p.model,"preferences":p,"projectMounts":self.project_mounts()?,"persona":persona,"sessionFile":inner.store.active_session(),"tools":definitions}),
         )
     }
     fn send_prompt(self: &Arc<Self>, command: Value) -> AppResult<()> {
@@ -714,6 +735,46 @@ impl Agent {
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
         let at = snapshot.server_time;
+        if snapshot
+            .data
+            .education
+            .assessments
+            .iter()
+            .any(|a| a.started_at.is_some() && a.stopped_at.is_none() && at < a.ends_at)
+        {
+            return Ok(());
+        }
+        let ready = {
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            let p = &inner.store.preferences;
+            p.enabled
+                && inner.live.auth[&p.provider]["configured"] == true
+                && !inner.live.busy
+                && snapshot.data.reminder_idle()
+        };
+        if ready {
+            if let Some(event) = snapshot.data.education.events.iter().find(|e| {
+                e.state == "pending"
+                    && snapshot
+                        .data
+                        .education
+                        .projects
+                        .iter()
+                        .any(|p| p.project_id == e.project_id && p.exam_mode)
+            }) {
+                (self.apply)(
+                    Action::Education {
+                        command: tomato_core::education::Command::ClaimEvent {
+                            id: event.id.clone(),
+                        },
+                    },
+                    None,
+                )?;
+                let text = format!("执行已启用的应试教学事件 {}：项目 {}，类型 {}，来源 {}。先 read_skill(name=exam-teaching)，读取 get_snapshot 中对应资料与进度。homework=课程结束后的作业（只覆盖已学内容，预先准备答案、评分点并复核）；grade=按发布时固定评分点批改指定提交，识别不清标记待复核；review=每日复盘，解释为什么错并安排复测；weeklyExam=根据本周已学范围和目标考试标准准备本周末两个考试窗口（避开固定占用），预先完成试卷、答案、评分点和复核。保存实际产物后使用 education finishEvent 完成事件。不得以文字回复代替落库。用户停止或供应商报错后保留状态，等待用户重试。", event.id,event.project_id,event.kind,event.source_id);
+                self.prompt(text, false, true, vec![], vec![])?;
+                return Ok(());
+            }
+        }
         // 用户排定的定时任务排在最前：它们是用户明确的安排，所以不受「自动唤醒」
         // 开关、每日上限、冷却和安静时段限制——但助手得是启用且已连接的状态。
         let due: Option<(String, String, String, u32)> = {
@@ -950,6 +1011,15 @@ impl Agent {
     pub fn call(self: &Arc<Self>, name: &str, args: &Value, agent: bool) -> AppResult<Value> {
         if !tools::definitions(agent).iter().any(|t| t["name"] == name) {
             return Err("工具未授权".into());
+        }
+        if name == "education" {
+            let command: tomato_core::education::Command =
+                serde_json::from_value(args["command"].clone()).map_err(|e| e.to_string())?;
+            if let tomato_core::education::Command::SaveResource { resource } = command {
+                return self.register_resource(resource);
+            }
+            return serde_json::to_value((self.apply)(Action::Education { command }, None)?)
+                .map_err(|e| e.to_string());
         }
         let workspace = self.dir.join("workspace");
         let _workspace_lock = if [
@@ -1550,7 +1620,6 @@ impl Agent {
                     Action::RestoreTask { .. } => Some(("找回了一条任务".to_string(), None)),
                     Action::ImportPlan { .. } => Some(("导入了学习计划".to_string(), None)),
                     Action::Import { .. } => Some(("恢复了备份".to_string(), None)),
-                    Action::SaveGoal { name, .. } => Some((format!("更新了主线「{name}」"), None)),
                     Action::SaveHabit { name, .. } => Some((format!("更新了习惯「{name}」"), None)),
                     Action::SaveVision { name, .. } => {
                         Some((format!("记下了愿景「{name}」"), None))
@@ -1611,9 +1680,6 @@ impl Agent {
                                 args["projectId"]
                                     .as_str()
                                     .is_none_or(|id| t.project_id.as_deref() == Some(id))
-                                    && args["goalId"]
-                                        .as_str()
-                                        .is_none_or(|id| t.goal_id.as_deref() == Some(id))
                                     && args["completed"]
                                         .as_bool()
                                         .is_none_or(|completed| t.completed == completed)
@@ -1628,7 +1694,7 @@ impl Agent {
                         let skills = self.available_skills();
                         let inner = self.inner.lock().map_err(|e| e.to_string())?;
                         Ok(
-                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"goals":s.data.goals,"visions":s.data.visions,"blocks":s.data.blocks,"todayBlocks":tomato_core::blocks::on_date(&s.data.blocks,&s.today),"nodeProgress":s.node_progress,"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":skills,"permission":"用户主动发起时可直接执行允许的操作；自动唤醒仅分析、提问与准备文件。保护规则不可绕开。"}),
+                            json!({"today":s.today,"stats":s.stats,"projects":s.data.projects,"visions":s.data.visions,"blocks":s.data.blocks,"todayBlocks":tomato_core::blocks::on_date(&s.data.blocks,&s.today),"anomalies":diagnose(&s,inner.store.preferences.daily_capacity_minutes),"memories":inner.store.memories,"recentTasks":s.data.tasks.iter().filter(|t|t.due_date.as_deref().is_some_and(|d|d>=s.today.as_str())).take(50).collect::<Vec<_>>(),"taskCount":s.data.tasks.len(),"skills":skills,"permission":"用户主动发起时可直接执行允许的操作；自动唤醒仅分析、提问与准备文件。保护规则不可绕开。"}),
                         )
                     }
                     _ => Err("未知工具".into()),

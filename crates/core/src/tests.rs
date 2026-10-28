@@ -396,7 +396,7 @@ fn plan_validation_and_conversion_fail_atomically() {
 
 #[test]
 fn plan_defaults_and_protection_match_task_contract() {
-    let plan: plan::PlanFile = serde_json::from_str(r#"{"format":"tomato-todo-plan","version":1,"pomodoroMinutes":25,"projects":[],"tasks":[{"id":"minimal","title":"最小任务"}]}"#).unwrap();
+    let plan: plan::PlanFile = serde_json::from_str(r#"{"format":"tomato-todo-plan","version":6,"pomodoroMinutes":25,"projects":[],"tasks":[{"id":"minimal","title":"最小任务","dueDate":"2026-10-12"}]}"#).unwrap();
     plan.validate().unwrap();
     assert_eq!(plan.tasks[0].estimate, 1);
     assert_eq!(plan.tasks[0].repeat, Repeat::None);
@@ -425,7 +425,7 @@ fn project_whitelist(e: &mut Engine, id: &str) -> Option<Vec<String>> {
 fn plan_project_whitelist_is_added_then_overwritten_by_import() {
     let mut e = engine();
     let create: plan::PlanFile = serde_json::from_str(
-        r##"{"format":"tomato-todo-plan","version":1,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d","appWhitelist":["org.mozilla.firefox"]}],"tasks":[{"id":"t1","title":"词汇","projectId":"english"}]}"##,
+        r##"{"format":"tomato-todo-plan","version":6,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d","appWhitelist":["org.mozilla.firefox"]}],"tasks":[{"id":"t1","title":"词汇","dueDate":"2026-10-12","projectId":"english"}]}"##,
     )
     .unwrap();
     e.dispatch(Action::ImportPlan { plan: create }, 1000)
@@ -437,7 +437,7 @@ fn plan_project_whitelist_is_added_then_overwritten_by_import() {
 
     // A regenerated file replaces the list, which is the agent round-trip.
     let update: plan::PlanFile = serde_json::from_str(
-        r##"{"format":"tomato-todo-plan","version":1,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d","appWhitelist":["org.mozilla.firefox","mdict"]}],"tasks":[]}"##,
+        r##"{"format":"tomato-todo-plan","version":6,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d","appWhitelist":["org.mozilla.firefox","mdict"]}],"tasks":[]}"##,
     )
     .unwrap();
     e.dispatch(Action::ImportPlan { plan: update }, 1010)
@@ -449,7 +449,7 @@ fn plan_project_whitelist_is_added_then_overwritten_by_import() {
 
     // Omitting the field keeps the local list instead of clearing it.
     let keep: plan::PlanFile = serde_json::from_str(
-        r##"{"format":"tomato-todo-plan","version":1,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d"}],"tasks":[]}"##,
+        r##"{"format":"tomato-todo-plan","version":6,"pomodoroMinutes":25,"projects":[{"id":"english","name":"英语一","color":"#849b7d"}],"tasks":[]}"##,
     )
     .unwrap();
     e.dispatch(Action::ImportPlan { plan: keep }, 1020).unwrap();
@@ -485,30 +485,12 @@ fn plan_import_updates_configuration_while_keeping_progress() {
     // Editing the file must now change the plan, not be silently ignored.
     plan.tasks[0].title = "改过的标题".into();
     plan.tasks[0].due_date = Some("2026-10-20".into());
-    plan.tasks[0].goal_id = Some("g1".into());
-    plan.goals.push(plan::PlanGoal {
-        id: "g1".into(),
-        name: "新主线".into(),
-        nodes: vec![crate::nodes::NodeSpec {
-            id: "n1".into(),
-            name: "阶段".into(),
-            start: "2026-10-20T00:00".into(),
-            end: "2026-10-21T00:00".into(),
-            required_tasks: 1,
-            confirmation_required: false,
-            signal: None,
-            block_success: crate::nodes::BlockRule::Never,
-            block_failure: crate::nodes::BlockRule::Never,
-        }],
-    });
     let s = e
         .dispatch(Action::ImportPlan { plan }, friday(10, 0))
         .unwrap();
     let t = s.data.tasks.iter().find(|t| t.id == id).unwrap();
     assert_eq!(t.title, "改过的标题");
     assert_eq!(t.due_date.as_deref(), Some("2026-10-20"));
-    assert_eq!(t.goal_id.as_deref(), Some("g1"));
-    assert_eq!(t.node_id.as_deref(), Some("n1"));
     // Progress and steps survive the update.
     assert!(t.subtasks[0].done);
 }
@@ -560,6 +542,12 @@ fn effective_whitelist_prefers_project_list_over_global() {
     let project = e
         .dispatch(
             Action::SaveProject {
+                directory: Some(
+                    std::env::temp_dir()
+                        .join("tomato-project")
+                        .to_string_lossy()
+                        .into_owned(),
+                ),
                 id: None,
                 name: "英语".into(),
                 color: "#849b7d".into(),
@@ -664,6 +652,12 @@ fn long_windows_paths_round_trip_in_global_and_project_whitelists() {
     let project = e
         .dispatch(
             Action::SaveProject {
+                directory: Some(
+                    std::env::temp_dir()
+                        .join("tomato-project")
+                        .to_string_lossy()
+                        .into_owned(),
+                ),
                 id: None,
                 name: "Portable".into(),
                 color: "#849b7d".into(),
@@ -735,7 +729,7 @@ fn long_windows_paths_round_trip_in_global_and_project_whitelists() {
 }
 
 #[test]
-fn expired_routines_count_as_misses_but_goal_work_does_not() {
+fn expired_routines_count_as_misses_but_appointments_do_not() {
     let mut e = engine();
     let mut routine = draft();
     routine.due_date = Some("2026-10-09".into());
@@ -752,27 +746,6 @@ fn expired_routines_count_as_misses_but_goal_work_does_not() {
     appointment.focus_minutes = Some(25);
     appointment.estimate = 1;
     e.dispatch(Action::SaveTask { task: appointment }, friday(8, 0))
-        .unwrap();
-    // The same schedule under a goal is a catch-up, not a routine miss.
-    let s = e
-        .dispatch(
-            Action::SaveGoal {
-                id: None,
-                name: "OpenCamp".into(),
-
-                nodes: vec![],
-            },
-            friday(8, 0),
-        )
-        .unwrap();
-    let goal = s.data.goals[0].id.clone();
-    let mut goal_task = draft();
-    goal_task.due_date = Some("2026-10-09".into());
-    goal_task.reminder_time = Some("09:00".into());
-    goal_task.focus_minutes = Some(25);
-    goal_task.estimate = 1;
-    goal_task.goal_id = Some(goal);
-    e.dispatch(Action::SaveTask { task: goal_task }, friday(8, 0))
         .unwrap();
     let s = e.snapshot(friday(16, 0)).unwrap();
     assert!(s
@@ -882,7 +855,7 @@ fn habit_validation_rejects_duplicate_slots_and_bad_times() {
 }
 
 #[test]
-fn visions_attach_to_a_project_or_goal_or_stand_alone() {
+fn visions_attach_to_a_project_or_stand_alone() {
     let mut e = engine();
     e.dispatch(
         Action::SaveVision {
@@ -890,7 +863,6 @@ fn visions_attach_to_a_project_or_goal_or_stand_alone() {
             name: "考上北大".into(),
             notes: "研究生工资与未来".into(),
             project_id: None,
-            goal_id: None,
         },
         1000,
     )
@@ -902,53 +874,22 @@ fn visions_attach_to_a_project_or_goal_or_stand_alone() {
             name: "英语一 80".into(),
             notes: String::new(),
             project_id: Some(project.clone()),
-            goal_id: None,
         },
         1000,
     )
     .unwrap();
-    let s = e
+    assert_eq!(e.snapshot(1000).unwrap().data.visions.len(), 2);
+    assert!(e
         .dispatch(
-            Action::SaveGoal {
+            Action::SaveVision {
                 id: None,
-                name: "OpenCamp".into(),
-
-                nodes: vec![],
+                name: "无效".into(),
+                notes: String::new(),
+                project_id: Some("missing".into())
             },
-            1000,
+            1000
         )
-        .unwrap();
-    let goal = s.data.goals[0].id.clone();
-    e.dispatch(
-        Action::SaveVision {
-            id: None,
-            name: "结营证书".into(),
-            notes: String::new(),
-            project_id: None,
-            goal_id: Some(goal.clone()),
-        },
-        1000,
-    )
-    .unwrap();
-    assert_eq!(e.snapshot(1000).unwrap().data.visions.len(), 3);
-    // Two owners at once, or a missing reference, is rejected.
-    for (pid, gid) in [
-        (Some(project.clone()), Some(goal.clone())),
-        (Some("missing".into()), None),
-    ] {
-        assert!(e
-            .dispatch(
-                Action::SaveVision {
-                    id: None,
-                    name: "无效".into(),
-                    notes: String::new(),
-                    project_id: pid,
-                    goal_id: gid,
-                },
-                1000,
-            )
-            .is_err());
-    }
+        .is_err());
     // Deleting the owner drops its marker.
     e.dispatch(Action::DeleteProject { id: project }, 1000)
         .unwrap();
@@ -1221,8 +1162,7 @@ fn draft() -> TaskDraft {
         title: "测试任务".into(),
         notes: "".into(),
         project_id: None,
-        goal_id: None,
-        due_date: None,
+        due_date: Some("2026-10-09".into()),
         reminder_time: None,
         focus_minutes: None,
         scrap_minutes: 0,
@@ -2035,10 +1975,10 @@ fn reminder_window_covers_multi_pomodoro_breaks_and_old_slots_stay_void() {
 }
 
 #[test]
-fn single_session_length_is_independent_of_the_date() {
+fn single_session_length_is_independent_of_reminder_time() {
     let mut e = engine();
     let mut d = draft();
-    d.due_date = None;
+    d.reminder_time = None;
     d.focus_minutes = Some(40);
     let s = e.dispatch(Action::SaveTask { task: d }, 1000).unwrap();
     let id = s.data.tasks[0].id.clone();
@@ -2059,6 +1999,7 @@ fn reminder_validation_and_lock_deferral() {
             .is_err());
     }
     let mut d = draft();
+    d.due_date = None;
     d.reminder_time = Some("09:00".into());
     assert!(e
         .dispatch(Action::SaveTask { task: d.clone() }, friday(8, 0))
@@ -2118,7 +2059,7 @@ fn custom_duration_and_repeat_keep_schedule_without_changing_global_settings() {
 }
 
 #[test]
-fn v2_plan_preserves_schedule_and_duration_old_backups_remain_flexible() {
+fn plan_preserves_schedule_and_duration_backup_defaults_remain_flexible() {
     let mut e = engine();
     let mut d = draft();
     d.due_date = Some("2026-10-09".into());
@@ -2128,7 +2069,7 @@ fn v2_plan_preserves_schedule_and_duration_old_backups_remain_flexible() {
         .dispatch(Action::SaveTask { task: d }, friday(8, 0))
         .unwrap();
     let mut plan = s.data.export_plan();
-    assert_eq!(plan.version, 5);
+    assert_eq!(plan.version, 6);
     let imported = engine()
         .dispatch(Action::ImportPlan { plan: plan.clone() }, friday(8, 0))
         .unwrap();
@@ -2206,7 +2147,7 @@ fn imported_partial_timer_keeps_remaining_time_and_defers_reminders() {
 }
 
 #[test]
-fn course_blocks_round_trip_through_plan_v5() {
+fn course_blocks_round_trip_through_plan_v6() {
     let mut e = engine();
     e.dispatch(
         Action::SaveBlock {
@@ -2222,7 +2163,7 @@ fn course_blocks_round_trip_through_plan_v5() {
     )
     .unwrap();
     let exported = e.snapshot(1000).unwrap().data.export_plan();
-    assert_eq!(exported.version, 5);
+    assert_eq!(exported.version, 6);
     assert_eq!(exported.blocks.len(), 1);
     exported.validate().unwrap();
 
@@ -2259,4 +2200,163 @@ fn course_blocks_round_trip_through_plan_v5() {
     // name from being silently reused for a different band later.
     let retired = fresh.snapshot(1020).unwrap().data.identities;
     assert!(retired.iter().any(|r| r.kind == "block" && r.retired));
+}
+
+#[test]
+fn every_task_entry_point_requires_a_date_but_not_a_reminder() {
+    let mut e = engine();
+    let at = friday(8, 0);
+    let before = e.export(at).unwrap();
+    for date in [None, Some("".into()), Some("2026-02-30".into())] {
+        let mut task = draft();
+        task.due_date = date.clone();
+        assert!(e.dispatch(Action::SaveTask { task }, at).is_err());
+        let mut plan = example_plan();
+        plan.tasks[0].due_date = date.clone();
+        assert!(e.dispatch(Action::ImportPlan { plan }, at).is_err());
+        let mut backup = AppData::default();
+        let mut task = draft();
+        task.due_date = date;
+        // Construct through the public DTO to exercise backup validation as well.
+        let mut raw = serde_json::to_value(task).unwrap();
+        raw["id"] = "invalid-task".into();
+        raw.as_object_mut().unwrap().remove("repeat");
+        for (key, value) in [
+            ("completed", serde_json::json!(false)),
+            ("createdAt", serde_json::json!(at)),
+            ("recurring", serde_json::json!(false)),
+        ] {
+            raw[key] = value;
+        }
+        let task: Task = serde_json::from_value(raw).unwrap();
+        backup.tasks.push(task);
+        assert!(e
+            .dispatch(
+                Action::Import {
+                    data: Box::new(backup)
+                },
+                at
+            )
+            .is_err());
+        assert_eq!(e.export(at).unwrap(), before);
+    }
+    let s = e.dispatch(Action::SaveTask { task: draft() }, at).unwrap();
+    assert!(s.data.tasks[0].reminder_time.is_none());
+    assert!(s.data.tasks[0].due_date.is_some());
+    let mut plan = serde_json::to_value(example_plan()).unwrap();
+    plan["goals"] = serde_json::json!([]);
+    assert!(serde_json::from_value::<plan::PlanFile>(plan).is_err());
+    assert!(serde_json::from_value::<Action>(
+        serde_json::json!({"type":"saveGoal","name":"旧目标","nodes":[]})
+    )
+    .is_err());
+}
+
+#[test]
+fn local_v3_upgrade_removes_mainlines_and_preserves_tasks_and_history() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("upgrade.sqlite3");
+    let mut e = Engine::open(&path).unwrap();
+    let at = friday(8, 0);
+    let snapshot = e.dispatch(Action::SaveTask { task: draft() }, at).unwrap();
+    let id = snapshot.data.tasks[0].id.clone();
+    e.dispatch(Action::ToggleTask { id: id.clone() }, at)
+        .unwrap();
+    let saved = e.dispatch(Action::SaveTask { task: draft() }, at).unwrap();
+    let deleted_id = saved.data.tasks[1].id.clone();
+    e.dispatch(
+        Action::DeleteTask {
+            id: deleted_id.clone(),
+        },
+        at,
+    )
+    .unwrap();
+    let mut legacy: serde_json::Value = serde_json::from_str(&e.export(at).unwrap()).unwrap();
+    legacy["version"] = 3.into();
+    legacy["templates"] = serde_json::json!([{
+        "id":"old-manual-template", "shape":{"title":"通用练习","goalId":"retired-goal"},
+        "printing":{"kind":"once","date":null,"time":null}
+    }]);
+    legacy["prints"] = serde_json::json!([{"templateId":"old-manual-template","date":null}]);
+    legacy["visions"] =
+        serde_json::json!([{"id":"old-vision","name":"方向","goalId":"retired-goal"}]);
+    for record in legacy["identities"].as_array_mut().unwrap() {
+        if record["restoreTask"].is_string() {
+            let mut task: serde_json::Value =
+                serde_json::from_str(record["restoreTask"].as_str().unwrap()).unwrap();
+            task["goalId"] = "retired-goal".into();
+            task["nodeId"] = "retired-node".into();
+            task["dueDate"] = serde_json::Value::Null;
+            record["restoreTask"] = task.to_string().into();
+        }
+    }
+    for kind in ["goal", "node", "signal"] {
+        legacy["identities"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id":format!("retired-{kind}"), "kind":kind, "retired":false
+            }));
+    }
+    legacy["goals"] = serde_json::json!([{"id":"retired-goal","name":"旧目标","nodes":[]}]);
+    legacy["nodeBindings"] = serde_json::json!([]);
+    legacy["signalEvents"] = serde_json::json!([]);
+    legacy["tasks"][0]["dueDate"] = serde_json::Value::Null;
+    legacy["tasks"][0]["goalId"] = "retired-goal".into();
+    legacy["tasks"][0]["nodeId"] = "retired-node".into();
+    // Exchange files must not take the local migration path.
+    assert!(serde_json::from_value::<AppData>(legacy.clone()).is_err());
+    let sessions = legacy["sessions"].clone();
+    e.conn
+        .execute(
+            "UPDATE app_state SET data=?1 WHERE id=1",
+            [legacy.to_string()],
+        )
+        .unwrap();
+    drop(e);
+    let mut e = Engine::open(&path).unwrap();
+    let data = e.snapshot(at).unwrap().data;
+    assert_eq!(data.version, 4);
+    assert_eq!(data.tasks[0].due_date.as_deref(), Some("2026-10-09"));
+    assert!(data.tasks[0].completed);
+    assert!(data.prints.is_empty());
+    assert_eq!(data.visions[0].project_id, None);
+    assert!(
+        matches!(&data.templates[0].printing, templates::Printing::Once { date: Some(date), time: None } if date == &crate::date_at(crate::now()))
+    );
+    assert!(data
+        .identities
+        .iter()
+        .all(|r| !["goal", "node", "signal"].contains(&r.kind.as_str())));
+    let restored: Task = serde_json::from_str(
+        data.identities
+            .iter()
+            .find(|r| r.id == deleted_id)
+            .unwrap()
+            .restore_task
+            .as_ref()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(restored.due_date.as_deref(), Some("2026-10-09"));
+    e.dispatch(Action::RestoreTask { task: restored }, at)
+        .unwrap();
+    assert_eq!(serde_json::to_value(&data.sessions).unwrap(), sessions);
+    let exported = e.export(at).unwrap();
+    assert!(!exported.contains("goalId"));
+    assert!(!exported.contains("nodeBindings"));
+    e.dispatch(Action::ToggleTask { id: id.clone() }, at)
+        .unwrap();
+    let original = e.data.tasks[0].clone();
+    e.dispatch(Action::DeleteTask { id: id.clone() }, at)
+        .unwrap();
+    e.dispatch(Action::RestoreTask { task: original }, at)
+        .unwrap();
+    e.dispatch(Action::DeleteTask { id: id.clone() }, at)
+        .unwrap();
+    let mut plan = example_plan();
+    plan.tasks[0].id = id;
+    assert!(e.dispatch(Action::ImportPlan { plan }, at).is_err());
+    drop(e);
+    assert_eq!(Engine::open(&path).unwrap().data.version, 4);
 }

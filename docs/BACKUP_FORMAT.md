@@ -1,24 +1,21 @@
-# 完整备份文件 v3
+# 完整备份文件 v4
 
 入口：**偏好设置 → 数据与备份 → 导出备份 / 导入备份**。文件采用 UTF-8 JSON，建议文件名 `tomato-todo-backup.json`，上限 20 MiB。备份覆盖项目、任务完成进度、计时状态、专注历史、设置、课表阻塞时段和定时锁机规则。只交换待办安排时应使用 [学习计划文件](PLAN_FORMAT.md)，避免替换现有数据。
 
-机器定义见 [backup.schema.json](backup.schema.json)，通用示例见 [backup.example.json](backup.example.json)。Schema 校验结构，Rust 核心检查引用、日期、时间和跨字段约束。当前数据/备份版本为 `3`；模型采用破坏性升级，不自动迁移旧本机数据库或备份。旧学习计划 v1/v2 仍可转换导入。
+机器定义见 [backup.schema.json](backup.schema.json)，通用示例见 [backup.example.json](backup.example.json)。Schema 校验结构，Rust 核心检查引用、日期、时间和跨字段约束。当前数据/备份版本为 `4`；外部旧版备份明确拒绝。本地 v3 数据库仅在首次打开时转换：删除目标、节点、配对与信号，保留任务、愿景、完成记录与专注历史；无日期旧任务取创建日，无日期单次模板取升级日；无日期印刷账本退役。任务撤销恢复记录同步转换，已删除目标归属的愿景成为总愿景。转换失败时原数据库不写入。
 
 ## 顶层字段
 
 | 字段           | 内容                       | 要求                                                                                                                          |
 | -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `version`      | 数据版本                   | 固定 `3`                                                                                                                      |
+| `version`      | 数据版本                   | 固定 `4`                                                                                                                      |
 | `projects`     | 项目数组                   | 最多 500 项，`id/name/color/appWhitelist` 同计划格式；`appWhitelist` 可选；提供时专注该项目的任务用这份专属清单替代通用白名单 |
-| `goals`        | 主线任务组                 | 最多 500 项；`id/name/nodes`，每个节点含 `spec/confirmed/emitted/result`，没有统一产出单位                                    |
-| `nodeBindings` | 实例配对历史               | 最多 200000 项，`taskId/goalId/nodeId/completed/boundAt`；删除实例仍保留其完成事实                                            |
-| `signalEvents` | 信号及裁定依据             | 最多 200000 项，保留来源、方向、内容、接收顺序及阻断时的规则和完成情况                                                        |
 | `identities`   | 永久 ID 登记               | 最多 1000000 项；`id/kind/retired/restoreTask`；历史 ID 不能用于新实体                                                        |
 | `habits`       | 习惯组数组                 | 最多 500 项，只保存 `id/name`；形状和安排由模板管理                                                                           |
 | `blocks`       | 课表阻塞时段               | 最多 60 项；`id/title/days/start/end/attention/notes`，每周重复的固定占用（课程、实验）；旧文件省略时为空                      |
-| `templates`    | 模板与印刷规则             | 最多 5000 项，结构同计划 v4；不含完成和统计                                                                                   |
+| `templates`    | 模板与印刷规则             | 最多 5000 项，结构同计划 v6；不含完成和统计                                                                                   |
 | `prints`       | 已印日期记录               | 最多 200000 项，删除实例后仍保留，恢复后防止重新生成                                                                          |
-| `visions`      | 愿景数组                   | 最多 500 项；含 `name`、可选 `notes`，可归 `projectId` 或 `goalId`（至多一个，都为 null 即顶层总愿景）；旧文件省略时为空      |
+| `visions`      | 愿景数组                   | 最多 500 项；含 `name`、可选 `notes`，可选 `projectId` 归属项目（为空即总愿景）；旧文件省略时为空      |
 | `tasks`        | 全部任务，包括已完成任务   | 最多 50,000 项                                                                                                                |
 | `settings`     | 番茄钟、主题与专注保护设置 | 必填                                                                                                                          |
 | `timer`        | 当前计时器                 | 必填                                                                                                                          |
@@ -29,19 +26,13 @@
 
 ## 任务与历史
 
-任务包含计划 v4 的实例字段，另有 `completed`、`completedAt`（Unix 秒/null）、`createdAt`（Unix 秒）、子任务 `done` 与提醒送达状态。`completed` 必须与 `completedAt` 是否存在一致。实例的日期、完成、步骤进度与专注历史均属于实例；`templateId` 只指向来源，修改模板不会改历史。`recurring` 是生成时冻结的重复属性，不能从当前模板反向计算。从习惯组移出或删除习惯组只清 `habitId`，不改写 `recurring`，因此历史缺勤与管辖分类不会随容器变化。实例不保存 `repeat/nextTaskId`。
+任务包含计划 v6 的实例字段，另有 `completed`、`completedAt`（Unix 秒/null）、`createdAt`（Unix 秒）、子任务 `done` 与提醒送达状态。`completed` 必须与 `completedAt` 是否存在一致。实例的日期、完成、步骤进度与专注历史均属于实例；`templateId` 只指向来源，修改模板不会改历史。`recurring` 是生成时冻结的重复属性，不能从当前模板反向计算。从习惯组移出或删除习惯组只清 `habitId`，不改写 `recurring`，因此历史缺勤与管辖分类不会随容器变化。实例不保存 `repeat/nextTaskId`。
 
-`goalId/habitId` 引用所属管辖组；目标实例按组 ID 与执行时间配对节点，可重复，提醒时刻可选。`nodeId` 保存配对；节点裁定后所有配对实例报废，包括已完成记录。普通定时实例的 `scrapMinutes` 默认 0，单位分钟，从计划块结束起算，仅当天有效；仍可重修的普通/目标实例进入待补队列。习惯不重修，只对已经生成而漏做的实例记缺勤。普通/习惯已过静态窗口的候选不再印刷；主线不控制模板印刷，后来配对到已裁定节点的实例立即报废。
+任务必须有有效的 `dueDate`；提醒时刻可选，`habitId` 引用习惯组。定时且重复的实例按习惯统计，过期计缺勤、不重修。普通定时任务按计划块加 `scrapMinutes` 判断作废，仍在当天重修窗口内的任务进入待补队列。`reminderFired/reminderPending/reminderExpired` 保存本机送达状态，缺省 false。模板与印刷账本规则见 [计划 v6](PLAN_FORMAT.md)。
 
-`reminderFired/reminderPending/reminderExpired` 保存本机提醒状态，缺省 false。目标的最终报废由配对节点的不可逆信号裁定决定，不能仅从 `reminderExpired` 推断。`templates` 和 `prints` 的完整规则见 [计划 v4](PLAN_FORMAT.md)。`automatic`、`printAheadDays` 和独立印刷记录随备份保存；恢复时保持模板自动预印设置，在后续轮询中只补齐未印且尚未报废的候选实例。
+永久 ID 记录随备份保存并与本机历史合并；不能用导入复用已经删除实体的 ID。撤销删除只恢复登记中的原任务。愿景是纯标记，可独立存在或属于项目，删除项目时其愿景一并删除。
 
-节点 `spec` 的配置见 [主线设计](NODE_DESIGN.md) 与计划 v4。节点 `result` 为 null 或 `{ verdict: success|failure, at, signalId }`；必须对应真实信号记录。结果和配对属于运行状态，不以节点时间自动生成过期状态。信号记录的 `deliveries` 包含 `nodeId/blocked/blockRule/before/after/pairedCount/completedCount/completed`，可解释传播和裁定。
-
-备份保留全部配对、确认、裁定、已发标记和 ID 历史。本机导入时合并已有 ID 历史，不能删除或改写本机已有的节点裁定。恢复更旧的文件若会倒退裁定则整体拒绝；恢复原文件到新数据库可完整保留其历史。删除任务时保存原任务恢复内容，撤销只恢复同一实体，不能借原 ID 创建另一条任务。节点已有配对、信号或裁定时不能删除；已有裁定节点只能改名。开始新一轮应创建新的任务组和节点。
-
-`visions` 是纯标记：愿景不参与任务、进度与缺勤，删除所属项目或目标时其愿景一并删除。
-
-历史记录包含 `id`、`source`、`taskId`（可空）、`taskTitle`、`projectName`、`startedAt`、`endedAt`、`durationSecs`、`completed`。`source` 为 `timer`（实际计时，旧 v3 文件省略时的默认值）或 `taskEstimate`（任务完成时按预计补足）。开始和结束均为 Unix 秒，结束不能早于开始，ID 在历史中唯一。已删除任务可保留历史，故历史任务 ID 不强制要求仍在当前列表里。睡眠/小憩锁机不生成专注记录。
+历史记录包含 `id`、`source`、`taskId`（可空）、`taskTitle`、`projectName`、`startedAt`、`endedAt`、`durationSecs`、`completed`。`source` 为 `timer`（实际计时，v4 文件省略时的默认值）或 `taskEstimate`（任务完成时按预计补足）。开始和结束均为 Unix 秒，结束不能早于开始，ID 在历史中唯一。已删除任务可保留历史，故历史任务 ID 不强制要求仍在当前列表里。睡眠/小憩锁机不生成专注记录。
 
 `timer` 记录的 `completed: true` 表示番茄到时完成或由用户「提前完成」，计入一次番茄；`durationSecs` 保存实际专注秒数（1—10800），提前完成番茄本身不会补足预计时长。重置、跳过和紧急退出记为 `completed: false`，只累计用时。番茄完成与任务勾选独立，自动到时和提前完成都不修改任务或步骤的完成状态。
 
@@ -58,7 +49,7 @@
 - `focusMinutes`：1—180；`shortBreakMinutes`：1—60；`longBreakMinutes`：1—120。
 - `longBreakEvery`：2—12；`dailyGoal`：1—30，以上均为整数。
 - `autoBreak`、`autoFocus`、`sound`、`notifications`、`alwaysOnTop`：布尔值。
-- `soundVolume`：整数 0—100，默认 100；旧 v3 文件可省略。`sound` 控制所有关键节点音效，背景噪音单独调节。
+- `soundVolume`：整数 0—100，默认 100；v4 文件可省略。`sound` 控制所有关键节点音效，背景噪音单独调节。
 - `theme`：`light`、`dark`、`system`。
 - `personaBackdrop`：布尔值，缺省 `false`；在普通页面背景显示当前内置人格的完整立绘。沉浸与专注保护界面不显示，自定义人格没有内置立绘时隐藏。
 - `protection`：见下表；旧文件可省略，默认关闭。
@@ -116,7 +107,7 @@
 
 `timer` 包含 `mode`（`focus/shortBreak/longBreak`）、`running`、`taskId`、`durationSecs`、`remainingSecs`、`deadline`、`startedAt`、`cycle`、`cycleDate`、`completionSerial`、`lastFinishedMode`。秒数非负，持续时间 1—10800，剩余不得超过持续时间；`running` 必须与 `deadline` 是否存在一致。可空的时间字段用 Unix 秒。`taskId` 非空时必须引用当前任务；最后完成的阶段可为 null。
 
-`cycle` 是 `cycleDate` 当天完整完成的番茄数，同一天跨任务累计；每累计 `longBreakEvery` 个安排长休息，其余安排短休息。`cycleDate` 是本机本地日期 `YYYY-MM-DD` 或 null，旧 v3 文件可省略。首次读取缺失日期的计数，或本地日期变化时，按专注历史的完成日期重建当天计数，因此昨日进度不会带到今早。跨午夜的专注计入结束日；延迟到次日才处理的昨日完成仍归昨日。日期变化不打断正在进行或已暂停的计时；若新一天尚无完成记录，昨日尚未开始的休息回到专注待机。
+`cycle` 是 `cycleDate` 当天完整完成的番茄数，同一天跨任务累计；每累计 `longBreakEvery` 个安排长休息，其余安排短休息。`cycleDate` 是本机本地日期 `YYYY-MM-DD` 或 null，v4 文件可省略。首次读取缺失日期的计数，或本地日期变化时，按专注历史的完成日期重建当天计数，因此昨日进度不会带到今早。跨午夜的专注计入结束日；延迟到次日才处理的昨日完成仍归昨日。日期变化不打断正在进行或已暂停的计时；若新一天尚无完成记录，昨日尚未开始的休息回到专注待机。
 
 导入先完整校验，再一次性替换数据；当前处于保护状态时不能恢复备份。确认框会说明替换范围。导入后：
 
@@ -127,3 +118,9 @@
 5. 严格模式及白名单配置保留，下次主动开始相应专注或启用时段后才生效。
 
 这里与直接重新打开本机数据库不同：本机重启继续按原截止时刻恢复严格专注/小憩；当前仍在已启用定时时段内时恢复锁机，已过去的时段不会补锁。程序关闭或电脑休眠时无法执行桌面拦截，也不会唤醒设备。
+
+## 项目教学记录
+
+v4新增可选 `education`，缺省为空；保存项目目录绑定元数据、资源索引、学期计划与修订历史、45分钟课程、固定版本题目与评分标准、答卷、批改、错因复测、复盘和持久化教学事件。完整字段见 [应试教学](EDUCATION.md) 与 backup.schema.json 的 education 定义。
+
+JSON备份不包含外部资料文件或本机 `project-grants.json` 授权；需另行备份项目目录。恢复后必须在项目页重新授权，导入路径不扩大沙箱权限。已发布题目/评分标准及提交/批改记录不可借导入修改；需要修订时保存新ID。计划v6不导出教学历史。

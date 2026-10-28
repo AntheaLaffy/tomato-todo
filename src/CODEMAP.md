@@ -10,7 +10,7 @@ generated_at: 2026-10-10
 | 任务                             | Domain    | Target                                                                                                                      | Also Check                                                                                                           |
 | -------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | 偏好布局与保存时机               | 界面      | main.ts 的 settingsPage/savePreferences/navigate、style.css 的 settings-grid                                                | tests/integration.mjs 的失焦/离页/手动/失败与布局检查                                                                |
-| 简洁模式与说明显隐 | 界面 | compact.ts、main.ts 的 settingsPage/bindForms/ponderChip、taskDialog/templateDialog/statsPage/soundDialog/renderImmersive/boot、style.css 的 data-explanation | agent.ts 的欢迎页/输入提示/定时空状态/人格操作建议、agent-canvas.ts 的空状态、nodegraph.ts 的编辑提示、ponder.ts 的偏好讲解、tests/integration.mjs 的 compact mode、docs/DESIGN.md |
+| 简洁模式与说明显隐 | 界面 | compact.ts、main.ts 的 settingsPage/bindForms/ponderChip、taskDialog/templateDialog/statsPage/soundDialog/renderImmersive/boot、style.css 的 data-explanation | agent.ts 的欢迎页/输入提示/定时空状态/人格操作建议、agent-canvas.ts 的空状态、ponder.ts 的偏好讲解、tests/integration.mjs 的 compact mode、docs/DESIGN.md |
 | 调整页面布局                     | 界面      | main.ts.analysis.md、style.css.analysis.md                                                                                  | —                                                                                                                    |
 | 任务到点提醒                     | 界面      | main.ts 的 pendingReminder/reminderBanner/taskDialog                                                                        | Rust reminders.rs、桌面轮询                                                                                          |
 | 模板编辑、独立标签、自动预印与手动整批印刷 | 界面/契约 | main.ts 的 tasksPage/templateDialog/focusBudget/printDialog/templatesCard（临时 / 手动 / 自动渐进披露）、types.ts 的 Template | crates/core/src/templates.rs、plan.rs、docs/CODEMAP.md |
@@ -19,11 +19,10 @@ generated_at: 2026-10-10
 | 修改计划文件流程                 | 桥接      | api.ts、types.ts、main.ts 的 importPlan                                                                                     | crates/core/src/plan.rs、docs/CODEMAP.md、桌面/预览适配层                                                            |
 | 修改桌面设置                     | 桥接      | api.ts、main.ts 的 desktopSettingsCard                                                                                      | src-tauri/src/desktop.rs；浏览器隐藏这些设置                                                                         |
 | 项目专属应用白名单               | 界面/桥接 | main.ts 的 projectWhitelistCard/addProjectWhitelist、types.ts 的 PlanProject                                                | crates/core/src/plan.rs、src-tauri/src/desktop_app.rs 的保护循环、docs/CODEMAP.md；项目页承载编辑，专注保护页只管通用白名单 |
-| 目标容器与待补                   | 界面      | main.ts 的 goalDialog/focusPage/todayTaskGroup/isCatchUp/taskList、types.ts 的 Goal                                                        | crates/core/src/lib.rs 的 Goal 与 nodes.rs、docs/BACKUP_FORMAT.md                                                    |
-| 习惯分组与周期印刷               | 界面      | main.ts 的 goalsPage/habitsTab/templateDialog、types.ts 的 Habit                                                            | crates/core/src/templates.rs、lib.rs 的 TaskKind 与 Snapshot.taskKinds、docs/BACKUP_FORMAT.md                        |
+| 习惯分组与周期印刷               | 界面      | main.ts 的 collectionsPage/habitsTab/templateDialog、types.ts 的 Habit                                                            | crates/core/src/templates.rs、lib.rs 的 TaskKind 与 Snapshot.taskKinds、docs/BACKUP_FORMAT.md                        |
 | 愿景标记                         | 界面      | main.ts 的 visionsTab/visionDialog/projectVisionCard、types.ts 的 Vision                                                    | crates/core/src/lib.rs 的 Vision、docs/BACKUP_FORMAT.md                                                              |
 | 定时锁机/严格模式界面            | 界面      | main.ts 的 lockPage/lockDialog/bindForms/guardPage/renderImmersive/focusSchedule/focusScheduleDialog（时段严格开关与随跨夜锁机切换日期的只读日程） | types.ts、crates/core/src/lock.rs、桌面桥接                                                                          |
-| 数据统计与纵切面                 | 界面      | main.ts 的 statsPage/goalStatsCard/crossSectionCard、types.ts 的 Session/GoalStat/NodeStat/LineOutcome                              | crates/core/src/lib.rs 的 stats/GoalStat/NodeStat/DayStat 与 ToggleTask 按预计补足、docs/BACKUP_FORMAT.md                                     |
+| 专注与任务统计                 | 界面      | main.ts 的 statsPage/activityCard、types.ts 的 Session/Snapshot.stats.days                              | crates/core/src/lib.rs 的 stats/DayStat 与 ToggleTask 按预计补足、docs/BACKUP_FORMAT.md                                     |
 | 本周日程表与课表阻塞时段         | 界面      | main.ts 的 schedulePage/resizeCalendar/mountCalendarResize/weekOffset/blocksCard/blockDialog、style.css 的 calendar-body/calendar-block/calendar-band | types.ts 的 Task、Block（dueDate/reminderTime/attention）、crates/core/src/blocks.rs、docs/PLAN_FORMAT.md、tests/integration.mjs 的窗口/显示缩放/拉伸检查 |
 | 写作业 BGM 导入与播放 | 声音 | bgm.ts、main.ts 的 backgroundSoundButton/soundDialog/renderImmersive | tests/audio.mjs、tests/integration.mjs；至少 3600 秒，本机 IndexedDB 保存，不随备份导出 |
 | 关键节点音效与音量               | 声音/契约 | audio.ts、sound-events.ts、main.ts 的 accept/soundPreviewControls                                                           | types.ts、Rust Settings、备份契约、tests/audio.mjs                                                                   |
@@ -39,10 +38,11 @@ generated_at: 2026-10-10
 | --------------- | ------ | ----------------------------------------------------------------------------------- |
 | compact.ts | 界面偏好 | 简洁模式的本机保存与根元素标记，默认展示完整说明；全局按 data-explanation 隐藏解释文字 |
 | scroll.ts | 界面 | 跨整体重绘保留标记过的滚动位置（`data-keep-scroll`）；main.ts 与 agent.ts 共用 |
+| education.ts | 教学界面 | 项目目录授权、资料导入/应试配置、学期/课程/作业/考试/批改/复盘展示、纸质试卷与答题卡导出及提交 |
 | main.ts         | 界面   | 页面、弹窗、事件与刷新；见 main.ts.analysis.md                                      |
 | style.css       | 视觉   | 设计变量、页面布局、明暗主题与响应式；见 style.css.analysis.md                      |
 | api.ts          | 桥接   | 原生入口报告桌面/Android 身份，选择 Tauri IPC 或本地 HTTP；计划/备份、助手附件和 Markdown 的系统保存与浏览器下载 |
-| types.ts        | 契约   | 实例、Template/Printing/PrintRecord、计划 v4 与备份 v3 的 Rust serde camelCase 类型 |
+| types.ts        | 契约   | 实例、Template/Printing/PrintRecord、计划 v6 与备份 v4 的 Rust serde camelCase 类型 |
 | bgm.ts          | 声音   | 本地长音频元数据校验、IndexedDB 持久化、循环播放/暂停与背景音量 |
 | audio.ts        | 声音   | 本地真实雨声解码/缓存与加载取消、棕噪音循环、11 种关键节点短音效、独立音量与安全音频激活；雨声及许可在 public/audio/ |
 | sound-events.ts | 声音   | 按已接受快照选择一次音效，共享提醒队列排序、静音/导入抑制与同时事件优先级           |
@@ -54,9 +54,7 @@ generated_at: 2026-10-10
 | agent-markdown.ts | 对话 | Marked + KaTeX + DOMPurify，回答排版、公式、代码复制按钮与安全链接 |
 | hand.ts         | 引导 | 助手手势、讲稿与键盘演示；脚本结束/出错自动收起，失败不阻断后续队列 |
 | hand-demo.ts    | 引导 | blocksTour 课表阻塞时段演示脚本 |
-| nodegraph.ts    | 界面   | 主线节点图：横向节点卡、信号横条、缩略图与节点检查器，拖拽重排                      |
 | ponder.ts       | 引导   | 概念登记表与讲解机制：悬停胶囊、长按 G 打开讲解面、全部概念列表                     |
 
-主线入口：main.ts 的 goalsTabContent/goalDialog 与 src/nodegraph.ts 的节点图，Snapshot.nodeProgress 为核心计算结果。成功/失败实例只读；删除配对任务可从组内恢复原实体；条件阻断分别针对成功与失败。
 
 新增界面说明时按用途添加 `data-explanation`，不要按字号或通用文字样式隐藏。说明与状态混排时只标记说明片段，不把操作按钮、进度、权限/后果提示或用户正文包进隐藏范围；简洁模式不新增文字展开入口。

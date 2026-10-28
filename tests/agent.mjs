@@ -949,6 +949,14 @@ test(
         (await page.locator("#agent-text").evaluate((el) => el.clientHeight)) >
           shortHeight,
       );
+      const projectDirectory = join(dir, "project-materials");
+      await mkdir(projectDirectory, { recursive: true });
+      await api({
+        op: "authorize_project_directory",
+        name: "未分类",
+        color: "#849b7d",
+        directory: projectDirectory,
+      });
       await page.locator("#agent-attachment-input").setInputFiles({
         name: "学习资料.csv",
         mimeType: "text/csv",
@@ -1193,8 +1201,13 @@ test(
       );
       while (await page.locator('[data-agent="remove-attachment"]').count())
         await page.locator('[data-agent="remove-attachment"]').first().click();
+      await expect(
+        page.locator('#agent-chat button[type="submit"]'),
+      ).toBeEnabled();
       await page.locator("#agent-text").fill("停止用例");
+      await expect(page.locator("#agent-text")).toHaveValue("停止用例");
       await page.locator("#agent-text").press("Shift+Enter");
+      await expect(page.locator("#agent-text")).toHaveValue("停止用例\n");
       assert.equal((await api({ op: "status" })).busy, false);
       await page.locator("#agent-text").evaluate((el) =>
         el.dispatchEvent(
@@ -1206,6 +1219,10 @@ test(
         ),
       );
       assert.equal((await api({ op: "status" })).busy, false);
+      await expect(
+        page.locator('#agent-chat button[type="submit"]'),
+      ).toBeEnabled();
+      await expect(page.locator("#agent-text")).toHaveValue("停止用例\n");
       await page.locator("#agent-text").press("Enter");
       await expect(page.locator(".streaming")).toContainText("正在处理");
       await page.locator('[data-agent="cancel"]').click();
@@ -1466,7 +1483,8 @@ test(
   async () => {
     const dir = await mkdtemp(join(tmpdir(), "tomato-agent-ui-"));
     const url = "http://127.0.0.1:4341";
-    const server = spawn("target/debug/tomato-preview", [], {
+    await copyFile("target/debug/tomato-preview", join(dir, "tomato-preview"));
+    const server = spawn(join(dir, "tomato-preview"), [], {
       env: {
         ...process.env,
         TOMATO_PORT: "4341",

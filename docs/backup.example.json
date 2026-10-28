@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "tasks": [],
   "projects": [
     {
@@ -117,7 +117,7 @@
       },
       "printing": {
         "kind": "once",
-        "date": null,
+        "date": "2026-10-12",
         "time": null
       },
       "automatic": false,
@@ -125,7 +125,18 @@
     }
   ],
   "prints": [],
-  "goals": [],
   "habits": [],
-  "visions": []
+  "visions": [],
+  "education": {
+    "projects": [],
+    "resources": [],
+    "semesters": [],
+    "semesterHistory": [],
+    "lessons": [],
+    "assessments": [],
+    "submissions": [],
+    "grades": [],
+    "reviews": [],
+    "events": []
+  }
 }

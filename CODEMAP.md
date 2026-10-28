@@ -23,9 +23,10 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
+| 项目资料目录与应试教学体系 | 教学 / 智能体 / 界面 | crates/core/src/education.rs、crates/agent/src/projects.rs、src/education.ts、docs/EDUCATION.md | agent/coding.mjs、agent/skills/exam-teaching/、桌面/预览手动Action边界、备份Schema、education_tests.rs、tests/education.mjs |
 | 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/desktop_app.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md、docs/HANDBOOK/12-课表与提醒.md |
-| 目标容器与过期补做 | 业务核心 / 界面 | crates/core/src/nodes.rs 的配对/信号与 lib.rs 的 Goal、src/main.ts 的 goalDialog | src/types.ts、docs/BACKUP_FORMAT.md |
-| 主线节点、信号与永久 ID | 业务核心 / 界面 | crates/core/src/nodes.rs、identities.rs、src/nodegraph.ts | docs/NODE_DESIGN.md、docs/HANDBOOK/15-目标与主线.md、src/main.ts 的 goalDialog、node_tests.rs、plan.rs、src/types.ts 与文件契约 |
+| 任务日期必填、周期星期与可选提醒 | 业务核心 / 界面 | crates/core/src/reminders.rs 的 validate、templates.rs 的 Printing/validate、src/main.ts 的 templateDialog/taskDialog | plan.rs、src/types.ts、助手 create_task、计划与备份 schema |
+| 永久 ID、任务恢复与本地 v3 升级 | 持久化 | crates/core/src/identities.rs、migration.rs、lib.rs 的 Engine | docs/HANDBOOK/15-任务身份.md、tests.rs、docs/BACKUP_FORMAT.md |
 | 习惯分组与周期印刷 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 habitsTab | templates.rs 的 materialize_templates、src/types.ts、docs/BACKUP_FORMAT.md |
 | 愿景标记 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Vision、src/main.ts 的 visionsTab | src/types.ts、docs/BACKUP_FORMAT.md |
 | 模板标签、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 tasksPage/templatesCard/templateDialog/printDialog | crates/core/src/plan.rs、docs/HANDBOOK/14-模板与印刷.md、src/types.ts、docs/CODEMAP.md |
@@ -67,7 +68,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | packaging/ | 发布 | AUR | 发行打包模板：AUR PKGBUILD 模板与桌面入口，由 scripts/publish-aur.mjs 渲染 |
 | .github/ | 构建 | GitHub Actions、Linux/Windows/macOS、Android NDK | CI 与标签发布工作流 |
 | tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
-| docs/ | 文件契约 / 领域设计 / 实现手册 | Rust core | 学习计划 v5 / 备份 v3 标准、Schema、通用示例，设计理念与节点语义实现记录；docs/HANDBOOK/ 按域记录实现事实与边界 |
+| docs/ | 文件契约 / 领域设计 / 实现手册 | Rust core | 学习计划 v6 / 备份 v4 标准、Schema、通用示例，设计理念与任务身份规则；docs/HANDBOOK/ 按域记录实现事实与边界 |
 | assets/ | 展示 | — | Boundary only：README 截图，仅由 README 引用，不含代码 |
 | public/ | 资源 | Vite | Internals not indexed：本地图标、内置角色头像及生成参考（personas/）、字体及字体许可证 |
 

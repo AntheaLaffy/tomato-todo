@@ -16,14 +16,13 @@ fn template() -> Template {
         automatic: false,
         print_ahead_days: 7,
         printing: Printing::Once {
-            date: None,
+            date: Some("2026-10-12".into()),
             time: None,
         },
         shape: Shape {
             title: "练习".into(),
             notes: "原稿".into(),
             project_id: None,
-            goal_id: None,
             habit_id: None,
             focus_minutes: Some(25),
             scrap_minutes: 30,
@@ -244,7 +243,7 @@ fn save_and_batch_print_fail_atomically_for_rules_dates_and_references() {
         )
         .is_err());
     assert_eq!(e.export(at(12, 8, 0)).unwrap(), before);
-    bad.shape.goal_id = Some("missing".into());
+    bad.shape.project_id = Some("missing".into());
     assert!(e
         .dispatch(
             Action::SaveTemplate {
@@ -273,7 +272,7 @@ fn overdue_prints_inside_grace_but_spent_prints_are_skipped_at_boundary() {
     let mut e = engine();
     let mut t = template();
     t.printing = Printing::Once {
-        date: None,
+        date: Some("2026-10-12".into()),
         time: Some("09:00".into()),
     };
     let s = save(
@@ -409,7 +408,7 @@ fn v3_plan_and_backup_keep_the_ledger_and_do_not_reset_progress() {
     )
     .unwrap();
     let plan = e.data.export_plan();
-    assert_eq!(plan.version, 5);
+    assert_eq!(plan.version, 6);
     plan.validate().unwrap();
     let s = e
         .dispatch(Action::ImportPlan { plan: plan.clone() }, at(12, 8, 2))
@@ -452,26 +451,20 @@ fn v3_plan_and_backup_keep_the_ledger_and_do_not_reset_progress() {
     assert_eq!(s.data.tasks.len(), 1);
 }
 #[test]
-fn v1_v2_plans_become_templates_and_keep_existing_progress() {
-    for version in [1, 2] {
-        let json = format!(
-            r#"{{"format":"tomato-todo-plan","version":{version},"pomodoroMinutes":25,"projects":[],"tasks":[{{"id":"old","title":"旧计划","repeat":"weekdays","dueDate":"2026-10-12"}}]}}"#
-        );
-        let plan: plan::PlanFile = serde_json::from_str(&json).unwrap();
+fn old_plan_versions_are_rejected_without_mutation() {
+    for version in 1..=5 {
+        let mut plan = example_plan_for_current_version();
+        plan.version = version;
         let mut e = engine();
-        let s = e
-            .dispatch(Action::ImportPlan { plan: plan.clone() }, at(12, 8, 0))
-            .unwrap();
-        assert_eq!(s.data.templates.len(), 1);
-        assert!(s.data.tasks[0].recurring);
-        e.dispatch(Action::ToggleTask { id: "old".into() }, at(12, 8, 1))
-            .unwrap();
-        let s = e
-            .dispatch(Action::ImportPlan { plan }, at(12, 8, 2))
-            .unwrap();
-        assert!(s.data.tasks[0].completed);
-        assert_eq!(s.data.tasks.len(), 5);
+        let before = e.export(at(12, 8, 0)).unwrap();
+        assert!(e
+            .dispatch(Action::ImportPlan { plan }, at(12, 8, 0))
+            .is_err());
+        assert_eq!(e.export(at(12, 8, 0)).unwrap(), before);
     }
+}
+fn example_plan_for_current_version() -> crate::plan::PlanFile {
+    serde_json::from_str(include_str!("../../../docs/plan.example.json")).unwrap()
 }
 
 fn calendar(t: &mut Template) {
@@ -675,4 +668,78 @@ fn multiple_shapes_share_a_habit_group_without_splitting_one_shape_per_time() {
         .iter()
         .all(|t| t.habit_id.is_none() && t.template_id.is_none() && t.recurring));
     assert!(s.task_kinds.values().all(|kind| *kind == TaskKind::Habit));
+}
+
+#[test]
+fn printing_requires_dates_and_weekdays_independently_of_time() {
+    let mut e = engine();
+    let at = at(12, 8, 0);
+    let before = e.export(at).unwrap();
+    let mut t = template();
+    t.printing = Printing::Once {
+        date: None,
+        time: None,
+    };
+    assert!(e
+        .dispatch(
+            Action::SaveTemplate {
+                template: t.clone(),
+                print_dates: vec![]
+            },
+            at
+        )
+        .is_err());
+    assert!(e
+        .dispatch(
+            Action::PrintInstances {
+                shape: t.shape.clone(),
+                printing: t.printing
+            },
+            at
+        )
+        .is_err());
+    assert_eq!(e.export(at).unwrap(), before);
+    t.printing = Printing::Weekly {
+        slots: vec![PrintSlot {
+            days: vec![1, 3],
+            time: None,
+        }],
+    };
+    let id = t.id.clone();
+    e.dispatch(
+        Action::SaveTemplate {
+            template: t,
+            print_dates: vec![],
+        },
+        at,
+    )
+    .unwrap();
+    let before = e.export(at).unwrap();
+    assert!(e
+        .dispatch(
+            Action::PrintTemplate {
+                id: id.clone(),
+                dates: vec![None]
+            },
+            at
+        )
+        .is_err());
+    assert_eq!(e.export(at).unwrap(), before);
+    let s = e
+        .dispatch(
+            Action::PrintTemplate {
+                id,
+                dates: vec![Some("2026-10-12".into())],
+            },
+            at,
+        )
+        .unwrap();
+    assert_eq!(s.data.tasks.len(), 2);
+    assert!(s
+        .data
+        .tasks
+        .iter()
+        .all(|t| t.due_date.is_some() && t.reminder_time.is_none()));
+    assert_eq!(s.data.tasks[0].due_date.as_deref(), Some("2026-10-12"));
+    assert_eq!(s.data.tasks[1].due_date.as_deref(), Some("2026-10-14"));
 }

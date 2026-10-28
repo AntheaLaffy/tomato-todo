@@ -250,7 +250,7 @@ pub fn candidate(
         &serde_json::to_value(&after).map_err(|e| e.to_string())?,
         "",
     );
-    let info = json!({"name":name,"fileHash":sha,"kind":origin.kind,"valid":true,"changes":differences,"truncated":differences.len()>=100,"effects":if origin.kind=="backup" { "导入完整备份会暂停计时、清除当前锁机并停用导入的定时锁机规则；任务历史和不可逆裁定仍由核心校验。" } else { "按 ID 更新计划配置，保留完成进度、历史和裁定。" }});
+    let info = json!({"name":name,"fileHash":sha,"kind":origin.kind,"valid":true,"changes":differences,"truncated":differences.len()>=100,"effects":if origin.kind=="backup" { "导入完整备份会暂停计时、清除当前锁机并停用导入的定时锁机规则；任务历史仍由核心校验。" } else { "按 ID 更新计划配置，保留完成进度和历史。" }});
     Ok((action, info))
 }
 fn diff(before: &Value, after: &Value, path: &str) -> Vec<Value> {
