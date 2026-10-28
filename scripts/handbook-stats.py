@@ -4,7 +4,7 @@
 为什么要有它：规模数字（行数、最大文件、文档量）是最容易过期的一类事实，
 手工维护必然腐烂。这里把采集过程固定下来，发布前跑一次即可。
 
-- 排除：node_modules、target、dist、bundle、gen、.git（构建产物与依赖）
+- 排除：node_modules、target、dist、bundle、gen、.git、artifacts（构建产物、依赖与本地资料）
 - 版本取 Cargo.toml 的 workspace 版本；提交数与标签取 git，取不到就写「—」
 - 本文件整体由脚本覆盖，要写额外内容请放到别的章节
 
@@ -18,7 +18,7 @@ import subprocess
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "HANDBOOK" / "01-规模盘点.md"
 
-EXCLUDE_DIRS = {"node_modules", "target", "dist", "bundle", "gen", ".git", "__pycache__"}
+EXCLUDE_DIRS = {"node_modules", "target", "dist", "bundle", "gen", ".git", "artifacts", "__pycache__"}
 LANGS = [("Rust", ".rs"), ("TypeScript", ".ts"), ("Node 脚本 .mjs", ".mjs"),
          ("CSS", ".css"), ("Python", ".py")]
 
@@ -127,7 +127,7 @@ def main() -> None:
     body = f"""# 规模盘点
 
 > 手册章节 ｜ 最后核对：v{version}（{today}）｜ **本文件由 `python3 scripts/handbook-stats.py` 生成**，不要手改数字；要补充说明请写到别的章节。
-> 采集口径：排除 `node_modules / target / dist / bundle / gen / .git`；行数为物理行数。
+> 采集口径：排除 `node_modules / target / dist / bundle / gen / .git / artifacts`；行数为物理行数。
 
 **一句话**：这是理解「为什么一个番茄钟能有这么多代码」的入口——规模不是界面堆出来的，是规则与边界堆出来的。
 
