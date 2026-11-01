@@ -203,7 +203,10 @@ test("compact mode: global hiding, local persistence and important information",
       page.getByText("每个番茄的持续时间", { exact: true }),
     ).toBeHidden();
     await expect(
-      page.getByText("休息结束后自动进入专注", { exact: true }),
+      page.getByText(
+        "休息后继续当前任务，达到预设轮数或任务完成后停止；自由专注不限制轮数",
+        { exact: true },
+      ),
     ).toBeVisible();
     await expect(page.locator("#settings-status")).toBeVisible();
     await expect(
@@ -880,6 +883,18 @@ test(
       await page.getByRole("button", { name: "偏好设置", exact: true }).click();
       await expect(page.locator("[name=focusMinutes]")).toHaveValue("30");
       await expect(page.locator("[name=soundVolume]")).toHaveValue("23");
+      await expect(page.locator('[name="autoStartTasks"]')).not.toBeChecked();
+      await page.locator('[name="autoStartTasks"]').check();
+      await page.getByRole("button", { name: "保存配置", exact: true }).click();
+      await expect(page.locator("#settings-status")).toHaveText("已保存");
+      assert.equal(
+        (await (await fetch(`${url}/api/snapshot`)).json()).data.settings
+          .autoStartTasks,
+        true,
+      );
+      await page.locator('[name="autoStartTasks"]').uncheck();
+      await page.getByRole("button", { name: "保存配置", exact: true }).click();
+      await expect(page.locator("#settings-status")).toHaveText("已保存");
       await page.locator("[name=soundVolume]").fill("24");
       let manualSaves = 0;
       await page.route("**/api/action", async (route) => {

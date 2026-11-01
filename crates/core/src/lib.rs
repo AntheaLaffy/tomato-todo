@@ -13,6 +13,7 @@ pub mod education;
 pub mod guard;
 pub mod habits;
 pub mod identities;
+pub mod learning;
 pub mod lock;
 pub mod migration;
 pub mod plan;
@@ -217,6 +218,8 @@ pub struct Settings {
     pub daily_goal: u32,
     pub auto_break: bool,
     pub auto_focus: bool,
+    #[serde(default)]
+    pub auto_start_tasks: bool,
     pub sound: bool,
     #[serde(default = "default_sound_volume")]
     pub sound_volume: u8,
@@ -259,6 +262,7 @@ impl Default for Settings {
             daily_goal: 8,
             auto_break: false,
             auto_focus: false,
+            auto_start_tasks: false,
             sound: true,
             sound_volume: default_sound_volume(),
             notifications: true,
@@ -293,6 +297,8 @@ pub struct Timer {
     pub cycle_date: Option<String>,
     pub completion_serial: u64,
     pub last_finished_mode: Option<Mode>,
+    #[serde(default)]
+    pub auto_focus_blocked: bool,
 }
 impl Default for Timer {
     fn default() -> Self {
@@ -308,6 +314,7 @@ impl Default for Timer {
             cycle_date: None,
             completion_serial: 0,
             last_finished_mode: None,
+            auto_focus_blocked: false,
         }
     }
 }
@@ -596,6 +603,7 @@ pub struct Snapshot {
     /// re-deriving it.
     pub task_kinds: HashMap<String, TaskKind>,
     pub data: AppData,
+    pub study_progress: Vec<serde_json::Value>,
     pub stats: Stats,
     pub remaining_secs: u32,
     pub today: String,
@@ -646,7 +654,22 @@ impl AppData {
             Mode::LongBreak => self.settings.long_break_minutes,
         }
     }
+    pub(crate) fn task_has_rounds_left(&self, task: &Task) -> bool {
+        !task.completed
+            && !task.reminder_expired
+            && self
+                .sessions
+                .iter()
+                .filter(|s| {
+                    s.source == SessionSource::Timer
+                        && s.completed
+                        && s.task_id.as_ref() == Some(&task.id)
+                })
+                .count()
+                < task.estimate as usize
+    }
     fn reset_to(&mut self, mode: Mode) {
+        self.timer.auto_focus_blocked = false;
         self.timer.mode = mode;
         self.timer.running = false;
         self.timer.duration_secs = self.duration(mode);
@@ -717,6 +740,7 @@ impl AppData {
     pub fn tick(&mut self, at: i64) -> bool {
         let teaching_changed = self.education.tick(at);
         let materialized = self.materialize_templates(at) || teaching_changed;
+        let reminders_changed = self.tick_reminders(at);
         let changed = self.tick_with_lock(at) || materialized;
         let cycle_changed = self.refresh_cycle(at);
         if cycle_changed
@@ -728,7 +752,7 @@ impl AppData {
         {
             self.reset_to(Mode::Focus);
         }
-        self.tick_reminders(at) || changed || cycle_changed
+        self.start_due_task(at) || reminders_changed || changed || cycle_changed
     }
     fn tick_with_lock(&mut self, at: i64) -> bool {
         let previous = serde_json::to_value(&self.lock).ok();
@@ -767,6 +791,7 @@ impl AppData {
     }
     fn finish_timer(&mut self, end: i64, at: i64) {
         let finished = self.timer.mode;
+        let continuation_blocked = self.timer.auto_focus_blocked;
         if finished == Mode::Focus {
             self.refresh_cycle(end);
         }
@@ -792,6 +817,14 @@ impl AppData {
         self.timer.last_finished_mode = Some(finished);
         let auto = if next == Mode::Focus {
             self.settings.auto_focus
+                && !continuation_blocked
+                && self.timer.task_id.as_ref().is_none_or(|id| {
+                    self.tasks
+                        .iter()
+                        .find(|t| &t.id == id)
+                        .is_some_and(|t| self.task_has_rounds_left(t))
+                })
+                && !(self.settings.auto_start_tasks && self.due_auto_task().is_some())
         } else {
             self.settings.auto_break
         };
@@ -809,7 +842,16 @@ impl AppData {
             return Err("专注保护中，结束前不能修改任务或计时；可提前完成番茄或紧急退出".into());
         }
         match action {
-            Action::Education { command } => self.education.apply(command, at)?,
+            Action::Education { command } => {
+                if matches!(command, education::Command::StartExam { .. })
+                    && (!self.reminder_idle()
+                        || self.timer.mode != Mode::Focus
+                        || self.timer.remaining_secs != self.timer.duration_secs)
+                {
+                    return Err("请先结束当前计时或锁机，再开始考试".into());
+                }
+                self.education.apply(command, at)?;
+            }
             Action::PrintInstances { shape, printing } => {
                 self.print_instances(shape, printing, at)?
             }
@@ -969,6 +1011,8 @@ impl AppData {
                     self.timer.task_id = None;
                     if focusing {
                         self.reset_to(Mode::Focus);
+                    } else {
+                        self.timer.auto_focus_blocked = true;
                     }
                 }
                 self.sessions.retain(|s| {
@@ -1008,6 +1052,9 @@ impl AppData {
                 let t = self.tasks.iter_mut().find(|t| t.id == task_id).unwrap();
                 t.completed = !t.completed;
                 t.completed_at = if t.completed { Some(at) } else { None };
+                if t.completed {
+                    self.education.task_completed(t, at);
+                }
             }
             Action::DeleteTask { id } => {
                 if !self.tasks.iter().any(|t| t.id == id) {
@@ -1348,6 +1395,7 @@ impl AppData {
                 // Restoring a file must not silently arm a scheduled desktop lock.
                 data.lock.active = None;
                 data.lock.suppressed_until = 0;
+                data.settings.auto_start_tasks = false;
                 for schedule in &mut data.lock.schedules {
                     schedule.enabled = false;
                 }
@@ -1758,6 +1806,7 @@ impl Engine {
                 .collect(),
             remaining_secs: self.data.timer.remaining(at),
             stats: self.data.stats(at),
+            study_progress: learning::summaries(&next, at),
             data: next,
             today: date_at(at),
             server_time: at,

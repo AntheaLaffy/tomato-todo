@@ -435,7 +435,10 @@ try {
   assert.equal(final.value.data.timer.running, false);
   assert.ok(final.value.data.sessions.every((s) => !s.completed));
   const earlyTask = await invoke("dispatch", {
-    action: { type: "saveTask", task: { title: "提前完成番茄，任务手动勾选" } },
+    action: {
+      type: "saveTask",
+      task: { title: "提前完成番茄，任务手动勾选", dueDate: final.value.today },
+    },
   });
   assert.equal(earlyTask.error, undefined);
   const earlyTaskId = earlyTask.value.data.tasks.find(

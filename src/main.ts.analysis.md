@@ -1,57 +1,57 @@
 ---
 source: main.ts
-lines: 3491
-generated_at: 2026-10-28
+lines: 3504
+generated_at: 2026-11-01
 ---
 
 ## 功能索引
 
 | 用途 | Lines | Notes |
 | --- | --- | --- |
-| 导入、状态、格式化与派发 | 1–510 | 接口改动核对共享核心与适配层 |
-| 导航、提醒与今日待办 | 511–788 | 接口改动核对共享核心与适配层 |
-| 本周日历、阻塞时段与任务列表 | 789–1073 | 接口改动核对共享核心与适配层 |
-| 习惯、愿景与统计 | 1074–1263 | 接口改动核对共享核心与适配层 |
-| 偏好、保护、锁机与沉浸 | 1264–1607 | 接口改动核对共享核心与适配层 |
-| 弹窗、模板印刷与任务编辑 | 1608–2228 | 接口改动核对共享核心与适配层 |
-| 项目、搜索、声音与表单绑定 | 2229–2639 | 接口改动核对共享核心与适配层 |
-| 文件导入与页面事件 | 2640–3300 | 接口改动核对共享核心与适配层 |
-| 批量操作、拖拽与快捷键 | 3301–3386 | 接口改动核对共享核心与适配层 |
-| 启动、讲解挂载与轮询 | 3387–3491 | 接口改动核对共享核心与适配层 |
+| 导入、状态、格式化与派发 | 1–514 | 接口改动核对共享核心与适配层 |
+| 导航、提醒与今日待办 | 515–794 | 接口改动核对共享核心与适配层 |
+| 本周日历、阻塞时段与任务列表 | 795–1079 | 接口改动核对共享核心与适配层 |
+| 习惯、愿景与统计 | 1080–1269 | 接口改动核对共享核心与适配层 |
+| 偏好、保护、锁机与沉浸 | 1270–1620 | 接口改动核对共享核心与适配层 |
+| 弹窗、模板印刷与任务编辑 | 1621–2241 | 接口改动核对共享核心与适配层 |
+| 项目、搜索、声音与表单绑定 | 2242–2652 | 接口改动核对共享核心与适配层 |
+| 文件导入与页面事件 | 2653–3313 | 接口改动核对共享核心与适配层 |
+| 批量操作、拖拽与快捷键 | 3314–3399 | 接口改动核对共享核心与适配层 |
+| 启动、讲解挂载与轮询 | 3400–3504 | 接口改动核对共享核心与适配层 |
 
 ## Symbols
 
 | Symbol | Type | Line |
 | --- | --- | --- |
-| focusPage | function | 681 |
-| todayTaskGroup | function | 724 |
-| compareTaskTime | function | 758 |
-| isCatchUp | function | 742 |
-| taskList | function | 765 |
-| isoDate | const | 789 |
-| resizeCalendar | function | 842 |
-| schedulePage | function | 859 |
-| tasksPage | function | 1017 |
-| collectionsPage | function | 1074 |
-| habitsTab | function | 1080 |
-| visionDialog | function | 1143 |
-| activityCard | function | 1196 |
-| statsPage | function | 1200 |
-| savePreferences | function | 1264 |
-| settingsPage | function | 1354 |
-| projectWhitelistCard | function | 1368 |
-| guardPage | function | 1408 |
-| templatesCard | function | 1660 |
-| datesForPrinting | function | 1671 |
-| printDialog | function | 1698 |
-| templateDialog | function | 1754 |
-| taskDialog | function | 2115 |
-| importPlan | function | 2657 |
-| selectControls | function | 3301 |
-| detachSelected | function | 3306 |
-| deleteSelectedTasks | function | 3316 |
-| sortProjects | function | 3341 |
-| boot | function | 3408 |
+| focusPage | function | 687 |
+| todayTaskGroup | function | 730 |
+| compareTaskTime | function | 764 |
+| isCatchUp | function | 748 |
+| taskList | function | 771 |
+| isoDate | const | 795 |
+| resizeCalendar | function | 848 |
+| schedulePage | function | 865 |
+| tasksPage | function | 1023 |
+| collectionsPage | function | 1080 |
+| habitsTab | function | 1086 |
+| visionDialog | function | 1149 |
+| activityCard | function | 1202 |
+| statsPage | function | 1206 |
+| savePreferences | function | 1270 |
+| settingsPage | function | 1361 |
+| projectWhitelistCard | function | 1375 |
+| guardPage | function | 1415 |
+| templatesCard | function | 1673 |
+| datesForPrinting | function | 1684 |
+| printDialog | function | 1711 |
+| templateDialog | function | 1767 |
+| taskDialog | function | 2128 |
+| importPlan | function | 2670 |
+| selectControls | function | 3314 |
+| detachSelected | function | 3319 |
+| deleteSelectedTasks | function | 3329 |
+| sortProjects | function | 3354 |
+| boot | function | 3421 |
 
 全部任务页用与待完成、已完成、全部同级的「模板」标签切换独立模板目录，避免模板被长任务列表推到页面底部；项目页仍在项目任务后显示本项目模板。模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通任务待补呈现。
 
@@ -81,4 +81,4 @@ Android 导航：setMobileNav控制抽屉和工作区 inert；平台身份由原
 
 角色背景板：settingsPage 的「体验与提醒」保存 settings.personaBackdrop（默认关闭）；render 与 setupAgent.backdrop 在普通页面允许显示，沉浸或专注保护时交给 syncPersonaBackdrop 隐藏。
 
-项目页挂载education.ts：资料目录授权、教学配置和只读教学记录；新项目必选目录，考试停笔状态变化提示上传答题卡。
+侧栏education路由挂载学生/教师面板；项目页挂载education.ts的资料目录授权、教学配置和完整教学记录，资料库委托resources.ts；新项目必选目录，考试停笔状态变化提示上传答题卡。

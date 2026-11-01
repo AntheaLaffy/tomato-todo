@@ -1,6 +1,7 @@
 import "./style.css";
 import {
   educationCard,
+  educationDashboard,
   educationBanner,
   mountEducation,
   chooseProjectDirectory,
@@ -70,6 +71,7 @@ import {
   ArrowUpDown,
   Lightbulb,
   Menu,
+  GraduationCap,
 } from "lucide";
 import { listen } from "@tauri-apps/api/event";
 import { initPonder, openPonder, openPonderList } from "./ponder";
@@ -189,6 +191,7 @@ const iconSet = {
   ArrowUpDown,
   Lightbulb,
   Menu,
+  GraduationCap,
 };
 const $ = <T extends Element = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -308,6 +311,7 @@ const labels: Record<string, string> = {
   collections: "习惯·愿景",
   stats: "数据统计",
   schedule: "本周日程",
+  education: "应试教育",
   guard: "专注保护",
   lock: "定时锁机",
   settings: "偏好设置",
@@ -572,6 +576,7 @@ function render() {
       ["collections", "repeat"],
       ["stats", "chart-no-axes-combined"],
       ["schedule", "calendar-days"],
+      ["education", "graduation-cap"],
       ["agent", "sparkles"],
       ["guard", "shield-check"],
       ["lock", "moon"],
@@ -584,10 +589,10 @@ function render() {
     <div class="sidebar-section"><span>我的项目</span><button class="icon-btn tiny" data-action="sort-projects" aria-label="项目排序">${icon("arrow-up-down")}</button><button class="icon-btn tiny" data-action="new-project" aria-label="新建项目">${icon("plus")}</button></div>
     <nav class="projects" data-keep-scroll="projects" aria-label="项目">${d.projects.map((p) => `<button class="nav-item project-nav ${page === `project:${p.id}` ? "active" : ""}" data-page="project:${p.id}" data-project-menu="${p.id}" draggable="true"><span class="project-dot" style="--project:${escape(p.color)}"></span><span>${escape(p.name)}</span><b>${look.activeByProject.get(p.id) ?? 0}</b></button>`).join("")}</nav>
     <div class="sidebar-bottom"><div class="daily-goal"><div><span>${icon("leaf")} 每日小目标</span><b>${s.todayPomodoros}<small> / ${d.settings.dailyGoal}</small></b></div><div class="progress-track"><i style="width:${Math.min(100, (s.todayPomodoros / d.settings.dailyGoal) * 100)}%"></i></div><p data-explanation>${s.todayPomodoros >= d.settings.dailyGoal ? "目标达成！今天的你很棒。" : "不必急，每一份专注都有意义。"}</p></div>
-    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.10.0</span></div></div>
+    <button class="nav-item ${page === "settings" ? "active" : ""}" data-page="settings">${icon("settings-2")}<span>偏好设置</span></button><div class="local-status"><span class="status-dot"></span>本地存储 · 安心专注 <span>v0.11.0</span></div></div>
   </aside>
   <div class="workspace"><header class="topbar">${mobile ? `<button class="icon-btn mobile-menu" data-action="toggle-navigation" aria-label="打开导航" aria-expanded="${mobileNavOpen}">${icon("menu")}</button>` : ""}<div class="breadcrumb">我的空间 ${icon("chevron-right")} <span>${escape(pageTitle())}</span></div><div class="top-actions"><button class="search-trigger" data-action="search">${icon("search")}<span>搜索任务</span><kbd>Ctrl K</kbd></button><span class="separator"></span><button class="icon-btn" data-action="theme" aria-label="切换明暗主题">${icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button><button class="icon-btn" data-action="ponder-list" aria-label="概念讲解">${icon("lightbulb")}</button><button class="icon-btn" data-action="help" aria-label="快捷键帮助">${icon("circle-help")}</button><div class="avatar">我</div></div></header>
-  <main data-ponder="${page.startsWith("project:") ? "project" : page}">${reminderBanner()}${educationBanner(state)}${page === "agent" ? agentPage() : page === "focus" ? focusPage() : page === "collections" ? collectionsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span data-explanation>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
+  <main data-ponder="${page.startsWith("project:") ? "project" : page}">${reminderBanner()}${educationBanner(state)}${page === "agent" ? agentPage() : page === "education" ? educationDashboard(state) : page === "focus" ? focusPage() : page === "collections" ? collectionsPage() : page === "stats" ? statsPage() : page === "schedule" ? schedulePage() : page === "settings" ? settingsPage() : page === "guard" ? guardPage() : page === "lock" ? lockPage() : tasksPage()}</main><footer class="workspace-footer"><span data-explanation>${icon("leaf")} 把时间留给真正重要的事。</span><span id="connection">${disconnected ? "连接中断，正在重试…" : "所有更改已保存到本机"}</span></footer></div>`;
   setMobileNav(mobileNavOpen);
   bindForms();
   if (page === "agent") mountAgent();
@@ -598,6 +603,7 @@ function render() {
       prefillAgent(text);
       void navigate("agent");
     },
+    refresh: render,
     modal,
     close: closeModal,
   });
@@ -1291,6 +1297,7 @@ async function savePreferences(): Promise<boolean> {
     for (const key of [
       "autoBreak",
       "autoFocus",
+      "autoStartTasks",
       "sound",
       "notifications",
       "personaBackdrop",
@@ -1353,7 +1360,7 @@ function soundPreviewControls() {
 }
 function settingsPage() {
   const s = state.data.settings;
-  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><div><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "当天每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息结束后自动进入专注")}</section><section class="card settings-card data-settings" data-ponder="plan-file"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务、步骤与课表阻塞时段<span data-explanation>，方便编辑或分享</span>。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用数据与备份。</div></section><section class="settings-tip" data-explanation>${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>简洁模式</strong><small data-explanation>隐藏解释性小字；立即生效，仅保存在本机</small></span><input class="switch" id="compact-mode" type="checkbox" ${compactModeEnabled() ? "checked" : ""}></label><label class="setting-row"><span><strong>外观主题</strong><small data-explanation>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("personaBackdrop", "角色背景板", "在页面背景显示当前人格的完整立绘；也可以让助手帮你开关")}${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings" data-ponder="backup"><h2>${icon("download")} 数据与备份</h2><p data-explanation>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note" data-explanation>${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section></div></div><div class="settings-save"><span id="settings-status" role="status" aria-live="polite">离开偏好页时自动保存</span><button type="submit" class="button primary">${icon("check")} 保存配置</button></div></form>`;
+  return `${heading("找到适合你的节奏。", "好的工具，应该顺着你的习惯。", "MAKE IT YOURS", false)}<form id="settings-form"><div class="settings-grid"><div><section class="card settings-card"><h2>${icon("timer")} 专注与休息</h2>${settingNumber("focusMinutes", "专注时长", "每个番茄的持续时间", 1, 180, "分钟")}${settingNumber("shortBreakMinutes", "短休息", "让大脑喘口气", 1, 60, "分钟")}${settingNumber("longBreakMinutes", "长休息", "完成一轮后，好好放松", 1, 120, "分钟")}${settingNumber("longBreakEvery", "长休息间隔", "当天每完成多少个番茄后长休息", 2, 12, "个")}${settingNumber("dailyGoal", "每日目标", "给自己一个可实现的小目标", 1, 30, "个")}${settingSwitch("autoBreak", "自动开始休息", "专注结束后直接进入休息")}${settingSwitch("autoFocus", "自动开始下一轮", "休息后继续当前任务，达到预设轮数或任务完成后停止；自由专注不限制轮数")}${settingSwitch("autoStartTasks", "到时间自动开始", "按任务的计划日期和时刻开始专注，沿用专注保护；正在计时、暂停或锁机时延后，过期不补开")}</section><section class="card settings-card data-settings" data-ponder="plan-file"><h2>${icon("list-todo")} 学习计划</h2><p>导出全部未完成任务、步骤与课表阻塞时段<span data-explanation>，方便编辑或分享</span>。导入时合并新任务，同 ID 的已有任务保留进度。计划文件不含计时记录和设置。</p><div class="button-row"><button type="button" class="button secondary" data-action="export-plan">${icon("download")} 导出计划</button><button type="button" class="button secondary" data-action="import-plan">${icon("upload")} 导入计划</button></div><div class="note">新导入的任务和步骤从未完成开始；完整进度请使用数据与备份。</div></section><section class="settings-tip" data-explanation>${icon("leaf")}<p>25 分钟只是起点。<br>最好的节奏，是你能坚持的节奏。</p></section></div><div><section class="card settings-card"><h2>${icon("settings-2")} 体验与提醒</h2><label class="setting-row"><span><strong>简洁模式</strong><small data-explanation>隐藏解释性小字；立即生效，仅保存在本机</small></span><input class="switch" id="compact-mode" type="checkbox" ${compactModeEnabled() ? "checked" : ""}></label><label class="setting-row"><span><strong>外观主题</strong><small data-explanation>给专注一个舒服的底色</small></span><select name="theme"><option value="light" ${s.theme === "light" ? "selected" : ""}>奶油白</option><option value="dark" ${s.theme === "dark" ? "selected" : ""}>夜间深色</option><option value="system" ${s.theme === "system" ? "selected" : ""}>跟随系统</option></select></label>${settingSwitch("personaBackdrop", "角色背景板", "在页面背景显示当前人格的完整立绘；也可以让助手帮你开关")}${settingSwitch("sound", "关键节点音效", "开始、暂停、完成与提醒时轻声反馈；专注期间不循环播放")}${settingNumber("soundVolume", "音效音量", "0 为静音，背景音在专注页单独调节", 0, 100, "%")}${settingSwitch("notifications", "桌面通知", "在桌面版中提醒专注与休息结束")}${desktop ? settingSwitch("alwaysOnTop", "窗口置顶", "由桌面窗口管理器决定是否支持") : ""}${soundPreviewControls()}</section>${desktopSettingsCard()}<section class="card settings-card data-settings" data-ponder="backup"><h2>${icon("download")} 数据与备份</h2><p data-explanation>任务、设置和专注记录保存在本机。换电脑前，可以导出一份完整备份。</p><div class="button-row"><button type="button" class="button secondary" data-action="export">${icon("download")} 导出备份</button><button type="button" class="button secondary" data-action="import">${icon("upload")} 导入备份</button></div><div class="note" data-explanation>${icon("lock-keyhole")} 无需账号，离线也能使用。</div></section></div></div><div class="settings-save"><span id="settings-status" role="status" aria-live="polite">离开偏好页时自动保存</span><button type="submit" class="button primary">${icon("check")} 保存配置</button></div></form>`;
 }
 function desktopSettingsCard() {
   if (!desktop || !nativeStatus) return "";
@@ -1559,6 +1566,12 @@ function renderImmersive() {
   updateClock();
 }
 function updateClock() {
+  document
+    .querySelectorAll<HTMLElement>(".teaching-remaining")
+    .forEach((el) => {
+      const seconds = Math.max(0, Number(el.dataset.endsAt) - state.serverTime);
+      el.textContent = `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+    });
   document
     .querySelectorAll(".teaching-local-clock")
     .forEach(

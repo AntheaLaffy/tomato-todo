@@ -1,7 +1,7 @@
 ---
 source: style.css
-lines: 5745
-generated_at: 2026-10-28
+lines: 6012
+generated_at: 2026-11-01
 ---
 
 ## 功能索引
@@ -28,6 +28,7 @@ generated_at: 2026-10-28
 | 概念讲解胶囊、聚光层与列表 | 4885–5089 | 悬停胶囊/进度条、遮罩与讲解面板、全部概念列表 |
 | 助手用量、提问、计划与会话列表 | 5090–5527 | 提问和提案操作、模型选择与会话侧栏 |
 | 简洁模式、背景音与移动端导航 | 5528–5708 | 说明显隐、声音入口与触控适配 |
+| 应试面板、教学记录与资料库 | 5709–6012 | 双视图/教学周、资料过滤/预览；窄屏覆盖置于基础样式后 |
 
 ## Symbols
 
@@ -63,4 +64,4 @@ Android 手机导航与触控（L:5640–5708）：原生平台标识限定样�
 
 角色背景板：`#persona-backdrop`（L:64 起）宽屏在内容右侧留出立绘位置，按原图比例 contain、不接收点击；只有显示时让 `#app` 的整页底色透明，窄屏作为淡化叠层，明暗分别调整透明度。开关与当前人格由 agent.ts 的 syncPersonaBackdrop 同步。
 
-教学界面：.education-card的配置/资料/课程/作业与批改块、自动换行；.calendar-block.teaching-block在周历显示正式课程与考试，不换算番茄。
+教学界面：.education-dashboard的双视图、教学周和学情/待办；.education-card保留配置与完整教学记录，.resource-filters/.resource-row/.resource-preview用于资料检索与预览；窄屏覆盖在文件末尾。.calendar-block.teaching-block在周历显示正式课程与考试，不换算番茄。

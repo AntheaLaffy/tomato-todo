@@ -29,6 +29,7 @@ generated_at: 2026-10-10
 | 侧栏项目排序与右键菜单           | 界面      | main.ts 的 showContextMenu/hideContextMenu/sortProjects 与捕获阶段的外部点击关闭                                            | tests/integration.mjs 的打开/排序/保存/关闭回归                                                                      |
 | 角色图像与背景板 | 界面/设置 | agent.ts 的 personaAvatar/personaIllustration/syncPersonaBackdrop、main.ts 的 settingsPage/render/setupAgent、style.css 的 #persona-backdrop | crates/core/src/lib.rs 的 Settings、src/types.ts、public/personas/、tests/personas.mjs、docs/BACKUP_FORMAT.md |
 | 学习助手界面                     | 界面/桥接 | agent.ts 的 agentPage/mountAgent/setupAgent/refreshAgent/thinkingSelectHtml/questionHtml/renderSessions（分组/归档侧栏）/sheetHtml 的 personas、focusSearch/resizeComposer（快捷键与输入）                                            | api.ts 的 agentCall、main.ts 的 revealAgent/轮询、style.css 的 agent-proposal/agent-option/agent-persona、docs/AGENT.md、scroll.ts、tests/agent.mjs |
+| 应试教育双端面板与项目教学记录 | 教学界面 | main.ts 的 education 路由；education.ts 的 educationDashboard/studentDashboard/teacherDashboard/educationCard/mountEducation | Snapshot.studyProgress、Rust learning.rs/education.rs、style.css 的 .education-dashboard、tests/education.mjs、docs/EDUCATION.md |
 | 助手的「手」（动画演示层）        | 界面      | hand.ts 的 runHandScript/handStep/moveTo/typeInto/say、main.ts 的 installHand                                              | hand-demo.ts 的 blocksTour、style.css 的 #hand-layer/hand-keyboard、docs/AGENT.md、tests/integration.mjs             |
 | 概念讲解（思索）                 | 界面/引导 | ponder.ts 的 PONDER_TARGETS/initPonder/openPonderList                                                                       | main.ts 的 data-ponder 与 data-action="ponder-list"、style.css、tests/integration.mjs                                |
 
@@ -38,7 +39,9 @@ generated_at: 2026-10-10
 | --------------- | ------ | ----------------------------------------------------------------------------------- |
 | compact.ts | 界面偏好 | 简洁模式的本机保存与根元素标记，默认展示完整说明；全局按 data-explanation 隐藏解释文字 |
 | scroll.ts | 界面 | 跨整体重绘保留标记过的滚动位置（`data-keep-scroll`）；main.ts 与 agent.ts 共用 |
-| education.ts | 教学界面 | 项目目录授权、资料导入/应试配置、学期/课程/作业/考试/批改/复盘展示、纸质试卷与答题卡导出及提交 |
+| education-index.ts | 教学索引 | 按Education对象缓存提交/批改/订正映射，复用最新版本与接受状态查询；WeakMap随快照释放 |
+| resources.ts | 资料库 | 名称/路径/知识点搜索与分页、类型/状态筛选、引用入口、预览/系统打开、流式下载、失效检查与路径修复/未引用登记清理 |
+| education.ts | 教学界面 | 学生/教师应试面板、项目资料目录授权、学情登记/确认、任务作业、提交与重交、逐评分点批改、订正与独立复测、考试打印和答题卡流程；功能索引见 education.ts.analysis.md |
 | main.ts         | 界面   | 页面、弹窗、事件与刷新；见 main.ts.analysis.md                                      |
 | style.css       | 视觉   | 设计变量、页面布局、明暗主题与响应式；见 style.css.analysis.md                      |
 | api.ts          | 桥接   | 原生入口报告桌面/Android 身份，选择 Tauri IPC 或本地 HTTP；计划/备份、助手附件和 Markdown 的系统保存与浏览器下载 |

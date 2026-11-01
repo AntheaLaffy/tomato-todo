@@ -110,6 +110,7 @@ export interface Settings {
   dailyGoal: number;
   autoBreak: boolean;
   autoFocus: boolean;
+  autoStartTasks: boolean;
   sound: boolean;
   soundVolume: number;
   notifications: boolean;
@@ -149,6 +150,7 @@ export interface Timer {
   cycleDate: string | null;
   completionSerial: number;
   lastFinishedMode: Mode | null;
+  autoFocusBlocked: boolean;
 }
 export interface Session {
   id: string;
@@ -207,6 +209,7 @@ export interface PlanFile {
 }
 export type TaskKind = "ordinary" | "habit";
 export interface Snapshot {
+  studyProgress: import("./education").StudySummary[];
   taskKinds: Record<string, TaskKind>;
   data: AppData;
   stats: {

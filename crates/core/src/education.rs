@@ -2,7 +2,7 @@
 use crate::{AppData, AppResult};
 use chrono::{Datelike, Local, TimeZone, Timelike};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -18,6 +18,12 @@ pub struct Education {
     pub grades: Vec<Grade>,
     pub reviews: Vec<Review>,
     pub events: Vec<TeachingEvent>,
+    #[serde(default)]
+    pub completed_tasks: Vec<crate::learning::CompletedStudyTask>,
+    #[serde(default)]
+    pub progress: Vec<crate::learning::ProgressRecord>,
+    #[serde(default)]
+    pub corrections: Vec<crate::learning::Correction>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -113,6 +119,7 @@ pub enum AssessmentKind {
     Homework,
     WeeklyExam,
     MockExam,
+    Retest,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -143,6 +150,10 @@ pub struct Assessment {
     #[serde(default = "initial_revision")]
     pub semester_revision: u32,
     pub lesson_id: Option<String>,
+    #[serde(default)]
+    pub task_id: Option<String>,
+    #[serde(default)]
+    pub retest_of_grade_id: Option<String>,
     pub title: String,
     pub kind: AssessmentKind,
     pub revision: u32,
@@ -228,20 +239,69 @@ pub struct TeachingEvent {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Command {
-    SaveProject { project: ProjectStudy },
-    SaveResource { resource: Resource },
-    SaveSemester { semester: Semester },
-    SaveLesson { lesson: Lesson },
-    AttendLesson { id: String, progress: String },
-    PublishAssessment { assessment: Assessment },
-    ConfirmPrinted { id: String },
-    StartExam { id: String },
-    Submit { submission: Submission },
-    Grade { grade: Grade },
-    SaveReview { review: Review },
-    ClaimEvent { id: String },
-    FinishEvent { id: String },
-    RetryEvent { id: String },
+    SaveProject {
+        project: ProjectStudy,
+    },
+    SaveResource {
+        resource: Resource,
+    },
+    RemoveResources {
+        ids: Vec<String>,
+    },
+    SaveSemester {
+        semester: Semester,
+    },
+    SaveLesson {
+        lesson: Lesson,
+    },
+    AttendLesson {
+        id: String,
+        progress: String,
+    },
+    PublishAssessment {
+        assessment: Assessment,
+    },
+    ConfirmPrinted {
+        id: String,
+    },
+    StartExam {
+        id: String,
+    },
+    EndExam {
+        id: String,
+    },
+    Submit {
+        submission: Submission,
+    },
+    Grade {
+        grade: Grade,
+    },
+    SaveReview {
+        review: Review,
+    },
+    ClaimEvent {
+        id: String,
+    },
+    FinishEvent {
+        id: String,
+    },
+    RetryEvent {
+        id: String,
+    },
+    RecordProgress {
+        record: crate::learning::ProgressRecord,
+    },
+    ConfirmProgress {
+        id: String,
+    },
+    SubmitCorrection {
+        correction: crate::learning::Correction,
+    },
+    ReviewCorrection {
+        id: String,
+        accepted: bool,
+        feedback: String,
+    },
 }
 impl Command {
     pub fn assistant_only(&self) -> bool {
@@ -254,6 +314,7 @@ impl Command {
                 | Self::SaveReview { .. }
                 | Self::FinishEvent { .. }
                 | Self::ClaimEvent { .. }
+                | Self::ReviewCorrection { .. }
         )
     }
 }
@@ -298,6 +359,66 @@ fn unique<'a>(ids: impl Iterator<Item = &'a str>) -> AppResult<()> {
     Ok(())
 }
 impl Education {
+    /// Build once per scan or mutation, including inactive configuration and archived plans.
+    pub fn resource_reference_index(&self) -> HashMap<String, Vec<String>> {
+        let mut refs: HashMap<String, Vec<String>> = HashMap::new();
+        let mut add = |ids: Vec<&str>, label: String| {
+            for id in ids.into_iter().collect::<HashSet<_>>() {
+                refs.entry(id.to_string()).or_default().push(label.clone());
+            }
+        };
+        for p in &self.projects {
+            add(
+                p.syllabus_id
+                    .iter()
+                    .chain(&p.past_paper_ids)
+                    .chain(&p.mock_paper_ids)
+                    .map(String::as_str)
+                    .collect(),
+                "项目教学配置".into(),
+            );
+        }
+        for s in self.semesters.iter().chain(&self.semester_history) {
+            for m in &s.milestones {
+                add(
+                    m.resource_ids.iter().map(String::as_str).collect(),
+                    format!("{} v{} 第{}周", s.title, s.revision, m.week),
+                );
+            }
+        }
+        for l in &self.lessons {
+            add(
+                l.resource_ids.iter().map(String::as_str).collect(),
+                format!("课程：{}", l.title),
+            );
+        }
+        for a in &self.assessments {
+            for q in &a.questions {
+                add(
+                    q.source_ids.iter().map(String::as_str).collect(),
+                    format!("{} / {}", a.title, q.id),
+                );
+            }
+        }
+        for s in &self.submissions {
+            add(
+                s.resource_ids.iter().map(String::as_str).collect(),
+                format!("答卷：{}", s.id),
+            );
+        }
+        for c in &self.corrections {
+            add(
+                c.resource_ids.iter().map(String::as_str).collect(),
+                format!("订正：{}", c.id),
+            );
+        }
+        refs
+    }
+    pub fn resource_references(&self, id: &str) -> Vec<String> {
+        self.resource_reference_index()
+            .remove(id)
+            .unwrap_or_default()
+    }
     fn event(&mut self, project: &str, kind: &str, source: &str, at: i64) {
         let id = format!("{kind}:{source}");
         if !self.events.iter().any(|e| e.id == id) {
@@ -309,6 +430,20 @@ impl Education {
                 state: "pending".into(),
                 created_at: at,
             });
+        }
+    }
+    pub(crate) fn task_completed(&mut self, task: &crate::Task, at: i64) {
+        let Some(record) = crate::learning::CompletedStudyTask::from_task(task, at) else {
+            return;
+        };
+        if self
+            .projects
+            .iter()
+            .any(|p| p.project_id == record.project_id && p.exam_mode)
+            && !self.completed_tasks.iter().any(|t| t.id == record.id)
+        {
+            self.event(&record.project_id, "taskHomework", &record.id, at);
+            self.completed_tasks.push(record);
         }
     }
     pub fn tick(&mut self, at: i64) -> bool {
@@ -413,11 +548,81 @@ impl Education {
             }};
         }
         match command {
+            Command::RecordProgress { mut record } => {
+                check(
+                    !self.progress.iter().any(|r| r.id == record.id),
+                    "进度记录不可覆盖，请新增一条更正记录",
+                )?;
+                record.recorded_at = at;
+                record.confirmed = record.source == crate::learning::ProgressSource::User;
+                self.progress.push(record);
+            }
+            Command::ConfirmProgress { id } => {
+                self.progress
+                    .iter_mut()
+                    .find(|r| r.id == id)
+                    .ok_or("进度记录不存在")?
+                    .confirmed = true;
+            }
+            Command::SubmitCorrection { mut correction } => {
+                check(
+                    !self.corrections.iter().any(|c| c.id == correction.id),
+                    "订正版本不可覆盖",
+                )?;
+                correction.submitted_at = at;
+                correction.accepted = None;
+                correction.feedback.clear();
+                correction.reviewed_at = None;
+                let project = self
+                    .grades
+                    .iter()
+                    .find(|g| g.id == correction.grade_id)
+                    .and_then(|g| self.submissions.iter().find(|s| s.id == g.submission_id))
+                    .and_then(|s| self.assessments.iter().find(|a| a.id == s.assessment_id))
+                    .ok_or("订正缺少原始批改")?
+                    .project_id
+                    .clone();
+                self.event(&project, "correction", &correction.id, at);
+                self.corrections.push(correction);
+            }
+            Command::ReviewCorrection {
+                id,
+                accepted,
+                feedback,
+            } => {
+                let correction = self
+                    .corrections
+                    .iter_mut()
+                    .find(|c| c.id == id && c.reviewed_at.is_none())
+                    .ok_or("订正已检查或不存在")?;
+                check(text(&feedback), "订正检查需要反馈")?;
+                correction.accepted = Some(accepted);
+                correction.feedback = feedback;
+                correction.reviewed_at = Some(at);
+            }
             Command::SaveProject { project } => {
                 save!(projects, project, project_id);
             }
             Command::SaveResource { resource } => {
                 save!(resources, resource, id);
+            }
+            Command::RemoveResources { ids } => {
+                check(!ids.is_empty(), "请选择要清理的资源登记")?;
+                let referenced = self.resource_reference_index();
+                let known = self
+                    .resources
+                    .iter()
+                    .map(|r| r.id.as_str())
+                    .collect::<HashSet<_>>();
+                for id in &ids {
+                    check(known.contains(id.as_str()), "资源登记不存在")?;
+                    check(
+                        !referenced.contains_key(id.as_str()),
+                        "资源仍被教学配置或历史记录引用，请修复路径并保留登记",
+                    )?;
+                }
+                let ids = ids.iter().collect::<HashSet<_>>();
+                self.resources.retain(|r| !ids.contains(&r.id));
             }
             Command::SaveSemester { semester } => {
                 if let Some(old) = self.semesters.iter().find(|s| s.id == semester.id) {
@@ -490,6 +695,13 @@ impl Education {
                 a.printed_at = Some(at);
             }
             Command::StartExam { id } => {
+                check(
+                    !self
+                        .assessments
+                        .iter()
+                        .any(|a| a.started_at.is_some() && a.stopped_at.is_none()),
+                    "请先结束当前考试",
+                )?;
                 let a = self
                     .assessments
                     .iter_mut()
@@ -504,6 +716,20 @@ impl Education {
                     "请先打印试卷与答题卡，并在考试窗口开始考试",
                 )?;
                 a.started_at = Some(at);
+            }
+            Command::EndExam { id } => {
+                let a = self
+                    .assessments
+                    .iter_mut()
+                    .find(|a| a.id == id)
+                    .ok_or("考试不存在")?;
+                check(
+                    a.kind != AssessmentKind::Homework
+                        && a.started_at.is_some()
+                        && a.stopped_at.is_none(),
+                    "考试尚未开始或已经停笔",
+                )?;
+                a.stopped_at = Some(at);
             }
             Command::Submit { mut submission } => {
                 check(
@@ -568,9 +794,19 @@ impl Education {
                     .ok_or("教学事件不存在")?;
                 let produced = match event.kind.as_str() {
                     "homework" => self.assessments.iter().any(|a| {
-                        a.kind == AssessmentKind::Homework
+                        a.project_id == event.project_id
+                            && a.kind == AssessmentKind::Homework
                             && a.lesson_id.as_ref() == Some(&event.source_id)
                     }),
+                    "taskHomework" => self.assessments.iter().any(|a| {
+                        a.kind == AssessmentKind::Homework
+                            && a.project_id == event.project_id
+                            && a.task_id.as_ref() == Some(&event.source_id)
+                    }),
+                    "correction" => self
+                        .corrections
+                        .iter()
+                        .any(|c| c.id == event.source_id && c.reviewed_at.is_some()),
                     "weeklyExam" => self.assessments.iter().any(|a| {
                         a.project_id == event.project_id
                             && a.kind == AssessmentKind::WeeklyExam
@@ -782,16 +1018,42 @@ pub fn validate(data: &AppData) -> AppResult<()> {
         )?;
         if a.kind == AssessmentKind::Homework {
             check(
-                a.lesson_id.as_ref().is_some_and(|id| {
-                    e.lessons.iter().any(|l| {
-                        &l.id == id
-                            && l.project_id == a.project_id
-                            && l.ai_enabled
-                            && l.state == LessonState::Ended
+                (a.task_id.is_none()
+                    && a.lesson_id.as_ref().is_some_and(|id| {
+                        e.lessons.iter().any(|l| {
+                            &l.id == id
+                                && l.project_id == a.project_id
+                                && l.ai_enabled
+                                && l.state == LessonState::Ended
+                        })
+                    }))
+                    || (a.lesson_id.is_none()
+                        && a.task_id.as_ref().is_some_and(|id| {
+                            e.completed_tasks
+                                .iter()
+                                .any(|t| &t.id == id && t.project_id == a.project_id)
+                        })),
+                "作业必须来自本项目已结束的AI课程或已完成学习任务",
+            )?;
+        }
+        if a.kind == AssessmentKind::Retest {
+            check(
+                a.retest_of_grade_id.as_ref().is_some_and(|id| {
+                    e.grades.iter().any(|g| {
+                        &g.id == id
+                            && e.submissions.iter().any(|s| {
+                                s.id == g.submission_id
+                                    && e.assessments.iter().any(|original| {
+                                        original.id == s.assessment_id
+                                            && original.project_id == a.project_id
+                                    })
+                            })
                     })
                 }),
-                "作业必须来自本项目已结束的AI课程",
+                "复测必须关联本项目原始批改",
             )?;
+        } else {
+            check(a.retest_of_grade_id.is_none(), "只有复测可以引用原始批改")?;
         }
         if a.kind == AssessmentKind::WeeklyExam {
             check(
@@ -834,14 +1096,21 @@ pub fn validate(data: &AppData) -> AppResult<()> {
                     "评分点需要分值与判分依据",
                 )?;
             }
-            if !q.extension && a.kind != AssessmentKind::MockExam {
+            if !q.extension && !matches!(a.kind, AssessmentKind::MockExam | AssessmentKind::Retest)
+            {
                 check(
                     q.topics.iter().all(|t| {
                         e.lessons.iter().any(|l| {
                             l.project_id == a.project_id
                                 && l.state == LessonState::Ended
                                 && l.topics.contains(t)
-                        })
+                        }) || e
+                            .completed_tasks
+                            .iter()
+                            .any(|task| task.project_id == a.project_id && task.topics.contains(t))
+                            || e.progress.iter().any(|r| {
+                                r.project_id == a.project_id && r.confirmed && &r.topic == t
+                            })
                     }),
                     "基础练习不能包含尚未授课的知识点；拓展题须明确标记",
                 )?;
@@ -942,15 +1211,43 @@ pub fn validate(data: &AppData) -> AppResult<()> {
         check(
             project_exists(&event.project_id)
                 && ["pending", "running", "done"].contains(&event.state.as_str())
-                && ["homework", "grade", "review", "weeklyExam"].contains(&event.kind.as_str()),
+                && [
+                    "homework",
+                    "taskHomework",
+                    "grade",
+                    "correction",
+                    "review",
+                    "weeklyExam",
+                ]
+                .contains(&event.kind.as_str()),
             "无效的教学事件",
         )?;
     }
+    crate::learning::validate(data)?;
     Ok(())
 }
 /// Imports may restore records, but cannot silently rewrite released questions or history.
 pub fn validate_transition(before: &Education, after: &Education) -> AppResult<()> {
+    crate::learning::validate_transition(before, after)?;
+    let active_resources = after
+        .resources
+        .iter()
+        .map(|r| r.id.as_str())
+        .collect::<HashSet<_>>();
+    let references = before.resource_reference_index();
+    for resource in &before.resources {
+        if !active_resources.contains(resource.id.as_str()) {
+            check(
+                !references.contains_key(resource.id.as_str()),
+                "教学历史引用的资源登记不能删除，请修复路径",
+            )?;
+        }
+    }
     for a in &before.assessments {
+        check(
+            after.assessments.iter().any(|b| b.id == a.id),
+            "已发布试卷不能删除",
+        )?;
         if let Some(b) = after.assessments.iter().find(|b| b.id == a.id) {
             let mut old = a.clone();
             old.printed_at = b.printed_at;
@@ -965,7 +1262,7 @@ pub fn validate_transition(before: &Education, after: &Education) -> AppResult<(
                 .submissions
                 .iter()
                 .find(|b| b.id == s.id)
-                .is_none_or(|b| b == s),
+                .is_some_and(|b| b == s),
             "提交历史不可改写",
         )?;
     }
@@ -975,7 +1272,7 @@ pub fn validate_transition(before: &Education, after: &Education) -> AppResult<(
                 .grades
                 .iter()
                 .find(|b| b.id == g.id)
-                .is_none_or(|b| b == g),
+                .is_some_and(|b| b == g),
             "批改历史不可改写",
         )?;
     }

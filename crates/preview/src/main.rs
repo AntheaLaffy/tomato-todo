@@ -1,6 +1,8 @@
 use axum::{
-    extract::{DefaultBodyLimit, State},
-    http::{HeaderMap, StatusCode},
+    body::Body,
+    extract::{DefaultBodyLimit, Query, State},
+    http::{header, HeaderMap, Request, StatusCode},
+    response::Response,
     routing::{get, post},
     Json, Router,
 };
@@ -84,7 +86,8 @@ fn apply_preview(
     )?;
     if current.protected()
         || current.lock.schedules.iter().any(|s| s.enabled)
-        || (current.settings.protection.mode != GuardMode::Off && current.settings.auto_focus)
+        || (current.settings.protection.mode != GuardMode::Off
+            && (current.settings.auto_focus || current.settings.auto_start_tasks))
     {
         return Err("浏览器预览不能控制桌面应用，请在桌面版使用专注保护".into());
     }
@@ -101,6 +104,52 @@ async fn agent_call(
         .map_err(error)?
         .map(Json)
         .map_err(error)
+}
+async fn project_resource(
+    State(service): State<Arc<tomato_agent::Agent>>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+    request: Request<Body>,
+) -> Result<Response, (StatusCode, String)> {
+    check_origin(request.headers())?;
+    if request
+        .headers()
+        .get("sec-fetch-site")
+        .is_some_and(|v| v == "cross-site")
+    {
+        return Err((StatusCode::FORBIDDEN, "不允许此来源".into()));
+    }
+    let id = query.get("id").ok_or_else(|| error("缺少资源 ID"))?.clone();
+    let file = tokio::task::spawn_blocking(move || service.project_resource_file(&id))
+        .await
+        .map_err(error)?
+        .map_err(error)?;
+    let mut response = ServeFile::new(&file.path)
+        .try_call(request)
+        .await
+        .map_err(error)?
+        .map(Body::new);
+    let encoded = file
+        .name
+        .as_bytes()
+        .iter()
+        .map(|b| format!("%{b:02X}"))
+        .collect::<String>();
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=resource; filename*=UTF-8''{encoded}")
+            .parse()
+            .map_err(error)?,
+    );
+    response
+        .headers_mut()
+        .insert(header::CONTENT_TYPE, file.mime_type.parse().map_err(error)?);
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
+    response
+        .headers_mut()
+        .insert("x-content-type-options", "nosniff".parse().unwrap());
+    Ok(response)
 }
 async fn guard_info() -> Json<tomato_core::guard::GuardInfo> {
     Json(tomato_core::guard::GuardInfo {
@@ -155,6 +204,7 @@ async fn main() {
         .merge(
             Router::new()
                 .route("/api/agent", post(agent_call))
+                .route("/api/project-resource", get(project_resource))
                 .layer(DefaultBodyLimit::max(20 * 1024 * 1024))
                 .with_state(service.clone()),
         );

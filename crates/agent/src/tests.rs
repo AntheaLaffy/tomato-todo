@@ -1371,3 +1371,171 @@ fn project_resources_reject_links_and_overlapping_authorizations() {
     };
     assert!(agent.register_resource(resource).is_err());
 }
+
+#[test]
+fn study_progress_is_current_and_assistant_can_confirm_on_user_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let initial = agent.call("get_snapshot", &json!({}), false).unwrap();
+    let project = initial["data"]["projects"][0]["id"].clone();
+    let record = json!({"id":"progress","projectId":project,"topic":"极限","position":"第2讲","state":"practicing","evidence":"用户说完成前两讲，基础题尚未验证","nextAction":"完成基础题","source":"user","confirmed":true,"recordedAt":0});
+    let saved = agent
+        .call(
+            "education",
+            &json!({"command":{"op":"recordProgress","record":record}}),
+            false,
+        )
+        .unwrap();
+    assert_eq!(
+        saved["data"]["education"]["progress"][0]["source"],
+        "assistant"
+    );
+    assert_eq!(
+        saved["data"]["education"]["progress"][0]["confirmed"],
+        false
+    );
+    agent
+        .call(
+            "education",
+            &json!({"command":{"op":"confirmProgress","id":"progress"}}),
+            false,
+        )
+        .unwrap();
+    assert_eq!(
+        agent.call("get_snapshot", &json!({}), false).unwrap()["data"]["education"]["progress"][0]
+            ["confirmed"],
+        true
+    );
+    let second = json!({"id":"progress-dispatch","projectId":project,"topic":"连续","position":"第1讲","state":"studied","evidence":"对话中完成并核验","nextAction":"开始做题","source":"user","confirmed":true,"recordedAt":0});
+    agent.call("dispatch",&json!({"action":{"type":"education","command":{"op":"recordProgress","record":second}}}),false).unwrap();
+    agent.call("dispatch",&json!({"action":{"type":"education","command":{"op":"confirmProgress","id":"progress-dispatch"}}}),false).unwrap();
+    let snapshot = agent.call("get_snapshot", &json!({}), false).unwrap();
+    assert_eq!(
+        snapshot["data"]["education"]["progress"][1]["source"],
+        "assistant"
+    );
+    assert_eq!(
+        snapshot["data"]["education"]["progress"][1]["confirmed"],
+        true
+    );
+    let read = agent
+        .call(
+            "get_study_progress",
+            &json!({"projectId":project,"limit":1}),
+            true,
+        )
+        .unwrap();
+    assert_eq!(read["total"], 2);
+    assert_eq!(read["records"].as_array().unwrap().len(), 1);
+    let record2 = json!({"id":"progress2","projectId":project,"topic":"极限","position":"第3讲","state":"practicing","evidence":"用户新更新","nextAction":"做题","source":"user","confirmed":true,"recordedAt":0});
+    let saved=agent.call("dispatch",&json!({"action":{"type":"education","command":{"op":"recordProgress","record":record2}}}),false).unwrap();
+    assert_eq!(
+        saved["data"]["education"]["progress"][1]["source"],
+        "assistant"
+    );
+    assert_eq!(
+        agent
+            .call(
+                "get_study_progress",
+                &json!({"projectId":project,"offset":1,"limit":1}),
+                false
+            )
+            .unwrap()["records"][0]["position"],
+        "第1讲"
+    );
+    let context = agent.call("get_context", &json!({}), false).unwrap();
+    assert!(context["asOf"].is_number());
+    assert!(context["studyProgress"].is_array());
+}
+
+#[test]
+fn project_resource_preview_export_repair_and_cleanup_keep_grants_and_references() {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    let dir = tempfile::tempdir().unwrap();
+    let materials = tempfile::tempdir().unwrap();
+    let exports = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let snapshot = agent.request(json!({"op":"authorize_project_directory","directory":materials.path(),"name":"资料","color":"#849b7d"})).unwrap();
+    let project_id = snapshot["data"]["education"]["projects"][0]["projectId"]
+        .as_str()
+        .unwrap();
+    let mut resource = tomato_core::education::Resource {
+        id: "resource-large".into(),
+        project_id: project_id.into(),
+        title: "大教材".into(),
+        kind: tomato_core::education::ResourceKind::Book,
+        path: "large.pdf".into(),
+        source: String::new(),
+        edition: String::new(),
+        topics: vec![],
+    };
+    let mut file = std::fs::File::create(materials.path().join(&resource.path)).unwrap();
+    let length = 100 * 1024 * 1024;
+    file.set_len(length).unwrap();
+    file.seek(SeekFrom::End(-4)).unwrap();
+    file.write_all(b"tail").unwrap();
+    agent.register_resource(resource.clone()).unwrap();
+    let info = agent
+        .request(json!({"op":"project_resource_info","resourceId":resource.id}))
+        .unwrap();
+    assert_eq!(info["sizeBytes"], length);
+    assert_eq!(info["canPreview"], false);
+    assert!(agent
+        .request(json!({"op":"preview_project_resource","resourceId":resource.id}))
+        .is_err());
+    let export = exports.path().join("copy.pdf");
+    assert_eq!(
+        agent.copy_project_resource(&resource.id, &export).unwrap(),
+        length
+    );
+    let mut copied = std::fs::File::open(export).unwrap();
+    copied.seek(SeekFrom::End(-4)).unwrap();
+    let mut tail = String::new();
+    copied.read_to_string(&mut tail).unwrap();
+    assert_eq!(tail, "tail");
+    assert!(agent
+        .copy_project_resource(&resource.id, &materials.path().join(&resource.path))
+        .is_err());
+    std::fs::rename(
+        materials.path().join(&resource.path),
+        materials.path().join("moved.pdf"),
+    )
+    .unwrap();
+    let scan = agent
+        .request(json!({"op":"scan_project_resources","projectId":project_id}))
+        .unwrap();
+    assert_eq!(scan["resources"][0]["state"], "missing");
+    agent
+        .request(
+            json!({"op":"repair_project_resource","resourceId":resource.id,"path":"moved.pdf"}),
+        )
+        .unwrap();
+    assert!(agent.project_resource_file(&resource.id).is_ok());
+    assert!(agent
+        .request(json!({"op":"clean_missing_resources","ids":[resource.id]}))
+        .is_err());
+    resource.id = "small".into();
+    resource.path = "small.txt".into();
+    std::fs::write(materials.path().join(&resource.path), "hello").unwrap();
+    agent.register_resource(resource.clone()).unwrap();
+    assert_eq!(
+        agent
+            .request(json!({"op":"preview_project_resource","resourceId":"small"}))
+            .unwrap()["data"],
+        "aGVsbG8="
+    );
+    std::fs::remove_file(materials.path().join(&resource.path)).unwrap();
+    agent
+        .request(json!({"op":"clean_missing_resources","ids":["small"]}))
+        .unwrap();
+    assert!(agent.project_resource_file("small").is_err());
+    std::fs::remove_file(dir.path().join("project-grants.json")).unwrap();
+    assert!(agent.project_resource_file("resource-large").is_err());
+    let scan = agent
+        .request(json!({"op":"scan_project_resources","projectId":project_id}))
+        .unwrap();
+    assert_eq!(scan["resources"][0]["state"], "unavailable");
+    assert!(agent
+        .request(json!({"op":"clean_missing_resources","ids":["resource-large"]}))
+        .is_err());
+}

@@ -10,7 +10,7 @@
 | -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `version`      | 数据版本                   | 固定 `4`                                                                                                                      |
 | `projects`     | 项目数组                   | 最多 500 项，`id/name/color/appWhitelist` 同计划格式；`appWhitelist` 可选；提供时专注该项目的任务用这份专属清单替代通用白名单 |
-| `identities`   | 永久 ID 登记               | 最多 1000000 项；`id/kind/retired/restoreTask`；历史 ID 不能用于新实体                                                        |
+| `identities`   | 永久 ID 登记               | 最多 1000000 项；`id/kind/retired/restoreTask`；历史 ID 不能用于新实体；进度和订正独立登记，完成任务快照复用原任务 ID |
 | `habits`       | 习惯组数组                 | 最多 500 项，只保存 `id/name`；形状和安排由模板管理                                                                           |
 | `blocks`       | 课表阻塞时段               | 最多 60 项；`id/title/days/start/end/attention/notes`，每周重复的固定占用（课程、实验）；旧文件省略时为空                      |
 | `templates`    | 模板与印刷规则             | 最多 5000 项，结构同计划 v6；不含完成和统计                                                                                   |
@@ -48,7 +48,7 @@
 
 - `focusMinutes`：1—180；`shortBreakMinutes`：1—60；`longBreakMinutes`：1—120。
 - `longBreakEvery`：2—12；`dailyGoal`：1—30，以上均为整数。
-- `autoBreak`、`autoFocus`、`sound`、`notifications`、`alwaysOnTop`：布尔值。
+- `autoBreak`、`autoFocus`、`autoStartTasks`、`sound`、`notifications`、`alwaysOnTop`：布尔值。`autoFocus`仅控制休息后续当前任务剩余轮次；`autoStartTasks`独立控制任务提醒时刻到达后的自动开始。计时、暂停、锁机或考试中不抢占，超过任务时段不补开；恢复备份会关闭`autoStartTasks`。
 - `soundVolume`：整数 0—100，默认 100；v4 文件可省略。`sound` 控制所有关键节点音效，背景噪音单独调节。
 - `theme`：`light`、`dark`、`system`。
 - `personaBackdrop`：布尔值，缺省 `false`；在普通页面背景显示当前内置人格的完整立绘。沉浸与专注保护界面不显示，自定义人格没有内置立绘时隐藏。
@@ -105,7 +105,7 @@
 
 ## 计时器与恢复行为
 
-`timer` 包含 `mode`（`focus/shortBreak/longBreak`）、`running`、`taskId`、`durationSecs`、`remainingSecs`、`deadline`、`startedAt`、`cycle`、`cycleDate`、`completionSerial`、`lastFinishedMode`。秒数非负，持续时间 1—10800，剩余不得超过持续时间；`running` 必须与 `deadline` 是否存在一致。可空的时间字段用 Unix 秒。`taskId` 非空时必须引用当前任务；最后完成的阶段可为 null。
+`timer` 包含 `mode`（`focus/shortBreak/longBreak`）、`running`、`taskId`、`durationSecs`、`remainingSecs`、`deadline`、`startedAt`、`cycle`、`cycleDate`、`completionSerial`、`lastFinishedMode`及`autoFocusBlocked`（缺省false；任务在休息阶段完成时，阻止本次休息结束后转为自由专注）。秒数非负，持续时间 1—10800，剩余不得超过持续时间；`running` 必须与 `deadline` 是否存在一致。可空的时间字段用 Unix 秒。`taskId` 非空时必须引用当前任务；最后完成的阶段可为 null。
 
 `cycle` 是 `cycleDate` 当天完整完成的番茄数，同一天跨任务累计；每累计 `longBreakEvery` 个安排长休息，其余安排短休息。`cycleDate` 是本机本地日期 `YYYY-MM-DD` 或 null，v4 文件可省略。首次读取缺失日期的计数，或本地日期变化时，按专注历史的完成日期重建当天计数，因此昨日进度不会带到今早。跨午夜的专注计入结束日；延迟到次日才处理的昨日完成仍归昨日。日期变化不打断正在进行或已暂停的计时；若新一天尚无完成记录，昨日尚未开始的休息回到专注待机。
 
@@ -121,6 +121,6 @@
 
 ## 项目教学记录
 
-v4新增可选 `education`，缺省为空；保存项目目录绑定元数据、资源索引、学期计划与修订历史、45分钟课程、固定版本题目与评分标准、答卷、批改、错因复测、复盘和持久化教学事件。完整字段见 [应试教学](EDUCATION.md) 与 backup.schema.json 的 education 定义。
+v4新增可选 `education`，缺省为空；保存项目目录绑定元数据、资源索引、学期计划与修订历史、45分钟课程、固定版本题目与评分标准、答卷、批改、错因复测、复盘、持久化教学事件、已完成学习任务快照、带来源的学情历史和逐题订正/检查结果。任务快照沿用任务ID，不重复登记永久ID；独立进度和订正记录各自登记。完整字段见 [应试教学](EDUCATION.md) 与 backup.schema.json 的 education 定义。
 
 JSON备份不包含外部资料文件或本机 `project-grants.json` 授权；需另行备份项目目录。恢复后必须在项目页重新授权，导入路径不扩大沙箱权限。已发布题目/评分标准及提交/批改记录不可借导入修改；需要修订时保存新ID。计划v6不导出教学历史。

@@ -169,6 +169,7 @@ export async function createStudySession({
   const allowed = new Set([
     "education",
     "get_context",
+    "get_study_progress",
     "get_canvas","save_canvas","generate_image",
     "get_snapshot",
     "get_tasks",

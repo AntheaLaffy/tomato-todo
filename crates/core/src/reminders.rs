@@ -71,6 +71,31 @@ impl AppData {
             .filter(|t| !t.completed && t.reminder_pending)
             .min_by_key(|t| (&t.due_date, &t.reminder_time, &t.id))
     }
+    pub(crate) fn due_auto_task(&self) -> Option<&Task> {
+        self.tasks
+            .iter()
+            .filter(|t| t.reminder_pending && self.task_has_rounds_left(t))
+            .min_by_key(|t| (&t.due_date, &t.reminder_time, &t.id))
+    }
+    pub(crate) fn start_due_task(&mut self, at: i64) -> bool {
+        if !self.settings.auto_start_tasks
+            || !self.reminder_idle()
+            || self
+                .education
+                .assessments
+                .iter()
+                .any(|a| a.started_at.is_some() && a.stopped_at.is_none())
+        {
+            return false;
+        }
+        let Some(task) = self.due_auto_task() else {
+            return false;
+        };
+        self.timer.task_id = Some(task.id.clone());
+        self.reset_to(crate::Mode::Focus);
+        self.start(at);
+        true
+    }
     pub(crate) fn tick_reminders(&mut self, at: i64) -> bool {
         let date = date_at(at);
         let now = Local.timestamp_opt(at, 0).single().unwrap();

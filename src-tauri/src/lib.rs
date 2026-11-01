@@ -12,6 +12,8 @@ mod files;
 mod focus_audio;
 #[cfg(target_os = "android")]
 mod mobile;
+#[cfg(not(target_os = "android"))]
+mod resources;
 
 fn preflight_action(current: &AppData, action: &Action) -> AppResult<()> {
     let mut proposed = current.clone();
@@ -24,7 +26,9 @@ fn preflight_action(current: &AppData, action: &Action) -> AppResult<()> {
         && (proposed.protected()
             || proposed.lock.schedules.iter().any(|s| s.enabled)
             || (proposed.settings.protection.mode != GuardMode::Off
-                && current.settings.protection.mode != proposed.settings.protection.mode))
+                && (current.settings.protection.mode != proposed.settings.protection.mode
+                    || (!current.settings.auto_focus && proposed.settings.auto_focus)
+                    || (!current.settings.auto_start_tasks && proposed.settings.auto_start_tasks))))
     {
         guard::preflight(std::process::id())?;
     }

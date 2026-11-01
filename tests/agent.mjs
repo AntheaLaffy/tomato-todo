@@ -404,6 +404,12 @@ test(
                 type: "function",
                 function: { name: "get_context", arguments: "{}" },
               },
+              {
+                index: 1,
+                id: "call_progress",
+                type: "function",
+                function: { name: "get_study_progress", arguments: "{}" },
+              },
             ],
           }
         : { role: "assistant", content: "先核实可用时间，再生成待审阅方案。" };
@@ -460,6 +466,11 @@ test(
           inputSchema: { type: "object", properties: {} },
         },
         {
+          name: "get_study_progress",
+          description: "Read latest subject learning evidence",
+          inputSchema: { type: "object", properties: {} },
+        },
+        {
           name: "dispatch",
           description: "Must never become available",
           inputSchema: { type: "object", properties: {} },
@@ -489,6 +500,7 @@ test(
       // workspace; the Rust-side dispatch/bash entries must never reach the model.
       const studyTools = [
         "get_context",
+        "get_study_progress",
         "read",
         "write",
         "edit",
@@ -508,7 +520,7 @@ test(
           text += event.assistantMessageEvent.delta;
       });
       await session.prompt("请先读学情摘要");
-      assert.deepEqual(calls, ["get_context"]);
+      assert.deepEqual(calls, ["get_context", "get_study_progress"]);
       assert.ok(text.includes("先核实可用时间"));
       assert.deepEqual(
         requests[0].tools.map((t) => t.function.name),
@@ -570,6 +582,10 @@ test(
       assert.ok(
         branchHistory.includes("call_context"),
         "tool history is kept in a branch",
+      );
+      assert.ok(
+        branchHistory.includes("call_progress"),
+        "study evidence reads are kept in a branch",
       );
       assert.ok(
         !branchHistory.includes("接着刚才的讨论"),
@@ -1003,6 +1019,11 @@ test(
         "先核对资料",
       );
       await page.waitForTimeout(2800);
+      assert.equal(
+        await page.locator(".agent-reasoning").evaluate((node) => node.open),
+        true,
+        "polling should preserve expanded model reasoning",
+      );
       await expect(page.locator(".agent-reasoning-text")).toBeVisible();
       assert.ok(
         JSON.stringify(requests.at(-1).messages).includes("数学,3"),

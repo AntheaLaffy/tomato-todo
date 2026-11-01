@@ -125,17 +125,8 @@ impl Agent {
                 past_paper_ids: vec![],
                 mock_paper_ids: vec![],
             });
-        if !profile.directory.is_empty()
-            && Path::new(&profile.directory) != directory
-            && snapshot
-                .data
-                .education
-                .resources
-                .iter()
-                .any(|r| r.project_id == project_id)
-        {
-            return Err("项目已有资料；请先在磁盘迁移资料到新目录，再使用相同项目重新授权；当前版本请保留原绑定以免断开引用".into());
-        }
+        // Explicit directory selection also repairs a moved project root; resource IDs
+        // and relative paths stay intact, and the next scan reports any missing files.
         profile.directory = directory.to_string_lossy().into();
         snapshot = (self.apply)(
             Action::Education {
@@ -151,30 +142,14 @@ impl Agent {
         atomic_json(&self.dir.join("project-grants.json"), &grants)?;
         Ok(json!(snapshot))
     }
-    fn project_path(&self, project_id: &str, path: &str) -> AppResult<PathBuf> {
+    pub(crate) fn project_path(&self, project_id: &str, path: &str) -> AppResult<PathBuf> {
         let mounts = self.project_mounts()?;
         let directory = mounts
             .as_array()
             .and_then(|ms| ms.iter().find(|m| m["projectId"] == project_id))
             .and_then(|m| m["directory"].as_str())
             .ok_or("项目目录尚未由用户授权，或目录已失联")?;
-        let relative = Path::new(path);
-        if relative.is_absolute()
-            || relative
-                .components()
-                .any(|p| !matches!(p, Component::Normal(_)))
-        {
-            return Err("资料路径必须是安全的项目相对路径".into());
-        }
-        let root = Path::new(directory);
-        let mut target = root.to_path_buf();
-        for component in relative.components() {
-            target.push(component);
-            if fs::symlink_metadata(&target).is_ok_and(|m| m.file_type().is_symlink()) {
-                return Err("项目资料不能通过符号链接跳转".into());
-            }
-        }
-        Ok(target)
+        resolve_path(Path::new(directory), path)
     }
     pub(crate) fn register_resource(self: &Arc<Self>, resource: Resource) -> AppResult<Value> {
         let path = self.project_path(&resource.project_id, &resource.path)?;
@@ -223,4 +198,24 @@ impl Agent {
         )?;
         serde_json::to_value(attachment).map_err(|e| e.to_string())
     }
+}
+pub(crate) fn resolve_path(root: &Path, path: &str) -> AppResult<PathBuf> {
+    let relative = Path::new(path);
+    if path.is_empty()
+        || path.contains('\\')
+        || relative.is_absolute()
+        || relative
+            .components()
+            .any(|p| !matches!(p, Component::Normal(_)))
+    {
+        return Err("资料路径必须是安全的项目相对路径".into());
+    }
+    let mut target = root.to_path_buf();
+    for component in relative.components() {
+        target.push(component);
+        if fs::symlink_metadata(&target).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err("项目资料不能通过符号链接跳转".into());
+        }
+    }
+    Ok(target)
 }

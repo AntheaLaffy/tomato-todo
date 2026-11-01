@@ -24,6 +24,7 @@ Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
 | 项目资料目录与应试教学体系 | 教学 / 智能体 / 界面 | crates/core/src/education.rs、crates/agent/src/projects.rs、src/education.ts、docs/EDUCATION.md | agent/coding.mjs、agent/skills/exam-teaching/、桌面/预览手动Action边界、备份Schema、education_tests.rs、tests/education.mjs |
+| 项目资料搜索、大文件与失效维护 | 教学 / 文件 | src/resources.ts、crates/agent/src/resources.rs | core/src/education.rs的引用索引/清理、src-tauri/src/resources.rs、preview/src/main.rs的流式响应、tests/education.mjs |
 | 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/desktop_app.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md、docs/HANDBOOK/12-课表与提醒.md |
 | 任务日期必填、周期星期与可选提醒 | 业务核心 / 界面 | crates/core/src/reminders.rs 的 validate、templates.rs 的 Printing/validate、src/main.ts 的 templateDialog/taskDialog | plan.rs、src/types.ts、助手 create_task、计划与备份 schema |
 | 永久 ID、任务恢复与本地 v3 升级 | 持久化 | crates/core/src/identities.rs、migration.rs、lib.rs 的 Engine | docs/HANDBOOK/15-任务身份.md、tests.rs、docs/BACKUP_FORMAT.md |

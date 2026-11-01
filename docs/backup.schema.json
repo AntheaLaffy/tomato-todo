@@ -487,6 +487,11 @@
           "minimum": 0,
           "maximum": 100,
           "default": 100
+        },
+        "autoStartTasks": {
+          "type": "boolean",
+          "default": false,
+          "description": "按任务计划时刻自动开始；恢复备份后关闭"
         }
       },
       "required": [
@@ -620,6 +625,11 @@
               "type": "null"
             }
           ]
+        },
+        "autoFocusBlocked": {
+          "type": "boolean",
+          "default": false,
+          "description": "任务完成后的本次休息不自动续轮"
         }
       },
       "required": [
@@ -1138,7 +1148,9 @@
             "assessment",
             "submission",
             "grade",
-            "review"
+            "review",
+            "progress",
+            "correction"
           ]
         },
         "retired": {
@@ -1215,6 +1227,27 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/educationTeachingEvent"
+          }
+        },
+        "completedTasks": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/educationCompletedStudyTask"
+          }
+        },
+        "progress": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/educationProgressRecord"
+          }
+        },
+        "corrections": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/educationCorrection"
           }
         }
       },
@@ -1664,6 +1697,20 @@
               "type": "null"
             }
           ]
+        },
+        "taskId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "retestOfGradeId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1901,7 +1948,14 @@
           "type": "string"
         },
         "kind": {
-          "type": "string"
+          "enum": [
+            "homework",
+            "taskHomework",
+            "grade",
+            "correction",
+            "review",
+            "weeklyExam"
+          ]
         },
         "sourceId": {
           "type": "string"
@@ -1949,7 +2003,161 @@
       "enum": [
         "homework",
         "weeklyExam",
-        "mockExam"
+        "mockExam",
+        "retest"
+      ]
+    },
+    "educationCompletedStudyTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "notes": {
+          "type": "string"
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completedAt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "title",
+        "notes",
+        "topics",
+        "completedAt"
+      ]
+    },
+    "educationProgressRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "topic": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "position": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "state": {
+          "enum": [
+            "studied",
+            "practicing",
+            "needsReview"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "nextAction": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "source": {
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "confirmed": {
+          "type": "boolean"
+        },
+        "recordedAt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "topic",
+        "position",
+        "state",
+        "evidence",
+        "nextAction",
+        "source",
+        "confirmed",
+        "recordedAt"
+      ]
+    },
+    "educationCorrection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "gradeId": {
+          "type": "string"
+        },
+        "questionId": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "resourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "submittedAt": {
+          "type": "integer"
+        },
+        "accepted": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "feedback": {
+          "type": "string"
+        },
+        "reviewedAt": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "gradeId",
+        "questionId",
+        "explanation",
+        "resourceIds",
+        "submittedAt",
+        "accepted",
+        "feedback",
+        "reviewedAt"
       ]
     }
   }

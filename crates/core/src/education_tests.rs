@@ -236,3 +236,242 @@ fn new_projects_require_directory_and_lessons_keep_their_plan_revision() {
     assert_eq!(data.education.semester_history[0].revision, 1);
     assert_eq!(data.education.semesters[0].revision, 2);
 }
+
+fn submit(data: &mut AppData, id: &str, assessment: &str, time: i64) {
+    command(data,json!({"op":"submit","submission":{"id":id,"assessmentId":assessment,"submittedAt":0,"resourceIds":[],"answers":"我的推导","unfinished":false,"questionTimes":[]}}),time).unwrap();
+}
+fn grade(data: &mut AppData, id: &str, submission: &str, time: i64) {
+    command(data,json!({"op":"grade","grade":{"id":id,"submissionId":submission,"assessmentRevision":1,"gradedAt":0,"awards":[{"questionId":"q1","pointId":"p1","awarded":2,"evidence":"写出法则但计算有误"}],"errors":[{"questionId":"q1","cause":"计算环节待核实","evidence":"答卷计算不一致","correction":"重新推导并检查","nextCheck":"独立做一道同类题","retestDate":"2026-11-08","confirmed":false}],"needsReview":false,"feedback":"需订正计算"}}),time).unwrap();
+}
+#[test]
+fn completed_learning_task_creates_one_durable_homework_event_and_snapshot() {
+    let mut data = fixture();
+    let task:crate::TaskDraft=serde_json::from_value(json!({"title":"极限第1讲","projectId":data.projects[0].id,"dueDate":"2026-11-02","tags":["极限"],"notes":"视频已听完，习题待做"})).unwrap();
+    data.apply(crate::Action::SaveTask { task }, at(2, 8, 0))
+        .unwrap();
+    let id = data.tasks[0].id.clone();
+    data.apply(crate::Action::ToggleTask { id: id.clone() }, at(2, 9, 0))
+        .unwrap();
+    assert_eq!(data.education.completed_tasks.len(), 1);
+    assert!(data
+        .education
+        .events
+        .iter()
+        .any(|e| e.kind == "taskHomework" && e.source_id == id));
+    let event_id = format!("taskHomework:{id}");
+    assert!(command(
+        &mut data,
+        json!({"op":"finishEvent","id":event_id}),
+        at(2, 9, 1)
+    )
+    .is_err());
+    data.apply(crate::Action::ToggleTask { id: id.clone() }, at(2, 9, 2))
+        .unwrap();
+    data.apply(crate::Action::ToggleTask { id: id.clone() }, at(2, 9, 3))
+        .unwrap();
+    assert_eq!(data.education.completed_tasks.len(), 1);
+    data.apply(crate::Action::DeleteTask { id: id.clone() }, at(2, 9, 4))
+        .unwrap();
+    assert_eq!(data.education.completed_tasks[0].title, "极限第1讲");
+    let mut packet = assessment(&data, "homework");
+    packet["assessment"]["lessonId"] = Value::Null;
+    packet["assessment"]["taskId"] = json!(id);
+    command(&mut data, packet, at(2, 10, 0)).unwrap();
+    command(
+        &mut data,
+        json!({"op":"finishEvent","id":event_id}),
+        at(2, 10, 1),
+    )
+    .unwrap();
+    assert_eq!(
+        data.education
+            .events
+            .iter()
+            .find(|e| e.id == event_id)
+            .unwrap()
+            .state,
+        "done"
+    );
+    let before = data.education.clone();
+    data.education.completed_tasks[0].title = "篡改".into();
+    assert!(validate_transition(&before, &data.education).is_err());
+}
+#[test]
+fn progress_is_timestamped_versioned_and_never_infers_mastery_from_time() {
+    let mut data = fixture();
+    let project_id = data.projects[0].id.clone();
+    for (id, position, time) in [("old", "第1讲", at(2, 8, 0)), ("new", "第2讲", at(2, 9, 0))] {
+        command(&mut data,json!({"op":"recordProgress","record":{"id":id,"projectId":project_id,"topic":"极限","position":position,"state":"practicing","evidence":"本人记录，习题尚未验证","nextAction":"完成基础题","source":"assistant","confirmed":true,"recordedAt":0}}),time).unwrap();
+    }
+    assert!(!data.education.progress[1].confirmed);
+    assert_eq!(data.education.progress[1].recorded_at, at(2, 9, 0));
+    let summary = crate::learning::summaries(&data, at(2, 10, 0));
+    assert_eq!(summary[0]["progress"][0]["position"], "第2讲");
+    assert_eq!(summary[0]["progressCount"], 2);
+    assert!(summary[0]["assessments"].as_array().unwrap().is_empty());
+    command(
+        &mut data,
+        json!({"op":"confirmProgress","id":"new"}),
+        at(2, 10, 0),
+    )
+    .unwrap();
+    assert!(data.education.progress[1].confirmed);
+    let before = data.education.clone();
+    data.education.progress[1].position = "已掌握".into();
+    assert!(validate_transition(&before, &data.education).is_err());
+}
+#[test]
+fn submission_revision_grading_correction_and_retest_keep_original_evidence() {
+    let mut data = fixture();
+    finish_lesson(&mut data);
+    let packet = assessment(&data, "homework");
+    command(&mut data, packet, at(7, 18, 0)).unwrap();
+    submit(&mut data, "sub", "assessment", at(7, 20, 0));
+    grade(&mut data, "grade", "sub", at(7, 20, 1));
+    let summary = crate::learning::summaries(&data, at(7, 20, 1));
+    assert_eq!(summary[0]["assessments"][0]["status"], "correctionDue");
+    command(&mut data,json!({"op":"submitCorrection","correction":{"id":"fix","gradeId":"grade","questionId":"q1","explanation":"重新计算并检查符号","resourceIds":[],"submittedAt":0,"accepted":true,"feedback":"伪造检查","reviewedAt":1}}),at(7,20,2)).unwrap();
+    assert!(data.education.corrections[0].accepted.is_none());
+    assert!(command(
+        &mut data,
+        json!({"op":"finishEvent","id":"correction:fix"}),
+        at(7, 20, 3)
+    )
+    .is_err());
+    command(&mut data,json!({"op":"reviewCorrection","id":"fix","accepted":true,"feedback":"推导已修正，安排独立复测"}),at(7,20,3)).unwrap();
+    command(
+        &mut data,
+        json!({"op":"finishEvent","id":"correction:fix"}),
+        at(7, 20, 4),
+    )
+    .unwrap();
+    assert!(command(
+        &mut data,
+        json!({"op":"reviewCorrection","id":"fix","accepted":false,"feedback":"改写旧记录"}),
+        at(7, 20, 5)
+    )
+    .is_err());
+    let mut retest = assessment(&data, "retest");
+    retest["assessment"]["id"] = json!("retest");
+    retest["assessment"]["lessonId"] = Value::Null;
+    retest["assessment"]["startsAt"] = json!(at(8, 19, 0));
+    retest["assessment"]["endsAt"] = json!(at(8, 20, 0));
+    assert!(command(&mut data, retest.clone(), at(7, 20, 5)).is_err());
+    retest["assessment"]["retestOfGradeId"] = json!("grade");
+    command(&mut data, retest, at(7, 20, 5)).unwrap();
+    let summary = crate::learning::summaries(&data, at(7, 20, 6));
+    assert_eq!(summary[0]["retests"][0]["correctionAccepted"], true);
+    assert_eq!(
+        summary[0]["retests"][0]["attempts"][0]["status"],
+        "upcoming"
+    );
+    // A new submission needs its own grade, even within the same second.
+    submit(&mut data, "sub2", "assessment", at(7, 20, 0));
+    let summary = crate::learning::summaries(&data, at(7, 20, 7));
+    let homework = summary[0]["assessments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == "assessment")
+        .unwrap();
+    assert_eq!(homework["status"], "submitted");
+    assert!(homework["score"].is_null());
+    assert_eq!(data.education.grades.len(), 1);
+    assert_eq!(data.education.submissions.len(), 2);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("learning.sqlite3");
+    let mut engine = crate::Engine::open(&path).unwrap();
+    engine
+        .dispatch(
+            crate::Action::Import {
+                data: Box::new(data),
+            },
+            at(7, 20, 7),
+        )
+        .unwrap();
+    drop(engine);
+    let mut engine = crate::Engine::open(path).unwrap();
+    let s = engine.snapshot(at(7, 20, 7)).unwrap();
+    assert_eq!(s.data.education.corrections[0].accepted, Some(true));
+    assert_eq!(s.study_progress[0]["retests"].as_array().unwrap().len(), 1);
+}
+#[test]
+fn exam_can_end_early_but_cannot_submit_before_stopping() {
+    let mut data = fixture();
+    finish_lesson(&mut data);
+    let packet = assessment(&data, "weeklyExam");
+    command(&mut data, packet, at(6, 18, 0)).unwrap();
+    command(
+        &mut data,
+        json!({"op":"confirmPrinted","id":"assessment"}),
+        at(7, 18, 0),
+    )
+    .unwrap();
+    command(
+        &mut data,
+        json!({"op":"startExam","id":"assessment"}),
+        at(7, 19, 0),
+    )
+    .unwrap();
+    let sub = json!({"op":"submit","submission":{"id":"sub","assessmentId":"assessment","resourceIds":[],"answers":"文本","unfinished":false,"submittedAt":0,"questionTimes":[]}});
+    assert!(command(&mut data, sub.clone(), at(7, 19, 10)).is_err());
+    command(
+        &mut data,
+        json!({"op":"endExam","id":"assessment"}),
+        at(7, 19, 30),
+    )
+    .unwrap();
+    assert_eq!(
+        data.education.assessments[0].stopped_at,
+        Some(at(7, 19, 30))
+    );
+    assert!(command(&mut data, sub, at(7, 19, 31)).is_err());
+}
+
+#[test]
+fn resource_cleanup_retains_archived_plan_references_and_is_atomic() {
+    let mut data = fixture();
+    let mut extra = data.education.resources[0].clone();
+    extra.id = "unused".into();
+    data.education.resources.push(extra);
+    assert!(command(
+        &mut data,
+        json!({"op":"removeResources","ids":["unused","mock"]}),
+        at(1, 8, 0)
+    )
+    .is_err());
+    assert!(data.education.resources.iter().any(|r| r.id == "unused"));
+    let mut revised = data.education.semesters[0].clone();
+    revised.revision += 1;
+    revised.milestones[0].resource_ids = vec!["past".into()];
+    command(
+        &mut data,
+        json!({"op":"saveSemester","semester":revised}),
+        at(1, 8, 0),
+    )
+    .unwrap();
+    // Mock remains configured too; detach it to isolate the archived-plan reference.
+    data.education.projects[0].exam_mode = false;
+    data.education.projects[0].mock_paper_ids.clear();
+    assert!(data
+        .education
+        .resource_references("mock")
+        .iter()
+        .any(|r| r.contains("v1")));
+    assert!(command(
+        &mut data,
+        json!({"op":"removeResources","ids":["mock"]}),
+        at(1, 8, 0)
+    )
+    .is_err());
+    command(
+        &mut data,
+        json!({"op":"removeResources","ids":["unused"]}),
+        at(1, 8, 0),
+    )
+    .unwrap();
+    assert!(!data.education.resources.iter().any(|r| r.id == "unused"));
+    let mut removed = data.education.clone();
+    removed.resources.retain(|r| r.id != "mock");
+    assert!(validate_transition(&data.education, &removed).is_err());
+}

@@ -2360,3 +2360,281 @@ fn local_v3_upgrade_removes_mainlines_and_preserves_tasks_and_history() {
     drop(e);
     assert_eq!(Engine::open(&path).unwrap().data.version, 4);
 }
+
+#[test]
+fn formal_exam_start_rejects_running_or_paused_focus_and_accepts_idle_focus() {
+    let mut e = engine();
+    let mut data = e.snapshot(friday(7, 0)).unwrap().data;
+    let project_id = data.projects[0].id.clone();
+    data.visions.push(Vision {
+        id: "exam-vision".into(),
+        name: "考试目标".into(),
+        notes: String::new(),
+        project_id: None,
+    });
+    data.education = serde_json::from_value(serde_json::json!({
+        "projects":[{"projectId":project_id,"directory":"/tmp/exam-fixture","examMode":true,"visionId":"exam-vision","target":"模拟考试","examDate":"2026-12-25","syllabusId":"syllabus","pastPaperIds":["past"],"mockPaperIds":["mock"]}],
+        "resources":[
+            {"id":"syllabus","projectId":project_id,"title":"考纲","kind":"syllabus","path":"syllabus.pdf","source":"官方","edition":"2026","topics":["极限"]},
+            {"id":"past","projectId":project_id,"title":"真题","kind":"pastPaper","path":"past.pdf","source":"历年真题","edition":"2025","topics":["极限"]},
+            {"id":"mock","projectId":project_id,"title":"模拟题","kind":"mockPaper","path":"mock.pdf","source":"模拟卷","edition":"2026","topics":["极限"]}
+        ],
+        "semesters":[{"id":"term","projectId":project_id,"title":"基础阶段","startDate":"2026-10-01","endDate":"2026-12-01","revision":1,"baseline":"起点","evidence":["课程目录"],"rationale":"按周推进","milestones":[{"week":1,"topics":["极限"],"resourceIds":["mock"],"objective":"掌握基础","lessonCount":1}]}],
+        "lessons":[],
+        "assessments":[{"id":"exam","projectId":project_id,"semesterId":"term","semesterRevision":1,"lessonId":null,"taskId":null,"retestOfGradeId":null,"title":"模拟考试","kind":"mockExam","revision":1,"startsAt":friday(9,0),"endsAt":friday(11,0),"instructions":"独立完成","reviewEvidence":"独立复解并检查答案","questions":[{"id":"q1","prompt":"求极限","topics":["极限"],"sourceIds":["mock"],"extension":false,"estimatedMinutes":30,"answer":"1","acceptableAlternatives":"等价推导","scoring":[{"id":"p1","description":"正确使用极限法则","points":5}]}],"publishedAt":0,"printedAt":null,"startedAt":null,"stoppedAt":null}],
+        "submissions":[],"grades":[],"reviews":[],"events":[]
+    })).unwrap();
+    e.dispatch(
+        Action::Import {
+            data: Box::new(data),
+        },
+        friday(7, 1),
+    )
+    .unwrap();
+    e.dispatch(
+        Action::SaveSettings {
+            settings: Settings {
+                focus_minutes: 120,
+                ..Settings::default()
+            },
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    e.dispatch(
+        Action::Education {
+            command: serde_json::from_value(serde_json::json!({"op":"confirmPrinted","id":"exam"}))
+                .unwrap(),
+        },
+        friday(8, 10),
+    )
+    .unwrap();
+    e.dispatch(Action::StartTimer, friday(8, 15)).unwrap();
+    let running = e
+        .dispatch(
+            Action::Education {
+                command: serde_json::from_value(serde_json::json!({"op":"startExam","id":"exam"}))
+                    .unwrap(),
+            },
+            friday(9, 0),
+        )
+        .unwrap_err();
+    assert_eq!(running, "请先结束当前计时或锁机，再开始考试");
+    e.dispatch(Action::PauseTimer, friday(9, 1)).unwrap();
+    let paused = e
+        .dispatch(
+            Action::Education {
+                command: serde_json::from_value(serde_json::json!({"op":"startExam","id":"exam"}))
+                    .unwrap(),
+            },
+            friday(9, 2),
+        )
+        .unwrap_err();
+    assert_eq!(paused, "请先结束当前计时或锁机，再开始考试");
+    e.dispatch(Action::ResetTimer, friday(9, 3)).unwrap();
+    let started = e
+        .dispatch(
+            Action::Education {
+                command: serde_json::from_value(serde_json::json!({"op":"startExam","id":"exam"}))
+                    .unwrap(),
+            },
+            friday(9, 4),
+        )
+        .unwrap();
+    assert_eq!(
+        started.data.education.assessments[0].started_at,
+        Some(friday(9, 4))
+    );
+}
+
+#[test]
+fn auto_focus_stops_at_task_round_limit_but_free_focus_can_continue() {
+    let mut e = engine();
+    e.dispatch(
+        Action::SaveSettings {
+            settings: Settings {
+                focus_minutes: 1,
+                short_break_minutes: 1,
+                long_break_minutes: 1,
+                auto_focus: true,
+                auto_break: true,
+                ..Settings::default()
+            },
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    let mut task = draft();
+    task.focus_minutes = Some(1);
+    task.estimate = 2;
+    let s = e.dispatch(Action::SaveTask { task }, friday(8, 0)).unwrap();
+    let id = s.data.tasks[0].id.clone();
+    e.dispatch(
+        Action::SelectTask {
+            id: Some(id.clone()),
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    e.dispatch(Action::StartTimer, friday(8, 0)).unwrap();
+    e.snapshot(friday(8, 1)).unwrap();
+    let s = e.snapshot(friday(8, 2)).unwrap();
+    assert!(s.data.timer.running);
+    assert_eq!(s.data.timer.mode, Mode::Focus);
+    e.snapshot(friday(8, 3)).unwrap();
+    let s = e.snapshot(friday(8, 4)).unwrap();
+    assert!(!s.data.timer.running);
+    assert_eq!(s.stats.total_pomodoros, 2);
+    assert!(!s.data.tasks[0].completed);
+    e.dispatch(Action::SelectTask { id: None }, friday(8, 4))
+        .unwrap();
+    e.dispatch(Action::StartTimer, friday(8, 4)).unwrap();
+    e.snapshot(friday(8, 5)).unwrap();
+    assert!(e.snapshot(friday(8, 6)).unwrap().data.timer.running);
+}
+
+#[test]
+fn completing_task_during_rest_blocks_free_focus_continuation_after_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("rest.sqlite3");
+    let mut e = Engine::open(&path).unwrap();
+    e.dispatch(
+        Action::SaveSettings {
+            settings: Settings {
+                focus_minutes: 1,
+                short_break_minutes: 1,
+                auto_focus: true,
+                auto_break: true,
+                ..Settings::default()
+            },
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    let mut task = draft();
+    task.focus_minutes = Some(1);
+    let s = e.dispatch(Action::SaveTask { task }, friday(8, 0)).unwrap();
+    let id = s.data.tasks[0].id.clone();
+    e.dispatch(
+        Action::SelectTask {
+            id: Some(id.clone()),
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    e.dispatch(Action::StartTimer, friday(8, 0)).unwrap();
+    e.snapshot(friday(8, 1)).unwrap();
+    let s = e
+        .dispatch(Action::ToggleTask { id }, friday(8, 1) + 1)
+        .unwrap();
+    assert!(s.data.timer.task_id.is_none());
+    assert!(s.data.timer.auto_focus_blocked);
+    drop(e);
+    let mut e = Engine::open(&path).unwrap();
+    let s = e.snapshot(friday(8, 2)).unwrap();
+    assert!(!s.data.timer.running);
+    assert_eq!(s.stats.total_pomodoros, 1);
+}
+
+#[test]
+fn scheduled_start_selects_due_task_and_never_interrupts_a_paused_timer_or_lock() {
+    let mut e = engine();
+    e.dispatch(
+        Action::SaveSettings {
+            settings: Settings {
+                auto_start_tasks: true,
+                ..Settings::default()
+            },
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    let mut task = draft();
+    task.reminder_time = Some("09:00".into());
+    task.focus_minutes = Some(45);
+    let s = e.dispatch(Action::SaveTask { task }, friday(8, 0)).unwrap();
+    let id = s.data.tasks[0].id.clone();
+    e.dispatch(Action::StartTimer, friday(8, 50)).unwrap();
+    e.dispatch(Action::PauseTimer, friday(8, 51)).unwrap();
+    let s = e.snapshot(friday(9, 0)).unwrap();
+    assert!(!s.data.timer.running);
+    assert!(s.data.tasks[0].reminder_pending);
+    let s = e.dispatch(Action::ResetTimer, friday(9, 1)).unwrap();
+    assert!(s.data.timer.running);
+    assert_eq!(s.data.timer.task_id, Some(id));
+    assert_eq!(s.remaining_secs, 2700);
+    assert!(!s.data.tasks[0].reminder_pending);
+    e.dispatch(Action::ResetTimer, friday(9, 2)).unwrap();
+    assert!(!e.snapshot(friday(9, 3)).unwrap().data.timer.running);
+    let mut later = draft();
+    later.reminder_time = Some("10:00".into());
+    later.focus_minutes = Some(1);
+    later.estimate = 1;
+    e.dispatch(Action::SaveTask { task: later }, friday(9, 3))
+        .unwrap();
+    e.dispatch(
+        Action::StartQuickLock {
+            minutes: 5,
+            strict: true,
+        },
+        friday(9, 59),
+    )
+    .unwrap();
+    assert!(!e.snapshot(friday(10, 0)).unwrap().data.timer.running);
+    let s = e.snapshot(friday(10, 4)).unwrap();
+    assert!(!s.data.timer.running);
+    assert!(s.data.tasks[1].reminder_expired);
+}
+
+#[test]
+fn scheduled_task_takes_priority_over_rest_continuation_and_import_disarms_it() {
+    let mut e = engine();
+    e.dispatch(
+        Action::SaveSettings {
+            settings: Settings {
+                auto_start_tasks: true,
+                auto_break: true,
+                auto_focus: true,
+                focus_minutes: 1,
+                short_break_minutes: 1,
+                ..Settings::default()
+            },
+        },
+        friday(8, 0),
+    )
+    .unwrap();
+    let mut task = draft();
+    task.reminder_time = Some("08:02".into());
+    task.focus_minutes = Some(45);
+    let s = e.dispatch(Action::SaveTask { task }, friday(8, 0)).unwrap();
+    let id = s.data.tasks[0].id.clone();
+    e.dispatch(Action::StartTimer, friday(8, 0)).unwrap();
+    e.snapshot(friday(8, 1)).unwrap();
+    let s = e.snapshot(friday(8, 2)).unwrap();
+    assert!(s.data.timer.running);
+    assert_eq!(s.data.timer.task_id, Some(id));
+    assert_eq!(s.remaining_secs, 2700);
+    let backup: AppData = serde_json::from_str(&e.export(friday(8, 2)).unwrap()).unwrap();
+    let mut restored = engine();
+    let s = restored
+        .dispatch(
+            Action::Import {
+                data: Box::new(backup),
+            },
+            friday(8, 2),
+        )
+        .unwrap();
+    assert!(!s.data.settings.auto_start_tasks);
+    assert!(!s.data.timer.running);
+    let mut old = serde_json::to_value(AppData::default()).unwrap();
+    old["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("autoStartTasks");
+    assert!(
+        !serde_json::from_value::<AppData>(old)
+            .unwrap()
+            .settings
+            .auto_start_tasks
+    );
+}

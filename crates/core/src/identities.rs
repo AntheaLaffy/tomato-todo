@@ -61,6 +61,12 @@ fn active(data: &AppData) -> AppResult<HashMap<String, String>> {
     for x in &data.education.reviews {
         add(&x.id, "review")?;
     }
+    for x in &data.education.progress {
+        add(&x.id, "progress")?;
+    }
+    for x in &data.education.corrections {
+        add(&x.id, "correction")?;
+    }
 
     Ok(ids)
 }
@@ -180,6 +186,8 @@ pub(crate) fn validate(data: &AppData) -> AppResult<()> {
                 "submission",
                 "grade",
                 "review",
+                "progress",
+                "correction",
             ]
             .contains(&record.kind.as_str())
         {

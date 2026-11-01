@@ -29,7 +29,8 @@
       "whitelist": [],
       "strict": false
     },
-    "soundVolume": 100
+    "soundVolume": 100,
+    "autoStartTasks": false
   },
   "timer": {
     "mode": "focus",
@@ -42,7 +43,8 @@
     "cycle": 0,
     "cycleDate": null,
     "completionSerial": 0,
-    "lastFinishedMode": null
+    "lastFinishedMode": null,
+    "autoFocusBlocked": false
   },
   "sessions": [
     {
@@ -137,6 +139,9 @@
     "submissions": [],
     "grades": [],
     "reviews": [],
-    "events": []
+    "events": [],
+    "completedTasks": [],
+    "progress": [],
+    "corrections": []
   }
 }

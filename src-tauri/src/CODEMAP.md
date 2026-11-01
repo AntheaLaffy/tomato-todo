@@ -14,7 +14,8 @@ generated_at: 2026-10-10
 | desktop_app.rs | 桌面 | 命令桥接、通知、单实例、任务提醒唤回、计时阶段结束唤回窗口、高亮、定时唤回锁机、严格保护与故障释放；驱动专注提示音抑制；学习助手 IPC 与 agent-wake 事件，应用待审阅文件前校验来源指纹 |
 | desktop.rs | 桌面 | 托盘菜单、桌面偏好、Linux XDG 与 Windows/macOS 原生自启动、平台配置目录、隐藏/原生激活重试、Windows 左键打开及 Linux 托盘宿主失联恢复 |
 | focus_audio.rs | 声音 / 桌面 | Linux 通过 pactl 监听并静音通知角色与聊天应用播放流，暂停/结束/退出时恢复进入专注前的静音状态；其他平台当前为空实现 |
+| resources.rs | 桌面资料 | 按资源ID复核本机授权，系统保存对话框后从原件流式复制，用系统应用打开大文件；仅桌面宿主注册 |
 | files.rs | 文件桥接 | 系统选择器导入/导出计划与备份，以及保存助手附件/Markdown；阻塞线程池等待用户选择，桌面路径与 Android SAF URI 分别写入 |
 | mobile.rs | Android | 本地核心 IPC、SQLite 恢复与计时轮询；尚未接入系统保护、后台服务和 Pi 运行时，开启保护前明确失败 |
 
-共享核心接口核对：Action/Snapshot携带普通任务和独立education教学记录；计划v6、备份v4。手动dispatch拒绝助手专属教学操作；目录选择通过原生选择器，实际授权由Agent私有存储管理。考试到点提醒与已有桌面通知共用宿主循环，不自动开启桌面保护。
+共享核心接口核对：Action/Snapshot携带普通任务、按证据推导的项目学情摘要和独立education教学记录；计划v6、备份v4。桌面保护预检覆盖autoFocus与autoStartTasks。手动dispatch拒绝助手专属教学操作；目录选择通过原生选择器，实际授权由Agent私有存储管理。考试到点提醒与已有桌面通知共用宿主循环，不自动开启桌面保护。

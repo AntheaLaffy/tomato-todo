@@ -300,6 +300,8 @@ pub fn run() {
             files::read_import,
             files::save_agent_file,
             files::choose_project_directory,
+            crate::resources::save_project_resource,
+            crate::resources::open_project_resource,
             crate::platform_kind,
             desktop::desktop_status,
             desktop::save_desktop_settings,
