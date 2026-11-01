@@ -17,7 +17,7 @@ generated_at: 2026-10-09
 | check-android-apk.py | 构建 | 校验 universal APK 的四个原生 ABI、ELF 架构和桌面 Node 资源排除；供本机原生测试和 CI 共用 |
 | publish-aur.mjs | 发布   | 下载发行 tarball、动态计算 sha256、由 packaging/aur 模板渲染 PKGBUILD/.SRCINFO；`--push` 时提交并推送到 AUR |
 | handbook-tests.py | 维护 | 人工章节→测试映射，采集 Rust/Node 用例与脚本断言，生成 95 测试索引并同步章节页眉 |
-| handbook-paths.py | 维护 | 汇总关键文件与事实出处，生成 04 导航附录的阅读入口和调用链 |
+| handbook-paths.py | 维护 | 汇总关键文件与事实出处，生成 04 导航附录的阅读入口和调用链；排除本机维护记录及构建目录 |
 | handbook-stats.py | 维护 | 采集源码/文档规模、版本、Git 状态与测试入口，生成 01 规模盘点 |
 | handbook-backlog.py | 维护 | 从各章节 F 段采集待补项，生成 90 待补清单 |
 | check-handbook.py | 维护 | 检查手册结构、版本、出处、措辞、隐私与章节体量 |

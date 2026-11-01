@@ -2372,8 +2372,9 @@ fn formal_exam_start_rejects_running_or_paused_focus_and_accepts_idle_focus() {
         notes: String::new(),
         project_id: None,
     });
+    let directory = std::env::temp_dir().join("exam-fixture");
     data.education = serde_json::from_value(serde_json::json!({
-        "projects":[{"projectId":project_id,"directory":"/tmp/exam-fixture","examMode":true,"visionId":"exam-vision","target":"模拟考试","examDate":"2026-12-25","syllabusId":"syllabus","pastPaperIds":["past"],"mockPaperIds":["mock"]}],
+        "projects":[{"projectId":project_id,"directory":directory,"examMode":true,"visionId":"exam-vision","target":"模拟考试","examDate":"2026-12-25","syllabusId":"syllabus","pastPaperIds":["past"],"mockPaperIds":["mock"]}],
         "resources":[
             {"id":"syllabus","projectId":project_id,"title":"考纲","kind":"syllabus","path":"syllabus.pdf","source":"官方","edition":"2026","topics":["极限"]},
             {"id":"past","projectId":project_id,"title":"真题","kind":"pastPaper","path":"past.pdf","source":"历年真题","edition":"2025","topics":["极限"]},

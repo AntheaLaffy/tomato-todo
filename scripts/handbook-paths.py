@@ -92,7 +92,7 @@ def symbols(path: pathlib.Path, cap: int | None = None) -> list[str]:
 
 def repo_index() -> dict[str, list[pathlib.Path]]:
     """文件名 → 仓库里的真实路径（用于把 A 表里的简写补全）。"""
-    skip = {"node_modules", "target", "dist", "bundle", "gen", ".git", "artifacts"}
+    skip = {"node_modules", "target", "dist", "bundle", "gen", ".git", "artifacts", ".project-maintenance"}
     index: dict[str, list[pathlib.Path]] = {}
     for p in ROOT.rglob("*"):
         if not p.is_file() or p.suffix not in (".rs", ".ts", ".mjs", ".py", ".css", ".json"):
@@ -109,7 +109,7 @@ INDEX: dict[str, list[pathlib.Path]] = {}
 def resolve(candidate: str) -> str | None:
     """把 A 表里的路径（可能是 `reminders.rs` 这种简写）补成仓库里的真实相对路径。"""
     candidate = candidate.strip().strip("`")
-    if candidate.startswith(("docs/HANDBOOK", "artifacts/")) or candidate in ("同上", "—", "-"):
+    if candidate.startswith(("docs/HANDBOOK", "artifacts/", ".project-maintenance/")) or candidate in ("同上", "—", "-"):
         return None
     direct = ROOT / candidate
     if direct.is_file():
