@@ -27,9 +27,9 @@ Rust 保持应用权限与文件边界，Pi 工作进程负责会话与模型调
 | conversations.rs | 对话 | 全文/标题/附件名搜索、重命名/置顶/归档恢复，调用 Pi 从真实节点创建分支并重发编辑或重试请求 |
 | attachments.rs | 对话 | 私有文件上传/下载、大小/文件名/签名/符号链接校验，以及消息附件到模型图片的转换 |
 | state.rs | 状态 | Preferences（含本机 networkProxy 校验）、Persona 人格卡与预设、Memory、完整消息/思考内容/附件引用/Canvas 文档版本/置顶/归档/作者模式/分支来源/对话人格、Schedule 与原子私有写入 |
-| bridge.rs | 桥接 | 127.0.0.1 的私有认证桥与标准无会话 Streamable HTTP，版本协商、通知202/无SSE GET405，拒绝浏览器 Origin |
-| external.rs | 外部接管 | MCP tools/resources/prompts、技能用途发现与参考URI、完整教学分页、显式暂停/归还内置自动执行，复用现有业务权限 |
+| bridge.rs | 桥接 | 127.0.0.1 的私有认证桥与标准无会话 Streamable HTTP，版本协商、通知202/无SSE GET405，拒绝浏览器 Origin；旧 `/call` 也走外部工具授权 |
+| external.rs | 外部接管 | MCP tools/resources/prompts、技能用途发现与参考URI、完整教学分页、显式暂停/归还内置自动执行；调用时复核外部工具清单 |
 | files.rs | 文件契约 | 工作区导出/分段读取/补丁/审阅/应用，来源与文件哈希并发校验 |
-| tools.rs | 契约 | 内嵌与外部工具定义及允许集合；角色背景板沿用 get_snapshot/dispatch 修改设置，自动唤醒不暴露直接改数据的工具 |
+| tools.rs | 契约 | 内嵌与外部工具定义及允许集合；自动唤醒不暴露直接改数据的工具，外部 MCP 不声明应用内对话的提问与计划工具；角色背景板沿用 get_snapshot/dispatch 修改设置 |
 | worker.rs | 运行时 | Node 启动、应用内代理/环境/GIO/手动桌面代理优先级、平台可执行文件、行协议及预期重启标记 |
 | tests.rs | 验证 | 权限、记忆、文件原子性/来源冲突、唤醒、附件私有保存、完整历史与分支、SDK 节点与停止状态；功能索引见 tests.rs.analysis.md |

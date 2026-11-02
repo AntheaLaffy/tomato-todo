@@ -228,6 +228,7 @@ export interface Education {
   }[];
 }
 let educationPanelView: "student" | "teacher" = "student";
+let educationProjectId: string | null = null;
 const esc = (s: unknown) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -614,27 +615,21 @@ function teacherDashboard(
 }
 export function educationDashboard(snapshot: Snapshot): string {
   const e = snapshot.data.education;
-  const projects = e.projects.filter(
-    (study) =>
-      study.examMode &&
-      snapshot.data.projects.some((p) => p.id === study.projectId),
+  const projects = snapshot.data.projects.filter((project) =>
+    e.projects.some(
+      (study) => study.examMode && study.projectId === project.id,
+    ),
+  );
+  const active =
+    projects.find((p) => p.id === educationProjectId) || projects[0];
+  const study = e.projects.find((p) => p.projectId === active?.id);
+  const summary = snapshot.studyProgress?.find(
+    (item) => item.projectId === active?.id,
   );
   const view = educationPanelView;
   return `<div class="education-dashboard"><div class="page-heading"><div><div class="eyebrow">应试学习</div><h1>应试教育</h1><p>学习进度、课程安排、作业与测评集中在这里。</p></div><div class="education-view-switch" role="group" aria-label="面板视图"><button type="button" data-education-view="student" aria-pressed="${view === "student"}" class="${view === "student" ? "active" : ""}">学生端</button><button type="button" data-education-view="teacher" aria-pressed="${view === "teacher"}" class="${view === "teacher" ? "active" : ""}">教师端</button></div></div>${
-    projects.length
-      ? projects
-          .map((study) => {
-            const project = snapshot.data.projects.find(
-              (p) => p.id === study.projectId,
-            )!;
-            const summary = snapshot.studyProgress?.find(
-              (item) => item.projectId === project.id,
-            );
-            return view === "student"
-              ? studentDashboard(snapshot, project, study, summary)
-              : teacherDashboard(snapshot, project, study, summary);
-          })
-          .join("")
+    active && study
+      ? `${projects.length > 1 ? `<nav class="education-project-nav" aria-label="应试项目">${projects.map((p) => `<button type="button" data-education-project="${esc(p.id)}" aria-current="${p.id === active.id ? "page" : "false"}" class="${p.id === active.id ? "active" : ""}">${esc(p.name)}</button>`).join("")}</nav>` : ""}${view === "student" ? studentDashboard(snapshot, active, study, summary) : teacherDashboard(snapshot, active, study, summary)}`
       : `<section class="education-dashboard-empty"><h2>还没有应试学习项目</h2><p>在项目中授权资料目录，再配置考纲、目标和课程资源。</p><button class="button primary" data-action="new-project">新建应试项目</button></section>`
   }</div>`;
 }
@@ -653,9 +648,6 @@ export function educationCard(snapshot: Snapshot, project: Project): string {
   const summary = snapshot.studyProgress?.find(
     (s) => s.projectId === project.id,
   );
-  const lessons = e.lessons
-    .filter((l) => l.projectId === project.id)
-    .sort((a, b) => a.startsAt - b.startsAt);
   const assessments = e.assessments
     .filter((a) => a.projectId === project.id)
     .sort((a, b) => b.startsAt - a.startsAt);
@@ -693,14 +685,6 @@ export function educationCard(snapshot: Snapshot, project: Project): string {
      .join("") || "<p>请让助手核对考纲、资源和学情后制定学期计划。</p>"
  }</details>
  <p>今日全科作业供给：${minutes} 分钟（估时）。默认晚自习19:00–22:00；固定课程计入学习负荷，作业按实际可用时间调整。</p>
- <details open><summary>课程 ${lessons.length} · 每节45分钟</summary>${
-   lessons
-     .map(
-       (l) =>
-         `<article class="study-row"><strong>${esc(l.title)}</strong><p>${when(l.startsAt)} — ${when(l.endsAt)} · ${esc({ planned: "待上课", active: "上课中", ended: "已下课", missed: "缺课" }[l.state] || l.state)} · ${esc(l.topics.join("、"))}</p>${l.state === "active" ? `<button class="button secondary small-button" data-attend-lesson="${esc(l.id)}">${l.attended ? "更新学习进度" : "确认参与课程"}</button>` : ""}<p>${esc(l.progress)}</p>${resourceLinks(l.resourceIds, e.resources, "课程资料")}</article>`,
-     )
-     .join("") || "<p>暂无课程。</p>"
- }</details>
  <details open><summary>作业与考试 ${assessments.length}</summary>${
    assessments
      .map((a) => {
@@ -763,8 +747,12 @@ export function openTeachingTask(
     const lesson = snapshot.data.education.lessons.find(
       (l) => l.id === link.sourceId,
     )!;
+    const canAssign =
+      lesson.state === "planned" &&
+      !lesson.attended &&
+      lesson.startsAt > snapshot.serverTime;
     hooks.modal(
-      `<h2 id="modal-title">${esc(lesson.title)}</h2><p>${when(lesson.startsAt)} — ${when(lesson.endsAt)}</p><p>${esc(lesson.topics.join("、"))}</p><p>${esc(lesson.progress || "具体学习位置尚未记录")}</p>${resourceLinks(lesson.resourceIds, snapshot.data.education.resources, "课程资料")}<p data-explanation>从今日待办选择课程即可使用番茄钟；勾选完成会记录本人确认的课程参与，掌握情况仍需练习与复测。</p><div class="modal-actions">${snapshot.serverTime >= lesson.startsAt && snapshot.serverTime < lesson.endsAt ? `<button class="button secondary" data-attend-lesson="${esc(lesson.id)}">记录学习进度</button>` : ""}<button class="button secondary" data-action="close-modal">返回今日专注</button></div>`,
+      `<h2 id="modal-title">${esc(lesson.title)}</h2><p>${when(lesson.startsAt)} — ${when(lesson.endsAt)}</p><p>${esc(lesson.topics.join("、"))}</p><p>${esc(lesson.progress || "具体学习位置尚未记录")}</p>${resourceLinks(lesson.resourceIds, snapshot.data.education.resources, "课程资料")}${canAssign ? `<button class="button secondary small-button" data-lesson-resources="${esc(lesson.id)}">指定课程资料</button>` : ""}<p data-explanation>从任务列表选择课程即可使用番茄钟；勾选完成会记录本人确认的课程参与，掌握情况仍需练习与复测。</p><div class="modal-actions">${snapshot.serverTime >= lesson.startsAt && snapshot.serverTime < lesson.endsAt ? `<button class="button secondary" data-attend-lesson="${esc(lesson.id)}">记录学习进度</button>` : ""}<button class="button secondary" data-action="close-modal">返回任务列表</button></div>`,
     );
     mountEducation(snapshot, hooks);
   }
@@ -843,6 +831,15 @@ export function mountEducation(
   bind("[data-open-assessment]", async (el) =>
     openAssessment(snapshot, el.dataset.openAssessment!, hooks),
   );
+  bind("[data-education-project]", async (el) => {
+    educationProjectId = el.dataset.educationProject!;
+    hooks.refresh();
+    document
+      .querySelector<HTMLElement>(
+        `[data-education-project="${CSS.escape(educationProjectId)}"]`,
+      )
+      ?.focus();
+  });
   document
     .querySelectorAll<HTMLElement>("[data-education-view]")
     .forEach((el) => {
@@ -886,6 +883,58 @@ export function mountEducation(
       `请读取 exam-teaching 技能，为项目 ${el.dataset.teachingRequest} 核对愿景、考纲、真题、模拟题和资源。结合学情与联网查证的同科目经验，制定有依据的学期进度并安排课程、周末周考。跨项目每天上午4节、下午2至4节，每节45分钟；19–22点为晚自习，固定课程计入当晚学习负荷并减少作业；按get_study_progress中的最新实际学情备课，复盘时间服从我的作息。缺少条件先向我补齐。`,
     ),
   );
+  bind("[data-lesson-resources]", async (el) => {
+    const lesson = snapshot.data.education.lessons.find(
+      (l) => l.id === el.dataset.lessonResources,
+    )!;
+    const resources = snapshot.data.education.resources.filter(
+      (r) => r.projectId === lesson.projectId,
+    );
+    hooks.modal(
+      `<h2 id="modal-title">指定课程资料 · ${esc(lesson.title)}</h2><p>从本项目已登记的资料中选择。开课后资料保留历史，不能修改。</p><form id="lesson-resources-form">${resources.length ? `<div class="lesson-resource-choices">${resources.map((r) => `<label><input type="checkbox" name="resourceIds" value="${esc(r.id)}" ${lesson.resourceIds.includes(r.id) ? "checked" : ""}>${esc(r.title)} · ${esc(kinds[r.kind] || r.kind)}</label>`).join("")}</div>` : `<p>本项目暂无资料，请先在项目资料库导入或登记。</p>`}<div class="modal-actions"><button type="button" class="button secondary" id="lesson-resources-cancel">返回课程</button><button type="submit" class="button primary" ${resources.length ? "" : "disabled"}>保存指定资料</button></div></form>`,
+    );
+    document.getElementById("lesson-resources-cancel")!.onclick = () =>
+      openTeachingTask(
+        snapshot,
+        snapshot.data.education.focusTasks!.find(
+          (link) => link.sourceId === lesson.id && link.kind === "lesson",
+        )!.taskId,
+        hooks,
+      );
+    const form = document.querySelector<HTMLFormElement>(
+      "#lesson-resources-form",
+    )!;
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      if (form.dataset.saving) return;
+      void run(async () => {
+        form.dataset.saving = "true";
+        const button = form.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        )!;
+        button.disabled = true;
+        try {
+          const next = await dispatch({
+            type: "education",
+            command: {
+              op: "setLessonResources",
+              id: lesson.id,
+              resourceIds: new FormData(form).getAll("resourceIds"),
+            },
+          });
+          hooks.accept(next);
+          const link = next.data.education.focusTasks?.find(
+            (item) => item.sourceId === lesson.id && item.kind === "lesson",
+          );
+          if (link) openTeachingTask(next, link.taskId, hooks);
+          hooks.toast("课程资料已指定");
+        } finally {
+          delete form.dataset.saving;
+          button.disabled = false;
+        }
+      });
+    };
+  });
   bind("[data-attend-lesson]", async (el) => {
     const progress = prompt("记录当前学习进度（下课后仍以实际进度为准）");
     if (progress !== null)

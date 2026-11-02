@@ -147,7 +147,7 @@ MCP 使用标准换行 JSON-RPC stdio，不启动第二份数据库。它连接�
 
 安装后可直接配置命令 `tomato-todo --mcp`，默认寻找本用户的连接文件；自定义数据库或数据目录时显式传 `--connection`。同一端口还提供标准 Streamable HTTP：读取私有 `connection.json` 的 `mcpUrl`，以 `Authorization: Bearer <token>` 连接 `/mcp`。这是无会话的JSON响应实现，通知返回202；不提供SSE订阅，GET返回405。端口和令牌随软件重启更新，stdio每次调用重读连接文件，适合稳定的本机客户端配置。传输遵循 [MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)，同时接受2025-06-18与2025-03-26；令牌不出现在状态接口或示例中。
 
-外部Agent使用与内置助手相同的业务工具与技能，不需要内置模型登录。`resources/list` 可发现接管指南 `tomato://guide` 和各技能入口；`resources/templates/list` 提供 `tomato://skills/{name}/{+reference}`，可读契约、参考文档和脚本；`prompts/get(name="take-over", arguments={task: ...})` 提供接管提示词。没有MCP资源界面的客户端也可用 `list_skills` 取得名称、用途与URI，再 `read_skill` 按需加载。仅限当前SDK轮次的图像生成与作者彩蛋不列入外部工具清单。
+外部Agent使用与内置助手相同的业务工具与技能，不需要内置模型登录。仅服务于应用内对话卡片的 `update_plan`、`request_user_input` 不在外部 MCP 清单中：外部 Pi 自己维护计划和提问，不应把它们误送到番茄 Todo 的聊天面板；即便绕过清单直接调用，也会被拒绝。`resources/list` 可发现接管指南 `tomato://guide` 和各技能入口；`resources/templates/list` 提供 `tomato://skills/{name}/{+reference}`，可读契约、参考文档和脚本；`prompts/get(name="take-over", arguments={task: ...})` 提供接管提示词。没有MCP资源界面的客户端也可用 `list_skills` 取得名称、用途与URI，再 `read_skill` 按需加载。仅限当前SDK轮次的图像生成与作者彩蛋不列入外部工具清单。
 
 接管先 `get_control_status` 与 `get_context`，按需 `get_tasks`、`get_study_progress`、`get_education`。后者按 `collection/projectId/id/offset/limit` 分页提供完整教学记录，集合为projects/resources/semesters/semesterHistory/lessons/assessments/submissions/grades/reviews/events/completedTasks/progress/corrections/focusTasks。教学的创建、发布、提交与批改走 `education`，课程/作业自动进入今日专注，不额外建一份任务。
 

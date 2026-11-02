@@ -138,6 +138,16 @@ impl Agent {
         )
     }
 
+    pub(crate) fn call_external(self: &Arc<Self>, name: &str, args: &Value) -> AppResult<Value> {
+        if !crate::tools::external_definitions()
+            .iter()
+            .any(|tool| tool["name"] == name)
+        {
+            return Err("外部 MCP 工具未授权".into());
+        }
+        self.call(name, args, false)
+    }
+
     pub(crate) fn mcp_method(self: &Arc<Self>, method: &str, params: &Value) -> AppResult<Value> {
         match method {
             "initialize" => Ok(
@@ -148,10 +158,9 @@ impl Agent {
             "ping" => Ok(json!({})),
             "tools/list" => Ok(json!({"tools":crate::tools::external_definitions()})),
             "tools/call" => {
-                match self.call(
+                match self.call_external(
                     params["name"].as_str().unwrap_or_default(),
                     &params["arguments"],
-                    false,
                 ) {
                     Ok(value) => {
                         let mut result = json!({"content":[{"type":"text","text":serde_json::to_string(&value).map_err(|e|e.to_string())?}]});

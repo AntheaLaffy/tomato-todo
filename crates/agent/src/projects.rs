@@ -45,6 +45,144 @@ impl Agent {
                 && fs::canonicalize(&g.directory).is_ok_and(|p| p == g.directory))
             .collect::<Vec<_>>()))
     }
+    pub(crate) fn rename_project_directory(self: &Arc<Self>, args: &Value) -> AppResult<Value> {
+        let _workspace = self.workspace_lock.lock().map_err(|e| e.to_string())?;
+        if self.inner.lock().map_err(|e| e.to_string())?.live.busy {
+            return Err("请先停止助手，再重命名项目资料目录".into());
+        }
+        let id = args["projectId"].as_str().ok_or("缺少项目 ID")?;
+        let name = args["name"].as_str().ok_or("缺少项目名称")?.trim();
+        let color = args["color"].as_str().ok_or("缺少项目颜色")?;
+        if name.is_empty()
+            || name.chars().count() > 40
+            || name == "."
+            || name == ".."
+            || name.ends_with([' ', '.'])
+            || name
+                .chars()
+                .any(|c| c.is_control() || "/\\<>:\"|?*".contains(c))
+            || matches!(
+                name.split('.')
+                    .next()
+                    .unwrap_or("")
+                    .to_ascii_uppercase()
+                    .as_str(),
+                "CON"
+                    | "PRN"
+                    | "AUX"
+                    | "NUL"
+                    | "COM1"
+                    | "COM2"
+                    | "COM3"
+                    | "COM4"
+                    | "COM5"
+                    | "COM6"
+                    | "COM7"
+                    | "COM8"
+                    | "COM9"
+                    | "LPT1"
+                    | "LPT2"
+                    | "LPT3"
+                    | "LPT4"
+                    | "LPT5"
+                    | "LPT6"
+                    | "LPT7"
+                    | "LPT8"
+                    | "LPT9"
+            )
+        {
+            return Err("项目名称不能作为安全的文件夹名称".into());
+        }
+        let snapshot = self
+            .engine
+            .lock()
+            .map_err(|e| e.to_string())?
+            .snapshot(tomato_core::now())?;
+        let project = snapshot
+            .data
+            .projects
+            .iter()
+            .find(|p| p.id == id)
+            .ok_or("项目不存在")?;
+        if name == project.name {
+            return serde_json::to_value((self.apply)(
+                Action::SaveProject {
+                    id: Some(id.into()),
+                    name: name.into(),
+                    color: color.into(),
+                    directory: None,
+                },
+                None,
+            )?)
+            .map_err(|e| e.to_string());
+        }
+        let profile = snapshot
+            .data
+            .education
+            .projects
+            .iter()
+            .find(|p| p.project_id == id)
+            .ok_or("项目没有绑定资料目录")?;
+        let mut grants = self.grants()?;
+        let grant_index = grants
+            .iter()
+            .position(|g| g.project_id == id)
+            .ok_or("项目资料目录未授权，请先在项目页重新授权")?;
+        let old = grants[grant_index].directory.clone();
+        if Path::new(&profile.directory) != old
+            || !old.is_dir()
+            || fs::canonicalize(&old).map_err(|e| e.to_string())? != old
+        {
+            return Err("项目资料目录已失联，请先重新授权现有资料目录".into());
+        }
+        let parent = old.parent().ok_or("资料目录没有父目录")?;
+        let target = parent.join(name);
+        if target != old && fs::symlink_metadata(&target).is_ok() {
+            return Err("目标资料目录已经存在，不会覆盖；请换一个项目名称".into());
+        }
+        let action = || Action::RenameProjectDirectory {
+            id: id.into(),
+            name: name.into(),
+            color: color.into(),
+            directory: target.to_string_lossy().into_owned(),
+        };
+        self.engine
+            .lock()
+            .map_err(|e| e.to_string())?
+            .preview_action(action(), tomato_core::now())?;
+        if target != old {
+            fs::rename(&old, &target).map_err(|e| format!("重命名资料目录失败：{e}"))?;
+        }
+        grants[grant_index].directory = target.clone();
+        let grants_file = self.dir.join("project-grants.json");
+        if let Err(e) = atomic_json(&grants_file, &grants) {
+            if target != old {
+                fs::rename(&target, &old).map_err(|rollback| {
+                    format!(
+                        "授权保存失败：{e}；目录回退失败：{rollback}，资料仍在 {}",
+                        target.display()
+                    )
+                })?;
+            }
+            return Err(format!("授权保存失败，目录已回退：{e}"));
+        }
+        match (self.apply)(action(), None) {
+            Ok(snapshot) => serde_json::to_value(snapshot).map_err(|e| e.to_string()),
+            Err(e) => {
+                grants[grant_index].directory = old.clone();
+                let grant_error = atomic_json(&grants_file, &grants).err();
+                let directory_error = if target != old {
+                    fs::rename(&target, &old).err()
+                } else {
+                    None
+                };
+                if grant_error.is_some() || directory_error.is_some() {
+                    return Err(format!("项目保存失败：{e}；回退不完整：授权 {grant_error:?}，目录 {directory_error:?}；资料位于 {}，请重新授权，不要重新导入", if directory_error.is_some() { target.display() } else { old.display() }));
+                }
+                Err(format!("项目保存失败，目录及授权已回退：{e}"))
+            }
+        }
+    }
     /// Only called by the user's settings request, never registered as an AI tool.
     pub(crate) fn authorize_project(self: &Arc<Self>, args: &Value) -> AppResult<Value> {
         let _lock = self.workspace_lock.lock().map_err(|e| e.to_string())?;

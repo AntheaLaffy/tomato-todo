@@ -5734,6 +5734,30 @@ html[data-compact-mode="true"]
   color: var(--accent);
   box-shadow: 0 1px 4px #00000012;
 }
+.education-project-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: thin;
+}
+.education-project-nav button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--secondary);
+  white-space: nowrap;
+}
+.education-project-nav button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
 .education-dashboard-project,
 .education-dashboard-empty {
   min-width: 0;

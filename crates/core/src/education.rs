@@ -256,6 +256,11 @@ pub enum Command {
     SaveLesson {
         lesson: Lesson,
     },
+    SetLessonResources {
+        id: String,
+        #[serde(rename = "resourceIds")]
+        resource_ids: Vec<String>,
+    },
     AttendLesson {
         id: String,
         progress: String,
@@ -664,6 +669,32 @@ impl Education {
                 lesson.state = LessonState::Planned;
                 lesson.attended = false;
                 save!(lessons, lesson, id);
+            }
+            Command::SetLessonResources { id, resource_ids } => {
+                let lesson = self
+                    .lessons
+                    .iter_mut()
+                    .find(|l| l.id == id)
+                    .ok_or("课程不存在")?;
+                check(
+                    lesson.state == LessonState::Planned
+                        && !lesson.attended
+                        && lesson.starts_at > at,
+                    "课程已开始，不能修改指定资料",
+                )?;
+                check(
+                    resource_ids.iter().all(|id| {
+                        self.resources
+                            .iter()
+                            .any(|r| r.id == *id && r.project_id == lesson.project_id)
+                    }),
+                    "只能指定本项目登记的资料",
+                )?;
+                check(
+                    resource_ids.iter().collect::<HashSet<_>>().len() == resource_ids.len(),
+                    "课程资料不能重复指定",
+                )?;
+                lesson.resource_ids = resource_ids;
             }
             Command::AttendLesson { id, progress } => {
                 let l = self

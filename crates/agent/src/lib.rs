@@ -211,6 +211,7 @@ impl Agent {
             }
             "status" => self.status(),
             "authorize_project_directory" => self.authorize_project(&args),
+            "rename_project_directory" => self.rename_project_directory(&args),
             "project_resource_info" => self.resource_info(&args),
             "preview_project_resource" => self.preview_resource(&args),
             "scan_project_resources" => self.scan_resources(&args),

@@ -93,10 +93,9 @@ async fn call(
     let result = if args["method"] == "tools/list" {
         Ok(json!({"tools":crate::tools::external_definitions()}))
     } else if args["method"] == "tools/call" {
-        agent.call(
+        agent.call_external(
             args["name"].as_str().unwrap_or_default(),
             &args["arguments"],
-            false,
         )
     } else {
         agent.mcp_method(args["method"].as_str().unwrap_or_default(), &args)

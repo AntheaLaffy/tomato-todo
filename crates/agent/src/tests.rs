@@ -755,6 +755,43 @@ fn questions_take_multi_select_and_a_real_approve_label() {
     assert!(ask(json!([{"id":"x","header":"确认","question":"？","options":[{"label":"only one","description":""}]}])).is_err());
 }
 #[test]
+fn external_mcp_excludes_in_app_ui_controls_and_cannot_call_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    let external = crate::tools::external_definitions();
+    let names = external
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(names.len(), external.len(), "external tools must be unique");
+    for name in ["update_plan", "request_user_input", "generate_image"] {
+        assert!(!names.contains(name), "{name} is an in-app control");
+    }
+    for name in ["get_tasks", "education", "set_external_control"] {
+        assert!(names.contains(name), "{name} should remain external");
+    }
+    let plan = json!({"plan":[{"step":"外部不应显示","status":"in_progress"}]});
+    assert_eq!(
+        agent.call_external("update_plan", &plan).unwrap_err(),
+        "外部 MCP 工具未授权"
+    );
+    assert!(agent.status().unwrap()["plan"].is_null());
+    let result = agent
+        .mcp_method(
+            "tools/call",
+            &json!({"name":"request_user_input","arguments":{
+                "questions":[{"id":"x","header":"确认","question":"同意？","options":[
+                    {"label":"同意","description":"应用"},{"label":"稍后","description":"等待"}
+                ]}]
+            }}),
+        )
+        .unwrap();
+    assert_eq!(result["isError"], true);
+    assert!(agent.status().unwrap()["questions"].is_null());
+    assert!(agent.call_external("get_tasks", &json!({})).is_ok());
+}
+
+#[test]
 fn only_a_user_request_may_edit_mcp_servers_and_course_blocks() {
     let names = |agent: bool| {
         crate::tools::definitions(agent)
@@ -1484,6 +1521,75 @@ fn project_directories_need_local_grants_and_chat_uploads_are_project_resources(
             json!({"op":"upload_attachment","projectId":id,"name":"outside.txt","data":"aGVsbG8="})
         )
         .is_err());
+}
+
+#[test]
+fn renaming_a_project_moves_its_directory_without_changing_resource_ids() {
+    let root = tempfile::tempdir().unwrap();
+    let directory = root.path().join("old-folder");
+    std::fs::create_dir(&directory).unwrap();
+    let agent_dir = tempfile::tempdir().unwrap();
+    let agent = service(agent_dir.path(), Arc::new(AtomicUsize::new(0)));
+    let initial = agent.request(json!({"op":"authorize_project_directory","directory":directory,"name":"原名称","color":"#849b7d"})).unwrap();
+    let id = initial["data"]["education"]["projects"][0]["projectId"]
+        .as_str()
+        .unwrap();
+    let uploaded = agent
+        .request(
+            json!({"op":"upload_attachment","projectId":id,"name":"notes.txt","data":"aGVsbG8="}),
+        )
+        .unwrap();
+    let resource_id = uploaded["id"].as_str().unwrap();
+    let target = root.path().join("新名称");
+    let renamed = agent.request(json!({"op":"rename_project_directory","projectId":id,"name":"新名称","color":"#849b7d"})).unwrap();
+    assert!(!directory.exists());
+    assert_eq!(
+        renamed["data"]["projects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == id)
+            .unwrap()["name"],
+        "新名称"
+    );
+    assert_eq!(
+        renamed["data"]["education"]["projects"][0]["directory"],
+        target.to_str().unwrap()
+    );
+    assert_eq!(
+        renamed["data"]["education"]["resources"][0]["id"],
+        resource_id
+    );
+    assert_eq!(
+        agent.project_mounts().unwrap()[0]["directory"],
+        target.to_str().unwrap()
+    );
+    assert_eq!(
+        std::fs::read_to_string(
+            agent
+                .project_path(id, "attachments")
+                .unwrap()
+                .join(resource_id)
+                .join("notes.txt")
+        )
+        .unwrap(),
+        "hello"
+    );
+    assert_eq!(
+        agent
+            .request(json!({"op":"project_resource_info","resourceId":resource_id}))
+            .unwrap()["name"],
+        "notes.txt"
+    );
+    let collision = root.path().join("occupied");
+    std::fs::create_dir(&collision).unwrap();
+    assert!(agent.request(json!({"op":"rename_project_directory","projectId":id,"name":"occupied","color":"#849b7d"})).is_err());
+    assert!(target.exists());
+    assert!(agent.request(json!({"op":"rename_project_directory","projectId":id,"name":"../outside","color":"#849b7d"})).is_err());
+    assert_eq!(
+        agent.project_mounts().unwrap()[0]["directory"],
+        target.to_str().unwrap()
+    );
 }
 
 #[cfg(unix)]

@@ -203,14 +203,17 @@ pub fn definitions(agent: bool) -> Vec<Value> {
     list
 }
 
-/// These operations need a live SDK turn rather than an external app client.
+/// UI-only controls need a live assistant turn; external MCP clients own their
+/// own questions and plans instead of writing to the in-app chat panel.
 pub fn external_definitions() -> Vec<Value> {
     definitions(false)
         .into_iter()
         .filter(|tool| {
             !matches!(
                 tool["name"].as_str(),
-                Some("generate_image" | "enable_creator_mode")
+                Some(
+                    "generate_image" | "enable_creator_mode" | "request_user_input" | "update_plan"
+                )
             )
         })
         .collect()

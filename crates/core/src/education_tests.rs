@@ -183,6 +183,51 @@ fn scheduled_lessons_materialize_once_and_updates_keep_the_same_focus_task() {
 }
 
 #[test]
+fn course_resources_can_be_assigned_only_before_class_from_same_project() {
+    let mut data = fixture();
+    let request = lesson(&data, "resources-lesson", at(2, 8, 30));
+    command(&mut data, request, at(1, 8, 0)).unwrap();
+    let task_id = data.education.focus_tasks[0].task_id.clone();
+    let set =
+        |ids: &[&str]| json!({"op":"setLessonResources","id":"resources-lesson","resourceIds":ids});
+    command(&mut data, set(&["past", "syllabus"]), at(1, 8, 1)).unwrap();
+    assert_eq!(
+        data.education.lessons[0].resource_ids,
+        vec!["past", "syllabus"]
+    );
+    assert_eq!(data.education.focus_tasks[0].task_id, task_id);
+    assert_eq!(data.tasks.len(), 1);
+    let before = data.education.lessons[0].resource_ids.clone();
+    assert!(command(&mut data, set(&["missing"]), at(1, 8, 2)).is_err());
+    assert!(command(&mut data, set(&["past", "past"]), at(1, 8, 2)).is_err());
+    let mut another = data.clone();
+    another
+        .education
+        .resources
+        .push(crate::education::Resource {
+            id: "other-project-resource".into(),
+            project_id: "another-project".into(),
+            ..another.education.resources[0].clone()
+        });
+    let cross_project: Command = serde_json::from_value(set(&["other-project-resource"])).unwrap();
+    assert!(another.education.apply(cross_project, at(1, 8, 3)).is_err());
+    assert_eq!(data.education.lessons[0].resource_ids, before);
+    assert!(command(&mut data, set(&["mock"]), at(2, 8, 30)).is_err());
+    assert_eq!(data.education.lessons[0].resource_ids, before);
+    let mut attended = fixture();
+    let request = lesson(&attended, "resources-lesson", at(2, 8, 30));
+    command(&mut attended, request, at(1, 8, 0)).unwrap();
+    command(
+        &mut attended,
+        json!({"op":"attendLesson","id":"resources-lesson","progress":"已学"}),
+        at(2, 8, 31),
+    )
+    .unwrap();
+    assert!(command(&mut attended, set(&["mock"]), at(2, 8, 32)).is_err());
+    data.validate().unwrap();
+}
+
+#[test]
 fn homework_focus_tasks_complete_only_with_a_finished_submission() {
     let mut data = fixture();
     finish_lesson(&mut data);

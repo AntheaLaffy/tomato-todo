@@ -483,6 +483,12 @@ pub enum Action {
         #[serde(default)]
         directory: Option<String>,
     },
+    RenameProjectDirectory {
+        id: String,
+        name: String,
+        color: String,
+        directory: String,
+    },
     SetProjectWhitelist {
         id: String,
         whitelist: Option<Vec<String>>,
@@ -1161,6 +1167,30 @@ impl AppData {
                         app_whitelist: None,
                     });
                 }
+            }
+            Action::RenameProjectDirectory {
+                id: pid,
+                name,
+                color,
+                directory,
+            } => {
+                let project = self
+                    .projects
+                    .iter_mut()
+                    .find(|p| p.id == pid)
+                    .ok_or("项目不存在")?;
+                let profile = self
+                    .education
+                    .projects
+                    .iter_mut()
+                    .find(|p| p.project_id == pid)
+                    .ok_or("项目没有绑定资料目录")?;
+                if !Path::new(&directory).is_absolute() {
+                    return Err("资料目录必须是绝对路径".into());
+                }
+                project.name = name.trim().into();
+                project.color = color;
+                profile.directory = directory;
             }
             Action::SetProjectWhitelist { id: pid, whitelist } => {
                 let p = self

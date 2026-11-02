@@ -2299,18 +2299,32 @@ function projectDialog(id?: string) {
       return;
     }
 
-    if (
-      await act(
-        {
-          type: "saveProject",
-          id: p?.id || null,
-          name: f.get("name"),
-          color: f.get("color"),
-        },
-        "项目已保存",
-      )
-    )
+    const nextName = String(f.get("name")).trim();
+    try {
+      const next =
+        nextName !== p.name
+          ? await agentCall<Snapshot>({
+              op: "rename_project_directory",
+              projectId: p.id,
+              name: nextName,
+              color: f.get("color"),
+            })
+          : await dispatch({
+              type: "saveProject",
+              id: p.id,
+              name: nextName,
+              color: f.get("color"),
+            });
+      accept(next);
       closeModal();
+      toast(
+        nextName !== p.name
+          ? "项目与资料目录已改名，原资料 ID 保留"
+          : "项目已保存",
+      );
+    } catch (error) {
+      toast(String(error));
+    }
   };
   if (p)
     $("#delete-project").onclick = () =>

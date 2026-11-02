@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, copyFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  writeFile,
+  rm,
+  copyFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
@@ -109,6 +116,22 @@ test(
             tools.some((t) => t.name === name),
             name,
           );
+        assert.equal(
+          tools.filter((t) => t.name === "get_tasks").length,
+          1,
+          "external tool names must be unique",
+        );
+        for (const name of [
+          "update_plan",
+          "request_user_input",
+          "generate_image",
+        ]) {
+          assert.ok(
+            !tools.some((t) => t.name === name),
+            `${name} belongs to in-app chat`,
+          );
+        }
+        assert.equal(new Set(tools.map((t) => t.name)).size, tools.length);
         assert.ok(
           (await client.listResources()).some(
             (r) => r.uri === "tomato://skills/exam-authoring/SKILL.md",
@@ -146,6 +169,25 @@ test(
         assert.ok(!result.isError, JSON.stringify(result.content));
         return JSON.parse(result.content[0].text);
       };
+      for (const client of clients) {
+        const blockedPlan = await client.callTool("update_plan", {
+          plan: [{ step: "不应显示", status: "in_progress" }],
+        });
+        assert.equal(blockedPlan.isError, true);
+        assert.match(blockedPlan.content[0].text, /外部 MCP 工具未授权/);
+      }
+      const legacyPlan = await fetch(connection.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          method: "tools/call",
+          name: "update_plan",
+          arguments: { plan: [{ step: "不应显示", status: "in_progress" }] },
+        }),
+      });
+      assert.equal(legacyPlan.status, 400);
+      assert.match(await legacyPlan.text(), /外部 MCP 工具未授权/);
+      assert.equal((await value("get_control_status")).internalBusy, false);
       await value("set_external_control", { controller: "local-test" });
       assert.equal(
         (await value("get_control_status")).automaticExecutionPaused,
@@ -166,7 +208,24 @@ test(
             `${today}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`,
           ).getTime() / 1000,
         );
+      const otherProjectId = "other-exam-project";
+      data.projects.push({
+        ...data.projects[0],
+        id: otherProjectId,
+        name: "另一门学科",
+      });
+      const nextDay = new Date(`${today}T12:00:00`);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const tomorrow = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, "0")}-${String(nextDay.getDate()).padStart(2, "0")}`;
+      const tomorrowAt = (hour, minute = 0) =>
+        Math.floor(
+          new Date(
+            `${tomorrow}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`,
+          ).getTime() / 1000,
+        );
       await mkdir(join(root, "materials"));
+      await mkdir(join(root, "other-materials"));
+      await writeFile(join(root, "materials", "mock.txt"), "独立课程资料内容");
       data.visions = [
         { id: "test-vision", name: "测试目标", notes: "", projectId: null },
       ];
@@ -183,26 +242,55 @@ test(
             pastPaperIds: ["past"],
             mockPaperIds: ["mock"],
           },
+          {
+            projectId: otherProjectId,
+            directory: join(root, "other-materials"),
+            examMode: true,
+            visionId: "test-vision",
+            target: "另一学科测试目标",
+            examDate: null,
+            syllabusId: "other-syllabus",
+            pastPaperIds: ["other-past"],
+            mockPaperIds: ["other-mock"],
+          },
         ],
-        resources: ["syllabus", "past", "mock"].map((id) => ({
-          id,
-          projectId,
-          title: id,
-          kind: { syllabus: "syllabus", past: "pastPaper", mock: "mockPaper" }[
-            id
-          ],
-          path: `${id}.txt`,
-          source: "测试材料",
-          edition: "1",
-          topics: ["测试主题"],
-        })),
+        resources: ["syllabus", "past", "mock"].flatMap((id) => [
+          {
+            id,
+            projectId,
+            title: id,
+            kind: {
+              syllabus: "syllabus",
+              past: "pastPaper",
+              mock: "mockPaper",
+            }[id],
+            path: `${id}.txt`,
+            source: "测试材料",
+            edition: "1",
+            topics: ["测试主题"],
+          },
+          {
+            id: `other-${id}`,
+            projectId: otherProjectId,
+            title: `other-${id}`,
+            kind: {
+              syllabus: "syllabus",
+              past: "pastPaper",
+              mock: "mockPaper",
+            }[id],
+            path: `${id}.txt`,
+            source: "测试材料",
+            edition: "1",
+            topics: ["另一学科"],
+          },
+        ]),
         semesters: [
           {
             id: "test-term",
             projectId,
             title: "测试周安排",
             startDate: today,
-            endDate: today,
+            endDate: tomorrow,
             revision: 1,
             baseline: "测试起点",
             evidence: ["测试资料"],
@@ -230,6 +318,21 @@ test(
             resourceIds: ["mock"],
             startsAt: at(8),
             endsAt: at(8, 45),
+            aiEnabled: true,
+            attended: false,
+            progress: "",
+            state: "planned",
+          },
+          {
+            id: "tomorrow-lesson",
+            projectId,
+            semesterId: "test-term",
+            semesterRevision: 1,
+            title: "预排课程资料",
+            topics: ["测试主题"],
+            resourceIds: ["mock"],
+            startsAt: tomorrowAt(8),
+            endsAt: tomorrowAt(8, 45),
             aiEnabled: true,
             attended: false,
             progress: "",
@@ -301,14 +404,17 @@ test(
         collection: "lessons",
         projectId,
       });
-      assert.equal(lessons.total, 1);
+      assert.equal(lessons.total, 2);
       const focus = await value("get_education", {
         collection: "focusTasks",
         projectId,
       });
-      assert.equal(focus.total, 2);
+      assert.equal(focus.total, 3);
       const homeworkTaskId = focus.records.find(
         (l) => l.kind === "homework",
+      ).taskId;
+      const lessonTaskId = focus.records.find(
+        (l) => l.sourceId === "tomorrow-lesson",
       ).taskId;
       browser = await chromium.launch({
         headless: true,
@@ -322,6 +428,70 @@ test(
       await page.goto(base);
       await expect(page.locator(".today-list")).toContainText("周安排课程入口");
       await expect(page.locator(".today-list")).toContainText("周安排作业入口");
+      await page.locator('[data-page="education"]').first().click();
+      const projectNav = page.getByRole("navigation", { name: "应试项目" });
+      await expect(projectNav.getByRole("button")).toHaveCount(2);
+      await expect(page.locator(".education-dashboard-project")).toHaveCount(1);
+      await expect(page.locator(".education-dashboard-project")).toContainText(
+        "独立测试目标",
+      );
+      await projectNav.getByRole("button", { name: "另一门学科" }).click();
+      await expect(page.locator(".education-dashboard-project")).toContainText(
+        "另一学科测试目标",
+      );
+      await expect(
+        page.locator(".education-dashboard-project"),
+      ).not.toContainText("独立测试目标");
+      await page.getByRole("button", { name: "教师端" }).click();
+      await expect(page.locator(".education-dashboard-project")).toContainText(
+        "另一门学科",
+      );
+      await projectNav
+        .getByRole("button", { name: data.projects[0].name })
+        .click();
+      await expect(page.locator(".education-dashboard-project")).toContainText(
+        "测试周安排",
+      );
+      await page.setViewportSize({ width: 360, height: 1000 });
+      assert.ok(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+        "education navigation should not overflow on mobile",
+      );
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.locator('[data-page="focus"]').first().click();
+      await page
+        .locator(`.projects [data-page="project:${projectId}"]`)
+        .click();
+      await expect(
+        page
+          .locator(".education-card > details > summary")
+          .filter({ hasText: /^课程 / }),
+      ).toHaveCount(0);
+      const lessonTask = page.locator(
+        `.all-tasks-card [data-task-id="${lessonTaskId}"]`,
+      );
+      await expect(lessonTask).toHaveCount(1);
+      await lessonTask.locator(".task-body").click();
+      await expect(page.getByRole("dialog")).toContainText("预排课程资料");
+      await expect(page.getByRole("dialog")).toContainText("课程资料");
+      await page.locator("[data-lesson-resources]").click();
+      await page.locator('#lesson-resources-form [value="past"]').check();
+      await page.locator('#lesson-resources-form [value="mock"]').uncheck();
+      await page
+        .locator('#lesson-resources-form button[type="submit"]')
+        .click();
+      await expect(page.getByRole("dialog")).toContainText("past");
+      assert.deepEqual(
+        (
+          await (await fetch(`${base}/api/snapshot`)).json()
+        ).data.education.lessons.find((l) => l.id === "tomorrow-lesson")
+          .resourceIds,
+        ["past"],
+      );
+      await page.locator('[data-action="close-modal"]').click();
+      await page.locator('[data-page="focus"]').first().click();
       const task = page.locator(`[data-task-id="${homeworkTaskId}"]`);
       await task.locator(".task-body").click();
       await expect(page.getByRole("dialog")).toContainText("测试题面");
