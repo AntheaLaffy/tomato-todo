@@ -142,6 +142,7 @@ export type AgentStatus = {
   } | null;
   dataDir: string;
   mcpConfig: unknown;
+  externalController?: string | null;
 };
 const defaults: Preferences = {
   enabled: false,
@@ -149,8 +150,8 @@ const defaults: Preferences = {
   provider: "deepseek",
   model: "",
   thinkingLevel: "medium",
-  dailyCapacityMinutes: null,
   networkProxy: "",
+  dailyCapacityMinutes: null,
   maxAutoWakesPerDay: 3,
   cooldownHours: 24,
   quietStart: "22:00",
@@ -358,7 +359,7 @@ export function agentPage(): string {
     <button class="button small" data-agent="imagegen" title="仅 Codex 账号支持，使用 Codex 用量">生成图片</button>
     <button class="button small" data-agent="new">新对话</button>
   </div></div>
-  <div id="agent-panel" class="agent-layout">
+  <div id="agent-external-control"></div><div id="agent-panel" class="agent-layout">
     <aside id="agent-sessions" class="agent-sessions" hidden></aside>
     <section class="card agent-conversation">
       <div id="agent-conversation-title" class="agent-conversation-title"></div>
@@ -471,6 +472,12 @@ function renderChat() {
       "agent-run-status",
       `<div class="agent-state error">${esc(status.error)} <button class="button small" type="button" data-agent="retry-message" data-id="${esc(lastUser.id)}" ${busy ? "disabled" : ""}>重试</button></div>`,
     );
+  replace(
+    "agent-external-control",
+    status.externalController
+      ? `<div class="agent-state">外部 Agent 接管中：${esc(status.externalController)} · 内置自动教学、定时和诊断执行已暂停。<button class="button small" data-agent="release-control">归还内置自动执行</button></div>`
+      : "",
+  );
   replace("agent-attachments", attachmentHtml(attachments, true));
   replace(
     "agent-upload-status",
@@ -818,13 +825,6 @@ async function loadUsage() {
     renderUsage();
   }
 }
-function sheetHtml(): string {
-  const s = status;
-  const currentSheet = sheet;
-  if (!s || !currentSheet) return "";
-  const p = s.preferences;
-  const busy = s.busy || requestPending;
-  const title: Record<string, string> = {
 export function networkSettingsCard() {
   return `<section class="card settings-card"><h2>网络代理</h2><label class="form-field"><span>HTTP(S) 代理地址</span><input name="networkProxy" type="url" maxlength="2048" placeholder="http://127.0.0.1:7890" value="${esc(status?.preferences.networkProxy ?? "")}" ${status ? "" : "disabled"}></label><p class="note">用于学习助手的对话、登录、联网与用量查询。留空跟随环境变量和系统代理；保存后生效。支持 HTTP(S) 地址，不支持 SOCKS 或带账号密码的地址。</p></section>`;
 }
@@ -838,6 +838,13 @@ export async function saveNetworkProxy(proxy: string) {
   usage = null;
   renderUsage();
 }
+function sheetHtml(): string {
+  const s = status;
+  const currentSheet = sheet;
+  if (!s || !currentSheet) return "";
+  const p = s.preferences;
+  const busy = s.busy || requestPending;
+  const title: Record<string, string> = {
     settings: "设置",
     memory: "记忆",
     signals: "学情信号",
@@ -959,13 +966,6 @@ function playDeeds() {
 }
 function update() {
   syncPersonaBackdrop(hooks?.backdrop() ?? false);
-  if (!hooks?.active() || !status) return;
-  const nextKey = status.conversations.find((c) => c.active)?.id ?? "new";
-  if (nextKey !== conversationKey) {
-    const selection = window.getSelection();
-    if (
-      document
-        .getElementById("agent-messages")
   const proxy = document.querySelector<HTMLInputElement>(
     '[name="networkProxy"]',
   );
@@ -973,6 +973,13 @@ function update() {
     proxy.value = status.preferences.networkProxy ?? "";
     proxy.disabled = false;
   }
+  if (!hooks?.active() || !status) return;
+  const nextKey = status.conversations.find((c) => c.active)?.id ?? "new";
+  if (nextKey !== conversationKey) {
+    const selection = window.getSelection();
+    if (
+      document
+        .getElementById("agent-messages")
         ?.contains(selection?.anchorNode ?? null)
     )
       selection?.removeAllRanges();
@@ -1398,6 +1405,7 @@ async function submit(form: HTMLFormElement) {
     (document.activeElement as HTMLElement)?.blur();
   } else if (form.id === "agent-config-form") {
     const preferences: Preferences = {
+      networkProxy: status?.preferences.networkProxy ?? "",
       enabled: data.has("enabled"),
       automatic: data.has("automatic"),
       provider: status?.preferences.provider ?? "deepseek",
@@ -1405,7 +1413,6 @@ async function submit(form: HTMLFormElement) {
       thinkingLevel: status?.preferences.thinkingLevel ?? "medium",
       dailyCapacityMinutes: data.get("dailyCapacityMinutes")
         ? Number(data.get("dailyCapacityMinutes"))
-      networkProxy: status?.preferences.networkProxy ?? "",
         : null,
       maxAutoWakesPerDay: Number(data.get("maxAutoWakesPerDay")),
       cooldownHours: Number(data.get("cooldownHours")),
@@ -1750,6 +1757,9 @@ async function action(button: HTMLButtonElement) {
       break;
     case "exit-creator-mode":
       await call({ op: "exit_creator_mode" });
+      break;
+    case "release-control":
+      await call({ op: "external_control", controller: null });
       break;
     case "cancel":
       await call({ op: "cancel" });

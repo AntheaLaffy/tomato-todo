@@ -244,6 +244,9 @@ impl PlanFile {
             let Some(plan) = incoming.get(task.id.as_str()) else {
                 continue;
             };
+            if data.teaching_task(&task.id).is_some() {
+                return Err("计划文件不能改写教学待办，请调整对应课程或作业".into());
+            }
             let estimate = plan_estimate(plan, self.pomodoro_minutes, data.settings.focus_minutes)?;
             let old = task.clone();
             let merged = plan.merge(&old, at, estimate);
@@ -271,8 +274,11 @@ impl PlanFile {
             // The file is the whole plan. Drop the incomplete things it no longer
             // names, but never history: completed instances stay.
             let planned_tasks: HashSet<&str> = self.tasks.iter().map(|t| t.id.as_str()).collect();
-            next.tasks
-                .retain(|t| t.completed || planned_tasks.contains(t.id.as_str()));
+            next.tasks.retain(|t| {
+                t.completed
+                    || planned_tasks.contains(t.id.as_str())
+                    || data.teaching_task(&t.id).is_some()
+            });
             let planned_habits: HashSet<&str> = self.habits.iter().map(|h| h.id.as_str()).collect();
             let removed_habits: Vec<String> = next
                 .habits
@@ -328,7 +334,7 @@ impl AppData {
         let tasks: Vec<_> = self
             .tasks
             .iter()
-            .filter(|t| !t.completed)
+            .filter(|t| !t.completed && self.teaching_task(&t.id).is_none())
             .map(|t| PlanTask {
                 template_id: t.template_id.clone(),
                 habit_id: t.habit_id.clone(),

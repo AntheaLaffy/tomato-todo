@@ -184,6 +184,7 @@ export async function createStudySession({
   await loader.reload();
   const allowed = new Set([
     "education",
+    "get_education","list_skills","get_control_status","set_external_control",
     "get_context",
     "get_study_progress",
     "get_canvas","save_canvas","generate_image",
@@ -209,7 +210,7 @@ export async function createStudySession({
   const appTool = (tool) => ({
     name: tool.name,
     label: tool.name,
-    description: tool.description,
+    description: tool.name==="get_snapshot"?"读取当前运行状态、完整设置与各类记录数量；任务用 get_tasks、学情用 get_study_progress、教学用 get_education，批量编辑走导出文件。":tool.description,
     parameters: Type.Unsafe(tool.inputSchema),
     executionMode: "sequential",
     execute: async (_id, args, signal) => {

@@ -17,10 +17,11 @@
 - `reviewCorrection`：`id`、`accepted`、`feedback`。
 - `attendLesson`：`id`、`progress`。
 - `confirmPrinted` / `startExam` / `endExam` / `finishEvent` / `retryEvent`：`id`。
-- claimEvent 仅供宿主领取事件，模型无需调用。
+- `claimEvent`：`id`。内置助手的事件由宿主预先领取；外部 agent 接管自动执行后，先领取 `pending` 事件，再保存实际产物并 `finishEvent`。不要重复领取 `running` 事件；失败事件仅在用户要求继续时用 `retryEvent` 重试。
 
 ## Education
 
+- `focusTasks`: 核心维护的 `{taskId, sourceId, kind}` 数组；`kind=lesson | homework`，关联普通任务与本项目课程/作业。只读来源关联，不自行填写或改写，不重复建任务。
 - `projects`: ProjectStudy[]
 - `resources`: Resource[]
 - `semesters`: Semester[]
@@ -120,6 +121,8 @@
 - `semesterId`: string
 - `semesterRevision`: integer
 - `lessonId`: string | null
+- `taskId`: string | null；来自已完成学习任务的作业引用原任务，`lessonId=null`。
+- `retestOfGradeId`: string | null；仅 `kind=retest` 时引用本项目原批改。
 - `title`: string
 - `kind`: AssessmentKind
 - `revision`: integer
@@ -204,4 +207,4 @@
 
 ## AssessmentKind
 
-`homework | weeklyExam | mockExam`
+`homework | weeklyExam | mockExam | retest`

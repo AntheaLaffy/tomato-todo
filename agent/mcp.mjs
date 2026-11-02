@@ -33,24 +33,20 @@ async function handle(message) {
   try {
     switch (message.method) {
       case "initialize":
-        result = {
-          // Echo the client's version when it asks for one, the way other MCP
-          // servers negotiate; fall back to the revision this bridge implements.
-          protocolVersion:
-            typeof message.params?.protocolVersion === "string"
-              ? message.params.protocolVersion
-              : "2025-11-25",
-          capabilities: { tools: {} },
-          serverInfo: { name: "tomato-study", version: "0.1.0" },
-          instructions:
-            "操作当前正在运行的软件实例。批量编辑优先导出文件、JSON Patch、审阅、应用；保护规则仍然生效。",
-        };
+        result = await bridge({ ...message.params, method: "initialize" });
         break;
       case "ping":
         result = {};
         break;
       case "tools/list":
         result = await bridge({ method: "tools/list" });
+        break;
+      case "resources/list":
+      case "resources/templates/list":
+      case "resources/read":
+      case "prompts/list":
+      case "prompts/get":
+        result = await bridge({ ...message.params, method: message.method });
         break;
       case "tools/call": {
         try {
@@ -59,6 +55,7 @@ async function handle(message) {
             ...message.params,
           });
           result = { content: [{ type: "text", text: JSON.stringify(value) }] };
+          if (value && typeof value === "object" && !Array.isArray(value)) result.structuredContent = value;
         } catch (error) {
           result = {
             isError: true,

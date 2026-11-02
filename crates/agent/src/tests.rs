@@ -503,6 +503,7 @@ fn service(dir: &Path, wakes: Arc<AtomicUsize>) -> Arc<Agent> {
             wakes.fetch_add(1, Ordering::SeqCst);
         }),
         workspace_lock: Mutex::new(()),
+        control_lock: Mutex::new(()),
         worker_pending: Mutex::new(std::collections::HashMap::new()),
     })
 }
@@ -902,6 +903,95 @@ fn user_skills_are_readable_from_the_agent_dir() {
     assert_eq!(read["text"], "# 自定义技能");
     assert!(agent
         .call("read_skill", &json!({"name":"../secret"}), true)
+        .is_err());
+}
+
+#[test]
+fn external_agents_discover_skills_and_control_automatic_execution_without_a_model() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = dir.path().join("skills/external-test/references");
+    fs::create_dir_all(&skill).unwrap();
+    fs::write(
+        skill.parent().unwrap().join("SKILL.md"),
+        "---\nname: external-test\ndescription: >\n  外部测试用途\n---\n# 入口",
+    )
+    .unwrap();
+    fs::write(skill.join("contract.md"), "本地测试契约").unwrap();
+    let wakes = Arc::new(AtomicUsize::new(0));
+    let agent = service(dir.path(), wakes.clone());
+    let catalog = agent.call("list_skills", &json!({}), true).unwrap();
+    assert!(catalog["skills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s["name"] == "external-test" && s["description"] == "外部测试用途"));
+    let resource = agent
+        .mcp_method(
+            "resources/read",
+            &json!({"uri":"tomato://skills/external-test/references/contract.md"}),
+        )
+        .unwrap();
+    assert_eq!(resource["contents"][0]["text"], "本地测试契约");
+    assert!(agent
+        .mcp_method(
+            "resources/read",
+            &json!({"uri":"tomato://skills/external-test/../../state.json"})
+        )
+        .is_err());
+    assert!(agent
+        .call(
+            "set_external_control",
+            &json!({"controller":"external-test"}),
+            true
+        )
+        .is_err());
+    agent
+        .call(
+            "set_external_control",
+            &json!({"controller":"external-test"}),
+            false,
+        )
+        .unwrap();
+    assert_eq!(
+        Store::load(dir.path())
+            .unwrap()
+            .external_controller
+            .as_deref(),
+        Some("external-test")
+    );
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        inner.store.preferences.enabled = true;
+        inner.store.preferences.daily_capacity_minutes = Some(1);
+        inner.live.auth = json!({"deepseek":{"configured":true}});
+    }
+    let snapshot = agent.engine.lock().unwrap().snapshot(time()).unwrap();
+    agent.observe(&snapshot).unwrap();
+    assert_eq!(wakes.load(Ordering::SeqCst), 0);
+    assert!(!agent.status().unwrap()["busy"].as_bool().unwrap());
+    agent.inner.lock().unwrap().live.busy = true;
+    assert!(agent
+        .call(
+            "set_external_control",
+            &json!({"controller":"other"}),
+            false
+        )
+        .is_err());
+    agent
+        .call("set_external_control", &json!({"controller":null}), false)
+        .unwrap();
+    assert_eq!(
+        agent.call("get_control_status", &json!({}), false).unwrap()["automaticExecutionPaused"],
+        false
+    );
+    assert_eq!(
+        agent
+            .call("get_education", &json!({"collection":"resources"}), false)
+            .unwrap()["total"],
+        0
+    );
+    assert!(agent
+        .call("get_education", &json!({"collection":"unknown"}), false)
         .is_err());
 }
 #[test]

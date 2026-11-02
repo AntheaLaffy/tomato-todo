@@ -543,6 +543,7 @@ impl Schedule {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Store {
+    pub external_controller: Option<String>,
     pub preferences: Preferences,
     pub memories: Vec<Memory>,
     /// 用户人格卡；首次运行从内置预设播种，之后完全由用户增删改。
@@ -566,6 +567,7 @@ impl Default for Store {
     fn default() -> Self {
         Self {
             preferences: Preferences::default(),
+            external_controller: None,
             memories: vec![],
             personas: builtin_personas(),
             default_persona: default_persona_id(),

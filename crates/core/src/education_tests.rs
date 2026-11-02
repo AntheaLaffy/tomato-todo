@@ -113,6 +113,133 @@ fn wall_clock_lessons_do_not_fabricate_attendance_or_mastery() {
     );
     assert!(data.sessions.is_empty());
 }
+
+#[test]
+fn scheduled_lessons_materialize_once_and_updates_keep_the_same_focus_task() {
+    let mut data = fixture();
+    command(
+        &mut data,
+        lesson(&fixture(), "bad", at(2, 8, 30)),
+        at(1, 8, 0),
+    )
+    .unwrap_err();
+    let request = lesson(&data, "focus-lesson", at(2, 8, 30));
+    command(&mut data, request.clone(), at(1, 8, 0)).unwrap();
+    let task = data.tasks[0].clone();
+    assert_eq!(task.due_date.as_deref(), Some("2026-11-02"));
+    assert_eq!(task.reminder_time.as_deref(), Some("08:30"));
+    assert_eq!(task.focus_minutes, Some(45));
+    assert_eq!(data.education.focus_tasks.len(), 1);
+    assert!(!data.tick(at(1, 8, 1)));
+    let mut revised = request;
+    revised["lesson"]["startsAt"] = json!(at(3, 10, 0));
+    revised["lesson"]["endsAt"] = json!(at(3, 10, 45));
+    command(&mut data, revised, at(1, 8, 2)).unwrap();
+    assert_eq!(data.tasks.len(), 1);
+    assert_eq!(data.tasks[0].id, task.id);
+    assert_eq!(data.tasks[0].due_date.as_deref(), Some("2026-11-03"));
+    let mut plan = data.export_plan();
+    assert!(plan.tasks.is_empty());
+    plan.replace = true;
+    data.apply(crate::Action::ImportPlan { plan }, at(1, 8, 3))
+        .unwrap();
+    assert_eq!(data.tasks[0].id, task.id);
+    assert!(data
+        .apply(
+            crate::Action::DeleteTask {
+                id: task.id.clone()
+            },
+            at(1, 8, 4)
+        )
+        .is_err());
+    data.apply(
+        crate::Action::SelectTask {
+            id: Some(task.id.clone()),
+        },
+        at(3, 10, 0),
+    )
+    .unwrap();
+    data.apply(crate::Action::StartTimer, at(3, 10, 0)).unwrap();
+    assert!(data.education.lessons[0].attended);
+    data.apply(crate::Action::ToggleTask { id: task.id }, at(3, 10, 10))
+        .unwrap();
+    data.tick(at(3, 10, 45));
+    assert_eq!(
+        data.education
+            .events
+            .iter()
+            .filter(|e| e.kind == "homework")
+            .count(),
+        1
+    );
+    assert!(!data
+        .education
+        .events
+        .iter()
+        .any(|e| e.kind == "taskHomework"));
+    assert_eq!(data.education.completed_tasks[0].topics, vec!["极限"]);
+    assert!(data.education.progress.is_empty());
+    data.validate().unwrap();
+}
+
+#[test]
+fn homework_focus_tasks_complete_only_with_a_finished_submission() {
+    let mut data = fixture();
+    finish_lesson(&mut data);
+    let packet = assessment(&data, "homework");
+    command(&mut data, packet, at(7, 18, 0)).unwrap();
+    let link = data
+        .education
+        .focus_tasks
+        .iter()
+        .find(|l| l.kind == crate::teaching_tasks::TeachingTaskKind::Homework)
+        .unwrap()
+        .clone();
+    assert!(data
+        .apply(
+            crate::Action::ToggleTask {
+                id: link.task_id.clone()
+            },
+            at(7, 19, 0)
+        )
+        .is_err());
+    for (id, unfinished) in [("part", true), ("finished", false)] {
+        command(&mut data, json!({"op":"submit","submission":{"id":id,"assessmentId":"assessment","submittedAt":0,"resourceIds":[],"answers":"已完成部分","unfinished":unfinished,"questionTimes":[]}}), at(7, 19, if unfinished { 10 } else { 20 })).unwrap();
+        assert_eq!(
+            data.tasks
+                .iter()
+                .find(|t| t.id == link.task_id)
+                .unwrap()
+                .completed,
+            !unfinished
+        );
+    }
+    assert!(!data
+        .sessions
+        .iter()
+        .any(|s| s.task_id.as_ref() == Some(&link.task_id)));
+    assert!(!data
+        .education
+        .events
+        .iter()
+        .any(|e| e.kind == "taskHomework"));
+    let restored: AppData = serde_json::from_value(serde_json::to_value(&data).unwrap()).unwrap();
+    assert_eq!(restored.education.focus_tasks, data.education.focus_tasks);
+    restored.validate().unwrap();
+}
+
+#[test]
+fn an_automatic_course_timer_does_not_confirm_attendance() {
+    let mut data = fixture();
+    data.settings.auto_start_tasks = true;
+    let request = lesson(&data, "automatic-lesson", at(2, 8, 30));
+    command(&mut data, request, at(1, 8, 0)).unwrap();
+    data.tick(at(2, 8, 30));
+    assert!(data.timer.running);
+    assert!(!data.education.lessons[0].attended);
+    assert!(data.education.progress.is_empty());
+    assert!(data.education.events.iter().all(|e| e.kind != "homework"));
+}
 #[test]
 fn cross_project_schedule_and_fixed_commitments_are_checked() {
     let mut data = fixture();

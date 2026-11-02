@@ -7,6 +7,8 @@ use std::collections::{HashMap, HashSet};
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Education {
+    #[serde(default)]
+    pub focus_tasks: Vec<crate::teaching_tasks::TeachingTask>,
     pub projects: Vec<ProjectStudy>,
     pub resources: Vec<Resource>,
     pub semesters: Vec<Semester>,
@@ -419,7 +421,7 @@ impl Education {
             .remove(id)
             .unwrap_or_default()
     }
-    fn event(&mut self, project: &str, kind: &str, source: &str, at: i64) {
+    pub(crate) fn event(&mut self, project: &str, kind: &str, source: &str, at: i64) {
         let id = format!("{kind}:{source}");
         if !self.events.iter().any(|e| e.id == id) {
             self.events.push(TeachingEvent {
@@ -433,7 +435,7 @@ impl Education {
         }
     }
     pub(crate) fn task_completed(&mut self, task: &crate::Task, at: i64) {
-        let Some(record) = crate::learning::CompletedStudyTask::from_task(task, at) else {
+        let Some(mut record) = crate::learning::CompletedStudyTask::from_task(task, at) else {
             return;
         };
         if self
@@ -442,7 +444,18 @@ impl Education {
             .any(|p| p.project_id == record.project_id && p.exam_mode)
             && !self.completed_tasks.iter().any(|t| t.id == record.id)
         {
-            self.event(&record.project_id, "taskHomework", &record.id, at);
+            if let Some(link) = self
+                .focus_tasks
+                .iter()
+                .find(|link| link.task_id == record.id)
+            {
+                if let Some(lesson) = self.lessons.iter().find(|l| l.id == link.source_id) {
+                    record.topics = lesson.topics.clone();
+                    record.notes = lesson.progress.clone();
+                }
+            } else {
+                self.event(&record.project_id, "taskHomework", &record.id, at);
+            }
             self.completed_tasks.push(record);
         }
     }
@@ -1229,6 +1242,12 @@ pub fn validate(data: &AppData) -> AppResult<()> {
 /// Imports may restore records, but cannot silently rewrite released questions or history.
 pub fn validate_transition(before: &Education, after: &Education) -> AppResult<()> {
     crate::learning::validate_transition(before, after)?;
+    for link in &before.focus_tasks {
+        check(
+            after.focus_tasks.contains(link),
+            "已建立的教学待办来源关联不能删除或改写",
+        )?;
+    }
     let active_resources = after
         .resources
         .iter()

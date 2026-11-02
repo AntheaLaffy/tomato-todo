@@ -18,6 +18,7 @@ pub mod lock;
 pub mod migration;
 pub mod plan;
 pub mod reminders;
+pub mod teaching_tasks;
 pub mod templates;
 
 pub fn check_user_action(action: &Action) -> AppResult<()> {
@@ -739,7 +740,9 @@ impl AppData {
     /// Advance at most one phase after downtime: never fabricate unattended focus sessions.
     pub fn tick(&mut self, at: i64) -> bool {
         let teaching_changed = self.education.tick(at);
-        let materialized = self.materialize_templates(at) || teaching_changed;
+        let teaching_tasks_changed = self.materialize_teaching_tasks(at);
+        let materialized =
+            self.materialize_templates(at) || teaching_changed || teaching_tasks_changed;
         let reminders_changed = self.tick_reminders(at);
         let changed = self.tick_with_lock(at) || materialized;
         let cycle_changed = self.refresh_cycle(at);
@@ -881,6 +884,7 @@ impl AppData {
                 t.reminder_pending = false;
                 self.timer.task_id = Some(id);
                 self.reset_to(Mode::Focus);
+                self.start_teaching_task(at);
                 self.start(at);
             }
             Action::EmergencyUnlock => {
@@ -924,6 +928,12 @@ impl AppData {
                 });
             }
             Action::SaveTask { task: d } => {
+                if d.id
+                    .as_ref()
+                    .is_some_and(|id| self.teaching_task(id).is_some())
+                {
+                    return Err("教学待办随课程或作业安排更新，请调整对应教学安排".into());
+                }
                 let existing =
                     d.id.as_ref()
                         .and_then(|id| self.tasks.iter().position(|t| &t.id == id));
@@ -1001,6 +1011,9 @@ impl AppData {
                     .find(|t| t.id == task_id)
                     .ok_or("任务不存在")?
                     .clone();
+                if self.teaching_task(&task_id).is_some() && !task.completed {
+                    self.complete_teaching_task(&task_id, at)?;
+                }
                 // Close this task's live timer before comparing actual effort with
                 // its budget; otherwise its eventual record would count twice.
                 if !task.completed && self.timer.task_id.as_ref() == Some(&task_id) {
@@ -1057,6 +1070,9 @@ impl AppData {
                 }
             }
             Action::DeleteTask { id } => {
+                if self.teaching_task(&id).is_some() {
+                    return Err("教学待办由对应课程或作业维护，不能单独删除".into());
+                }
                 if !self.tasks.iter().any(|t| t.id == id) {
                     return Err("任务不存在".into());
                 }
@@ -1190,6 +1206,9 @@ impl AppData {
                     .collect();
             }
             Action::DetachTasks { ids, target } => {
+                if ids.iter().any(|id| self.teaching_task(id).is_some()) {
+                    return Err("教学待办须保留来源项目，请调整对应教学安排".into());
+                }
                 for t in self.tasks.iter_mut() {
                     if ids.contains(&t.id) {
                         match target {
@@ -1356,6 +1375,7 @@ impl AppData {
                 {
                     return Err("作废实例不能开始专注".into());
                 }
+                self.start_teaching_task(at);
                 self.start(at);
             }
             Action::PauseTimer => {
@@ -1455,11 +1475,13 @@ impl AppData {
                 }
             }
         }
+        self.materialize_teaching_tasks(at);
         self.validate()
     }
 
     pub fn validate(&self) -> AppResult<()> {
         education::validate(self)?;
+        teaching_tasks::validate(self)?;
         self.lock.validate()?;
         templates::validate(self)?;
         identities::validate(self)?;

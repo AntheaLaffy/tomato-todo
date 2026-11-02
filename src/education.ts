@@ -194,6 +194,11 @@ export interface StudySummary {
   }[];
 }
 export interface Education {
+  focusTasks?: {
+    taskId: string;
+    sourceId: string;
+    kind: "lesson" | "homework";
+  }[];
   projects: ProjectStudy[];
   progress: ProgressRecord[];
   corrections: Correction[];
@@ -715,6 +720,57 @@ export function educationCard(snapshot: Snapshot, project: Project): string {
 export function printablePaper(a: Assessment): string {
   return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>${esc(a.title)}</title><style>body{font:16px serif;line-height:1.7;margin:20mm}article{break-inside:avoid;margin-bottom:18mm}section{break-before:page}.space{height:65mm;border-bottom:1px solid #aaa}small{display:block}</style><h1>${esc(a.title)}</h1><p>试卷ID：${esc(a.id)} · v${a.revision} · ${when(a.startsAt)} — ${when(a.endsAt)}</p><p>${esc(a.instructions)}</p>${a.questions.map((q) => `<article><h2>${esc(q.id)}${q.extension ? "（拓展）" : ""}（${q.scoring.reduce((n, p) => n + p.points, 0)}分）</h2><p style="white-space:pre-wrap">${esc(q.prompt)}</p></article>`).join("")}<section><h1>答题卡</h1><p>姓名：____________　试卷：${esc(a.id)}　日期：____________</p><p>每题完成后记录本机显示的当地时刻，精确到时、分；考试结束立即停笔并拍照上传。</p>${a.questions.map((q) => `<article><h2>${esc(q.id)}</h2><small>完成时刻：____:____　返回修改时刻：____:____</small><div class="space"></div></article>`).join("")}</section></html>`;
 }
+export function educationFocusExams(snapshot: Snapshot): string {
+  const e = snapshot.data.education;
+  const exams = e.assessments.filter(
+    (a) =>
+      a.kind !== "homework" &&
+      new Date(a.startsAt * 1000).toLocaleDateString("sv-SE") <=
+        snapshot.today &&
+      (new Date(a.startsAt * 1000).toLocaleDateString("sv-SE") ===
+        snapshot.today ||
+        a.startedAt) &&
+      !e.submissions.some((s) => s.assessmentId === a.id && !s.unfinished),
+  );
+  if (!exams.length) return "";
+  return `<section class="card"><div class="card-heading"><h2>今日测评 <span class="count-label">${exams.length}</span></h2></div>${exams.map((a) => `<article class="study-row"><strong>${esc(a.title)}</strong><p>${when(a.startsAt)} — ${when(a.endsAt)}</p><button class="button secondary small-button" data-open-assessment="${esc(a.id)}">${a.startedAt ? (a.stoppedAt ? "提交答题卡" : "查看进行中的考试") : "查看试卷与开考"}</button></article>`).join("")}</section>`;
+}
+
+function openAssessment(
+  snapshot: Snapshot,
+  id: string,
+  hooks: Parameters<typeof mountEducation>[1],
+) {
+  const a = snapshot.data.education.assessments.find((a) => a.id === id);
+  if (!a) return;
+  hooks.modal(
+    `<h2 id="modal-title">作业与测评</h2><div data-focus-assessment="${esc(id)}">${assessmentRow(a, snapshot.data.education, snapshot.serverTime)}</div><div class="modal-actions"><button class="button secondary" data-action="close-modal">返回今日专注</button></div>`,
+  );
+  mountEducation(snapshot, hooks);
+}
+
+export function openTeachingTask(
+  snapshot: Snapshot,
+  taskId: string,
+  hooks: Parameters<typeof mountEducation>[1],
+): boolean {
+  const link = snapshot.data.education.focusTasks?.find(
+    (l) => l.taskId === taskId,
+  );
+  if (!link) return false;
+  if (link.kind === "homework") openAssessment(snapshot, link.sourceId, hooks);
+  else {
+    const lesson = snapshot.data.education.lessons.find(
+      (l) => l.id === link.sourceId,
+    )!;
+    hooks.modal(
+      `<h2 id="modal-title">${esc(lesson.title)}</h2><p>${when(lesson.startsAt)} — ${when(lesson.endsAt)}</p><p>${esc(lesson.topics.join("、"))}</p><p>${esc(lesson.progress || "具体学习位置尚未记录")}</p>${resourceLinks(lesson.resourceIds, snapshot.data.education.resources, "课程资料")}<p data-explanation>从今日待办选择课程即可使用番茄钟；勾选完成会记录本人确认的课程参与，掌握情况仍需练习与复测。</p><div class="modal-actions">${snapshot.serverTime >= lesson.startsAt && snapshot.serverTime < lesson.endsAt ? `<button class="button secondary" data-attend-lesson="${esc(lesson.id)}">记录学习进度</button>` : ""}<button class="button secondary" data-action="close-modal">返回今日专注</button></div>`,
+    );
+    mountEducation(snapshot, hooks);
+  }
+  return true;
+}
+
 export function mountEducation(
   snapshot: Snapshot,
   hooks: {
@@ -734,8 +790,25 @@ export function mountEducation(
     }
   };
   mountResources(snapshot, hooks);
-  const command = async (command: Record<string, unknown>) =>
-    hooks.accept(await dispatch({ type: "education", command }));
+  const command = async (command: Record<string, unknown>) => {
+    const next = await dispatch({ type: "education", command });
+    hooks.accept(next);
+    const panel = document.querySelector<HTMLElement>(
+      "[data-focus-assessment]",
+    );
+    if (panel) {
+      const a = next.data.education.assessments.find(
+        (a) => a.id === panel.dataset.focusAssessment,
+      );
+      if (a)
+        panel.innerHTML = assessmentRow(
+          a,
+          next.data.education,
+          next.serverTime,
+        );
+      mountEducation(next, hooks);
+    }
+  };
   document
     .querySelectorAll<HTMLFormElement>(".study-config")
     .forEach((form) => {
@@ -767,6 +840,9 @@ export function mountEducation(
     document
       .querySelectorAll<HTMLElement>(selector)
       .forEach((el) => (el.onclick = () => void run(() => fn(el))));
+  bind("[data-open-assessment]", async (el) =>
+    openAssessment(snapshot, el.dataset.openAssessment!, hooks),
+  );
   document
     .querySelectorAll<HTMLElement>("[data-education-view]")
     .forEach((el) => {

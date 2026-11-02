@@ -4,6 +4,7 @@ mod bridge;
 mod canvas;
 mod conversations;
 mod creator;
+mod external;
 pub mod files;
 mod projects;
 mod resources;
@@ -72,6 +73,7 @@ pub struct Agent {
     apply: Apply,
     wake: Arc<dyn Fn() + Send + Sync>,
     workspace_lock: Mutex<()>,
+    control_lock: Mutex<()>,
     worker_pending:
         Mutex<std::collections::HashMap<String, std::sync::mpsc::Sender<AppResult<Value>>>>,
 }
@@ -105,6 +107,7 @@ impl Agent {
             apply,
             wake,
             workspace_lock: Mutex::new(()),
+            control_lock: Mutex::new(()),
             worker_pending: Mutex::new(std::collections::HashMap::new()),
         });
         bridge::start(&service)?;
@@ -202,6 +205,10 @@ impl Agent {
             }
         }
         match op {
+            "external_control" => {
+                self.external_control(&args)?;
+                self.status()
+            }
             "status" => self.status(),
             "authorize_project_directory" => self.authorize_project(&args),
             "project_resource_info" => self.resource_info(&args),
@@ -765,10 +772,21 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"creatorEntrance":inner.live.creator_entrance,"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"personas":inner.store.personas_view(),"persona":inner.store.persona_id(),"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"externalController":inner.store.external_controller,"creatorEntrance":inner.live.creator_entrance,"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"personas":inner.store.personas_view(),"persona":inner.store.persona_id(),"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
+        let _control = self.control_lock.lock().map_err(|e| e.to_string())?;
+        if self
+            .inner
+            .lock()
+            .map_err(|e| e.to_string())?
+            .store
+            .external_controller
+            .is_some()
+        {
+            return Ok(());
+        }
         let at = snapshot.server_time;
         if snapshot
             .data
@@ -1082,6 +1100,10 @@ impl Agent {
             None
         };
         match name {
+            "list_skills" => self.skill_catalog(),
+            "get_control_status" => self.control_status(),
+            "set_external_control" => self.external_control(args),
+            "get_education" => self.education_records(args),
             "get_canvas" | "save_canvas" => self.canvas_operation(name, args, "assistant"),
             "web_search" | "web_fetch" => {
                 let preferences = self

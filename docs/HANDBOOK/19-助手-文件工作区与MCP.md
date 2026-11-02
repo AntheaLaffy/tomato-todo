@@ -1,9 +1,9 @@
 # 域：助手的文件工作区与 MCP（双向）
 
-> 手册章节 ｜ 最后核对：v0.11.0（2026-11-01）｜ 更新时机：改动本章涉及的代码或文档时同步。
+> 手册章节 ｜ 最后核对：v0.12.0（2026-11-02）｜ 更新时机：改动本章涉及的代码或文档时同步。
 > 事实一律以当前代码为准；本章每条事实都标了出处，核对时先看那一行。
 > 导航：文件与阅读顺序见 [04-导航对照](04-导航对照.md)（维护者附录）与 [CODEMAP](../../CODEMAP.md)。
-> 验证：`crates/agent/src/tests.rs` 34 个用例 · `tests/agent.mjs` 9 个用例，138 处断言（明细见 [95-测试索引](95-测试索引.md)）
+> 验证：`crates/agent/src/tests.rs` 36 个用例 · `tests/agent.mjs` 13 个用例，182 处断言 · `tests/external-control.mjs` 1 个用例，18 处断言（明细见 [95-测试索引](95-测试索引.md)）
 
 ## A. 事实（带代码出处）
 
@@ -23,14 +23,14 @@
 | 12 | 助手也能作为 **MCP 服务端**对外：`--mcp` 走标准 stdio JSON-RPC，**不启动第二份数据库**，连的是正在运行的实例 | `docs/AGENT.md`「外部 MCP」 |
 | 13 | 本机 MCP 桥接**只监听 127.0.0.1**，要求私有连接令牌，并**拒绝浏览器 Origin** | 同上 |
 | 14 | 外部客户端能用 `dispatch` 直接执行单项动作，或审阅后 `apply_file`；但**不能**紧急退出；原生能力预检、严格保护、来源与哈希校验仍然执行 | 同上 |
-| 15 | 桥接不自己加超时：`initialize` 按客户端提议的协议版本应答，成败由工具逻辑决定 | 同上 |
+| 15 | 外部MCP支持stdio与无会话的Streamable HTTP，暴露tools/resources/prompts；`initialize` 协商受支持版本；读取技能、教学查询与接管/归还不依赖内置模型登录，也不新增请求时间上限 | `external.rs`、`bridge.rs`、`agent/mcp.mjs` |
 | 16 | 助手也能作为 **MCP 客户端**：配置放在软件自己的 `mcp.json`（与 `state.json` 同目录），用 Codex 同款 `mcpServers` 形状 | `docs/AGENT.md`「接入 MCP 服务器」 |
 | 17 | 传输：`command`（stdio）或 `url`（streamable HTTP，支持 `${ENV}` 头与 OAuth 登录）；`enabled: false` 单独停用 | 同上 |
 | 18 | 工具命名 `mcp__<服务器>__<工具>`；资源用 `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource` 读取 | 同上 |
 | 19 | 暴露方式三档：`codemode`（默认，只在代码里调用）、`deferred`（由工具搜索按需加载）、`direct`（显式写进清单）；应用用的是策展过的清单，配成 `direct` 的服务器在这里不会被声明 | 同上 |
 | 20 | **只在用户主动发起的对话里连接 MCP**；异常自动唤醒不加载任何 MCP 服务器 | 同上 |
 | 21 | MCP 服务器**不在编程沙箱里**：以用户身份、在沙箱之外运行；每次请求新建会话，会话结束（含退出）一起关闭，不留后台进程 | 同上 |
-| 23 | **桥接实测**：对运行中的实例调用 `tools/list` 返回 **36 个工具**——正是动手档（`definitions(false)`），含 `create_task`/`move_tasks`/`patch_file`/`apply_file`/`dispatch` 等写操作；`list_mcp_servers` 能报出已配置服务器的名称、启用状态与暴露方式 | 对运行中实例的真实请求 |
+| 23 | 外部工具由 `external_definitions()` 从动手档筛选：任务、教学、保护、文件与技能共用业务实现；只限SDK轮次的图像生成和作者彩蛋不对外声明。`set_external_control` 持久化暂停内置自动执行，事件继续排队，用户可从界面或MCP归还 | `tools.rs`、`external.rs`、`tests/external-control.mjs` |
 | 22 | 配置坏了不会静默：列表接口会把校验错误一起报出来，服务器自己的通知追加到同目录 `mcp.log` | 同上 |
 
 ## B. 可讲的细节
@@ -54,6 +54,7 @@
 - 文件 ≤20MB；单次读取结果 ≤256KB
 - 外部 MCP 客户端不能触发紧急退出；严格保护照旧生效
 - 异常自动唤醒不加载任何 MCP 服务器
+- 外部接管没有自动过期；暂停后续内置自动请求，不中断当前请求，不暂停核心课程/提醒/考试时钟
 
 ## E. 边界与坑
 

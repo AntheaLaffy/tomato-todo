@@ -26,6 +26,8 @@
 
 ## 任务与历史
 
+`education.focusTasks` 为可省略的教学待办关联数组（缺省为空），每项为 `{taskId, sourceId, kind}`，`kind` 为 `lesson` 或 `homework`。关联任务保存在同一备份的 `tasks` 中，来源必须存在、属于同一项目且一对一；不允许通过导入删除或改写已经建立的关联。已有安排在本机推进时自动生成缺少的待办，不为已过往日期的课程追造执行记录。生成待办不等于参与、专注或掌握。
+
 任务包含计划 v6 的实例字段，另有 `completed`、`completedAt`（Unix 秒/null）、`createdAt`（Unix 秒）、子任务 `done` 与提醒送达状态。`completed` 必须与 `completedAt` 是否存在一致。实例的日期、完成、步骤进度与专注历史均属于实例；`templateId` 只指向来源，修改模板不会改历史。`recurring` 是生成时冻结的重复属性，不能从当前模板反向计算。从习惯组移出或删除习惯组只清 `habitId`，不改写 `recurring`，因此历史缺勤与管辖分类不会随容器变化。实例不保存 `repeat/nextTaskId`。
 
 任务必须有有效的 `dueDate`；提醒时刻可选，`habitId` 引用习惯组。定时且重复的实例按习惯统计，过期计缺勤、不重修。普通定时任务按计划块加 `scrapMinutes` 判断作废，仍在当天重修窗口内的任务进入待补队列。`reminderFired/reminderPending/reminderExpired` 保存本机送达状态，缺省 false。模板与印刷账本规则见 [计划 v6](PLAN_FORMAT.md)。

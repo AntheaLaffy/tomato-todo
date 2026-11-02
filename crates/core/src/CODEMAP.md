@@ -39,6 +39,7 @@ generated_at: 2026-10-10
 | File | Domain | Function |
 | --- | --- | --- |
 | education.rs | 教学核心 | 项目目录绑定元数据、资源引用/清理及学期修订、45分钟课程、固定题目/评分标准、答卷/批改/复盘、持久化教学事件与跨项目约束；功能索引见 education.rs.analysis.md |
+| teaching_tasks.rs | 教学执行 | 课程/作业到普通待办的一对一来源关联、改期更新、明确参与、提交完成与重复作业抑制；计划导出排除并保留教学待办 |
 | learning.rs | 学情证据 | 已完成任务快照、来源可审计且不可覆写的进度历史、订正检查、按提交/批改/订正索引计算动态学情摘要及掌握/计时/订正/复测分层 |
 | education_tests.rs | 验证 | 应试前置条件、课程时钟/缺课、冲突、发布不可变、固定评分与SQLite恢复 |
 | lib.rs | 业务核心 | 备份 v4 数据模型（含 SessionSource 实际计时/任务完成按预计补足、默认关闭的 personaBackdrop 与当天休息周期 cycleDate）、Action、计时与跨日周期重建、静态实例、习惯、愿景、按冻结字段推导的管辖分类（TaskKind）、统计（逐日完成、缺勤与作废）、Engine 持久化；功能索引见 lib.rs.analysis.md |

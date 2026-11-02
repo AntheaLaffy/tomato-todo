@@ -6,9 +6,13 @@
 
 联网工具默认不需要密钥：DeepSeek 使用免 Key 的 Exa 搜索，可在连接配置另填 Exa API Key 提升额度；Codex 使用账号服务端搜索。`web_fetch` 可读取公开网页，但会拦截本机、内网与保留地址。
 
-设置里的「用量」会查询并显示 DeepSeek 账户余额与 Codex 订阅额度（5 小时与每周窗口、套餐、额度）；原始数据可展开，邮箱等字段不展示。查询只读取凭据，不会消耗模型额度。
+对话页的「查询用量」会显示当前后端的 DeepSeek 账户余额或 Codex 订阅额度（5 小时与每周窗口、套餐、额度）；原始数据可展开，邮箱等字段不展示。查询不消耗模型额度；Codex 使用 Pi SDK 的认证解析，登录凭据临近过期时自动刷新并保存，与对话保持一致。连接失败会显示网络错误码并提示检查代理，查询失败按当前后端标注。
 
-运行时使用随包 Node 的原生 HTTP(S) 代理支持。优先采用启动环境中的 `HTTP_PROXY` / `HTTPS_PROXY`（也接受小写）；某协议缺少显式代理时，通过 GIO 桌面代理解析器读取系统配置。显式 `NO_PROXY` / `no_proxy` 保留，否则本机地址默认直连，使用系统代理时同时带入桌面配置的忽略地址。修改代理配置后需重启应用，让工作进程采用新配置；不需要为此重新登录 Codex。桌面 IPC 与浏览器预览将助手请求放在后台阻塞线程执行，等待用量等网络回复时不阻塞窗口或 HTTP 执行器。
+学习助手的聊天模型统一使用 512,000 token 的客户端上下文预算，覆盖 DeepSeek、Codex（含 Spark）和已配置的第三方连接；输出上限、认证与传输沿用 SDK。这个数值用于客户端上下文估算和自动压缩，服务端仍执行自己的模型限制。Pi 工具视图中的 `get_snapshot` 只返回运行状态、完整 `data.settings` / `timer` / `lock`、当日统计和各类记录数量，避免完整教学历史与身份索引占满窗口；具体任务、学情与完整历史通过分页工具或 `export_backup` → `read_file` 分段读取。恢复旧会话时用 Pi 原生 `context_edit` 将完整快照投影为摘要，保留原始消息及分支；外部 MCP 的快照接口继续返回完整软件快照。
+
+「偏好设置 → 网络代理」可填写 `http://127.0.0.1:7890` 这样的 HTTP(S) 代理地址，用于学习助手的对话、登录、联网与用量查询。地址不能带账号密码、路径、参数或片段，不支持 SOCKS；留空跟随环境变量和系统配置。它保存在本机助手 `state.json` 的 `preferences.networkProxy`，默认空串，不随任务备份导出。保存代理会关闭空闲工作进程并创建新进程，无需退出应用或重新登录；分析或登录进行中拒绝修改，先停止当前运行。
+
+运行时使用随包 Node 的原生 HTTP(S) 代理支持。应用内地址优先于启动环境中的 `HTTP_PROXY` / `HTTPS_PROXY`（也接受小写）；未配置时，Linux 通过 GIO 读取系统代理，解析器未返回 HTTP(S) 代理则直接读取 GNOME 手动代理设置，以覆盖 niri 等桌面的 libproxy 配置缺口。HTTPS 未单独配置时沿用桌面 HTTP 代理。显式 `NO_PROXY` / `no_proxy` 保留，否则本机地址默认直连，使用系统代理时同时带入桌面配置的忽略地址。外部环境或系统代理改动仍需重启应用才能重新读取。桌面 IPC 与浏览器预览将助手请求放在后台阻塞线程执行，等待用量等网络回复时不阻塞窗口或 HTTP 执行器。
 
 对话输入框下方的「思考强度」可选择关闭、最低、低、中、高、更高、最高（off/minimal/low/medium/high/xhigh/max），默认中。选择保存到助手偏好，下一轮请求（包括恢复会话）显式传给 Pi SDK；模型不支持的强度由 SDK 按模型能力调整，非推理模型关闭思考。运行中不可修改。
 
@@ -49,6 +53,8 @@ Rust 本地检查不调用模型。每60秒重新计算，启动时也检查；�
 
 
 内置技能通过 `read_skill` 按需加载：证据诊断、学习规划、长期记忆、备份/计划批量编辑、工作区脚本批量改动、应用操作与状态解释，以及随包收录的通用技能（shell 脚本、管道与文本处理、正则、写给读者的改动说明）。文件技能的参考文档与 Schema 从仓库的规范文档复制到运行包，不包含私人课表、计划或数据库。用户也可以把自定义技能放到 `~/.agents/skills/` 或助手私有目录 `skills/`，助手会列出并读取；技能名只允许目录名，不能越出技能根。
+
+应试教学由 `exam-teaching` 维护应用契约；出题与组卷同时读取 `exam-authoring`，以真题为质量基准，按资料角色取材，留存蓝图、逐题依据、固定评分和实际复解记录。其参考文件与结构检查脚本一同随包，私人资料导航不进入安装包，详见 [应试教学](EDUCATION.md)。
 
 部分通用技能改编自 MIT《The Missing Semester》课程材料（CC BY-NC-SA 4.0，出处已随技能保留）；此许可与应用自身的 MIT 不同，如需纯 MIT 分发可换成自写版本。
 
@@ -138,6 +144,14 @@ Rust 本地检查不调用模型。每60秒重新计算，启动时也检查；�
 ```
 
 MCP 使用标准换行 JSON-RPC stdio，不启动第二份数据库。它连接正在运行的桌面/预览实例，共享同一个 Engine；关闭软件后不可操作。桥接仅监听127.0.0.1，要求私有连接令牌并拒绝浏览器 Origin。
+
+安装后可直接配置命令 `tomato-todo --mcp`，默认寻找本用户的连接文件；自定义数据库或数据目录时显式传 `--connection`。同一端口还提供标准 Streamable HTTP：读取私有 `connection.json` 的 `mcpUrl`，以 `Authorization: Bearer <token>` 连接 `/mcp`。这是无会话的JSON响应实现，通知返回202；不提供SSE订阅，GET返回405。端口和令牌随软件重启更新，stdio每次调用重读连接文件，适合稳定的本机客户端配置。传输遵循 [MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)，同时接受2025-06-18与2025-03-26；令牌不出现在状态接口或示例中。
+
+外部Agent使用与内置助手相同的业务工具与技能，不需要内置模型登录。`resources/list` 可发现接管指南 `tomato://guide` 和各技能入口；`resources/templates/list` 提供 `tomato://skills/{name}/{+reference}`，可读契约、参考文档和脚本；`prompts/get(name="take-over", arguments={task: ...})` 提供接管提示词。没有MCP资源界面的客户端也可用 `list_skills` 取得名称、用途与URI，再 `read_skill` 按需加载。仅限当前SDK轮次的图像生成与作者彩蛋不列入外部工具清单。
+
+接管先 `get_control_status` 与 `get_context`，按需 `get_tasks`、`get_study_progress`、`get_education`。后者按 `collection/projectId/id/offset/limit` 分页提供完整教学记录，集合为projects/resources/semesters/semesterHistory/lessons/assessments/submissions/grades/reviews/events/completedTasks/progress/corrections/focusTasks。教学的创建、发布、提交与批改走 `education`，课程/作业自动进入今日专注，不额外建一份任务。
+
+需要由外部Agent独立处理教学、定时与复盘时，调用 `set_external_control {controller: "客户端名称"}` 暂停内置助手后续自动执行；内置请求正在运行则拒绝接管，先等待结束或由用户停止。事件继续持久化排队，课程、提醒与考试时钟照常推进。该状态保存到助手私有 `state.json`，没有自动过期，也不会关掉用户主动聊天。完成后传 `controller:null` 归还，或在学习助手页面点击「归还内置自动执行」。这是显式的执行归属，不新增模型调度、轮次限制或重试循环。
 
 外部客户端除只读、记忆与文件工具外，可以使用 `dispatch` 直接执行单项 Action，或在 `review_file` 后 `apply_file` 显式应用文件。它不能 `emergencyUnlock` 或 `completeFocus`，紧急退出与提前完成番茄由用户在界面操作；原生能力预检、严格保护、来源/文件哈希校验仍然执行。浏览器预览的 MCP 同样不能启用桌面保护。
 

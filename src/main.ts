@@ -3,6 +3,8 @@ import {
   educationCard,
   educationDashboard,
   educationBanner,
+  educationFocusExams,
+  openTeachingTask,
   mountEducation,
   chooseProjectDirectory,
 } from "./education";
@@ -14,11 +16,11 @@ import {
   prefillAgent,
   setupAgent,
   syncPersonaBackdrop,
-} from "./agent";
-import {
   networkSettingsCard,
   saveNetworkProxy,
   refreshAgent,
+} from "./agent";
+import {
   type IconNode,
   Sun,
   Moon,
@@ -521,9 +523,9 @@ async function navigate(next: string) {
   if (page === "settings" && settingsDirty && next !== page) {
     if (!(await savePreferences())) return;
   }
+  if (next === "settings" && !mobile) await refreshAgent();
   setMobileNav(false);
   page = next;
-  if (next === "settings" && !mobile) await refreshAgent();
   search = "";
   filter = "active";
   priority = "all";
@@ -600,22 +602,25 @@ function render() {
   setMobileNav(mobileNavOpen);
   bindForms();
   if (page === "agent") mountAgent();
-  mountEducation(state, {
+  mountEducation(state, educationHooks());
+  icons();
+  updateClock();
+  resizeCalendar();
+  mountCalendarResize();
+  restoreScroll(scrollMemory);
+}
+function educationHooks() {
+  return {
     accept,
     toast,
-    ask: (text) => {
+    ask: (text: string) => {
       prefillAgent(text);
       void navigate("agent");
     },
     refresh: render,
     modal,
     close: closeModal,
-  });
-  icons();
-  updateClock();
-  resizeCalendar();
-  mountCalendarResize();
-  restoreScroll(scrollMemory);
+  };
 }
 // 每一页的思索条目：悬停整页不弹胶囊（整页都是它），所以在标题旁给一个
 // 明确的入口，点开就是这一页的「设计理念 + 怎么用」。
@@ -729,7 +734,7 @@ function focusPage() {
         : activeList
     }</div>
     <button class="quick-add" data-action="new-task">${icon("plus")} 添加一个想完成的任务 <kbd>N</kbd></button><div class="list-footnote" data-explanation>${icon("sparkles")} 开始之前，先选一件最重要的事。</div></section></div>
-    <div class="bottom-grid"><section class="card week-card"><div class="card-heading"><h2>这一周的专注节奏</h2><button class="text-button" data-page="stats">查看统计 ${icon("arrow-up-right")}</button></div>${weekChart(false)}</section><section class="quote-card" data-explanation><div class="quote-leaf">${icon("leaf")}</div><span class="eyebrow">ONE THING AT A TIME</span><h3>不求每一天都满分，<br>只求每一刻都投入。</h3><p>一个番茄，一点进步。</p><div class="quote-dots"><i></i><i></i><i></i></div></section></div>`;
+    ${educationFocusExams(state)}<div class="bottom-grid"><section class="card week-card"><div class="card-heading"><h2>这一周的专注节奏</h2><button class="text-button" data-page="stats">查看统计 ${icon("arrow-up-right")}</button></div>${weekChart(false)}</section><section class="quote-card" data-explanation><div class="quote-leaf">${icon("leaf")}</div><span class="eyebrow">ONE THING AT A TIME</span><h3>不求每一天都满分，<br>只求每一刻都投入。</h3><p>一个番茄，一点进步。</p><div class="quote-dots"><i></i><i></i><i></i></div></section></div>`;
 }
 function todayTaskGroup(
   title: string,
@@ -790,8 +795,11 @@ function taskList(tasks: Task[], compact = false, order = sort) {
         selected = task.id === state.data.timer.taskId,
         picked = selectMode && selectedTaskIds.has(task.id),
         catchUp = isCatchUp(task),
-        voided = isVoid(task);
-      return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}" ${voided ? "disabled" : ""}>${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed && !voided ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="编辑 ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
+        voided = isVoid(task),
+        teaching = state.data.education.focusTasks?.find(
+          (l) => l.taskId === task.id,
+        );
+      return `<article data-task-id="${escape(task.id)}" class="task-row ${selectMode ? "selecting" : ""} ${picked ? "picked" : ""} ${task.reminderPending ? "reminded" : ""} ${catchUp ? "catch-up" : ""} ${task.completed ? "completed" : ""} ${selected && !task.completed ? "selected" : ""}">${selectMode ? `<button class="task-checkbox pick ${picked ? "on" : ""}" data-select-task="${task.id}" aria-label="选择 ${escape(task.title)}">${picked ? icon("check") : ""}</button>` : `<button class="task-checkbox p${task.priority}" data-toggle-task="${task.id}" aria-label="${task.completed ? "重新打开" : "完成"}任务 ${escape(task.title)}" aria-pressed="${task.completed}" ${voided ? "disabled" : ""}>${task.completed ? icon("check") : ""}</button>`}<button class="task-body" ${selectMode ? `data-select-task="${task.id}"` : `data-edit-task="${task.id}"`}><span class="task-title">${escape(task.title)}${catchUp ? '<span class="catch-up-chip">待补</span>' : ""}</span><span class="task-meta">${teaching ? `<span class="tag">${teaching.kind === "lesson" ? "课程" : "作业"}</span>` : ""}${task.reminderTime ? `<span>${icon("clock-3")}${escape(task.reminderTime)} 提醒</span>` : ""}${task.focusMinutes ? `<span>${task.focusMinutes} 分钟/次</span>` : ""}${p ? `<span class="task-project" style="--project:${escape(p.color)}"><i></i>${escape(p.name)}</span>` : ""}${task.dueDate ? `<span class="${task.dueDate < state.today && !task.completed ? "overdue" : ""}">${icon("calendar-days")}${dateLabel(task.dueDate)}</span>` : ""}${task.subtasks.length ? `<span>${icon("list-todo")}${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}</span>` : ""}${!compact && task.tags.length ? `<span class="tag"># ${escape(task.tags.join(" # "))}</span>` : ""}</span></button><div class="task-trailing"><span class="tomato-count ${done >= task.estimate ? "achieved" : ""}">${logo}<span>${done}<small>/${task.estimate}</small></span></span>${selectMode ? "" : `${!task.completed && !voided ? `<button class="task-play icon-btn" data-focus-task="${task.id}" aria-label="专注于 ${escape(task.title)}">${icon(selected && state.data.timer.running ? "pause" : "play")}</button>` : ""}<button class="icon-btn task-more" data-edit-task="${task.id}" aria-label="${teaching ? "查看教学安排" : "编辑"} ${escape(task.title)}">${icon("ellipsis")}</button>`}</div></article>`;
     })
     .join("");
 }
@@ -885,7 +893,13 @@ function schedulePage() {
   const brk = state.data.settings.shortBreakMinutes;
   const lists = days.map((d) =>
     state.data.tasks
-      .filter((t) => t.dueDate === isoDate(d))
+      .filter(
+        (t) =>
+          t.dueDate === isoDate(d) &&
+          !state.data.education.focusTasks?.some(
+            (l) => l.taskId === t.id && l.kind === "lesson",
+          ),
+      )
       .sort((a, b) => toMin(a.reminderTime) - toMin(b.reminderTime)),
   );
   // Bands are weekly, so each column shows the ones starting that weekday. A
@@ -1310,6 +1324,14 @@ async function savePreferences(): Promise<boolean> {
     if (desktop) settings.alwaysOnTop = f.has("alwaysOnTop");
     settings.theme = f.get("theme") as Settings["theme"];
     preferencesStatus("正在保存…");
+    if (f.has("networkProxy")) {
+      try {
+        await saveNetworkProxy(String(f.get("networkProxy") ?? ""));
+      } catch (error) {
+        preferencesStatus(`保存失败：${String(error)}；修改已保留`);
+        return false;
+      }
+    }
     if (
       desktop &&
       nativeStatus &&
@@ -1324,14 +1346,6 @@ async function savePreferences(): Promise<boolean> {
         );
       } catch (error) {
         preferencesStatus(
-    if (f.has("networkProxy")) {
-      try {
-        await saveNetworkProxy(String(f.get("networkProxy") ?? ""));
-      } catch (error) {
-        preferencesStatus(`保存失败：${String(error)}；修改已保留`);
-        return false;
-      }
-    }
           `保存失败：${String(error)}；修改已保留，下次离开时重试`,
         );
         return false;
@@ -2138,6 +2152,7 @@ function templateDialog(
 }
 
 function taskDialog(id?: string) {
+  if (id && openTeachingTask(state, id, educationHooks())) return;
   const task = state.data.tasks.find((t) => t.id === id);
   const subs = task?.subtasks.map((s) => ({ ...s })) || [];
   const projectId =
@@ -2855,6 +2870,13 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (d.toggleTask) {
+    const link = state.data.education.focusTasks?.find(
+      (l) => l.taskId === d.toggleTask,
+    );
+    if (link?.kind === "homework") {
+      taskDialog(d.toggleTask);
+      return;
+    }
     await act({ type: "toggleTask", id: d.toggleTask });
     return;
   }

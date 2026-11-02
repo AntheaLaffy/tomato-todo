@@ -458,7 +458,7 @@ test(
       });
       const hw = packet("hw", "homework", now - 60, now + 3600),
         exam = packet("exam", "mockExam", now - 30, now + 1800);
-      const data = structuredClone(snapshot.data);
+      let data = structuredClone(snapshot.data);
       data.education = {
         projects: [
           {
@@ -609,7 +609,7 @@ test(
         needsReview: false,
         feedback: "请订正计算",
       };
-      data.education = snapshot.data.education;
+      data = structuredClone(snapshot.data);
       data.education.grades.push(grade);
       await action({ type: "import", data });
       await page.reload();
@@ -747,6 +747,13 @@ test(
         await new Promise((r) => setTimeout(r, 100));
       }
       const clockData = structuredClone(final);
+      clockData.tasks = clockData.tasks.filter(
+        (task) =>
+          !clockData.education.focusTasks.some(
+            (link) => link.taskId === task.id,
+          ),
+      );
+      clockData.education.focusTasks = [];
       clockData.education.assessments = [deadline];
       clockData.education.submissions = [];
       clockData.education.grades = [];

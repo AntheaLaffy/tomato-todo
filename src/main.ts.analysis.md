@@ -1,57 +1,57 @@
 ---
 source: main.ts
-lines: 3504
-generated_at: 2026-11-01
+lines: 3538
+generated_at: 2026-11-02
 ---
 
 ## 功能索引
 
 | 用途 | Lines | Notes |
 | --- | --- | --- |
-| 导入、状态、格式化与派发 | 1–514 | 接口改动核对共享核心与适配层 |
-| 导航、提醒与今日待办 | 515–794 | 接口改动核对共享核心与适配层 |
-| 本周日历、阻塞时段与任务列表 | 795–1079 | 接口改动核对共享核心与适配层 |
-| 习惯、愿景与统计 | 1080–1269 | 接口改动核对共享核心与适配层 |
-| 偏好、保护、锁机与沉浸 | 1270–1620 | 接口改动核对共享核心与适配层 |
-| 弹窗、模板印刷与任务编辑 | 1621–2241 | 接口改动核对共享核心与适配层 |
-| 项目、搜索、声音与表单绑定 | 2242–2652 | 接口改动核对共享核心与适配层 |
-| 文件导入与页面事件 | 2653–3313 | 接口改动核对共享核心与适配层 |
-| 批量操作、拖拽与快捷键 | 3314–3399 | 接口改动核对共享核心与适配层 |
-| 启动、讲解挂载与轮询 | 3400–3504 | 接口改动核对共享核心与适配层 |
+| 导入、状态、格式化与派发 | 1–560 | 共享核心与适配层 |
+| 导航、提醒与今日待办 | 561–805 | 课程与作业进入普通任务列表，考试使用专门入口 |
+| 周日程、固定占用与任务列表 | 806–1097 | 课程只画教学块，避免来源任务重复显示 |
+| 习惯、愿景与统计 | 1098–1440 | 普通任务和教学任务使用同一执行统计 |
+| 偏好、保护、锁机与沉浸 | 1441–1646 | 核心保护不绕开 |
+| 弹窗、模板与任务编辑 | 1647–2268 | 教学任务打开来源详情，不独立改日期 |
+| 项目、搜索、声音与表单 | 2269–2679 | 现有任务环境 |
+| 导入与页面事件 | 2680–3347 | 作业复选框进入提交，不伪装完成 |
+| 批量、拖拽与快捷键 | 3348–3433 | 教学来源须保留 |
+| 启动与轮询 | 3434–3538 | 接收共享快照 |
 
 ## Symbols
 
 | Symbol | Type | Line |
 | --- | --- | --- |
-| focusPage | function | 687 |
-| todayTaskGroup | function | 730 |
-| compareTaskTime | function | 764 |
-| isCatchUp | function | 748 |
-| taskList | function | 771 |
-| isoDate | const | 795 |
-| resizeCalendar | function | 848 |
-| schedulePage | function | 865 |
-| tasksPage | function | 1023 |
-| collectionsPage | function | 1080 |
-| habitsTab | function | 1086 |
-| visionDialog | function | 1149 |
-| activityCard | function | 1202 |
-| statsPage | function | 1206 |
-| savePreferences | function | 1270 |
-| settingsPage | function | 1361 |
-| projectWhitelistCard | function | 1375 |
-| guardPage | function | 1415 |
-| templatesCard | function | 1673 |
-| datesForPrinting | function | 1684 |
-| printDialog | function | 1711 |
-| templateDialog | function | 1767 |
-| taskDialog | function | 2128 |
-| importPlan | function | 2670 |
-| selectControls | function | 3314 |
-| detachSelected | function | 3319 |
-| deleteSelectedTasks | function | 3329 |
-| sortProjects | function | 3354 |
-| boot | function | 3421 |
+| focusPage | function | 696 |
+| todayTaskGroup | function | 739 |
+| compareTaskTime | function | 773 |
+| isCatchUp | function | 757 |
+| taskList | function | 780 |
+| isoDate | const | 799 |
+| resizeCalendar | function | 860 |
+| schedulePage | function | 877 |
+| tasksPage | function | 1041 |
+| collectionsPage | function | 1098 |
+| habitsTab | function | 1104 |
+| visionDialog | function | 1167 |
+| activityCard | function | 1220 |
+| statsPage | function | 1224 |
+| savePreferences | function | 1288 |
+| settingsPage | function | 1387 |
+| projectWhitelistCard | function | 1401 |
+| guardPage | function | 1441 |
+| templatesCard | function | 1699 |
+| datesForPrinting | function | 1710 |
+| printDialog | function | 1737 |
+| templateDialog | function | 1793 |
+| taskDialog | function | 2154 |
+| importPlan | function | 2697 |
+| selectControls | function | 3348 |
+| detachSelected | function | 3353 |
+| deleteSelectedTasks | function | 3363 |
+| sortProjects | function | 3388 |
+| boot | function | 3455 |
 
 全部任务页用与待完成、已完成、全部同级的「模板」标签切换独立模板目录，避免模板被长任务列表推到页面底部；项目页仍在项目任务后显示本项目模板。模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通任务待补呈现。
 
@@ -69,7 +69,7 @@ generated_at: 2026-11-01
 
 背景音：backgroundSoundButton 在普通专注、沉浸与专注保护（含严格模式）界面共用入口；休息锁机不提供声音入口。soundDialog 调用 bgm.ts 导入并保存至少 1 小时的音频，手动循环播放/暂停/移除，与合成噪音互斥；雨声使用随包真实录音，异步解码期间后续选择可取消旧请求；boot 恢复保存文件，不自动播放。
 
-偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/备份。长休息间隔说明按当天完成的番茄累计，跨日重置由 Rust 核心负责。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。
+偏好页：settingsPage 按内容高度分列，左列专注/学习计划，右列体验/桌面集成/网络代理/备份。网络代理保存到助手 Preferences，空闲时重建 Node，失败保留表单。长休息间隔说明按当天完成的番茄累计，跨日重置由 Rust 核心负责。savePreferences 合并手动保存与离页保存；输入仅标记 dirty，窗口失焦不保存；无效或保存失败时保留表单并阻止离页。
 
 锁机日程：focusSchedule / focusScheduleDialog白天取 state.today；当天启用且星期匹配的跨夜锁机开始后取次日，午夜后继续显示这一天（改称今天）。午间小憩、停用时段和未安排跨夜锁机均显示今日；updateClock 在时间边界同步入口和已打开的弹窗。时间排序、无时间排末尾，排除已报废实例。展示任务/项目/备注/步骤，无修改和计时入口；renderImmersive 在保护期间提供入口，严格模式可用，休息锁机使用深色弹窗。
 

@@ -1249,6 +1249,35 @@
           "items": {
             "$ref": "#/$defs/educationCorrection"
           }
+        },
+        "focusTasks": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sourceId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "lesson",
+                  "homework"
+                ]
+              }
+            },
+            "required": [
+              "taskId",
+              "sourceId",
+              "kind"
+            ]
+          }
         }
       },
       "required": [

@@ -7,6 +7,8 @@
 - **把番茄 Todo 当 MCP 服务器**（外部客户端连正在运行的软件）：见 [AGENT.md](AGENT.md) 的「外部 MCP」。
 - **给助手接一个 MCP 服务器**（本文）：助手作为客户端，连接你配置的程序。
 
+外部Agent接管软件的本机入口是 `tomato-todo --mcp`；也可使用私有连接文件里的 `mcpUrl` 和令牌走标准HTTP。接管指南、技能和参考文件已作为MCP resources/prompts暴露，`list_skills`、`get_education` 让没有资源浏览界面的客户端也能发现并使用。需要暂停内置自动执行时显式 `set_external_control`，结束后归还；具体字段和数据边界见上述外部MCP说明。
+
 ## 最小可用服务器
 
 stdio 传输，一个工具就够跑通。用官方 SDK（Node 版，例子见 [modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk)）：

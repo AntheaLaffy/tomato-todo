@@ -2086,7 +2086,7 @@ test(
         401,
       );
       mcp = spawn(
-        "target/debug/tomato-preview",
+        join(dir, "tomato-preview"),
         ["--mcp", "--connection", connectionFile],
         { stdio: "pipe" },
       );
@@ -2104,7 +2104,7 @@ test(
       assert.equal(
         (await rpc(1, "initialize", { protocolVersion: "2025-11-25" })).result
           .serverInfo.name,
-        "tomato-study",
+        "tomato-todo",
       );
       const listed = await rpc(2, "tools/list");
       assert.ok(listed.result.tools.some((t) => t.name === "dispatch"));
