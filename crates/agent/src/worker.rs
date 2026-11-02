@@ -5,47 +5,93 @@ use serde_json::{json, Value};
 use std::{
     io::{BufRead, BufReader, Write},
     process::{Child, ChildStdin, Command, Stdio},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 use tomato_core::AppResult;
 pub struct Process {
     pub child: Child,
     pub stdin: ChildStdin,
+    pub stopping: Arc<AtomicBool>,
 }
 #[cfg(target_os = "linux")]
-fn configure_proxy(command: &mut Command) {
+fn desktop_proxy_settings() -> Option<gio::Settings> {
+    let schema = gio::SettingsSchemaSource::default()?.lookup("org.gnome.system.proxy", true)?;
+    Some(gio::Settings::new_full(
+        &schema,
+        None::<&gio::SettingsBackend>,
+        None,
+    ))
+}
+#[cfg(target_os = "linux")]
+fn manual_proxy(settings: &gio::Settings, scheme: &str) -> Option<String> {
+    if settings.string("mode") != "manual" {
+        return None;
+    }
+    let proxy = settings.child(scheme);
+    let host = proxy.string("host");
+    let port = proxy.int("port");
+    if host.is_empty() || port == 0 {
+        return (scheme == "https")
+            .then(|| manual_proxy(settings, "http"))
+            .flatten();
+    }
+    let mut proxy_url = url::Url::parse("http://localhost").ok()?;
+    proxy_url.set_host(Some(&host)).ok()?;
+    proxy_url.set_port(Some(port as u16)).ok()?;
+    if scheme == "http" && proxy.boolean("use-authentication") {
+        proxy_url
+            .set_username(&proxy.string("authentication-user"))
+            .ok()?;
+        proxy_url
+            .set_password(Some(&proxy.string("authentication-password")))
+            .ok()?;
+    }
+    Some(proxy_url.into())
+}
+#[cfg(target_os = "linux")]
+fn configure_proxy(command: &mut Command, explicit: &str) {
     // Desktop launchers often lack the shell's exports. Use the desktop resolver
     // only when no explicit HTTP(S) proxy was supplied, then let Node handle I/O.
     let resolver = gio::ProxyResolver::default();
+    let settings = desktop_proxy_settings();
     let mut desktop_proxy = false;
     for (scheme, variable) in [("http", "HTTP_PROXY"), ("https", "HTTPS_PROXY")] {
-        if [variable.to_string(), variable.to_lowercase()]
-            .iter()
-            .any(|name| std::env::var(name).is_ok_and(|value| !value.is_empty()))
+        if !explicit.is_empty()
+            || [variable.to_string(), variable.to_lowercase()]
+                .iter()
+                .any(|name| std::env::var(name).is_ok_and(|value| !value.is_empty()))
         {
             continue;
         }
-        if let Ok(proxies) = resolver.lookup(
-            &format!("{scheme}://chatgpt.com/"),
-            None::<&gio::Cancellable>,
-        ) {
-            if let Some(proxy) = proxies
-                .first()
-                .filter(|proxy| proxy.starts_with("http://") || proxy.starts_with("https://"))
-            {
-                command.env(variable, proxy.as_str());
-                desktop_proxy = true;
-            }
+        let resolved = resolver
+            .lookup(
+                &format!("{scheme}://chatgpt.com/"),
+                None::<&gio::Cancellable>,
+            )
+            .ok()
+            .and_then(|proxies| {
+                proxies
+                    .first()
+                    .filter(|proxy| proxy.starts_with("http://") || proxy.starts_with("https://"))
+                    .map(ToString::to_string)
+            });
+        // libproxy can ignore GNOME's manual settings under niri and other desktops.
+        if let Some(proxy) = resolved.or_else(|| {
+            settings
+                .as_ref()
+                .and_then(|settings| manual_proxy(settings, scheme))
+        }) {
+            command.env(variable, proxy);
+            desktop_proxy = true;
         }
     }
     if std::env::var_os("NO_PROXY").is_none() && std::env::var_os("no_proxy").is_none() {
         let mut bypass = vec!["localhost".into(), "127.0.0.1".into(), "::1".into()];
         if desktop_proxy {
-            if let Some(schema) = gio::SettingsSchemaSource::default()
-                .and_then(|source| source.lookup("org.gnome.system.proxy", true))
-            {
-                let settings =
-                    gio::Settings::new_full(&schema, None::<&gio::SettingsBackend>, None);
+            if let Some(settings) = settings {
                 bypass.extend(
                     settings
                         .strv("ignore-hosts")
@@ -58,7 +104,7 @@ fn configure_proxy(command: &mut Command) {
     }
 }
 #[cfg(not(target_os = "linux"))]
-fn configure_proxy(command: &mut Command) {
+fn configure_proxy(command: &mut Command, _explicit: &str) {
     if std::env::var_os("NO_PROXY").is_none() && std::env::var_os("no_proxy").is_none() {
         command.env("NO_PROXY", "localhost,127.0.0.1,::1");
     }
@@ -69,7 +115,20 @@ pub fn start(agent: &Arc<Agent>) -> AppResult<Process> {
         return Err("Agent 运行包未构建，请运行 pnpm run agent:build 后重新启动".into());
     }
     let mut command = Command::new(node);
-    configure_proxy(&mut command);
+    let proxy = agent
+        .inner
+        .lock()
+        .map_err(|e| e.to_string())?
+        .store
+        .preferences
+        .network_proxy
+        .clone();
+    configure_proxy(&mut command, &proxy);
+    if !proxy.is_empty() {
+        for variable in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"] {
+            command.env(variable, &proxy);
+        }
+    }
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -88,9 +147,14 @@ pub fn start(agent: &Arc<Agent>) -> AppResult<Process> {
         .map_err(|e| e.to_string())?;
     let stdin = child.stdin.take().ok_or("无法连接 Agent 输入")?;
     let stdout = child.stdout.take().ok_or("无法连接 Agent 输出")?;
+    let stopping = Arc::new(AtomicBool::new(false));
+    let stopped = stopping.clone();
     let weak = Arc::downgrade(agent);
     std::thread::spawn(move || {
         for line in BufReader::new(stdout).lines() {
+            if stopped.load(Ordering::Acquire) {
+                continue;
+            }
             let Some(agent) = weak.upgrade() else {
                 return;
             };
@@ -133,11 +197,17 @@ pub fn start(agent: &Arc<Agent>) -> AppResult<Process> {
                 agent.event(event);
             }
         }
-        if let Some(agent) = weak.upgrade() {
-            agent.failure("Agent 进程已退出；重试会重新启动，历史与记忆仍保留");
+        if !stopped.load(Ordering::Acquire) {
+            if let Some(agent) = weak.upgrade() {
+                agent.failure("Agent 进程已退出；重试会重新启动，历史与记忆仍保留");
+            }
         }
     });
-    Ok(Process { child, stdin })
+    Ok(Process {
+        child,
+        stdin,
+        stopping,
+    })
 }
 pub fn send(process: &mut Process, value: &Value) -> AppResult<()> {
     serde_json::to_writer(&mut process.stdin, value).map_err(|e| e.to_string())?;

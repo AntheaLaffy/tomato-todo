@@ -35,6 +35,7 @@ type Preferences = {
   provider: string;
   model: string;
   thinkingLevel: ThinkingLevel;
+  networkProxy: string;
   dailyCapacityMinutes: number | null;
   maxAutoWakesPerDay: number;
   cooldownHours: number;
@@ -149,6 +150,7 @@ const defaults: Preferences = {
   model: "",
   thinkingLevel: "medium",
   dailyCapacityMinutes: null,
+  networkProxy: "",
   maxAutoWakesPerDay: 3,
   cooldownHours: 24,
   quietStart: "22:00",
@@ -504,7 +506,8 @@ function renderChat() {
           .join("")}</ol></div>`
       : "",
   );
-  replace("agent-questions", questionHtml());
+  if (!document.activeElement?.closest(".agent-other"))
+    replace("agent-questions", questionHtml());
   const thinkingBox = document.getElementById("agent-thinking");
   if (thinkingBox && !thinkingBox.contains(document.activeElement))
     replace("agent-thinking", thinkingSelectHtml());
@@ -806,7 +809,10 @@ async function loadUsage() {
   try {
     usage = await agentCall<Usage>({ op: "usage" });
   } catch (error) {
-    usage = { deepseek: { error: String(error) } };
+    usage =
+      status?.preferences.provider === "openai-codex"
+        ? { codex: { error: String(error) } }
+        : { deepseek: { error: String(error) } };
   } finally {
     usageLoading = false;
     renderUsage();
@@ -819,6 +825,19 @@ function sheetHtml(): string {
   const p = s.preferences;
   const busy = s.busy || requestPending;
   const title: Record<string, string> = {
+export function networkSettingsCard() {
+  return `<section class="card settings-card"><h2>网络代理</h2><label class="form-field"><span>HTTP(S) 代理地址</span><input name="networkProxy" type="url" maxlength="2048" placeholder="http://127.0.0.1:7890" value="${esc(status?.preferences.networkProxy ?? "")}" ${status ? "" : "disabled"}></label><p class="note">用于学习助手的对话、登录、联网与用量查询。留空跟随环境变量和系统代理；保存后生效。支持 HTTP(S) 地址，不支持 SOCKS 或带账号密码的地址。</p></section>`;
+}
+export async function saveNetworkProxy(proxy: string) {
+  const latest = await agentCall<AgentStatus>({ op: "status" });
+  if ((latest.preferences.networkProxy ?? "") === proxy.trim()) return;
+  await call({
+    op: "configure",
+    preferences: { ...latest.preferences, networkProxy: proxy.trim() },
+  });
+  usage = null;
+  renderUsage();
+}
     settings: "设置",
     memory: "记忆",
     signals: "学情信号",
@@ -947,6 +966,13 @@ function update() {
     if (
       document
         .getElementById("agent-messages")
+  const proxy = document.querySelector<HTMLInputElement>(
+    '[name="networkProxy"]',
+  );
+  if (proxy?.disabled && status) {
+    proxy.value = status.preferences.networkProxy ?? "";
+    proxy.disabled = false;
+  }
         ?.contains(selection?.anchorNode ?? null)
     )
       selection?.removeAllRanges();
@@ -1379,6 +1405,7 @@ async function submit(form: HTMLFormElement) {
       thinkingLevel: status?.preferences.thinkingLevel ?? "medium",
       dailyCapacityMinutes: data.get("dailyCapacityMinutes")
         ? Number(data.get("dailyCapacityMinutes"))
+      networkProxy: status?.preferences.networkProxy ?? "",
         : null,
       maxAutoWakesPerDay: Number(data.get("maxAutoWakesPerDay")),
       cooldownHours: Number(data.get("cooldownHours")),

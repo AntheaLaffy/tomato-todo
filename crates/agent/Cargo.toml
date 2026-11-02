@@ -13,6 +13,7 @@ uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
 base64 = "0.22"
 tempfile = "3"
+url = "2"
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "signal"] }
 

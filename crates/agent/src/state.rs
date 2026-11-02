@@ -228,6 +228,7 @@ pub struct Preferences {
     pub provider: String,
     pub model: String,
     pub thinking_level: String,
+    pub network_proxy: String,
     pub daily_capacity_minutes: Option<u32>,
     pub max_auto_wakes_per_day: u32,
     pub cooldown_hours: u32,
@@ -245,6 +246,7 @@ impl Default for Preferences {
             provider: "deepseek".into(),
             model: String::new(),
             thinking_level: "medium".into(),
+            network_proxy: String::new(),
             daily_capacity_minutes: None,
             max_auto_wakes_per_day: 3,
             cooldown_hours: 24,
@@ -257,6 +259,26 @@ impl Default for Preferences {
 }
 impl Preferences {
     pub fn validate(&self) -> AppResult<()> {
+        if !self.network_proxy.is_empty() {
+            let proxy = url::Url::parse(&self.network_proxy)
+                .map_err(|_| "网络代理需为完整的 HTTP(S) 地址，例如 http://127.0.0.1:7890")?;
+            if self.network_proxy.len() > 2048
+                || self.network_proxy.chars().any(char::is_whitespace)
+                || !["http", "https"].contains(&proxy.scheme())
+                || !self
+                    .network_proxy
+                    .starts_with(&format!("{}://", proxy.scheme()))
+                || proxy.host_str().is_none()
+                || proxy.port() == Some(0)
+                || !proxy.username().is_empty()
+                || proxy.password().is_some()
+                || proxy.path() != "/"
+                || proxy.query().is_some()
+                || proxy.fragment().is_some()
+            {
+                return Err("网络代理仅支持不含账号密码、路径或参数的 HTTP(S) 地址".into());
+            }
+        }
         if !["off", "minimal", "low", "medium", "high", "xhigh", "max"]
             .contains(&self.thinking_level.as_str())
         {

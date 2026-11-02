@@ -6,6 +6,10 @@ export const codexHome = process.env.CODEX_HOME || join(homedir(), ".codex");
 export const codexAuthPath = join(codexHome, "auth.json");
 export const codexConfigPath = join(codexHome, "config.toml");
 
+export function configureContextWindows(runtime) {
+  for(const provider of new Set(["deepseek","openai-codex",...runtime.getRegisteredProviderIds()]))runtime.registerProvider(provider,{models:runtime.getAllModels(provider).map(model=>(model.type??"chat")==="chat"?{...model,contextWindow:512000}:model)});
+}
+
 // Codex CLI intentionally keeps this file small and TOML-like. This parser only
 // handles the provider fields documented by Codex, while ignoring unrelated
 // project/UI settings instead of trying to interpret arbitrary TOML.

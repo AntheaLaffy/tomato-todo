@@ -236,7 +236,8 @@ impl Agent {
                     .preferences
                     .provider
                     .clone();
-                self.ask_worker(json!({"op":"usage","provider":provider}), 20)
+                // Pi may refresh OAuth (15s) before the quota request (12s).
+                self.ask_worker(json!({"op":"usage","provider":provider}), 30)
             }
             // Codex-style MCP server management, answered by the packaged runtime
             // so the SDK's own config validation is the single source of truth.
@@ -254,8 +255,10 @@ impl Agent {
                 files::download(&self.dir.join("workspace"), &args)
             }
             "configure" => {
-                let preferences: Preferences = serde_json::from_value(args["preferences"].clone())
-                    .map_err(|e| e.to_string())?;
+                let mut preferences: Preferences =
+                    serde_json::from_value(args["preferences"].clone())
+                        .map_err(|e| e.to_string())?;
+                preferences.network_proxy = preferences.network_proxy.trim().into();
                 preferences.validate()?;
                 if ["apiKey", "exaKey"]
                     .iter()
@@ -263,13 +266,38 @@ impl Agent {
                 {
                     return Err("Key 过长".into());
                 }
-                {
+                let proxy_changed = {
                     let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
                     if inner.live.busy {
                         return Err("请先停止当前分析或登录再修改后端配置".into());
                     }
-                    inner.store.preferences = preferences;
-                    inner.store.save(&self.dir)?;
+                    let proxy_changed =
+                        inner.store.preferences.network_proxy != preferences.network_proxy;
+                    let mut next = inner.store.clone();
+                    next.preferences = preferences;
+                    next.save(&self.dir)?;
+                    inner.store = next;
+                    proxy_changed
+                };
+                if proxy_changed {
+                    let mut process = self.process.lock().map_err(|e| e.to_string())?;
+                    if let Some(previous) = process.take() {
+                        previous
+                            .stopping
+                            .store(true, std::sync::atomic::Ordering::Release);
+                        drop(previous.stdin);
+                        let mut child = previous.child;
+                        child.wait().map_err(|e| e.to_string())?;
+                    }
+                    for (_, pending) in self
+                        .worker_pending
+                        .lock()
+                        .map_err(|e| e.to_string())?
+                        .drain()
+                    {
+                        let _ = pending.send(Err("网络代理已修改，请重试请求".into()));
+                    }
+                    *process = Some(worker::start(self)?);
                 }
                 let api_key = args["apiKey"].as_str().unwrap_or_default().trim();
                 let exa_key = args["exaKey"].as_str().unwrap_or_default().trim();

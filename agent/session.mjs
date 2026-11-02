@@ -43,6 +43,13 @@ export async function closeStudySession(session, reason = "new") {
  */
 export const mcpStatus = { servers: [], errors: [] };
 const noOp = () => {};
+// Historical ledgers belong in the paged tools/files, not one model context turn.
+function snapshotSummary(value) {
+  const data=value.data,counts=Object.fromEntries(Object.entries(data).filter(([,v])=>Array.isArray(v)).map(([k,v])=>[k,v.length]));
+  counts.identities=Object.keys(data.identities??{}).length;
+  counts.education=Object.fromEntries(Object.entries(data.education??{}).filter(([,v])=>Array.isArray(v)).map(([k,v])=>[k,v.length]));
+  return {today:value.today,serverTime:value.serverTime,remainingSecs:value.remainingSecs,data:{settings:data.settings,timer:data.timer,lock:data.lock},stats:{todaySeconds:value.stats?.todaySeconds,todayPomodoros:value.stats?.todayPomodoros},counts,note:"当前运行状态摘要；任务用 get_tasks，学情用 get_study_progress；完整数据用 export_backup 后 read_file 按 JSON Pointer 分段读取。"};
+}
 // Let Pi extract the actual path, including tools and compaction entries. Replaying
 // the UI's text would silently change what the model sees after editing a message.
 export async function forkStudySession(dir, command) {
@@ -113,6 +120,15 @@ export async function createStudySession({
   const manager = safe
     ? SessionManager.open(saved, sessions, cwd)
     : SessionManager.create(cwd, sessions);
+  // Pi's branch-local context edits keep the original history while preventing
+  // old full snapshots from overflowing again when a conversation is restored.
+  for(const entry of manager.buildSessionProjection().entries)for(const message of entry.messages){
+    if(message.role!=="toolResult"||message.toolName!=="get_snapshot")continue;
+    const text=message.content.filter(c=>c.type==="text").map(c=>c.text).join("\n");let value;
+    try{value=JSON.parse(text);}catch{continue;}
+    if(!value?.data||!("identities" in value.data||"education" in value.data||"tasks" in value.data))continue;
+    const summary=snapshotSummary(value);manager.appendContextEdit(entry.sourceEntry.id,{content:[{type:"text",text:JSON.stringify(summary)}],details:summary});
+  }
   const settingsManager = SettingsManager.inMemory({
     compaction: { enabled: true },
     retry: { enabled: true, maxRetries: 2 },
@@ -204,7 +220,8 @@ export async function createStudySession({
         toolApi.registerTool(appTool(command.tools.find(t=>t.name==="get_agent_internals")));
         toolApi.setActiveTools([...session.getActiveToolNames(),"get_agent_internals"]);
       }
-      if (tool.name!=="get_snapshot" && value?.data?.tasks) value={ok:true,today:value.today,taskCount:value.data.tasks.length,stats:{todaySeconds:value.stats.todaySeconds,todayPomodoros:value.stats.todayPomodoros},note:"修改已应用，可用 get_tasks 查看具体任务。"};
+      if(tool.name==="get_snapshot"&&value?.data)value=snapshotSummary(value);
+      else if (value?.data?.tasks) value={ok:true,today:value.today,taskCount:value.data.tasks.length,stats:{todaySeconds:value.stats.todaySeconds,todayPomodoros:value.stats.todayPomodoros},note:"修改已应用，可用 get_tasks 查看具体任务。"};
       return {
         content: [{ type: "text", text: JSON.stringify(value) }],
         details: value,

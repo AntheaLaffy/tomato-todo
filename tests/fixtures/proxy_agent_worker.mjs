@@ -6,7 +6,8 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   const request = JSON.parse(line);
   if (request.op !== "usage") return;
   try {
-    const response = await fetch("http://proxy-target.invalid/usage");
+    await fetch("http://proxy-target.invalid/usage").then((r) => r.json());
+    const response = await fetch("https://proxy-target.invalid/usage");
     emit({
       type: "network_result",
       id: request.id,

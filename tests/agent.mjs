@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import { createConnection } from "node:net";
 import { createInterface } from "node:readline";
 import {
@@ -16,6 +17,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { chromium, expect } from "@playwright/test";
 import { ModelRuntime } from "../agent/node_modules/@earendil-works/pi-coding-agent/dist/index.js";
+import { SessionManager } from "../agent/node_modules/@earendil-works/pi-coding-agent/dist/index.js";
 import {
   closeStudySession,
   createStudySession,
@@ -26,6 +28,7 @@ import { parseExa, publicAddress } from "../agent/web.mjs";
 import {
   codexAuthDocument,
   codexProviderConfigs,
+  configureContextWindows,
   normalizeCodexCredential,
   parseCodexConfig,
 } from "../agent/codex-config.mjs";
@@ -41,97 +44,195 @@ test("sandboxed shell keeps the app's local timezone", () => {
   assert.equal(env[tz + 1], Intl.DateTimeFormat().resolvedOptions().timeZone);
 });
 
-test(
-  "Rust worker starts packaged Node with HTTP proxy support",
-  { timeout: 20000 },
-  async () => {
-    const dir = await mkdtemp(join(tmpdir(), "tomato-proxy-"));
-    const requests = [];
-    const proxy = createServer((request, response) => {
-      requests.push(request.url);
-      response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ codex: { route: "local-proxy" } }));
-    });
-    const target = createServer((request, response) => {
-      response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ codex: { route: "local-proxy" } }));
-    });
-    await new Promise((resolve) => target.listen(0, "127.0.0.1", resolve));
-    const tunnels = new Set();
-    proxy.on("connect", (request, socket, head) => {
-      requests.push(request.url);
-      const upstream = createConnection(
-        target.address().port,
-        "127.0.0.1",
-        () => {
-          socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-          if (head.length) upstream.write(head);
-          socket.pipe(upstream).pipe(socket);
-        },
-      );
-      tunnels.add(socket);
-      tunnels.add(upstream);
-      socket.on("error", () => upstream.destroy());
-      upstream.on("error", () => socket.destroy());
-    });
-    await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
-    await mkdir(join(dir, "agent/bin"), { recursive: true });
-    await copyFile("target/debug/tomato-preview", join(dir, "tomato-preview"));
-    await copyFile("agent/bundle/bin/node", join(dir, "agent/bin/node"));
-    await copyFile(
-      "tests/fixtures/proxy_agent_worker.mjs",
-      join(dir, "agent/worker.mjs"),
-    );
-    const endpoint = "http://127.0.0.1:4343";
-    const server = spawn(join(dir, "tomato-preview"), [], {
-      env: {
-        ...process.env,
-        TOMATO_PORT: "4343",
-        TOMATO_DATA_PATH: join(dir, "data.sqlite3"),
-        HTTP_PROXY: `http://127.0.0.1:${proxy.address().port}`,
-        http_proxy: `http://127.0.0.1:${proxy.address().port}`,
-        NO_PROXY: "localhost,127.0.0.1,::1",
-        no_proxy: "localhost,127.0.0.1,::1",
+async function verifyProxy(mode) {
+  const dir = await mkdtemp(join(tmpdir(), "tomato-proxy-"));
+  const key = join(dir, "key.pem"),
+    cert = join(dir, "cert.pem");
+  execFileSync(
+    "openssl",
+    [
+      "req",
+      "-x509",
+      "-newkey",
+      "rsa:2048",
+      "-nodes",
+      "-keyout",
+      key,
+      "-out",
+      cert,
+      "-days",
+      "1",
+      "-subj",
+      "/CN=proxy-target.invalid",
+      "-addext",
+      "subjectAltName=DNS:proxy-target.invalid",
+    ],
+    { stdio: "ignore" },
+  );
+  const requests = [];
+  const proxy = createServer((request, response) => {
+    requests.push(request.url);
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ codex: { route: "local-proxy" } }));
+  });
+  const target = createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ codex: { route: "local-proxy" } }));
+  });
+  await new Promise((resolve) => target.listen(0, "127.0.0.1", resolve));
+  const secure = createHttpsServer(
+    { key: await readFile(key), cert: await readFile(cert) },
+    (_request, response) =>
+      response.end(JSON.stringify({ codex: { route: "local-proxy" } })),
+  );
+  await new Promise((resolve) => secure.listen(0, "127.0.0.1", resolve));
+  const tunnels = new Set();
+  proxy.on("connect", (request, socket, head) => {
+    requests.push(request.url);
+    const upstream = createConnection(
+      (request.url.endsWith(":443") ? secure : target).address().port,
+      "127.0.0.1",
+      () => {
+        socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+        if (head.length) upstream.write(head);
+        socket.pipe(upstream).pipe(socket);
       },
-      stdio: "pipe",
+    );
+    tunnels.add(socket);
+    tunnels.add(upstream);
+    socket.on("error", () => upstream.destroy());
+    upstream.on("error", () => socket.destroy());
+  });
+  await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+  await mkdir(join(dir, "agent/bin"), { recursive: true });
+  await copyFile("target/debug/tomato-preview", join(dir, "tomato-preview"));
+  await copyFile("agent/bundle/bin/node", join(dir, "agent/bin/node"));
+  await copyFile(
+    "tests/fixtures/proxy_agent_worker.mjs",
+    join(dir, "agent/worker.mjs"),
+  );
+  const endpoint = "http://127.0.0.1:4343";
+  const env = {
+    ...process.env,
+    TOMATO_PORT: "4343",
+    TOMATO_DATA_PATH: join(dir, "data.sqlite3"),
+    NODE_EXTRA_CA_CERTS: cert,
+  };
+  for (const name of [
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+  ])
+    delete env[name];
+  if (mode === "environment") {
+    env.HTTP_PROXY =
+      env.HTTPS_PROXY = `http://127.0.0.1:${proxy.address().port}`;
+    env.NO_PROXY = "localhost,127.0.0.1,::1";
+  } else if (mode === "preferences") {
+    env.HTTP_PROXY =
+      env.HTTPS_PROXY =
+      env.http_proxy =
+      env.https_proxy =
+        "http://127.0.0.1:1";
+  } else {
+    env.XDG_CONFIG_HOME = join(dir, "config");
+    env.GSETTINGS_BACKEND = "keyfile";
+    env.GIO_USE_PROXY_RESOLVER = "dummy";
+    for (const [schema, name, value] of [
+      ["org.gnome.system.proxy", "mode", "manual"],
+      ["org.gnome.system.proxy.http", "host", "127.0.0.1"],
+      ["org.gnome.system.proxy.http", "port", String(proxy.address().port)],
+    ])
+      execFileSync("gsettings", ["set", schema, name, value], { env });
+  }
+  const server = spawn(join(dir, "tomato-preview"), [], {
+    env,
+    stdio: "pipe",
+  });
+  let logs = "";
+  server.stderr.on("data", (chunk) => (logs += chunk));
+  try {
+    await waitFor(async () => {
+      try {
+        return (await fetch(`${endpoint}/api/snapshot`)).ok;
+      } catch {
+        return false;
+      }
     });
-    let logs = "";
-    server.stderr.on("data", (chunk) => (logs += chunk));
-    try {
-      await waitFor(async () => {
-        try {
-          return (await fetch(`${endpoint}/api/snapshot`)).ok;
-        } catch {
-          return false;
-        }
-      });
-      const response = await fetch(`${endpoint}/api/agent`, {
+    if (mode === "preferences") {
+      const status = await fetch(`${endpoint}/api/agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "usage" }),
+        body: JSON.stringify({ op: "status" }),
+      }).then((r) => r.json());
+      const configured = await fetch(`${endpoint}/api/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          op: "configure",
+          preferences: {
+            ...status.preferences,
+            networkProxy: `http://127.0.0.1:${proxy.address().port}`,
+          },
+        }),
       });
-      assert.equal(response.status, 200, await response.clone().text());
-      assert.deepEqual(await response.json(), {
-        codex: { route: "local-proxy" },
-      });
-      assert.ok(
-        requests.includes("proxy-target.invalid:80") ||
-          requests.includes("http://proxy-target.invalid/usage"),
-        JSON.stringify(requests),
-      );
-    } catch (error) {
-      throw new Error(`${error.message}\n${logs}`, { cause: error });
-    } finally {
-      server.kill("SIGTERM");
-      for (const socket of tunnels) socket.destroy();
-      proxy.closeAllConnections();
-      target.closeAllConnections();
-      await Promise.all([
-        new Promise((resolve) => proxy.close(resolve)),
-        new Promise((resolve) => target.close(resolve)),
-      ]);
+      assert.equal(configured.status, 200, await configured.clone().text());
+      assert.equal((await configured.json()).error, null);
     }
-  },
+    const response = await fetch(`${endpoint}/api/agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "usage" }),
+    });
+    assert.equal(response.status, 200, await response.clone().text());
+    assert.deepEqual(await response.json(), {
+      codex: { route: "local-proxy" },
+    });
+    assert.ok(
+      requests.includes("proxy-target.invalid:80") ||
+        requests.includes("http://proxy-target.invalid/usage"),
+      JSON.stringify(requests),
+    );
+    assert.ok(
+      requests.includes("proxy-target.invalid:443"),
+      JSON.stringify(requests),
+    );
+  } catch (error) {
+    throw new Error(`${error.message}\n${logs}`, { cause: error });
+  } finally {
+    server.kill("SIGTERM");
+    if (server.exitCode === null)
+      await new Promise((resolve) => server.once("exit", resolve));
+    for (const socket of tunnels) socket.destroy();
+    proxy.closeAllConnections();
+    target.closeAllConnections();
+    secure.closeAllConnections();
+    await Promise.all([
+      new Promise((resolve) => proxy.close(resolve)),
+      new Promise((resolve) => target.close(resolve)),
+      new Promise((resolve) => secure.close(resolve)),
+    ]);
+  }
+}
+test(
+  "Rust worker uses environment proxy for HTTP and HTTPS",
+  { timeout: 30000 },
+  () => verifyProxy("environment"),
+);
+test(
+  "Rust worker uses desktop proxy for HTTP and HTTPS",
+  { timeout: 30000, skip: process.platform !== "linux" },
+  () => verifyProxy("desktop"),
+);
+test(
+  "Rust worker uses preferences proxy for HTTP and HTTPS",
+  { timeout: 30000 },
+  () => verifyProxy("preferences"),
 );
 
 test("Codex CLI provider and OAuth files map to Pi without network access", async () => {
@@ -157,7 +258,40 @@ experimental_bearer_token = "test-token"`);
     refreshOnCreate: false,
     allowModelNetwork: false,
   });
+  const originalCodex = runtime.getModel("openai-codex", "gpt-6.1-sol");
   runtime.registerProvider(provider.id, provider);
+  const otherCodexModels = runtime
+    .getAllModels("openai-codex")
+    .filter((model) => (model.type ?? "chat") !== "chat");
+  const spark = runtime
+    .getModels("openai-codex")
+    .find((model) => model.id.includes("spark"));
+  configureContextWindows(runtime);
+  const codexModel = runtime.getModel("openai-codex", "gpt-6.1-sol");
+  assert.equal(codexModel.contextWindow, 512000);
+  assert.equal(codexModel.maxTokens, originalCodex.maxTokens);
+  assert.equal(codexModel.api, originalCodex.api);
+  assert.deepEqual(codexModel.input, originalCodex.input);
+  assert.ok(runtime.getProvider("openai-codex").auth.oauth);
+  assert.deepEqual(
+    runtime
+      .getAllModels("openai-codex")
+      .filter((model) => (model.type ?? "chat") !== "chat"),
+    otherCodexModels,
+  );
+  assert.equal(
+    runtime.getModel("openai-codex", spark.id).contextWindow,
+    512000,
+  );
+  assert.ok(
+    runtime
+      .getModels("deepseek")
+      .every((model) => model.contextWindow === 512000),
+  );
+  assert.equal(
+    runtime.getModel(provider.id, provider.models[0].id).contextWindow,
+    512000,
+  );
   assert.equal(
     runtime.getModel("custom", "gpt-6-sol")?.baseUrl,
     "https://example.test/v1",
@@ -185,6 +319,137 @@ experimental_bearer_token = "test-token"`);
   assert.equal(shared.tokens.access_token, "access");
   assert.ok(Number.isFinite(Date.parse(shared.last_refresh)));
 });
+
+test(
+  "usage refreshes Codex OAuth through Pi and reports transport failures",
+  { timeout: 20000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tomato-usage-"));
+    const codex = join(dir, "codex"),
+      data = join(dir, "agent");
+    await mkdir(codex);
+    const token = `e30.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "synthetic-account" }, exp: 9999999999 })).toString("base64url")}.signature`;
+    await writeFile(
+      join(codex, "auth.json"),
+      JSON.stringify({
+        tokens: {
+          id_token: "synthetic-id",
+          access_token: "expired-token",
+          refresh_token: "synthetic-refresh",
+          account_id: "synthetic-account",
+          expires: 1,
+        },
+      }),
+    );
+    const requests = [];
+    let fail = false;
+    const mock = createServer(async (request, response) => {
+      let body = "";
+      for await (const chunk of request) body += chunk;
+      requests.push({ path: request.url, headers: request.headers, body });
+      if (request.url === "/oauth/token") {
+        response.end(
+          JSON.stringify({
+            access_token: token,
+            refresh_token: "rotated-refresh",
+            expires_in: 3600,
+          }),
+        );
+      } else if (fail) request.socket.destroy();
+      else
+        response.end(
+          JSON.stringify({
+            plan_type: "plus",
+            rate_limit: { primary_window: { used_percent: 17 } },
+          }),
+        );
+    });
+    await new Promise((resolve) => mock.listen(0, "127.0.0.1", resolve));
+    const worker = spawn(
+      "agent/bundle/bin/node",
+      [
+        "--import",
+        resolve("tests/fixtures/usage_fetch.mjs"),
+        resolve("agent/worker.mjs"),
+        data,
+      ],
+      {
+        env: {
+          ...process.env,
+          CODEX_HOME: codex,
+          TOMATO_TEST_USAGE_ORIGIN: `http://127.0.0.1:${mock.address().port}`,
+          NO_PROXY: "127.0.0.1",
+          no_proxy: "127.0.0.1",
+        },
+        stdio: "pipe",
+      },
+    );
+    const events = [];
+    let output = "";
+    createInterface({ input: worker.stdout }).on("line", (line) =>
+      events.push(JSON.parse(line)),
+    );
+    worker.stderr.on("data", (chunk) => (output += chunk));
+    const usage = async (id) => {
+      worker.stdin.write(
+        JSON.stringify({ op: "usage", provider: "openai-codex", id }) + "\n",
+      );
+      return waitFor(() =>
+        events.find(
+          (event) => event.type === "network_result" && event.id === id,
+        ),
+      );
+    };
+    try {
+      await waitFor(() => events.some((event) => event.type === "ready"));
+      const first = await usage("first");
+      assert.equal(
+        first.result?.codex?.rate_limit?.primary_window?.used_percent,
+        17,
+        JSON.stringify(first),
+      );
+      assert.deepEqual(
+        requests.map((request) => request.path),
+        ["/oauth/token", "/usage"],
+      );
+      assert.equal(
+        new URLSearchParams(requests[0].body).get("refresh_token"),
+        "synthetic-refresh",
+      );
+      assert.equal(requests[1].headers.authorization, `Bearer ${token}`);
+      assert.equal(
+        requests[1].headers["chatgpt-account-id"],
+        "synthetic-account",
+      );
+      const saved = JSON.parse(await readFile(join(codex, "auth.json")));
+      assert.equal(saved.tokens.refresh_token, "rotated-refresh");
+      assert.equal(saved.tokens.id_token, "synthetic-id");
+      assert.equal((await stat(join(codex, "auth.json"))).mode & 0o777, 0o600);
+      assert.equal((await usage("second")).result.codex.plan_type, "plus");
+      assert.equal(
+        requests.filter((request) => request.path === "/oauth/token").length,
+        1,
+      );
+      fail = true;
+      const failed = await usage("failed");
+      assert.match(
+        failed.result.codex.error,
+        /用量接口连接失败.*UND_ERR_SOCKET.*网络代理/,
+      );
+      assert.ok(!JSON.stringify(events).includes(token));
+      assert.ok(!JSON.stringify(events).includes("synthetic-refresh"));
+    } catch (error) {
+      throw new Error(`${error.message}\n${output}`, { cause: error });
+    } finally {
+      if (worker.exitCode === null) {
+        worker.stdin.end();
+        await new Promise((resolve) => worker.once("exit", resolve));
+      }
+      mock.closeAllConnections();
+      await new Promise((resolve) => mock.close(resolve));
+    }
+  },
+);
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(fn, tries = 100) {
@@ -530,7 +795,7 @@ test(
       assert.ok(file.startsWith(join(dir, "sessions")));
       const history = await readFile(file, "utf8");
       assert.ok(history.includes("请先读学情摘要"));
-      session.dispose();
+      await closeStudySession(session);
       const resumed = await createStudySession({
         runtime,
         dir,
@@ -758,9 +1023,224 @@ test(
         /路径无效/,
       );
     } finally {
-      session?.dispose();
+      await closeStudySession(session);
       server.closeAllConnections();
       await new Promise((r) => server.close(r));
+    }
+  },
+);
+
+test(
+  "large snapshots stay out of model context across tool calls and session restoration",
+  { timeout: 30000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tomato-snapshot-"));
+    const snapshot = {
+      today: "2026-11-02",
+      stats: { todaySeconds: 60, todayPomodoros: 1 },
+      data: {
+        settings: { personaBackdrop: true, soundVolume: 55 },
+        timer: { status: "idle" },
+        lock: {},
+        tasks: [{ id: "synthetic-task" }],
+        identities: Object.fromEntries(
+          Array.from({ length: 6000 }, (_, i) => [
+            `identity-${i}`,
+            { title: "synthetic-ledger-entry".repeat(15) },
+          ]),
+        ),
+        education: {
+          progress: Array.from({ length: 5000 }, (_, i) => ({
+            id: `progress-${i}`,
+            note: "synthetic-history".repeat(20),
+          })),
+        },
+      },
+    };
+    const raw = JSON.stringify(snapshot),
+      requests = [];
+    assert.ok(raw.length > 3_000_000);
+    const server = createServer(async (request, response) => {
+      let body = "";
+      for await (const chunk of request) body += chunk;
+      const parsed = JSON.parse(body);
+      requests.push(parsed);
+      const read =
+        parsed.messages.at(-1).role === "user" && requests.length === 1;
+      const delta = read
+        ? {
+            role: "assistant",
+            tool_calls: [
+              {
+                index: 0,
+                id: "snapshot-call",
+                type: "function",
+                function: { name: "get_snapshot", arguments: "{}" },
+              },
+            ],
+          }
+        : { role: "assistant", content: "已读取设置，继续完成任务。" };
+      const chunk = (delta, finish_reason = null) => ({
+        id: "snapshot",
+        object: "chat.completion.chunk",
+        created: 1,
+        model: "snapshot-model",
+        choices: [{ index: 0, delta, finish_reason }],
+      });
+      response.writeHead(200, { "Content-Type": "text/event-stream" });
+      response.end(
+        `data: ${JSON.stringify(chunk(delta))}\n\ndata: ${JSON.stringify(chunk({}, read ? "tool_calls" : "stop"))}\n\ndata: [DONE]\n\n`,
+      );
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const runtime = await ModelRuntime.create({
+      modelsPath: null,
+      modelsStorePath: null,
+      refreshOnCreate: false,
+      allowModelNetwork: false,
+    });
+    runtime.registerProvider("deepseek", {
+      baseUrl: `http://127.0.0.1:${server.address().port}`,
+      apiKey: "synthetic",
+      api: "openai-completions",
+      models: [
+        {
+          id: "snapshot-model",
+          name: "Local snapshot regression",
+          reasoning: false,
+          input: ["text"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 65536,
+          maxTokens: 4096,
+        },
+      ],
+    });
+    const command = {
+      provider: "deepseek",
+      model: "snapshot-model",
+      preferences: {},
+      automatic: true,
+      tools: [
+        {
+          name: "get_snapshot",
+          description: "Read full snapshot",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+    };
+    const create = (command) =>
+      createStudySession({
+        runtime,
+        dir,
+        root: resolve("agent"),
+        command,
+        toolRequest: async () => snapshot,
+      });
+    let session;
+    try {
+      const created = await create(command);
+      session = created.session;
+      await session.prompt("读取当前设置后继续完成任务");
+      assert.equal(
+        session.getLastAssistantText(),
+        "已读取设置，继续完成任务。",
+      );
+      const result = JSON.parse(
+        requests[1].messages.find((message) => message.role === "tool").content,
+      );
+      assert.deepEqual(result.data.settings, snapshot.data.settings);
+      assert.equal(result.counts.identities, 6000);
+      assert.equal(result.counts.education.progress, 5000);
+      assert.equal(result.counts.tasks, 1);
+      assert.match(result.note, /get_tasks.*get_study_progress.*read_file/);
+      assert.ok(!("identities" in result.data));
+      assert.ok(JSON.stringify(requests[1]).length < 100_000);
+      assert.ok(
+        (await readFile(created.manager.getSessionFile(), "utf8")).length <
+          100_000,
+      );
+      await closeStudySession(session);
+      session = undefined;
+      const old = SessionManager.create(
+        join(dir, "workspace/coding"),
+        join(dir, "sessions"),
+      );
+      old.appendMessage({
+        role: "user",
+        content: [{ type: "text", text: "继续之前的任务" }],
+        timestamp: Date.now(),
+      });
+      old.appendMessage({
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "old-snapshot",
+            name: "get_snapshot",
+            arguments: {},
+          },
+        ],
+        api: "openai-completions",
+        provider: "deepseek",
+        model: "snapshot-model",
+        stopReason: "toolUse",
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        timestamp: Date.now(),
+      });
+      const original = old.appendMessage({
+        role: "toolResult",
+        toolCallId: "old-snapshot",
+        toolName: "get_snapshot",
+        content: [{ type: "text", text: raw }],
+        details: snapshot,
+        isError: false,
+        timestamp: Date.now(),
+      });
+      const restored = await create({
+        ...command,
+        sessionFile: old.getSessionFile(),
+      });
+      session = restored.session;
+      assert.equal(
+        restored.manager.getEntry(original).message.content[0].text,
+        raw,
+      );
+      assert.equal(
+        restored.manager
+          .getEntries()
+          .filter((entry) => entry.type === "context_edit").length,
+        1,
+      );
+      await session.prompt("继续，不要遗漏当前设置");
+      assert.equal(
+        session.getLastAssistantText(),
+        "已读取设置，继续完成任务。",
+      );
+      assert.ok(JSON.stringify(requests.at(-1)).length < 100_000);
+      await closeStudySession(session);
+      session = undefined;
+      const reopened = await create({
+        ...command,
+        sessionFile: old.getSessionFile(),
+      });
+      session = reopened.session;
+      assert.equal(
+        reopened.manager
+          .getEntries()
+          .filter((entry) => entry.type === "context_edit").length,
+        1,
+      );
+    } finally {
+      await closeStudySession(session);
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
     }
   },
 );
@@ -1660,6 +2140,57 @@ test(
       await page.reload();
       await page.locator('[data-page="agent"]').click();
       await expect(page.locator("#agent-thinking-select")).toHaveValue("high");
+      await page.locator('[data-page="settings"]').click();
+      const proxyInput = page.locator('[name="networkProxy"]');
+      await expect(proxyInput).toHaveValue("");
+      await proxyInput.fill("socks5://127.0.0.1:7890");
+      await page.locator('#settings-form [type="submit"]').click();
+      await expect(page.locator("#settings-status")).toContainText(
+        "网络代理仅支持",
+      );
+      assert.equal((await api({ op: "status" })).preferences.networkProxy, "");
+      await expect(proxyInput).toHaveValue("socks5://127.0.0.1:7890");
+      await proxyInput.fill("http://127.0.0.1:17890");
+      await page.locator('[data-page="agent"]').click();
+      await expect(page.locator("h1")).toContainText("学习助手");
+      assert.equal(
+        (await api({ op: "status" })).preferences.networkProxy,
+        "http://127.0.0.1:17890",
+      );
+      await page.reload();
+      await page.locator('[data-page="settings"]').click();
+      await expect(proxyInput).toHaveValue("http://127.0.0.1:17890");
+      await page.setViewportSize({ width: 360, height: 900 });
+      assert.ok(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await proxyInput.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: "artifacts/network-proxy.png" });
+      await proxyInput.fill("");
+      await page.locator('#settings-form [type="submit"]').click();
+      await expect(page.locator("#settings-status")).toContainText("已保存");
+      assert.equal((await api({ op: "status" })).preferences.networkProxy, "");
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.locator('[data-page="agent"]').click();
+      await page.locator("#agent-model-select").selectOption("openai-codex|");
+      await page.route("**/api/agent", async (route) => {
+        if (route.request().postDataJSON()?.op === "usage")
+          await route.fulfill({
+            status: 400,
+            contentType: "text/plain",
+            body: "synthetic offline",
+          });
+        else await route.continue();
+      });
+      await page.locator('[data-agent="refresh-usage"]').click();
+      await expect(page.locator(".agent-usage-line")).toContainText("Codex");
+      await expect(page.locator(".agent-usage-line")).not.toContainText(
+        "DeepSeek",
+      );
+      await page.unroute("**/api/agent");
+      await page.locator("#agent-model-select").selectOption("deepseek|");
       // Memory lives in an on-demand sheet.
       await page.locator('[data-agent="memory"]').click();
       await page
@@ -1740,13 +2271,23 @@ test(
       });
       await asked.goto(url);
       await asked.locator('[data-page="agent"]').click();
+      const other = asked.locator(".agent-other input");
+      await other.fill("想");
+      await asked.waitForTimeout(3000);
+      assert.equal(
+        await other.evaluate((input) => input === document.activeElement),
+        true,
+        "polling should not replace the focused multi-select answer input",
+      );
+      await other.pressSequentially("补充");
+      await expect(other).toHaveValue("想补充");
       await asked
         .locator('[data-agent="choose"][data-label="英语（推荐）"]')
         .click();
       await asked.locator('[data-agent="choose"][data-label="数学"]').click();
       await expect(asked.locator(".agent-choice.picked")).toHaveCount(2);
       await asked.locator('[data-agent="answer-choice"]').click();
-      assert.deepEqual(sent, ["选科目：英语（推荐）、数学"]);
+      assert.deepEqual(sent, ["选科目：英语（推荐）、数学；补充：想补充"]);
       // 多个问题时确认收拢到页脚一个按钮：一次提交把整组答案当作一条消息发出去。
       pending = [
         {

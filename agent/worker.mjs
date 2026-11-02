@@ -7,7 +7,7 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { closeStudySession, createStudySession, forkStudySession, mcpStatus } from "./session.mjs";
 import { mcpCommand } from "./mcp-config.mjs";
 import { networkTool } from "./web.mjs";
-import { codexAuthDocument, codexAuthPath, codexProviderConfigs, normalizeCodexCredential, readCodexConfig } from "./codex-config.mjs";
+import { codexAuthDocument, codexAuthPath, codexProviderConfigs, configureContextWindows, normalizeCodexCredential, readCodexConfig } from "./codex-config.mjs";
 
 process.umask(0o077);
 const dir = resolve(process.argv[2]);
@@ -102,6 +102,13 @@ async function usageJson(url, headers) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return text ? JSON.parse(text) : {};
 }
+function usageError(error) {
+  const causes=[];for(let cause=error;cause&&!causes.includes(cause);cause=cause.cause)causes.push(cause);
+  const codes=[...new Set(causes.flatMap(cause=>[cause.code,...(Array.isArray(cause.errors)?cause.errors:[]).map(e=>e.code)]).filter(code=>typeof code==="string"&&/^[A-Z0-9_]+$/.test(code)))];
+  if(causes.some(cause=>cause.name==="TimeoutError"))return "用量查询超时，请检查网络代理或稍后重试";
+  if(causes.some(cause=>cause.message==="fetch failed"))return `用量接口连接失败${codes.length?`（${codes.join(" / ")}）`:""}，请检查偏好设置中的网络代理`;
+  return String(error.message);
+}
 // Provider-side quota is not part of the Pi SDK: DeepSeek exposes a balance
 // endpoint, and the ChatGPT subscription exposes rate-limit windows through the
 // same backend Codex CLI reads. Both are best-effort; an error is reported as-is.
@@ -121,23 +128,25 @@ async function usageReport(provider) {
           balances: data.balance_infos ?? [],
         };
       } catch (error) {
-        report.deepseek = { error: String(error.message) };
+        report.deepseek = { error: usageError(error) };
       }
     }
   } else if (provider === "openai-codex") {
-    const codex = await credentials.read("openai-codex");
-    if (codex?.access) {
-      try {
+    try {
+      // Use Pi's auth resolution so quota reads refresh expired OAuth just like chat.
+      const auth = await (await initialized).getAuth("openai-codex");
+      if (auth?.auth.apiKey) {
+        const codex = await credentials.read("openai-codex");
         report.codex = await usageJson(
           "https://chatgpt.com/backend-api/wham/usage",
           {
-            authorization: `Bearer ${codex.access}`,
+            authorization: `Bearer ${auth.auth.apiKey}`,
             "chatgpt-account-id": codex.accountId ?? "",
           },
         );
-      } catch (error) {
-        report.codex = { error: String(error.message) };
       }
+    } catch (error) {
+      report.codex = { error: usageError(error) };
     }
   }
   return report;
@@ -160,6 +169,7 @@ const initialized = (async () => {
     if (provider.id === "openai-codex" || !provider.baseUrl) continue;
     runtime.registerProvider(provider.id, provider);
   }
+  configureContextWindows(runtime);
   return runtime;
 })();
 async function authStatus() {

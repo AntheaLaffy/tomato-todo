@@ -352,6 +352,56 @@ fn thinking_preference_defaults_and_validates_sdk_levels() {
     assert!(preferences.validate().is_err());
 }
 
+#[test]
+fn network_proxy_is_local_validated_and_cannot_interrupt_a_turn() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::default();
+    assert!(store.preferences.network_proxy.is_empty());
+    for proxy in [
+        "",
+        "http://127.0.0.1:7890",
+        "https://proxy.example:8443",
+        "http://[::1]:7890",
+    ] {
+        store.preferences.network_proxy = proxy.into();
+        store.preferences.validate().unwrap();
+        store.save(dir.path()).unwrap();
+        assert_eq!(
+            Store::load(dir.path()).unwrap().preferences.network_proxy,
+            proxy
+        );
+    }
+    for proxy in [
+        "127.0.0.1:7890",
+        "http:proxy",
+        "socks5://localhost:1080",
+        "http://localhost:0",
+        "http://localhost:99999",
+        "http://user:password@localhost:7890",
+        "http://localhost/path",
+        "http://localhost?key=secret",
+        "http://localhost#fragment",
+    ] {
+        store.preferences.network_proxy = proxy.into();
+        assert!(store.preferences.validate().is_err(), "{proxy}");
+    }
+    store.preferences.network_proxy.clear();
+    store.save(dir.path()).unwrap();
+    let agent = service(dir.path(), Arc::new(AtomicUsize::new(0)));
+    agent.inner.lock().unwrap().live.busy = true;
+    let mut preferences = agent.status().unwrap()["preferences"].clone();
+    preferences["networkProxy"] = json!("http://127.0.0.1:7890");
+    assert!(agent
+        .request(json!({"op":"configure","preferences":preferences}))
+        .unwrap_err()
+        .contains("请先停止"));
+    assert!(Store::load(dir.path())
+        .unwrap()
+        .preferences
+        .network_proxy
+        .is_empty());
+}
+
 fn action(value: Value) -> Action {
     serde_json::from_value(value).unwrap()
 }
