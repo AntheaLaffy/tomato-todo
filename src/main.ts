@@ -2891,7 +2891,24 @@ document.addEventListener("click", async (e) => {
       taskDialog(d.toggleTask);
       return;
     }
-    await act({ type: "toggleTask", id: d.toggleTask });
+    const wasCompleted = state.data.tasks.find(
+      (t) => t.id === d.toggleTask,
+    )?.completed;
+    const eventId =
+      link?.kind === "lesson"
+        ? `homework:${link.sourceId}`
+        : `taskHomework:${d.toggleTask}`;
+    const hadEvent = state.data.education.events.some((e) => e.id === eventId);
+    if (
+      (await act({ type: "toggleTask", id: d.toggleTask })) &&
+      !wasCompleted &&
+      !hadEvent &&
+      state.data.education.events.some(
+        (e) => e.id === eventId && e.state === "pending",
+      ) &&
+      !protectedNow()
+    )
+      await navigate("agent");
     return;
   }
   if (d.focusTask) {

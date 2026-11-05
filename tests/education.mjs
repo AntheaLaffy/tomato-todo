@@ -496,6 +496,20 @@ test(
         corrections: [],
       };
       await action({ type: "import", data });
+      const savedTask = await action({
+        type: "saveTask",
+        task: { title: "等待布置作业的学习任务", projectId: p, dueDate: date },
+      });
+      const studyTaskId = savedTask.data.tasks.find(
+        (task) => task.title === "等待布置作业的学习任务",
+      ).id;
+      const ordinaryTask = await action({
+        type: "saveTask",
+        task: { title: "普通任务不跳转", dueDate: date },
+      });
+      const ordinaryTaskId = ordinaryTask.data.tasks.find(
+        (task) => task.title === "普通任务不跳转",
+      ).id;
       browser = await chromium.launch({
         headless: true,
         executablePath: process.env.CHROMIUM_PATH || "/usr/sbin/chromium",
@@ -506,6 +520,19 @@ test(
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(base);
+      await page.locator('[data-page="tasks"]').first().click();
+      await page.locator(`[data-toggle-task="${ordinaryTaskId}"]`).click();
+      await expect(page.locator("h1")).toContainText("把想做的事，慢慢完成。");
+      await page.locator(`[data-toggle-task="${studyTaskId}"]`).click();
+      await expect(page.locator("h1")).toContainText("学习助手", {
+        timeout: 2000,
+      });
+      snapshot = await (await fetch(base + "/api/snapshot")).json();
+      assert.ok(
+        snapshot.data.education.events.some(
+          (event) => event.id === `taskHomework:${studyTaskId}`,
+        ),
+      );
       await page.locator('[data-page="education"]').first().click();
       await expect(page.locator(".education-dashboard")).toContainText(
         "学生端",

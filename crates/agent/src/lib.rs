@@ -825,6 +825,16 @@ impl Agent {
                     None,
                 )?;
                 let text = format!("执行已启用的应试教学事件 {}：项目 {}，类型 {}，来源 {}。先 read_skill(name=exam-teaching)，读取 get_snapshot 中对应资料与进度。homework=课程结束后的作业；taskHomework=完成学习任务后的作业，先读取education.completedTasks中sourceId对应的任务快照及get_study_progress，绑定assessment.taskId（lessonId=null），只覆盖明确已学的知识点，未明确的范围先核实，不推定掌握；两种作业都预先准备答案、评分点并复核，并按用户可用自习时间和固定课程减量，不机械补满180分钟；correction=依据原题、发布答案和评分标准检查指定订正，使用reviewCorrection保存结果，订正通过不代表独立复测已通过；grade=按发布时固定评分点批改指定提交，识别不清标记待复核；review=每日复盘，解释为什么错并安排复测；weeklyExam=根据本周已学范围和目标考试标准准备本周末两个考试窗口（避开固定占用），预先完成试卷、答案、评分点和复核。保存实际产物后使用 education finishEvent 完成事件。不得以文字回复代替落库。用户停止或供应商报错后保留状态，等待用户重试。", event.id,event.project_id,event.kind,event.source_id);
+                // 出题要在助手页可见；只在领取作业事件时唤醒，避免普通教学事件
+                // 或每次轮询反复抢走用户当前页面。
+                if matches!(event.kind.as_str(), "taskHomework" | "homework") {
+                    self.inner
+                        .lock()
+                        .map_err(|e| e.to_string())?
+                        .live
+                        .wake_serial += 1;
+                    (self.wake)();
+                }
                 self.prompt(text, false, true, vec![], vec![])?;
                 return Ok(());
             }

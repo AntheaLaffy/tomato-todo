@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3538
+lines: 3569
 generated_at: 2026-11-02
 ---
 
@@ -15,9 +15,9 @@ generated_at: 2026-11-02
 | 偏好、保护、锁机与沉浸 | 1441–1646 | 核心保护不绕开 |
 | 弹窗、模板与任务编辑 | 1647–2268 | 教学任务打开来源详情，不独立改日期 |
 | 项目、搜索、声音与表单 | 2269–2679 | 现有任务环境 |
-| 导入与页面事件 | 2680–3347 | 作业复选框进入提交，不伪装完成 |
-| 批量、拖拽与快捷键 | 3348–3433 | 教学来源须保留 |
-| 启动与轮询 | 3434–3538 | 接收共享快照 |
+| 导入与页面事件 | 2680–3378 | 作业复选框进入提交；新建教学作业事件时立即切到学习助手 |
+| 批量、拖拽与快捷键 | 3379–3464 | 教学来源须保留 |
+| 启动与轮询 | 3465–3569 | 接收共享快照及宿主唤醒 |
 
 ## Symbols
 
@@ -46,12 +46,12 @@ generated_at: 2026-11-02
 | printDialog | function | 1737 |
 | templateDialog | function | 1793 |
 | taskDialog | function | 2154 |
-| importPlan | function | 2697 |
-| selectControls | function | 3348 |
-| detachSelected | function | 3353 |
-| deleteSelectedTasks | function | 3363 |
-| sortProjects | function | 3388 |
-| boot | function | 3455 |
+| importPlan | function | 2711 |
+| selectControls | function | 3379 |
+| detachSelected | function | 3384 |
+| deleteSelectedTasks | function | 3394 |
+| sortProjects | function | 3419 |
+| boot | function | 3486 |
 
 全部任务页用与待完成、已完成、全部同级的「模板」标签切换独立模板目录，避免模板被长任务列表推到页面底部；项目页仍在项目任务后显示本项目模板。模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通任务待补呈现。
 
@@ -81,4 +81,4 @@ Android 导航：setMobileNav控制抽屉和工作区 inert；平台身份由原
 
 角色背景板：settingsPage 的「体验与提醒」保存 settings.personaBackdrop（默认关闭）；render 与 setupAgent.backdrop 在普通页面允许显示，沉浸或专注保护时交给 syncPersonaBackdrop 隐藏。
 
-侧栏education路由挂载学生/教师面板；项目页挂载education.ts的资料目录授权、教学配置和完整教学记录，资料库委托resources.ts；新项目必选目录，考试停笔状态变化提示上传答题卡。
+侧栏education路由挂载学生/教师面板；项目页挂载education.ts的资料目录授权、教学配置和完整教学记录，资料库委托resources.ts；新项目必选目录，考试停笔状态变化提示上传答题卡。任务完成复选框以新快照的作业事件为准，仅初次产生taskHomework/课程homework时直接导航助手，已完成任务重开和普通任务保持原页面。

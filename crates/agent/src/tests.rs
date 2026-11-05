@@ -1260,6 +1260,78 @@ fn legacy_single_conversation_migrates() {
     assert_eq!(store.active_session().as_deref(), Some("/tmp/legacy.json"));
 }
 #[test]
+fn completed_exam_study_task_wakes_the_assistant_for_homework_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let wakes = Arc::new(AtomicUsize::new(0));
+    let agent = service(dir.path(), wakes.clone());
+    {
+        let mut inner = agent.inner.lock().unwrap();
+        inner.store.preferences.enabled = true;
+        inner.store.preferences.automatic = false;
+        inner.live.auth = json!({"deepseek":{"configured":true}});
+    }
+    let snapshot = {
+        let mut engine = agent.engine.lock().unwrap();
+        let mut data = engine.snapshot(time()).unwrap().data;
+        let project = data.projects[0].id.clone();
+        data.visions.push(tomato_core::Vision {
+            id: "vision".into(),
+            name: "备考".into(),
+            notes: String::new(),
+            project_id: None,
+        });
+        data.education.projects.push(
+            serde_json::from_value(json!({
+                "projectId":project,"directory":dir.path(),"examMode":true,"visionId":"vision",
+                "target":"2027年数学一备考","examDate":"2027-12-25",
+                "syllabusId":"syllabus","pastPaperIds":["past"],"mockPaperIds":["mock"]
+            }))
+            .unwrap(),
+        );
+        for (id, kind) in [
+            ("syllabus", "syllabus"),
+            ("past", "pastPaper"),
+            ("mock", "mockPaper"),
+        ] {
+            data.education.resources.push(serde_json::from_value(json!({
+                "id":id,"projectId":project,"title":id,"kind":kind,
+                "path":format!("{id}.pdf"),"source":"模拟资料","edition":"2026","topics":["极限"]
+            })).unwrap());
+        }
+        engine
+            .dispatch(
+                Action::Import {
+                    data: Box::new(data),
+                },
+                time(),
+            )
+            .unwrap();
+        engine.dispatch(action(json!({"type":"saveTask","task":{"title":"极限学习","projectId":project,"dueDate":"2026-10-12"}})), time()).unwrap();
+        let id = engine.snapshot(time()).unwrap().data.tasks[0].id.clone();
+        engine
+            .dispatch(Action::ToggleTask { id: id.clone() }, time())
+            .unwrap();
+        let snapshot = engine.snapshot(time()).unwrap();
+        assert!(snapshot
+            .data
+            .education
+            .events
+            .iter()
+            .any(|event| event.id == format!("taskHomework:{id}") && event.state == "pending"));
+        snapshot
+    };
+    // Missing runtime fails the model turn, but the claimed event and navigation
+    // signal survive; polling must not repeatedly pull the user away.
+    assert!(agent.observe(&snapshot).is_err());
+    assert_eq!(wakes.load(Ordering::SeqCst), 1);
+    assert_eq!(agent.status().unwrap()["wakeSerial"], 1);
+    let latest = agent.engine.lock().unwrap().snapshot(time()).unwrap();
+    assert_eq!(latest.data.education.events[0].state, "running");
+    agent.observe(&latest).unwrap();
+    assert_eq!(wakes.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn wake_waits_for_idle_respects_quiet_and_deduplicates_across_restart() {
     let dir = tempfile::tempdir().unwrap();
     let count = Arc::new(AtomicUsize::new(0));

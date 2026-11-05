@@ -13,7 +13,7 @@ Rust 保持应用权限与文件边界，Pi 工作进程负责会话与模型调
 | 运行时人格与切换 | 智能体 | state.rs 的 Persona、lib.rs 的 prompt_command/call | tools.rs 的人格工具、agent/session.mjs 的 personaBlock、src/agent.ts 的 personas sheet、docs/AGENT.md |
 | 附件上传、下载与文件权限 | 对话 | attachments.rs、lib.rs 的 validated_images | src/agent-chat.ts、src-tauri/src/files.rs、tests.rs |
 | 工具与唤醒 | 智能体 | lib.rs.analysis.md、tools.rs | docs/AGENT.md、tests.rs |
-| 学情摘要与助手教学控制 | 教学 / 智能体 | lib.rs 的 get_context/get_study_progress/education、tools.rs | core/src/learning.rs、src/education.ts、agent/skills/exam-teaching/ |
+| 学情摘要与助手教学控制 | 教学 / 智能体 | lib.rs 的 get_context/get_study_progress/education/observe作业事件唤醒、tools.rs | core/src/learning.rs、src/main.ts 的 toggleTask、src/education.ts、agent/skills/exam-teaching/ |
 
 ## 文件
 
