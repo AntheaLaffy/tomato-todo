@@ -43,6 +43,7 @@ struct Live {
     auth_event: Value,
     tool: String,
     wake_serial: u64,
+    homework_wake_event_id: Option<String>,
     automatic: bool,
     scheduled: bool,
     creator_entrance: Value,
@@ -773,7 +774,7 @@ impl Agent {
         // approve/decline instead of making them hunt through the sheets.
         let reviewed = inner.live.reviewed.keys().cloned().collect::<Vec<_>>();
         Ok(
-            json!({"externalController":inner.store.external_controller,"creatorEntrance":inner.live.creator_entrance,"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"personas":inner.store.personas_view(),"persona":inner.store.persona_id(),"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
+            json!({"externalController":inner.store.external_controller,"creatorEntrance":inner.live.creator_entrance,"creatorMode":inner.store.active_conversation().is_some_and(|c| c.creator_mode),"preferences":inner.store.preferences,"personas":inner.store.personas_view(),"persona":inner.store.persona_id(),"memories":inner.store.memories,"messages":inner.store.messages(),"conversations":inner.store.conversations_view(),"canvases":canvas::summaries(&inner.store),"generated":inner.live.generated,"wakes":inner.store.wakes.iter().rev().take(30).collect::<Vec<_>>(),"busy":inner.live.busy,"authenticating":inner.live.authentication,"stream":inner.live.text,"thinking":inner.live.thinking,"error":inner.live.error,"providers":inner.live.auth,"authEvent":inner.live.auth_event,"tool":inner.live.tool,"questions":inner.live.questions,"plan":inner.live.plan,"hand":inner.live.hand,"deeds":inner.live.deeds,"schedules":inner.store.schedules,"wakeSerial":inner.live.wake_serial,"homeworkWakeEventId":inner.live.homework_wake_event_id,"anomalies":inner.live.anomalies,"reviewed":reviewed,"files":files::list(&self.dir.join("workspace"))?,"dataDir":self.dir,"mcpConfig":{"mcpServers":{"tomato":{"command":std::env::current_exe().map_err(|e|e.to_string())?,"args":["--mcp","--connection",self.dir.join("connection.json")]}}}}),
         )
     }
     pub fn observe(self: &Arc<Self>, snapshot: &Snapshot) -> AppResult<()> {
@@ -828,11 +829,10 @@ impl Agent {
                 // 出题要在助手页可见；只在领取作业事件时唤醒，避免普通教学事件
                 // 或每次轮询反复抢走用户当前页面。
                 if matches!(event.kind.as_str(), "taskHomework" | "homework") {
-                    self.inner
-                        .lock()
-                        .map_err(|e| e.to_string())?
-                        .live
-                        .wake_serial += 1;
+                    let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+                    inner.live.wake_serial += 1;
+                    inner.live.homework_wake_event_id = Some(event.id.clone());
+                    drop(inner);
                     (self.wake)();
                 }
                 self.prompt(text, false, true, vec![], vec![])?;
@@ -929,11 +929,10 @@ impl Agent {
                 String::new()
             };
             let text = format!("这是你为用户排定的定时任务「{name}」，现在到点了{remind_note}。按下面的指令现在去办：能直接用工具做完的就做完（包括 MCP、建/改任务），不要只写方案；做完用一两句话说清做了什么、结果如何、以及需要用户本人补做的动作。指令：{instruction}");
-            self.inner
-                .lock()
-                .map_err(|e| e.to_string())?
-                .live
-                .wake_serial += 1;
+            let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+            inner.live.wake_serial += 1;
+            inner.live.homework_wake_event_id = None;
+            drop(inner);
             return self.prompt(text, false, true, vec![], vec![]);
         }
         let prompt = {
@@ -1002,6 +1001,7 @@ impl Agent {
                 inner.store.wakes.drain(..excess);
             }
             inner.live.wake_serial += 1;
+            inner.live.homework_wake_event_id = None;
             inner.store.save(&self.dir)?;
             inner.live.busy = true;
             format!("本地检测到一个学习安排信号。看一眼当前数据和已确认背景，用一两句话说你注意到了什么、你的建议（怎么调、为什么）和想问的一个点，不要罗列清单。这一轮只分析、提问和准备待审阅文件，不直接改数据；用户回应后即可直接调整。信号：{}",serde_json::to_string(&eligible).map_err(|e|e.to_string())?)

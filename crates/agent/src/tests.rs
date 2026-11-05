@@ -1325,6 +1325,10 @@ fn completed_exam_study_task_wakes_the_assistant_for_homework_once() {
     assert!(agent.observe(&snapshot).is_err());
     assert_eq!(wakes.load(Ordering::SeqCst), 1);
     assert_eq!(agent.status().unwrap()["wakeSerial"], 1);
+    assert_eq!(
+        agent.status().unwrap()["homeworkWakeEventId"],
+        snapshot.data.education.events[0].id
+    );
     let latest = agent.engine.lock().unwrap().snapshot(time()).unwrap();
     assert_eq!(latest.data.education.events[0].state, "running");
     agent.observe(&latest).unwrap();

@@ -1,6 +1,6 @@
 ---
 source: main.ts
-lines: 3569
+lines: 3587
 generated_at: 2026-11-02
 ---
 
@@ -8,50 +8,50 @@ generated_at: 2026-11-02
 
 | 用途 | Lines | Notes |
 | --- | --- | --- |
-| 导入、状态、格式化与派发 | 1–560 | 共享核心与适配层 |
-| 导航、提醒与今日待办 | 561–805 | 课程与作业进入普通任务列表，考试使用专门入口 |
-| 周日程、固定占用与任务列表 | 806–1097 | 课程只画教学块，避免来源任务重复显示 |
-| 习惯、愿景与统计 | 1098–1440 | 普通任务和教学任务使用同一执行统计 |
-| 偏好、保护、锁机与沉浸 | 1441–1646 | 核心保护不绕开 |
-| 弹窗、模板与任务编辑 | 1647–2268 | 教学任务打开来源详情，不独立改日期 |
-| 项目、搜索、声音与表单 | 2269–2679 | 现有任务环境 |
-| 导入与页面事件 | 2680–3378 | 作业复选框进入提交；新建教学作业事件时立即切到学习助手 |
-| 批量、拖拽与快捷键 | 3379–3464 | 教学来源须保留 |
-| 启动与轮询 | 3465–3569 | 接收共享快照及宿主唤醒 |
+| 导入、状态、格式化与派发 | 1–570 | 作业事件ID去重、预填来源与唤醒切页 |
+| 导航、提醒与今日待办 | 571–815 | 课程与作业进入普通任务列表，考试使用专门入口 |
+| 周日程、固定占用与任务列表 | 816–1107 | 课程只画教学块，避免来源任务重复显示 |
+| 习惯、愿景与统计 | 1108–1450 | 普通任务和教学任务使用同一执行统计 |
+| 偏好、保护、锁机与沉浸 | 1451–1656 | 核心保护不绕开 |
+| 弹窗、模板与任务编辑 | 1657–2278 | 教学任务打开来源详情，不独立改日期 |
+| 项目、搜索、声音与表单 | 2279–2689 | 现有任务环境 |
+| 导入与页面事件 | 2690–3392 | 新教学作业事件时预填可编辑请求、切到助手并聚焦输入框 |
+| 批量、拖拽与快捷键 | 3393–3478 | 教学来源须保留 |
+| 启动与轮询 | 3479–3587 | 后台作业唤醒按事件ID预填；其他唤醒不追加请求 |
 
 ## Symbols
 
 | Symbol | Type | Line |
 | --- | --- | --- |
-| focusPage | function | 696 |
-| todayTaskGroup | function | 739 |
-| compareTaskTime | function | 773 |
-| isCatchUp | function | 757 |
-| taskList | function | 780 |
-| isoDate | const | 799 |
-| resizeCalendar | function | 860 |
-| schedulePage | function | 877 |
-| tasksPage | function | 1041 |
-| collectionsPage | function | 1098 |
-| habitsTab | function | 1104 |
-| visionDialog | function | 1167 |
-| activityCard | function | 1220 |
-| statsPage | function | 1224 |
-| savePreferences | function | 1288 |
-| settingsPage | function | 1387 |
-| projectWhitelistCard | function | 1401 |
-| guardPage | function | 1441 |
-| templatesCard | function | 1699 |
-| datesForPrinting | function | 1710 |
-| printDialog | function | 1737 |
-| templateDialog | function | 1793 |
-| taskDialog | function | 2154 |
-| importPlan | function | 2711 |
-| selectControls | function | 3379 |
-| detachSelected | function | 3384 |
-| deleteSelectedTasks | function | 3394 |
-| sortProjects | function | 3419 |
-| boot | function | 3486 |
+| focusPage | function | 706 |
+| todayTaskGroup | function | 749 |
+| compareTaskTime | function | 783 |
+| isCatchUp | function | 767 |
+| taskList | function | 790 |
+| isoDate | const | 817 |
+| resizeCalendar | function | 870 |
+| schedulePage | function | 887 |
+| tasksPage | function | 1051 |
+| collectionsPage | function | 1108 |
+| habitsTab | function | 1114 |
+| visionDialog | function | 1177 |
+| activityCard | function | 1230 |
+| statsPage | function | 1234 |
+| savePreferences | function | 1298 |
+| settingsPage | function | 1397 |
+| projectWhitelistCard | function | 1411 |
+| guardPage | function | 1451 |
+| templatesCard | function | 1709 |
+| datesForPrinting | function | 1720 |
+| printDialog | function | 1747 |
+| templateDialog | function | 1803 |
+| taskDialog | function | 2164 |
+| importPlan | function | 2721 |
+| selectControls | function | 3393 |
+| detachSelected | function | 3398 |
+| deleteSelectedTasks | function | 3408 |
+| sortProjects | function | 3433 |
+| boot | function | 3500 |
 
 全部任务页用与待完成、已完成、全部同级的「模板」标签切换独立模板目录，避免模板被长任务列表推到页面底部；项目页仍在项目任务后显示本项目模板。模板修改默认只影响未来；syncTemplate 只同步形状，保留实例的日期/管辖/进度。自动预印 0–90 天，手动一次印完选定范围；过期过滤由核心执行，isCatchUp 负责普通任务待补呈现。
 
@@ -81,4 +81,4 @@ Android 导航：setMobileNav控制抽屉和工作区 inert；平台身份由原
 
 角色背景板：settingsPage 的「体验与提醒」保存 settings.personaBackdrop（默认关闭）；render 与 setupAgent.backdrop 在普通页面允许显示，沉浸或专注保护时交给 syncPersonaBackdrop 隐藏。
 
-侧栏education路由挂载学生/教师面板；项目页挂载education.ts的资料目录授权、教学配置和完整教学记录，资料库委托resources.ts；新项目必选目录，考试停笔状态变化提示上传答题卡。任务完成复选框以新快照的作业事件为准，仅初次产生taskHomework/课程homework时直接导航助手，已完成任务重开和普通任务保持原页面。
+侧栏education路由挂载学生/教师面板；项目页挂载education.ts的资料目录授权、教学配置和完整教学记录，资料库委托resources.ts；新项目必选目录，考试停笔状态变化提示上传答题卡。任务完成复选框以新快照的作业事件为准，仅初次产生taskHomework/课程homework时向输入框追加带来源及作业要求的请求、导航助手并聚焦；后台唤醒按事件ID追加一次，已完成任务重开、普通任务及其他教学事件保持原页面。

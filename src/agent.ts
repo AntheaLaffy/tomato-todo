@@ -81,6 +81,7 @@ export type AgentStatus = {
   error: string | null;
   tool: string;
   wakeSerial: number;
+  homeworkWakeEventId?: string | null;
   providers: Record<
     string,
     {
@@ -160,6 +161,8 @@ const defaults: Preferences = {
 };
 let status: AgentStatus | null = null;
 let draft = "";
+// A homework request may arrive while the scheduled turn creates its first conversation.
+let pendingHomeworkDraft: { previous: string } | null = null;
 let attachments: ChatAttachment[] = [];
 let uploading = 0;
 let requestPending = false;
@@ -218,7 +221,7 @@ let usage: Usage | null = null;
 let usageLoading = false;
 let hooks: {
   active: () => boolean;
-  wake: () => void;
+  wake: (eventId?: string | null) => void;
   toast: (text: string) => void;
   accept: (s: Snapshot) => void;
   backdrop: () => boolean;
@@ -291,11 +294,19 @@ const checked = (name: string, fallback: boolean) =>
 // and signals live in sheets that open on demand.
 /** Put text in the composer from elsewhere in the app (e.g. "hand me the timetable"). */
 export function prefillAgent(text: string) {
+  pendingHomeworkDraft = null;
   draft = text;
   const box = document.getElementById(
     "agent-text",
   ) as HTMLTextAreaElement | null;
   if (box) box.value = text;
+  resizeComposer();
+}
+export function appendAgentDraft(text: string) {
+  pendingHomeworkDraft ??= { previous: draft };
+  draft = draft ? `${draft.trimEnd()}\n\n${text}` : text;
+  const box = document.querySelector<HTMLTextAreaElement>("#agent-text");
+  if (box) box.value = draft;
   resizeComposer();
 }
 function resizeComposer() {
@@ -985,10 +996,17 @@ function update() {
       selection?.removeAllRanges();
     if (document.activeElement?.closest(".agent-message-edit"))
       (document.activeElement as HTMLElement).blur();
-    conversationDrafts.set(conversationKey, { text: draft, attachments });
+    const movingDraft = pendingHomeworkDraft ? draft : null;
+    conversationDrafts.set(conversationKey, {
+      text: pendingHomeworkDraft?.previous ?? draft,
+      attachments,
+    });
     conversationKey = nextKey;
     const saved = conversationDrafts.get(nextKey);
-    draft = saved?.text ?? "";
+    draft = movingDraft
+      ? [saved?.text, movingDraft].filter(Boolean).join("\n\n")
+      : (saved?.text ?? "");
+    pendingHomeworkDraft = null;
     attachments = saved?.attachments ?? [];
     editingMessage = null;
     expandedThinking.clear();
@@ -1055,7 +1073,7 @@ export async function refreshAgent() {
     status = result;
     if (status.wakeSerial > serial) {
       serial = status.wakeSerial;
-      hooks.wake();
+      hooks.wake(status.homeworkWakeEventId);
     }
     update();
   } catch (error) {
@@ -1371,6 +1389,7 @@ async function submit(form: HTMLFormElement) {
         attachmentIds: attachments.map((a) => a.id),
       },
       (result) => {
+        pendingHomeworkDraft = null;
         if (draft === sentDraft) draft = "";
         attachments = attachments.filter(
           (a) => !sentAttachments.some((sent) => sent.id === a.id),

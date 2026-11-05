@@ -244,6 +244,52 @@ const when = (n: number) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+/** Keep the request tied to the event's immutable source, not an edited task row. */
+export function homeworkRequest(
+  snapshot: Snapshot,
+  eventId: string,
+): string | null {
+  const education = snapshot.data.education;
+  const event = education.events.find((item) => item.id === eventId);
+  if (
+    !event ||
+    !["homework", "taskHomework"].includes(event.kind) ||
+    !education.projects.some(
+      (project) => project.projectId === event.projectId && project.examMode,
+    )
+  )
+    return null;
+  const project = snapshot.data.projects.find((p) => p.id === event.projectId);
+  if (!project) return null;
+  let source: string;
+  if (event.kind === "taskHomework") {
+    const task = education.completedTasks.find(
+      (item) =>
+        item.id === event.sourceId && item.projectId === event.projectId,
+    );
+    if (!task) return null;
+    source = `完成的任务：${task.title}（taskId: ${task.id}，完成于 ${when(task.completedAt)}）
+任务完成时的备注：${task.notes || "未记录，需核实实际学到的位置"}
+任务知识点：${task.topics.join("、") || "未记录，需先核实"}`;
+  } else {
+    const lesson = education.lessons.find(
+      (item) =>
+        item.id === event.sourceId && item.projectId === event.projectId,
+    );
+    if (!lesson) return null;
+    const resources = lesson.resourceIds.map(
+      (id) => education.resources.find((item) => item.id === id)?.title ?? id,
+    );
+    source = `刚结束的课程：${lesson.title}（lessonId: ${lesson.id}，${when(lesson.startsAt)}—${when(lesson.endsAt)}）
+课程知识点：${lesson.topics.join("、") || "未记录，需先核实"}
+实际进度：${lesson.progress || "未记录，需核实实际讲授范围"}
+指定资料：${resources.join("、") || "未指定，需检查项目资料"}`;
+  }
+  return `请读取 exam-teaching 和 exam-authoring 技能，为应试项目「${project.name}」（projectId: ${event.projectId}）布置对应作业。
+${source}
+教学事件：${event.id}。先查询事件状态，若后台已在处理或已有作业，不要重复发布；需要重试时请先说明。读取 get_study_progress 与项目已授权资料，核实实际已学范围、证据和当日课程及自习负荷；只对有依据的已学内容出题，未知部分先问我，不推定掌握，也不要机械凑满 180 分钟。发布前完成命题蓝图、答案、评分点及独立复解与适用核验；保存实际作业后再 finishEvent。`;
+}
 export async function chooseProjectDirectory(): Promise<string | null> {
   return isTauri() ? invoke<string | null>("choose_project_directory") : null;
 }

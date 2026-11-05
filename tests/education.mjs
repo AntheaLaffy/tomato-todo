@@ -403,11 +403,32 @@ test(
       ];
       for (const r of resources)
         await writeFile(join(materials, r.path), r.title);
+      const lessonDay = new Date(`${date}T12:00:00`);
+      lessonDay.setDate(lessonDay.getDate() - 1);
+      const lessonDate = lessonDay.toLocaleDateString("sv-SE");
+      const lessonStart = Math.floor(
+        new Date(`${lessonDate}T08:30:00`).getTime() / 1000,
+      );
+      const completedLesson = {
+        id: "lesson-prefill",
+        projectId: p,
+        semesterId: "term",
+        semesterRevision: 1,
+        title: "极限基础课程",
+        topics: ["极限法则"],
+        resourceIds: ["mock"],
+        startsAt: lessonStart,
+        endsAt: lessonStart + 2700,
+        aiEnabled: true,
+        attended: true,
+        progress: "讲完基础第2讲，例题未独立做完",
+        state: "ended",
+      };
       const semester = {
         id: "term",
         projectId: p,
         title: "测试学期",
-        startDate: date,
+        startDate: lessonDate,
         endDate: date,
         revision: 1,
         baseline: "基础待验证",
@@ -476,12 +497,21 @@ test(
         resources,
         semesters: [semester],
         semesterHistory: [],
-        lessons: [],
+        lessons: [completedLesson],
         assessments: [hw, exam],
         submissions: [],
         grades: [],
         reviews: [],
-        events: [],
+        events: [
+          {
+            id: "homework:lesson-prefill",
+            projectId: p,
+            kind: "homework",
+            sourceId: completedLesson.id,
+            state: "pending",
+            createdAt: completedLesson.endsAt,
+          },
+        ],
         completedTasks: [
           {
             id: "study-task",
@@ -498,7 +528,13 @@ test(
       await action({ type: "import", data });
       const savedTask = await action({
         type: "saveTask",
-        task: { title: "等待布置作业的学习任务", projectId: p, dueDate: date },
+        task: {
+          title: "等待布置作业的学习任务",
+          projectId: p,
+          dueDate: date,
+          notes: "基础第2讲，视频23:10；法则条件待验证",
+          tags: ["极限"],
+        },
       });
       const studyTaskId = savedTask.data.tasks.find(
         (task) => task.title === "等待布置作业的学习任务",
@@ -520,6 +556,8 @@ test(
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(base);
+      await page.locator('[data-page="agent"]').first().click();
+      await page.locator("#agent-text").fill("原草稿请保留");
       await page.locator('[data-page="tasks"]').first().click();
       await page.locator(`[data-toggle-task="${ordinaryTaskId}"]`).click();
       await expect(page.locator("h1")).toContainText("把想做的事，慢慢完成。");
@@ -527,12 +565,76 @@ test(
       await expect(page.locator("h1")).toContainText("学习助手", {
         timeout: 2000,
       });
+      await expect(page.locator("#agent-text")).toHaveValue(/原草稿请保留/);
+      await expect(page.locator("#agent-text")).toBeFocused();
+      await expect(page.locator("#agent-text")).toHaveValue(
+        /等待布置作业的学习任务/,
+      );
+      await expect(page.locator("#agent-text")).toHaveValue(
+        /基础第2讲，视频23:10；法则条件待验证/,
+      );
+      await expect(page.locator("#agent-text")).toHaveValue(/极限/);
+      await expect(page.locator("#agent-text")).toHaveValue(
+        new RegExp(`taskHomework:${studyTaskId}`),
+      );
+      await expect(page.locator("#agent-text")).toHaveValue(
+        /get_study_progress/,
+      );
+      await expect(page.locator("#agent-text")).toHaveValue(/不要重复发布/);
       snapshot = await (await fetch(base + "/api/snapshot")).json();
       assert.ok(
         snapshot.data.education.events.some(
           (event) => event.id === `taskHomework:${studyTaskId}`,
         ),
       );
+      // A claimed course-homework wake also carries the original lesson context.
+      // Simulate the status signal without starting a paid model.
+      await page.locator('[data-page="tasks"]').first().click();
+      const wakeStatus = await post("/api/agent", { op: "status" });
+      await page.route("**/api/agent", async (route) => {
+        if (route.request().postDataJSON()?.op === "status")
+          await route.fulfill({
+            json: {
+              ...wakeStatus,
+              wakeSerial: wakeStatus.wakeSerial + 1,
+              homeworkWakeEventId: "homework:lesson-prefill",
+              conversations: [
+                ...wakeStatus.conversations.map((item) => ({
+                  ...item,
+                  active: false,
+                })),
+                {
+                  id: "scheduled-lesson-conversation",
+                  title: "课程作业",
+                  updatedAt: now,
+                  messageCount: 1,
+                  active: true,
+                },
+              ],
+            },
+          });
+        else await route.continue();
+      });
+      await expect(page.locator("h1")).toContainText("学习助手", {
+        timeout: 8000,
+      });
+      await expect(page.locator("#agent-text")).toHaveValue(/极限基础课程/);
+      await expect(page.locator("#agent-text")).toHaveValue(
+        /讲完基础第2讲，例题未独立做完/,
+      );
+      await expect(page.locator("#agent-text")).toHaveValue(/指定资料：mock/);
+      await expect(page.locator("#agent-text")).toHaveValue(
+        /homework:lesson-prefill/,
+      );
+      await page.waitForTimeout(3000);
+      const finalDraft = await page.locator("#agent-text").inputValue();
+      assert.ok(finalDraft.includes("原草稿请保留"));
+      assert.equal(
+        finalDraft.split(`taskHomework:${studyTaskId}`).length - 1,
+        1,
+      );
+      assert.equal(finalDraft.split("homework:lesson-prefill").length - 1, 1);
+      await page.unroute("**/api/agent");
       await page.locator('[data-page="education"]').first().click();
       await expect(page.locator(".education-dashboard")).toContainText(
         "学生端",

@@ -7,6 +7,7 @@ import {
   openTeachingTask,
   mountEducation,
   chooseProjectDirectory,
+  homeworkRequest,
 } from "./education";
 import { compactModeEnabled, setCompactMode } from "./compact";
 import { captureScroll, restoreScroll } from "./scroll";
@@ -14,6 +15,7 @@ import {
   agentPage,
   mountAgent,
   prefillAgent,
+  appendAgentDraft,
   setupAgent,
   syncPersonaBackdrop,
   networkSettingsCard,
@@ -277,6 +279,14 @@ let settingsSave: Promise<boolean> | null = null;
 let agentWakePending = false;
 let revealingAgent = false;
 let agentWakeBlockedSettingsRevision: number | null = null;
+const preparedHomeworkRequests = new Set<string>();
+async function prepareHomeworkDraft(eventId: string, snapshot?: Snapshot) {
+  if (preparedHomeworkRequests.has(eventId)) return;
+  const request = homeworkRequest(snapshot ?? (await getSnapshot()), eventId);
+  if (!request || preparedHomeworkRequests.has(eventId)) return;
+  preparedHomeworkRequests.add(eventId);
+  appendAgentDraft(request);
+}
 async function revealAgent() {
   if (
     !agentWakePending ||
@@ -2907,8 +2917,12 @@ document.addEventListener("click", async (e) => {
         (e) => e.id === eventId && e.state === "pending",
       ) &&
       !protectedNow()
-    )
+    ) {
+      await prepareHomeworkDraft(eventId, state);
       await navigate("agent");
+      if (page === "agent")
+        document.querySelector<HTMLTextAreaElement>("#agent-text")?.focus();
+    }
     return;
   }
   if (d.focusTask) {
@@ -3539,7 +3553,11 @@ async function boot() {
     active: () => page === "agent",
     backdrop: () =>
       state.data.settings.personaBackdrop && !protectedNow() && !immersive,
-    wake: () => {
+    wake: (eventId) => {
+      if (eventId)
+        void prepareHomeworkDraft(eventId).catch((error) =>
+          toast(`作业请求预填失败：${error}`),
+        );
       agentWakePending = true;
       void revealAgent();
     },
