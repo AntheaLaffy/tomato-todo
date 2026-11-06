@@ -299,6 +299,8 @@ function runtimeUnitText(executable, dataArg) {
     "# 自定义时写解析后的绝对路径（与 scripts/install.mjs 的 xdg() 一致）。",
     "# 不加 Restart=：runtime 同时由 DSH 插件 host 经 subprocess 保活",
     "# （MIGRATION.md），两边都重启会在 127.0.0.1:43987 上冲突。",
+    "# node 版本要求 ≥ 22.6（TS 类型剥离直跑）：请保证 systemd 用户环境的 PATH",
+    "# 指向该版本（如 ~/.config/environment.d/ 配置），系统 node 过旧会 ERR_UNKNOWN_FILE_EXTENSION。",
     "",
     "[Service]",
     "Type=simple",
@@ -310,16 +312,15 @@ function runtimeUnitText(executable, dataArg) {
   ].join("\n");
 }
 
-function guardUnitText(executable, guardData) {
+function guardUnitText(executable) {
   return [
     "[Unit]",
     "Description=Tomato Todo guard（专注保护 / 通知 / 托盘）",
+    "# guard 默认数据目录 = ~/.local/share/studio.tomato.todo/guard/（与 runtime",
+    "# 的 guard-client 同目录，API.md 已定），unit 无需 --data。",
     "# 默认不 enable：API.md 规定 guard 由 runtime 监督并在崩溃时重启，本 unit",
     "# 仅为手动/应急使用保留；安装时只有 --enable-guard 才会 enable（理由见",
     "# scripts/install.mjs 头注释）。",
-    "# guard 数据目录假设：runtime 把 guard 的 token 写入下面的目录。",
-    `# 假设路径：${guardData}`,
-    "# 注意：API.md 未指定该目录具体路径，runtime 工作流落地后需对齐。",
     "",
     "[Service]",
     "Type=simple",
@@ -383,6 +384,25 @@ async function install() {
     vendorFiles = await walkFiles(vendorDir);
   }
 
+  // src 是运行时必需的：bin/tomato-runtime 经 ../src/main.mjs 启动（零构建设计，
+  // 没有 vendor bundle 也能跑引擎桩）。与 bin/vendor 一样记入 manifest 防覆盖。
+  // package.json 的 "type":"module" 一并带上，避免 Node 的模块类型探测告警。
+  const sourceSrc = join(dirname(dirname(runtimeSource)), "src");
+  const sourcePkg = join(dirname(dirname(runtimeSource)), "package.json");
+  const srcExists = (await stat(sourceSrc).catch(() => null))?.isDirectory() === true;
+  let srcFiles = [];
+  if (srcExists) {
+    for (const file of await walkFiles(sourceSrc)) {
+      srcFiles.push(join(runtimeDir, "src", relative(sourceSrc, file)));
+    }
+  } else {
+    warn(`${sourceSrc} 不存在，跳过 src 复制——安装出的 runtime 将无法启动`);
+  }
+  const pkgFile = join(runtimeDir, "package.json");
+  if (await lexists(sourcePkg)) {
+    srcFiles.push(pkgFile);
+  }
+
   // 管理权检查：已存在的目标文件必须出现在旧 manifest 里；launcher 沿用旧
   // 惯例——必须是恰好指向本脚本目标的符号链接。
   const previous = await readManifest(manifestPath);
@@ -397,6 +417,7 @@ async function install() {
     runtimeUnit,
     guardUnit,
     ...vendorFiles,
+    ...srcFiles,
   ]) {
     if (await lexists(path)) {
       if (!managed.has(path)) {
@@ -473,6 +494,12 @@ async function install() {
   }
 
   await atomicWrite(runtimeBinary, await readFile(runtimeSource), 0o755);
+  if (srcExists) {
+    await replaceTree(sourceSrc, join(runtimeDir, "src"));
+  }
+  if (await lexists(sourcePkg)) {
+    await atomicWrite(pkgFile, await readFile(sourcePkg), 0o644);
+  }
   if (vendorExists) {
     await replaceTree(sourceVendor, vendorDir);
   } else {
@@ -489,7 +516,7 @@ async function install() {
     }
   }
   await atomicWrite(runtimeUnit, runtimeUnitText(runtimeBinary, dataArg));
-  await atomicWrite(guardUnit, guardUnitText(guardBinary, guardDataDir));
+  await atomicWrite(guardUnit, guardUnitText(guardBinary));
   await atomicWrite(
     manifestPath,
     JSON.stringify(
