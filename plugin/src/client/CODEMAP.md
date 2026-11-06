@@ -18,9 +18,9 @@
 
 | 目录 | 内容 | 所有者 |
 | --- | --- | --- |
-| `skin/` | `theme.js`（`--dsw-alias-*` 覆盖）、`styles.js`（`--tomato-*` 变量/氛围 CSS/组件 CSS）、`ambient.js`（`#tomato-ambient` 窗光/插画/微粒/时段） | 皮肤工作流 |
-| `app/` | `frame.js` 主视图框架（导航+页面容器）、`registry.js` 页面注册表、`navigation.js` 跨模块切页/开面板信号、`hud.js` 常驻 HUD、`immersive.js` 沉浸层与结束确认、`sound.js` WebAudio 背景音与节点音效、`dock.js` 输入框入口卡、`overlay.js` 宿主、`nav-copy.js` 导航文案 | lead（HUD/沉浸/音效属沉浸工作流） |
-| `pages/` | 九页：`focus` `tasks` `habits` `stats` `calendar` `education` `guard` `schedule` `preferences`，各自 `registerPage` 自注册；`stub.js` 占位工厂 | 页面工作流 |
+| `skin/` | `theme.js`（`--dsw-alias-*` 覆盖）、`styles.js`（`--tomato-*` 变量/氛围 CSS/组件 CSS）、`ambient.js`（`#tomato-ambient` 地面层 + `#tomato-sky` 天空层/插画/微粒/时段）、`prefs.js`（氛围开关与手动时段）、`settings-row.js`（DSH 设置-通用的「番茄氛围」行） | 皮肤工作流 |
+| `app/` | `frame.js` 主视图框架（导航+页面容器）、`registry.js` 页面注册表、`navigation.js` 跨模块切页/开面板信号、`hud.js` 常驻 HUD、`immersive.js` 沉浸层与结束确认、`sound.js` WebAudio 背景音与节点音效、`reminders.js` 提醒横幅、`dock.js` 输入框入口卡、`overlay.js` 宿主、`nav-copy.js` 导航文案 | lead（HUD/沉浸/音效属沉浸工作流） |
+| `pages/` | 九页：`focus` `tasks` `habits` `stats` `calendar` `education` `guard` `schedule` `preferences`，各自 `registerPage` 自注册；对话框 `task-dialog` `search` `template-dialog` `print-dialog`；`stub.js` 占位工厂 | 页面工作流 |
 | `shared/` | `api.js` HTTP 数据面、`store.js` 快照/dispatch/轮询、`derive.js` 派生视图、`ui.js` 组件库、`ui.css.js` 状态样式、`icons.js` 线性图标、`copy.js` zh/en 注册表 | lead |
 
 ## 约定
@@ -29,4 +29,5 @@
   写操作 `tryDispatch(action)`；派生只从 `shared/derive.js` 取。
 - 颜色只用 `var(--tomato-*)` / `var(--dsw-alias-*)`；文案经 `registerCopy` + `t()`；
   状态样式用 `t-` 类，布局用 inline style。
-- 自检：`pnpm check:client`（构建 + 假 DOM/真 React 逐页渲染）。
+- 自检：`pnpm check:client`（构建 + 假 DOM/真 React 逐页渲染九页与全部 slot 组件）；
+  `pnpm check:client:live` 用运行中 runtime 的真实 `/api/state` 渲染一遍。
