@@ -151,7 +151,7 @@ impl Desktop {
         }
         #[cfg(target_os = "macos")]
         {
-            return macos::focus(id).map(|()| true);
+            return macos::focus(id);
         }
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         {
@@ -180,10 +180,9 @@ impl Desktop {
         }
         #[cfg(target_os = "macos")]
         {
-            return Err(
-                "macOS 下 guard 没有宿主窗口，专注锁定暂不可用（界面已迁移至 DSH 插件，如需 macOS 锁定请与 lead 确认方案）"
-                    .into(),
-            );
+            // macos 片没有宿主窗口：lock_window 永远返回明确错误（见 macos.rs），
+            // 专注保护只能走白名单模式，错误信息直接透传给 runtime。
+            return Err(macos::lock_window().unwrap_err());
         }
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         {
