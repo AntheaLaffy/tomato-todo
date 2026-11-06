@@ -16,6 +16,12 @@
 - 删除内置学习助手（Pi SDK）及其界面、Canvas、ImageGen 与作者模式；删除旧 Tauri 壳与预览服务。
 - 删除 `docs/AGENT.md`；`docs/MCP.md` 改为「把 tomato-runtime 的 MCP 接入任意客户端」。
 
+### 质量
+
+- 领域核心 109 条测试逐条移植自 Rust（crates/core 的 tests/education_tests/template_tests），tsc strict 全绿；
+  runtime 60 条、工具脚本 18 条、guard 22 条测试全绿；guard 另通过 Xvfb+openbox 隔离桌面冒烟
+  与 Windows/macOS 交叉编译检查。
+
 ### 破坏性变更
 
 - 不兼容旧协议：MCP 初始化信息、工具实现与桌面协议全部重写；旧数据、旧接口或旧文件格式按需要提供一次性转换，其余明确拒绝。

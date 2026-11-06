@@ -127,6 +127,25 @@ HTTP 契约（API.md 已同步）：`GET /guard/status` 增 `backend` 字段（�
 未触碰用户桌面）。留待收尾：真实硬件上的 Wayland/Windows/macOS 运行验证、GNOME 扩展
 随包安装、systemd user service / 自启（阶段 5 打包）。
 
+## 阶段 5 记录（收尾，tomato-ts-rewrite 集成线）
+
+- 旧栈删除：agent/、crates/{agent,preview,core}、旧 src/、src-tauri/、旧 tests/、
+  根 Cargo.toml/Cargo.lock、tsconfig/vite/index.html、assets 旧截图、旧脚本
+  （install.py/build-agent.mjs/dev.mjs/agent-runtime.mjs/check-android-apk.py）。
+- 根 CODEMAP.md 按新结构重写；docs/CROSS_PLATFORM.md 改写为 guard 后端矩阵；
+  根 AGENTS.md 换为插件架构与「助手与 MCP 实现规范」。
+- scripts/handbook-paths.py 删除 18/19/26 死条目，04 附录重建，check-handbook 通过。
+- 根 package.json：移除旧 UI 依赖、版本 0.13.0、runtime:test 修正为
+  `cd runtime && node --test`、pnpm-lock 重新生成。
+- 集成验证：core 109/109 + tsc 全绿；runtime 60/60；工具脚本 18/18；guard 22/22；
+  插件 v2 已在 DSH 上线（host 双工具 + 双槽位 active）。
+
+## 上线步骤（用户侧）
+
+1. 关闭旧版番茄 Todo；跑 `node scripts/export-sqlite.mjs`（一次性迁移出 plan.json/backup-v4.json）。
+2. `node scripts/install.mjs`（装 runtime+guard 到 ~/.local/lib/tomato/ 并启用 systemd user service）。
+3. DSH 里刷新页面：入口卡出现，面板数据自动接通；对话直接说「看看我今天的安排」即可。
+
 ## 语言问题结论（已与用户确认）
 
 - 原生只留 crates/guard 一个 Rust 小二进制（guard 的 X11/Wayland 绑定生态只有 Rust 完整）。
