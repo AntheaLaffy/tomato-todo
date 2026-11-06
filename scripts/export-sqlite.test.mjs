@@ -587,6 +587,28 @@ test("exportFromDb：v4 库直接导出，不做迁移", async (t) => {
   assert.equal(backup.tasks.length, 3);
 });
 
+test("exportFromDb：库旁存在 -wal 时警告旧应用可能仍在运行", async (t) => {
+  const dir = await tempDir(t, "tomato-export-wal-");
+  const dbPath = join(dir, "tomato.sqlite3");
+  createDb(dbPath, v4Data());
+  // 自建库默认 journal_mode=delete，头信息不引用 -wal，sqlite 打开时会无视该文件；
+  // 这里只验证脚本层面的文件系统检查与警告，不触碰真实 WAL 语义。
+  await writeFile(`${dbPath}-wal`, "stale wal placeholder");
+  const warn = t.mock.method(console, "warn", () => {});
+  await exportFromDb(dbPath, join(dir, "out"), {});
+  assert.ok(
+    warn.mock.calls.some((call) => String(call.arguments[0]).includes("-wal")),
+    "存在 -wal 时应输出警告",
+  );
+  const warned = warn.mock.calls.length;
+  // 无 -wal 时不应警告。
+  const dir2 = await tempDir(t, "tomato-export-nowal-");
+  const dbPath2 = join(dir2, "tomato.sqlite3");
+  createDb(dbPath2, v4Data());
+  await exportFromDb(dbPath2, join(dir2, "out"), {});
+  assert.equal(warn.mock.calls.length, warned, "无 -wal 时不应输出 -wal 警告");
+});
+
 test("exportFromDb：输出已存在时拒绝覆盖，--force 才覆盖", async (t) => {
   const dir = await tempDir(t, "tomato-export-idem-");
   const dbPath = join(dir, "tomato.sqlite3");

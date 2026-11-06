@@ -11,7 +11,8 @@
 //                      历史等未映射进计划的数据全部保留，日后可按备份 v4 恢复。
 // v3 旧库先按 crates/core/src/migration.rs 的 read_local() 逐条升级到 v4 再导出；
 // v4 库直接导出。库以 readOnly 打开，绝不写库；输出文件先写临时文件再 rename，
-// 任一目标已存在且未加 --force 时拒绝覆盖。
+// 任一目标已存在且未加 --force 时拒绝覆盖。库旁存在 -wal 文件（旧应用可能仍在
+// 运行）时只警告不阻止，建议完全退出旧应用后再导出。
 //
 // 要求 Node ≥ 22.5（node:sqlite 内建模块；22.13 之前运行时需加 --experimental-sqlite）。
 // 本脚本在 Node 24 上验证。
@@ -29,6 +30,7 @@
 //     语义的离线迁移与导出；新 runtime 导入/打开数据时自行校验与推进状态。
 //   - Rust 对缺失键的 Value 索引得 Null，故「缺失」与 null 在迁移规则里同义，脚本对
 //     undefined 与 null 一视同仁。
+import { accessSync } from "node:fs";
 import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -343,6 +345,18 @@ export function buildBackup(data) {
  * 且（因调用方在写文件前先走完这里）不会产生任何输出文件。返回 { data, fromVersion }。
  */
 function loadAppData(dbPath) {
+  // 旧应用以 WAL 模式运行（crates/core/src/lib.rs 的 PRAGMA journal_mode=WAL）；
+  // -wal 文件存在通常意味着旧应用还在运行，此时读到的可能是运行中的中间状态。
+  // 只警告不阻止：只读打开读到的仍是事务一致快照，但强烈建议先完全退出旧应用。
+  try {
+    accessSync(`${dbPath}-wal`);
+    console.warn(
+      `警告：检测到 ${dbPath}-wal（旧应用可能仍在运行）；` +
+        "建议完全退出旧版番茄 Todo 后再导出，避免导出运行中的中间状态",
+    );
+  } catch {
+    /* 没有 -wal 文件，旧库已干净关闭 */
+  }
   let db;
   try {
     // readOnly：迁移导出是单向的，旧库一个字都不能动。
