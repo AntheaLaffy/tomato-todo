@@ -68,8 +68,8 @@ export function parseLockState(raw: unknown): LockState {
 export function serializeLockState(s: LockState): Record<string, unknown> {
   return {
     schedules: s.schedules.map(serializeLockSchedule),
-    // 与 Rust skip_serializing_if 对齐：无活动锁机时省略键，而不是写 "active": null。
-    ...(s.active === null ? {} : { active: serializeActiveLock(s.active) }),
+    // 与 Rust 一致：Option 直接序列化，None 显式写 "active": null（serde 两端接受）。
+    active: s.active === null ? null : serializeActiveLock(s.active),
     suppressedUntil: s.suppressedUntil,
   };
 }

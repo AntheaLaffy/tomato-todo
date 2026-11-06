@@ -3,19 +3,17 @@
 //! 语义基准：docs/HANDBOOK/14-模板与印刷.md、docs/DESIGN.md「模板、印刷与实例」，
 //! 以及 crates/core/src/templates.rs 原文。时间一律按本机时区解读（对应 Rust chrono::Local）。
 //!
-//! 与 Rust 语义的分歧清单（实现不改，测试按现状断言；期望的修复见各条目）：
+//! 与 Rust 语义的分歧清单（均已由 root 修复实现，测试按修复后的 Rust 语义断言）：
 //!
-//! 1. parseLockState（packages/core/src/lock.ts:63）把 `active: null` 直接交给 parseActiveLock，
-//!    而 Rust 的 serde `Option` 接受显式 null（LockState 没有 skip_serializing_if，
-//!    序列化确实写出 `"active": null`）。后果：任何含空锁机的导出 JSON 无法被
-//!    parseAppData 重新解析，文件引擎（Engine.open）也无法重开自己的文件。
+//! 1. parseLockState 曾拒绝 `active: null`（Rust serde `Option` 接受显式 null，LockState 没有
+//!    skip_serializing_if）。已修复：解析端容忍 null，序列化与 Rust 一致显式写 `"active": null`。
 //!    测试用 stripNullActive / parseBackup 在解析前删掉该 null 键（结果等价于 Rust 解析），
 //!    其余断言仍按 Rust 语义逐字验证。
-//! 2. validateTemplates（packages/core/src/templates.ts:315-327）日程时段校验把 seen 集合的
-//!    插入放在整个时段检查之后，漏检「同一时段内重复日期」；Rust 在 any() 里边检查边插入
-//!    （templates.rs:268-275），会以「无效或重复的日程时段，请把同一开始时间的日期合并」拒绝。
-//!    calendar_validation_and_transient_batches_fail_atomically 对该情形按现状断言
-//!    （不报错、去重后印 1 条），其余三种非法时段仍验证报错与原子性。
+//! 2. validateTemplates 日程时段校验曾把 seen 集合的插入放在整个时段检查之后，漏检
+//!    「同一时段内重复日期」。已修复：与 Rust 一致在 some() 里边检查边插入
+//!    （templates.rs:268-275），以「无效或重复的日程时段，请把同一开始时间的日期合并」拒绝。
+//!    calendar_validation_and_transient_batches_fail_atomically 对该情形按修复后语义断言
+//!    （报错 + 原子性），其余三种非法时段同样验证报错与原子性。
 
 import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -439,8 +437,8 @@ describe("模板与印刷（templates / habits）", () => {
     const e = engine();
     const now = at(12, 8, 0);
     const before = e.export(now);
-    // Rust 期望全部四种非法时段都报错；其中「同一时段内重复日期」TS 校验漏检（分歧 2），
-    // 单独按现状断言，其余三种验证报错与原子性。
+    // 与 Rust 一致：全部四种非法时段（无效日期、同时刻两时段、空时段表、
+    // 同一时段内重复日期）都报错，且引擎状态保持原子性。
     const throwing: { dates: string[]; time: string | null }[][] = [
       [{ dates: ["2026-02-30"], time: null }],
       [
@@ -448,6 +446,7 @@ describe("模板与印刷（templates / habits）", () => {
         { dates: ["2026-10-14"], time: "09:00" },
       ],
       [],
+      [{ dates: ["2026-10-12", "2026-10-12"], time: null }],
     ];
     for (const slots of throwing) {
       const t = template();
@@ -459,20 +458,6 @@ describe("模板与印刷（templates / habits）", () => {
       ).toThrow();
       expect(e.export(now)).toBe(before);
     }
-    // 分歧 2：Rust 会拒绝同一时段内的重复日期；TS 现状是去重后成功印刷，不留模板与账本。
-    const t = template();
-    const s = e.dispatch(
-      {
-        type: "printInstances",
-        shape: clone(t.shape),
-        printing: { kind: "calendar", slots: [{ dates: ["2026-10-12", "2026-10-12"], time: null }] },
-      },
-      now,
-    );
-    expect(s.data.tasks).toHaveLength(1);
-    expect(s.data.templates).toHaveLength(0);
-    expect(s.data.prints).toHaveLength(0);
-    expect(s.data.tasks[0]!.templateId).toBeNull();
   });
 
   it("multiple_shapes_share_a_habit_group_without_splitting_one_shape_per_time", () => {

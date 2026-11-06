@@ -313,17 +313,20 @@ export function validateTemplates(data: AppData): void {
       const seen = new Set<string>();
       const times = new Set<string>();
       for (const slot of printing.slots) {
+        const timeKey = slot.time ?? "null";
         if (
           slot.dates.length === 0 ||
           slot.dates.length > 366 ||
           (slot.time !== null && !validTime(slot.time)) ||
-          times.has(slot.time ?? "null") ||
-          slot.dates.some((date) => !validDate(date) || seen.has(`${date}|${slot.time ?? "null"}`))
+          (times.has(timeKey) ? true : (times.add(timeKey), false)) ||
+          slot.dates.some((date) => {
+            const key = `${date}|${timeKey}`;
+            // 与 Rust 一致：检查即插入——同一时段内的重复日期也会被拒。
+            return !validDate(date) || (seen.has(key) ? true : (seen.add(key), false));
+          })
         ) {
           throw new AppError("无效或重复的日程时段，请把同一开始时间的日期合并");
         }
-        times.add(slot.time ?? "null");
-        for (const date of slot.dates) seen.add(`${date}|${slot.time ?? "null"}`);
       }
       if (seen.size > 366) {
         throw new AppError("一次日程表最多 366 项");
