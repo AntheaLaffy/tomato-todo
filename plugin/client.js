@@ -4590,6 +4590,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       skipped: "Dismissed — it stays in your tasks"
     }
   });
+  var BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 8px)";
   var dismissed = /* @__PURE__ */ new Set();
   function reminderKey(task) {
     return `${task.id}|${task.dueDate}|${task.reminderTime}`;
@@ -4653,7 +4654,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         className: "t-root",
         style: {
           position: "fixed",
-          top: 10,
+          top: BANNER_TOP,
           left: "50%",
           transform: "translateX(-50%)",
           zIndex: 45,

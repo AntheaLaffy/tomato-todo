@@ -31,6 +31,9 @@ registerCopy("reminder", {
   },
 });
 
+// 与 HUD 同一套顶部偏移：横幅落在 DSH 顶部栏之下，不压住窗口按钮。
+const BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 8px)";
+
 const dismissed = new Set();
 
 function reminderKey(task) {
@@ -112,7 +115,7 @@ export function ReminderBanner() {
       className: "t-root",
       style: {
         position: "fixed",
-        top: 10,
+        top: BANNER_TOP,
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 45,
