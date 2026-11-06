@@ -259,6 +259,8 @@ let sampleState = {
     identities: [],
     tasks: [
       { id: "t1", title: "语法加强 Day05（下）", completed: false, dueDate: new Date().toISOString().slice(0, 10), reminderTime: "20:00", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 45, focusMinutes: 25, priority: 1, scrapMinutes: 0, kind: "plain" },
+      // reminderPending：验证提醒横幅（core reminders.pendingReminder 语义）
+      { id: "t2", title: "408 真题：数据结构错题回顾", completed: false, dueDate: new Date().toISOString().slice(0, 10), reminderTime: "21:30", projectId: "p1", tags: ["408"], subtasks: [], notes: "", estimate: 2, focusMinutes: 25, priority: 2, scrapMinutes: 30, reminderPending: true, reminderFired: true, reminderExpired: false, completedAt: null, createdAt: 1700000000 },
     ],
     blocks: [],
     templates: [],
@@ -400,6 +402,10 @@ for (const word of ["今日专注", "全部任务", "数据统计", "偏好设�
   if (!mainMarkup.includes(word)) failures.push(`主视图导航缺少「${word}」`);
 }
 if (!(renderedBy["shell.overlay"] || "").includes("番茄")) failures.push("overlay 渲染内容里没有番茄文案");
+// 提醒横幅只在样例数据里有一条待提醒任务；实时数据此刻可能没有到期提醒。
+if (!process.env.SMOKE_LIVE && !(renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
+  failures.push("提醒横幅没有渲染");
+}
 if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注")) failures.push("入口卡没有渲染开始专注按钮");
 if (!(renderedBy["shell.overlay"] || "").includes("个番茄")) failures.push("HUD 没有渲染今日番茄计数");
 if (!(renderedBy["conversation.composer.dock"] || "").includes("今日待办")) failures.push("入口卡没有渲染今日待办");

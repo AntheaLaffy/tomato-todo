@@ -4571,9 +4571,211 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     );
   }
 
+  // plugin/src/client/app/reminders.js
+  registerCopy("reminder", {
+    zh: {
+      now: "该做这件事了",
+      start: "开始专注",
+      later: "稍后再说",
+      more: "还有 {n} 条提醒",
+      minutes: "{n} 分钟 · 第 {round} 轮",
+      skipped: "已收起，提醒仍在待办里"
+    },
+    en: {
+      now: "Time for this one",
+      start: "Start focus",
+      later: "Later",
+      more: "{n} more reminders",
+      minutes: "{n} min · round {round}",
+      skipped: "Dismissed — it stays in your tasks"
+    }
+  });
+  var dismissed = /* @__PURE__ */ new Set();
+  function reminderKey(task) {
+    return `${task.id}|${task.dueDate}|${task.reminderTime}`;
+  }
+  function isIdle(state) {
+    const data = state && state.data || {};
+    const timer = data.timer || {};
+    const lock = data.lock || {};
+    return !timer.running && (timer.startedAt ?? null) === null && Number(timer.remainingSecs) === Number(timer.durationSecs) && (lock.active ?? null) === null;
+  }
+  function pendingReminderTask(state, ignored = dismissed) {
+    if (!isIdle(state)) return null;
+    const tasks = state && state.data && state.data.tasks || [];
+    let best = null;
+    for (const task of tasks) {
+      if (task.completed || !task.reminderPending) continue;
+      if (ignored.has(reminderKey(task))) continue;
+      const key = `${task.dueDate}|${task.reminderTime}|${task.id}`;
+      if (best === null || key < `${best.dueDate}|${best.reminderTime}|${best.id}`) best = task;
+    }
+    return best;
+  }
+  function ReminderBanner() {
+    const state = useSnapshot();
+    const [tick, setTick] = useState(0);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    useEffect(() => {
+      const id = setInterval(() => setTick((n) => n + 1), 5e3);
+      return () => clearInterval(id);
+    }, []);
+    void tick;
+    const task = pendingReminderTask(state);
+    if (!task) return null;
+    const pendingCount = (state && state.data && state.data.tasks || []).filter(
+      (item) => !item.completed && item.reminderPending && !dismissed.has(reminderKey(item))
+    ).length;
+    const data = state && state.data || {};
+    const settings = data.settings || {};
+    const project = (data.projects || []).find((p) => p.id === task.projectId) || null;
+    const minutes = Number(task.focusMinutes ?? settings.focusMinutes) || 0;
+    const rounds = Number(task.estimate) || 1;
+    const start = async () => {
+      setBusy(true);
+      setError(null);
+      const res = await tryDispatch({ type: "startReminder", id: task.id });
+      setBusy(false);
+      if (!res.ok) {
+        setError(res.error || t("common.writeFailed"));
+        return;
+      }
+      openImmersive();
+    };
+    const later = () => {
+      dismissed.add(reminderKey(task));
+      setTick((n) => n + 1);
+    };
+    return h(
+      "div",
+      {
+        className: "t-root",
+        style: {
+          position: "fixed",
+          top: 10,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 45,
+          width: "min(560px, calc(100vw - 32px))",
+          pointerEvents: "auto"
+        }
+      },
+      h(
+        "div",
+        {
+          className: "t-card",
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "9px 10px 9px 14px",
+            borderRadius: 15,
+            background: "color-mix(in srgb, var(--tomato-surface) 92%, transparent)",
+            backdropFilter: "blur(12px)"
+          }
+        },
+        h(
+          "div",
+          {
+            style: {
+              width: 30,
+              height: 30,
+              borderRadius: 10,
+              background: "var(--tomato-brand-soft)",
+              color: "var(--tomato-accent-fg)",
+              display: "grid",
+              placeItems: "center",
+              flex: "none"
+            }
+          },
+          h(Icon, { name: "bell", size: 16 })
+        ),
+        h(
+          "div",
+          { style: { flex: 1, minWidth: 0 } },
+          h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                fontSize: 12,
+                color: "var(--tomato-ink-3)"
+              }
+            },
+            t("reminder.now"),
+            project ? h(
+              "span",
+              { style: { display: "inline-flex", alignItems: "center", gap: 4 } },
+              h("span", {
+                style: {
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: project.color || "var(--tomato-ink-3)",
+                  display: "inline-block"
+                }
+              }),
+              project.name
+            ) : null,
+            task.reminderTime ? h("span", { className: "t-mono" }, task.reminderTime) : null
+          ),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "var(--tomato-ink)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }
+            },
+            task.title
+          ),
+          h(
+            "div",
+            { style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
+            t("reminder.minutes", { n: minutes, round: rounds }),
+            pendingCount > 1 ? h(
+              "span",
+              { style: { marginLeft: 8, color: "var(--tomato-accent-fg)" } },
+              t("reminder.more", { n: pendingCount - 1 })
+            ) : null
+          ),
+          error ? h(
+            "div",
+            { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)", marginTop: 2 } },
+            error
+          ) : null
+        ),
+        h(
+          Btn,
+          { size: "sm", variant: "primary", icon: "play", disabled: busy, onClick: start },
+          t("reminder.start")
+        ),
+        h(
+          Btn,
+          { size: "sm", variant: "plain", disabled: busy, onClick: later },
+          t("reminder.later")
+        )
+      )
+    );
+  }
+
   // plugin/src/client/app/overlay.js
   function AppOverlay({ openPanel }) {
-    return h(Fragment, null, h(Hud, { openPanel }), h(Immersive, null), h(ToastHost, null));
+    return h(
+      Fragment,
+      null,
+      h(Hud, { openPanel }),
+      h(ReminderBanner, null),
+      h(Immersive, null),
+      h(ToastHost, null)
+    );
   }
 
   // plugin/src/client/app/dock.js
