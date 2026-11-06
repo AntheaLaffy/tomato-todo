@@ -352,7 +352,7 @@ for (const { key, registration } of slotRegistrations) {
   try {
     renderedBy[key] = ReactDOMServer.renderToStaticMarkup(element);
   } catch (e) {
-    failures.push(`渲染 ${key} 失败：${e && e.message ? e.message : e}`);
+    failures.push(`渲染 ${key} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
   }
 }
 
@@ -368,7 +368,7 @@ for (const pageId of PAGE_IDS) {
     renderedBy[`page:${pageId}`] = markup;
     if (!markup || markup.length < 500) failures.push(`页面 ${pageId} 渲染为空`);
   } catch (e) {
-    failures.push(`渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}`);
+    failures.push(`渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
   }
 }
 storage.delete("tomato-dsh.page");

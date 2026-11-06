@@ -56,7 +56,9 @@ export function fmtMinutes(minutes) {
   if (m < 60) return t("common.minutes", { n: m });
   const h = Math.floor(m / 60);
   const rest = m % 60;
-  return rest === 0 ? t("common.hours", { n: h }) : `${t("common.hours", { n: h })} ${rest}m`;
+  return rest === 0
+    ? t("common.hours", { n: h })
+    : `${t("common.hours", { n: h })} ${t("common.minutes", { n: rest })}`;
 }
 
 export function fmtHHMM(secondsOfDay) {
