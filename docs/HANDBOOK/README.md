@@ -84,9 +84,9 @@
    python3 scripts/handbook-tests.py        # 重新采集 95-测试索引.md 的测试清单
    ```
 
-   `pnpm run check:handbook` 一次跑完这四条；单跑某一条用 `pnpm run handbook:stats` / `handbook:tests` / `handbook:paths`（入口句与调用链改 `scripts/handbook-paths.py` 的 `ENTRY` / `CHAINS`，然后重跑）。
+   `python3 scripts/check-handbook.py` 校验，生成物用其余四条重新采集（入口句与调用链改 `scripts/handbook-paths.py` 的 `ENTRY` / `CHAINS`，然后重跑）。
 
-4. **生成物不要手改**：`pnpm run check:handbook` 会重写 [01-规模盘点](01-规模盘点.md)、[90-待补清单](90-待补清单.md)、[95-测试索引](95-测试索引.md) 三份文件——提交前跑一次，让它们与代码一致；CI 只跑 `scripts/check-handbook.py`（纯校验，不改文件），否则每次代码改动都会因为行数变化把无关 PR 变红。
+4. **生成物不要手改**：`handbook-stats.py` / `handbook-tests.py` / `handbook-backlog.py` 会重写 [01-规模盘点](01-规模盘点.md)、[90-待补清单](90-待补清单.md)、[95-测试索引](95-测试索引.md) 三份文件——提交前跑一次，让它们与代码一致；CI 只跑 `scripts/check-handbook.py`（纯校验，不改文件），否则每次代码改动都会因为行数变化把无关 PR 变红。
 5. **措辞可对外**：C 段里不许出现仓库黑话（脚本会查），也不许出现任何私人任务、私人系统的字样。
 6. **引用数字要标版本**：例如「维护者技能 22 个」这种数字会随版本变，写的时候注明版本。
 7. **新增一章**：复制下面的空壳，编号接在现有序列后，并把它加进上面的覆盖表。
