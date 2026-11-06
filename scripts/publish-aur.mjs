@@ -31,7 +31,6 @@ const pkgname = "tomato-todo-bin";
 const repo = "AntheaLaffy/tomato-todo";
 const remote = `ssh://aur@aur.archlinux.org/${pkgname}.git`;
 const template = join(root, "packaging/aur/PKGBUILD.in");
-const desktop = join(root, "packaging/aur/tomato-todo.desktop");
 const license = join(root, "LICENSE");
 
 const argv = process.argv.slice(2);
@@ -82,7 +81,6 @@ await mkdir(work, { recursive: true });
 await fetchTarball();
 const sums = {
   tarball: await sha256(tarball),
-  desktop: await sha256(desktop),
   license: await sha256(license),
 };
 console.log(`tarball sha256 ${sums.tarball}`);
@@ -90,10 +88,8 @@ console.log(`tarball sha256 ${sums.tarball}`);
 const pkgbuild = (await readFile(template, "utf8"))
   .replaceAll("@PKGVER@", version)
   .replaceAll("@SHA256_TARBALL@", sums.tarball)
-  .replaceAll("@SHA256_DESKTOP@", sums.desktop)
   .replaceAll("@SHA256_LICENSE@", sums.license);
 await writeFile(join(work, "PKGBUILD"), pkgbuild);
-await copyFile(desktop, join(work, "tomato-todo.desktop"));
 await copyFile(license, join(work, "LICENSE"));
 await writeFile(
   join(work, ".SRCINFO"),
@@ -117,7 +113,7 @@ if (await exists(join(checkout, ".git"))) {
   await rm(checkout, { recursive: true, force: true });
   execFileSync("git", ["clone", remote, checkout], { stdio: "inherit" });
 }
-for (const name of ["PKGBUILD", ".SRCINFO", "tomato-todo.desktop", "LICENSE"])
+for (const name of ["PKGBUILD", ".SRCINFO", "LICENSE"])
   await copyFile(join(work, name), join(checkout, name));
 execFileSync("git", ["-C", checkout, "add", "-A"], { stdio: "inherit" });
 const dirty = execFileSync("git", ["-C", checkout, "status", "--porcelain"], {

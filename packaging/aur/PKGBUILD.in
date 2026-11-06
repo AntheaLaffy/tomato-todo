@@ -3,8 +3,8 @@
 # fills in the real hashes. Do not hand-edit the generated PKGBUILD in the AUR
 # repository: change this file and re-run the script.
 #
-# Upstream publishes a self-contained tarball (Tauri binary + bundled Node/Pi
-# agent runtime), so this is a -bin package; there is no source build here.
+# Upstream publishes a self-contained tarball (Node runtime + Rust guard), so
+# this is a -bin package; there is no source build here.
 pkgname=tomato-todo-bin
 pkgver=@PKGVER@
 pkgrel=1
@@ -12,36 +12,79 @@ pkgdesc='任务与番茄钟，一个安静的专注空间'
 arch=('x86_64')
 url='https://github.com/AntheaLaffy/tomato-todo'
 license=('MIT')
-depends=('gtk3' 'webkit2gtk-4.1' 'libayatana-appindicator' 'hicolor-icon-theme' 'libpulse' 'gst-plugins-bad')
+# guard 可能链接的系统库：x11rb → libxcb（guard_x11.rs），gio → glib2
+# （guard_shell.rs 的 D-Bus 通知/托盘）；Wayland 路径（guard_wayland.rs）是
+# 纯 std socket + serde_json，不需要额外系统库。crates/guard/Cargo.toml 尚
+# 在重写分支并行开发中，落地后需与本行对齐。
+depends=('libxcb' 'glib2')
 provides=('tomato-todo')
 conflicts=('tomato-todo')
 options=('!strip' '!debug')
+# 单 tarball 假设：发布工作流产出
+# tomato-todo-$pkgver-$CARCH-linux.tar.gz，内含 tomato-runtime、tomato-guard
+# 与 runtime 的 vendor/ 树（新产物布局由发布工作流并行决定，落定后复核此
+# 假设；若改为多产物，本模板与 scripts/publish-aur.mjs 需同步改）。
 source=("https://github.com/AntheaLaffy/tomato-todo/releases/download/v$pkgver/tomato-todo-$pkgver-$CARCH-linux.tar.gz"
-        'tomato-todo.desktop'
         'LICENSE')
 sha256sums=('@SHA256_TARBALL@'
-            '@SHA256_DESKTOP@'
             '@SHA256_LICENSE@')
 
 package() {
-  install -Dm755 "$srcdir/tomato-todo" "$pkgdir/usr/bin/tomato-todo"
+  # 布局镜像用户安装脚本 scripts/install.mjs 的 ~/.local/lib/tomato/：
+  #   /usr/lib/tomato/bin/tomato-runtime   + 兄弟目录 /usr/lib/tomato/vendor/
+  #   /usr/lib/tomato/guard/tomato-guard
+  # bin/ 与 vendor/ 必须保持兄弟关系：runtime 按相对位置解析 vendor/core.mjs。
+  # tarball 可能平铺（tomato-runtime + vendor/ + tomato-guard）也可能带
+  # runtime/ 目录树（runtime/bin/… + runtime/vendor/…），两种都接受。
+  if [ -f "$srcdir/runtime/bin/tomato-runtime" ]; then
+    install -Dm755 "$srcdir/runtime/bin/tomato-runtime" "$pkgdir/usr/lib/tomato/bin/tomato-runtime"
+    if [ -d "$srcdir/runtime/vendor" ]; then
+      cp -a "$srcdir/runtime/vendor" "$pkgdir/usr/lib/tomato/vendor"
+    fi
+  else
+    install -Dm755 "$srcdir/tomato-runtime" "$pkgdir/usr/lib/tomato/bin/tomato-runtime"
+    if [ -d "$srcdir/vendor" ]; then
+      cp -a "$srcdir/vendor" "$pkgdir/usr/lib/tomato/vendor"
+    fi
+  fi
+  install -Dm755 "$srcdir/tomato-guard" "$pkgdir/usr/lib/tomato/guard/tomato-guard"
 
-  # Tauri resolves bundled resources from /usr/lib/<product name>, and the
-  # product name is "Tomato Todo" (a space, not the Cargo package name).
-  install -d "$pkgdir/usr/lib/Tomato Todo"
-  cp -a "$srcdir/agent" "$pkgdir/usr/lib/Tomato Todo/agent"
-  cp -a "$srcdir/desktop-integrations" "$pkgdir/usr/lib/Tomato Todo/desktop-integrations"
-  install -Dm644 "$srcdir/install-desktop-integration.py" "$pkgdir/usr/lib/Tomato Todo/install-desktop-integration.py"
+  install -d "$pkgdir/usr/bin"
+  ln -s /usr/lib/tomato/bin/tomato-runtime "$pkgdir/usr/bin/tomato-runtime"
+  ln -s /usr/lib/tomato/guard/tomato-guard "$pkgdir/usr/bin/tomato-guard"
 
-  # Releases before the bundle stopped shipping npm's absolute .bin shims carry
-  # dangling links to the CI runner; drop them if present. Harmless once the
-  # bundle is built by scripts/build-agent.mjs, which removes the directory.
-  rm -rf "$pkgdir/usr/lib/Tomato Todo/agent/node_modules/.bin"
+  # systemd user unit（内容与 scripts/install.mjs 生成的 unit 同源；这里的
+  # ExecStart 是包内绝对路径，用户安装版是 ~/.local 下的路径）。
+  install -d "$pkgdir/usr/lib/systemd/user"
+  cat > "$pkgdir/usr/lib/systemd/user/tomato-runtime.service" <<'EOF'
+[Unit]
+Description=Tomato Todo runtime（数据、HTTP API 与 MCP）
+# 不加 Restart=：runtime 同时由 DSH 插件 host 经 subprocess 保活
+# （MIGRATION.md），两边都重启会在 127.0.0.1:43987 上冲突。
 
-  install -Dm644 "$srcdir/icons/32x32.png"       "$pkgdir/usr/share/icons/hicolor/32x32/apps/tomato-todo.png"
-  install -Dm644 "$srcdir/icons/128x128.png"     "$pkgdir/usr/share/icons/hicolor/128x128/apps/tomato-todo.png"
-  install -Dm644 "$srcdir/icons/128x128@2x.png"  "$pkgdir/usr/share/icons/hicolor/256x256/apps/tomato-todo.png"
+[Service]
+Type=simple
+ExecStart=/usr/lib/tomato/bin/tomato-runtime --serve --data %h/.local/share/studio.tomato.todo
 
-  install -Dm644 "$srcdir/tomato-todo.desktop" "$pkgdir/usr/share/applications/tomato-todo.desktop"
+[Install]
+WantedBy=default.target
+EOF
+  cat > "$pkgdir/usr/lib/systemd/user/tomato-guard.service" <<'EOF'
+[Unit]
+Description=Tomato Todo guard（专注保护 / 通知 / 托盘）
+# 默认不 enable：API.md 规定 guard 由 runtime 监督并在崩溃时重启，本 unit
+# 仅为手动/应急使用保留；AUR 包安装不会自动启用。
+# guard 数据目录假设：XDG_STATE_HOME/studio.tomato.todo/guard（runtime 在此
+# 写 guard 的 token）。注意：API.md 未指定该目录具体路径，runtime 工作流
+# 落地后需对齐。
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/tomato/guard/tomato-guard --serve
+
+[Install]
+WantedBy=default.target
+EOF
+
   install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
