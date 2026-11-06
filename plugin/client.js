@@ -128,6 +128,210 @@
     );
   }
 
+  // plugin/src/client/shared/api.js
+  var api_exports = {};
+  __export(api_exports, {
+    API_BASE: () => API_BASE,
+    ApiError: () => ApiError,
+    getExportBackup: () => getExportBackup,
+    getExportPlan: () => getExportPlan,
+    getHealth: () => getHealth,
+    getState: () => getState,
+    ping: () => ping,
+    postDispatch: () => postDispatch
+  });
+  var API_BASE = "http://127.0.0.1:43987";
+  var ApiError = class extends Error {
+    constructor(message, status) {
+      super(message);
+      this.name = "ApiError";
+      this.status = status;
+      this.userMessage = message;
+    }
+  };
+  async function request(path, { method = "GET", body, timeoutMs = 5e3 } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(API_BASE + path, {
+        method,
+        headers: body === void 0 ? void 0 : { "Content-Type": "application/json" },
+        body: body === void 0 ? void 0 : JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch (e) {
+      throw new ApiError(
+        e && e.name === "AbortError" ? "runtime 响应超时" : "无法连接番茄 runtime（127.0.0.1:43987）",
+        0
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+    if (!res.ok) {
+      const message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : `请求失败（HTTP ${res.status}）`;
+      throw new ApiError(message, res.status);
+    }
+    return payload;
+  }
+  function getState(opts) {
+    return request("/api/state", opts);
+  }
+  function postDispatch(action, opts) {
+    return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
+  }
+  function getExportPlan(opts) {
+    return request("/api/export/plan", { timeoutMs: 15e3, ...opts });
+  }
+  function getExportBackup(opts) {
+    return request("/api/export/backup", { timeoutMs: 3e4, ...opts });
+  }
+  function getHealth(opts) {
+    return request("/health", opts);
+  }
+  async function ping(opts) {
+    try {
+      const health = await getHealth({ timeoutMs: 2e3, ...opts });
+      return health && health.ok === true;
+    } catch {
+      return false;
+    }
+  }
+
+  // plugin/src/client/shared/store.js
+  var snapshot = null;
+  var readError = null;
+  var inflightRead = null;
+  var pollTimer = null;
+  var beatTimer = null;
+  var disposed = false;
+  var listeners = /* @__PURE__ */ new Set();
+  function emit() {
+    for (const fn of Array.from(listeners)) {
+      try {
+        fn(snapshot, readError);
+      } catch {
+      }
+    }
+  }
+  function subscribe(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
+  function getSnapshot() {
+    return snapshot;
+  }
+  function useSnapshot() {
+    const [tick, setTick] = useState(0);
+    useEffect(() => {
+      const off = subscribe(() => setTick((n) => n + 1));
+      return off;
+    }, []);
+    return snapshot;
+  }
+  function apply(next) {
+    snapshot = next;
+    readError = null;
+    emit();
+  }
+  function refresh() {
+    if (disposed) return Promise.resolve(snapshot);
+    if (inflightRead !== null) return inflightRead;
+    inflightRead = getState({ timeoutMs: 4e3 }).then((next) => {
+      apply(next);
+      return next;
+    }).catch((e) => {
+      readError = e instanceof ApiError ? e.userMessage : String(e);
+      emit();
+      return snapshot;
+    }).finally(() => {
+      inflightRead = null;
+    });
+    return inflightRead;
+  }
+  var MUTATING = /* @__PURE__ */ new Set();
+  async function dispatch(action) {
+    const key = action && action.type ? action.type : "unknown";
+    MUTATING.add(key);
+    try {
+      const res = await postDispatch(action, { timeoutMs: 8e3 });
+      if (res && res.snapshot) {
+        apply(res.snapshot);
+      } else {
+        await refresh();
+      }
+      return res;
+    } catch (e) {
+      const err = e instanceof ApiError ? e : new ApiError(String(e), 0);
+      err.actionType = key;
+      throw err;
+    } finally {
+      MUTATING.delete(key);
+    }
+  }
+  async function tryDispatch(action) {
+    try {
+      await dispatch(action);
+      return { ok: true, error: null };
+    } catch (e) {
+      return { ok: false, error: e && e.userMessage ? e.userMessage : String(e) };
+    }
+  }
+  function nextDelay() {
+    const data = snapshot && snapshot.data;
+    const timer = data && data.timer;
+    const running = !!(timer && timer.running);
+    return running ? 5e3 : 8e3;
+  }
+  function startHeartbeat() {
+    stopHeartbeat();
+    beatTimer = setInterval(() => {
+      if (disposed) return;
+      const data = snapshot && snapshot.data;
+      const timer = data && data.timer;
+      if (timer && timer.running) emit();
+    }, 1e3);
+  }
+  function stopHeartbeat() {
+    if (beatTimer !== null) {
+      clearInterval(beatTimer);
+      beatTimer = null;
+    }
+  }
+  function startPolling() {
+    stopPolling();
+    disposed = false;
+    const tick = () => {
+      if (disposed) return;
+      refresh().finally(() => {
+        if (disposed) return;
+        pollTimer = setTimeout(tick, nextDelay());
+      });
+    };
+    refresh();
+    startHeartbeat();
+    pollTimer = setTimeout(tick, nextDelay());
+    return stopPolling;
+  }
+  function stopPolling() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    stopHeartbeat();
+  }
+  function dispose() {
+    disposed = true;
+    stopPolling();
+    listeners.clear();
+  }
+
   // plugin/src/client/shared/ui.css.js
   var UI_CSS = `
 .t-root{color:var(--tomato-ink);font-variant-numeric:tabular-nums;
@@ -470,6 +674,14 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
   .t-amb-verse,.t-amb-seal,#tomato-ambient .t-amb-enso{display:none}
 }
 
+/* 氛围总开关与插画开关：设置行的偏好直接写 html 属性，CSS 即时生效。 */
+html[data-tomato-skin=off] #tomato-sky,
+html[data-tomato-skin=off] #tomato-ambient{display:none!important}
+html[data-tomato-backdrop=off] #tomato-sky .t-amb-art,
+html[data-tomato-backdrop=off] #tomato-ambient .t-amb-art,
+html[data-tomato-backdrop=off] #tomato-sky .t-amb-enso,
+html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!important}
+
 /* ---------- reduced motion：停漂移与摇摆，保留 0–120ms 的必要过渡 ---------- */
 @media (prefers-reduced-motion:reduce){
   #root{animation:none}
@@ -501,6 +713,59 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     style.textContent = TOMATO_VARS + UI_CSS + ATMOS_CSS;
     document.head.appendChild(style);
     return () => style.remove();
+  }
+
+  // plugin/src/client/skin/prefs.js
+  var KEY = "tomato-dsh.skin";
+  var DEFAULTS = { ambience: true, daypart: "auto" };
+  var current = load();
+  var listeners2 = /* @__PURE__ */ new Set();
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return { ...DEFAULTS };
+      const parsed = JSON.parse(raw);
+      return {
+        ambience: parsed.ambience !== false,
+        daypart: parsed.daypart === "morning" || parsed.daypart === "day" || parsed.daypart === "dusk" || parsed.daypart === "night" ? parsed.daypart : "auto"
+      };
+    } catch {
+      return { ...DEFAULTS };
+    }
+  }
+  function persist() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(current));
+    } catch {
+    }
+  }
+  function applySkinPrefs() {
+    const root = document.documentElement;
+    root.setAttribute("data-tomato-skin", current.ambience ? "on" : "off");
+    if (current.daypart === "auto") {
+      root.removeAttribute("data-tomato-daypart-manual");
+    } else {
+      root.setAttribute("data-tomato-daypart", current.daypart);
+      root.setAttribute("data-tomato-daypart-manual", "1");
+    }
+  }
+  function getSkinPrefs() {
+    return { ...current };
+  }
+  function setSkinPrefs(patch) {
+    current = { ...current, ...patch };
+    persist();
+    applySkinPrefs();
+    for (const fn of Array.from(listeners2)) {
+      try {
+        fn(current);
+      } catch {
+      }
+    }
+  }
+  function subscribeSkinPrefs(fn) {
+    listeners2.add(fn);
+    return () => listeners2.delete(fn);
   }
 
   // plugin/src/client/skin/ambient.js
@@ -601,6 +866,11 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
   var GROUND_INNER = '<div class="t-amb-glow"></div><div class="t-amb-grain"></div>' + ART + '<div class="t-amb-enso"></div>' + VERSE_MARKUP + motesMarkup();
   var SKY_INNER = '<div class="t-amb-wash"></div><div class="t-amb-lamp"></div>' + ART + '<div class="t-amb-enso"></div>' + VERSE_MARKUP + motesMarkup();
   function applyDaypart() {
+    const manual = getSkinPrefs().daypart;
+    if (manual !== "auto") {
+      document.documentElement.setAttribute("data-tomato-daypart", manual);
+      return manual;
+    }
     const hour = (/* @__PURE__ */ new Date()).getHours();
     const part = hour >= 6 && hour < 11 ? "morning" : hour < 17 ? "day" : hour < 22 ? "dusk" : "night";
     document.documentElement.setAttribute("data-tomato-daypart", part);
@@ -798,119 +1068,9 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     L2("--dsw-menu-surface-fill", "#fffdf7e6", "#262019e6")
   ]);
 
-  // plugin/src/client/skin/main.js
-  function TomatoMark({ size }) {
-    return h(Icon, {
-      name: "tomato",
-      size: size || 22,
-      stroke: 1.5,
-      style: { color: "var(--tomato-brand)" }
-    });
-  }
-  function TomatoWordmark() {
-    return h(
-      "span",
-      {
-        style: {
-          display: "inline-flex",
-          alignItems: "baseline",
-          gap: 6,
-          fontFamily: "'Noto Serif SC','Songti SC',Georgia,serif",
-          fontSize: 14.5,
-          fontWeight: 600,
-          letterSpacing: ".02em",
-          color: "var(--tomato-ink)",
-          whiteSpace: "nowrap"
-        }
-      },
-      "番茄 Todo",
-      h("span", {
-        style: {
-          width: 5,
-          height: 5,
-          borderRadius: "50%",
-          background: "var(--tomato-brand)",
-          display: "inline-block",
-          marginBottom: 2
-        }
-      })
-    );
-  }
-  function HeroMark() {
-    return h(Icon, {
-      name: "tomato",
-      size: 30,
-      stroke: 1.4,
-      style: { color: "var(--tomato-brand)" }
-    });
-  }
-  function SkinSky() {
-    return h("div", {
-      id: "tomato-sky",
-      "data-tomato-ambient": "sky",
-      "aria-hidden": "true",
-      style: { pointerEvents: "none" },
-      dangerouslySetInnerHTML: { __html: SKY_INNER }
-    });
-  }
-  function safeInject(ctx, key, options, Component) {
-    try {
-      ctx.slots.inject(key, () => ctx.slots.register(options, Component));
-    } catch {
-    }
-  }
-  function registerSkin(ctx) {
-    const removeStyles = injectStyles();
-    const removeAmbient = injectAmbient();
-    const theme = ctx.get ? ctx.get("theme") : null;
-    const removeTokens = theme && typeof theme.overrideTokens === "function" ? theme.overrideTokens(SKIN_SOURCE, SKIN_TOKENS) : null;
-    safeInject(
-      ctx,
-      "shell.overlay",
-      { name: "shell.overlay", id: "tomato-sky", order: -1e3 },
-      SkinSky
-    );
-    safeInject(
-      ctx,
-      "sidebar.brand.mark",
-      { name: "sidebar.brand.mark" },
-      TomatoMark
-    );
-    safeInject(
-      ctx,
-      "sidebar.brand.name",
-      { name: "sidebar.brand.name" },
-      TomatoWordmark
-    );
-    safeInject(
-      ctx,
-      "conversation.hero.brand.mark",
-      { name: "conversation.hero.brand.mark" },
-      HeroMark
-    );
-    const dispose2 = () => {
-      try {
-        removeStyles();
-      } catch {
-      }
-      try {
-        removeAmbient();
-      } catch {
-      }
-      try {
-        removeTokens?.();
-      } catch {
-      }
-    };
-    if (typeof ctx.effect === "function") {
-      ctx.effect(() => dispose2);
-    }
-    return dispose2;
-  }
-
   // plugin/src/client/shared/copy.js
   var REG = /* @__PURE__ */ new Map();
-  var current = "zh";
+  var current2 = "zh";
   var ZH = "zh";
   var EN = "en";
   function registerCopy(ns, dicts) {
@@ -920,14 +1080,14 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     REG.set(ns, entry);
   }
   function setLocale(id) {
-    current = typeof id === "string" && /^zh/i.test(id) ? ZH : EN;
+    current2 = typeof id === "string" && /^zh/i.test(id) ? ZH : EN;
   }
   function t(key, vars) {
     const dot = key.indexOf(".");
     const ns = dot > 0 ? key.slice(0, dot) : "common";
     const name = dot > 0 ? key.slice(dot + 1) : key;
     const entry = REG.get(ns);
-    const dict = entry ? entry[current] : void 0;
+    const dict = entry ? entry[current2] : void 0;
     let text = dict && dict[name] !== void 0 ? dict[name] : void 0;
     if (text === void 0) {
       const fallback = entry ? entry[ZH] : void 0;
@@ -1016,210 +1176,6 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
       daypartNight: "Late night"
     }
   });
-
-  // plugin/src/client/shared/api.js
-  var api_exports = {};
-  __export(api_exports, {
-    API_BASE: () => API_BASE,
-    ApiError: () => ApiError,
-    getExportBackup: () => getExportBackup,
-    getExportPlan: () => getExportPlan,
-    getHealth: () => getHealth,
-    getState: () => getState,
-    ping: () => ping,
-    postDispatch: () => postDispatch
-  });
-  var API_BASE = "http://127.0.0.1:43987";
-  var ApiError = class extends Error {
-    constructor(message, status) {
-      super(message);
-      this.name = "ApiError";
-      this.status = status;
-      this.userMessage = message;
-    }
-  };
-  async function request(path, { method = "GET", body, timeoutMs = 5e3 } = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let res;
-    try {
-      res = await fetch(API_BASE + path, {
-        method,
-        headers: body === void 0 ? void 0 : { "Content-Type": "application/json" },
-        body: body === void 0 ? void 0 : JSON.stringify(body),
-        signal: controller.signal
-      });
-    } catch (e) {
-      throw new ApiError(
-        e && e.name === "AbortError" ? "runtime 响应超时" : "无法连接番茄 runtime（127.0.0.1:43987）",
-        0
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-    let payload = null;
-    try {
-      payload = await res.json();
-    } catch {
-      payload = null;
-    }
-    if (!res.ok) {
-      const message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : `请求失败（HTTP ${res.status}）`;
-      throw new ApiError(message, res.status);
-    }
-    return payload;
-  }
-  function getState(opts) {
-    return request("/api/state", opts);
-  }
-  function postDispatch(action, opts) {
-    return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
-  }
-  function getExportPlan(opts) {
-    return request("/api/export/plan", { timeoutMs: 15e3, ...opts });
-  }
-  function getExportBackup(opts) {
-    return request("/api/export/backup", { timeoutMs: 3e4, ...opts });
-  }
-  function getHealth(opts) {
-    return request("/health", opts);
-  }
-  async function ping(opts) {
-    try {
-      const health = await getHealth({ timeoutMs: 2e3, ...opts });
-      return health && health.ok === true;
-    } catch {
-      return false;
-    }
-  }
-
-  // plugin/src/client/shared/store.js
-  var snapshot = null;
-  var readError = null;
-  var inflightRead = null;
-  var pollTimer = null;
-  var beatTimer = null;
-  var disposed = false;
-  var listeners = /* @__PURE__ */ new Set();
-  function emit() {
-    for (const fn of Array.from(listeners)) {
-      try {
-        fn(snapshot, readError);
-      } catch {
-      }
-    }
-  }
-  function subscribe(fn) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-  }
-  function getSnapshot() {
-    return snapshot;
-  }
-  function useSnapshot() {
-    const [tick, setTick] = useState(0);
-    useEffect(() => {
-      const off = subscribe(() => setTick((n) => n + 1));
-      return off;
-    }, []);
-    return snapshot;
-  }
-  function apply(next) {
-    snapshot = next;
-    readError = null;
-    emit();
-  }
-  function refresh() {
-    if (disposed) return Promise.resolve(snapshot);
-    if (inflightRead !== null) return inflightRead;
-    inflightRead = getState({ timeoutMs: 4e3 }).then((next) => {
-      apply(next);
-      return next;
-    }).catch((e) => {
-      readError = e instanceof ApiError ? e.userMessage : String(e);
-      emit();
-      return snapshot;
-    }).finally(() => {
-      inflightRead = null;
-    });
-    return inflightRead;
-  }
-  var MUTATING = /* @__PURE__ */ new Set();
-  async function dispatch(action) {
-    const key = action && action.type ? action.type : "unknown";
-    MUTATING.add(key);
-    try {
-      const res = await postDispatch(action, { timeoutMs: 8e3 });
-      if (res && res.snapshot) {
-        apply(res.snapshot);
-      } else {
-        await refresh();
-      }
-      return res;
-    } catch (e) {
-      const err = e instanceof ApiError ? e : new ApiError(String(e), 0);
-      err.actionType = key;
-      throw err;
-    } finally {
-      MUTATING.delete(key);
-    }
-  }
-  async function tryDispatch(action) {
-    try {
-      await dispatch(action);
-      return { ok: true, error: null };
-    } catch (e) {
-      return { ok: false, error: e && e.userMessage ? e.userMessage : String(e) };
-    }
-  }
-  function nextDelay() {
-    const data = snapshot && snapshot.data;
-    const timer = data && data.timer;
-    const running = !!(timer && timer.running);
-    return running ? 5e3 : 8e3;
-  }
-  function startHeartbeat() {
-    stopHeartbeat();
-    beatTimer = setInterval(() => {
-      if (disposed) return;
-      const data = snapshot && snapshot.data;
-      const timer = data && data.timer;
-      if (timer && timer.running) emit();
-    }, 1e3);
-  }
-  function stopHeartbeat() {
-    if (beatTimer !== null) {
-      clearInterval(beatTimer);
-      beatTimer = null;
-    }
-  }
-  function startPolling() {
-    stopPolling();
-    disposed = false;
-    const tick = () => {
-      if (disposed) return;
-      refresh().finally(() => {
-        if (disposed) return;
-        pollTimer = setTimeout(tick, nextDelay());
-      });
-    };
-    refresh();
-    startHeartbeat();
-    pollTimer = setTimeout(tick, nextDelay());
-    return stopPolling;
-  }
-  function stopPolling() {
-    if (pollTimer !== null) {
-      clearTimeout(pollTimer);
-      pollTimer = null;
-    }
-    stopHeartbeat();
-  }
-  function dispose() {
-    disposed = true;
-    stopPolling();
-    listeners.clear();
-  }
 
   // plugin/src/client/shared/ui.js
   var SIZES = {
@@ -2035,6 +1991,316 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     );
   }
 
+  // plugin/src/client/skin/settings-row.js
+  registerCopy("skinprefs", {
+    zh: {
+      title: "番茄氛围",
+      desc: "打开 DSH 就在慢学习的纸色氛围里：窗光、微尘与线描书桌。不影响学习数据。",
+      ambience: "氛围层",
+      daypart: "时段",
+      auto: "跟随时间",
+      morning: "晨光",
+      day: "白天",
+      dusk: "黄昏",
+      night: "夜读",
+      backdrop: "角色背景板",
+      backdropOff: "已隐藏插画，只留窗光",
+      backdropUnavailable: "运行时未连接，暂时无法修改背景板",
+      saveFailed: "保存失败：{error}"
+    },
+    en: {
+      title: "Tomato ambience",
+      desc: "Opening DSH lands you in a slow study mood: window light, drifting motes and a line-art desk. Study data is untouched.",
+      ambience: "Ambience layer",
+      daypart: "Time of day",
+      auto: "Follow clock",
+      morning: "Morning",
+      day: "Daylight",
+      dusk: "Dusk",
+      night: "Night reading",
+      backdrop: "Illustration",
+      backdropOff: "Illustration hidden; window light remains",
+      backdropUnavailable: "Runtime offline — illustration can't be changed now",
+      saveFailed: "Couldn't save: {error}"
+    }
+  });
+  function Row({ label, hint, children, dim = false }) {
+    return h(
+      "div",
+      {
+        className: "t-root",
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          padding: "9px 0",
+          minWidth: 0,
+          opacity: dim ? 0.6 : 1
+        }
+      },
+      h(
+        "div",
+        { style: { flex: 1, minWidth: 0 } },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 13,
+              fontWeight: 550,
+              color: "var(--dsw-alias-label-primary, var(--tomato-ink))"
+            }
+          },
+          label
+        ),
+        hint ? h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              lineHeight: 1.5,
+              marginTop: 2,
+              color: "var(--dsw-alias-label-tertiary, var(--tomato-ink-3))"
+            }
+          },
+          hint
+        ) : null
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: 10, flex: "none" } }, children)
+    );
+  }
+  function TomatoSkinSettingsRow() {
+    const state = useSnapshot();
+    const [prefs, setPrefs] = useState(getSkinPrefs());
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+    useEffect(() => subscribeSkinPrefs(setPrefs), []);
+    const settings = state && state.data && state.data.settings || null;
+    const backdrop = settings ? !!settings.personaBackdrop : true;
+    const toggleBackdrop = async (next) => {
+      if (!settings) return;
+      setSaving(true);
+      setError(null);
+      const res = await tryDispatch({ type: "saveSettings", settings: { ...settings, personaBackdrop: next } });
+      setSaving(false);
+      if (!res.ok) setError(res.error);
+    };
+    return h(
+      "div",
+      { className: "t-root", style: { display: "flex", flexDirection: "column", gap: 2 } },
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 650,
+            color: "var(--dsw-alias-label-primary, var(--tomato-ink))",
+            marginBottom: 2
+          }
+        },
+        h(Dot, { color: "var(--tomato-brand)", size: 6 }),
+        t("skinprefs.title")
+      ),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            lineHeight: 1.6,
+            color: "var(--dsw-alias-label-tertiary, var(--tomato-ink-3))",
+            marginBottom: 4
+          }
+        },
+        t("skinprefs.desc")
+      ),
+      h(
+        Row,
+        { label: t("skinprefs.ambience") },
+        h(Toggle, {
+          checked: prefs.ambience,
+          onChange: (next) => setSkinPrefs({ ambience: next })
+        })
+      ),
+      h(
+        Row,
+        { label: t("skinprefs.daypart") },
+        h(Select, {
+          value: prefs.daypart,
+          width: 132,
+          options: [
+            { value: "auto", label: t("skinprefs.auto") },
+            { value: "morning", label: t("skinprefs.morning") },
+            { value: "day", label: t("skinprefs.day") },
+            { value: "dusk", label: t("skinprefs.dusk") },
+            { value: "night", label: t("skinprefs.night") }
+          ],
+          onChange: (next) => setSkinPrefs({ daypart: next })
+        })
+      ),
+      h(
+        Row,
+        {
+          label: t("skinprefs.backdrop"),
+          hint: settings ? backdrop ? void 0 : t("skinprefs.backdropOff") : t("skinprefs.backdropUnavailable"),
+          dim: !settings || saving
+        },
+        h(Toggle, {
+          checked: backdrop,
+          onChange: (next) => {
+            if (!settings || saving) return;
+            toggleBackdrop(next);
+          }
+        })
+      ),
+      error ? h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--dsw-alias-state-error-primary, #b8503f)",
+            paddingTop: 2
+          }
+        },
+        t("skinprefs.saveFailed", { error })
+      ) : null
+    );
+  }
+
+  // plugin/src/client/skin/main.js
+  function TomatoMark({ size }) {
+    return h(Icon, {
+      name: "tomato",
+      size: size || 22,
+      stroke: 1.5,
+      style: { color: "var(--tomato-brand)" }
+    });
+  }
+  function TomatoWordmark() {
+    return h(
+      "span",
+      {
+        style: {
+          display: "inline-flex",
+          alignItems: "baseline",
+          gap: 6,
+          fontFamily: "'Noto Serif SC','Songti SC',Georgia,serif",
+          fontSize: 14.5,
+          fontWeight: 600,
+          letterSpacing: ".02em",
+          color: "var(--tomato-ink)",
+          whiteSpace: "nowrap"
+        }
+      },
+      "番茄 Todo",
+      h("span", {
+        style: {
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          background: "var(--tomato-brand)",
+          display: "inline-block",
+          marginBottom: 2
+        }
+      })
+    );
+  }
+  function HeroMark() {
+    return h(Icon, {
+      name: "tomato",
+      size: 30,
+      stroke: 1.4,
+      style: { color: "var(--tomato-brand)" }
+    });
+  }
+  function SkinSky() {
+    return h("div", {
+      id: "tomato-sky",
+      "data-tomato-ambient": "sky",
+      "aria-hidden": "true",
+      style: { pointerEvents: "none" },
+      dangerouslySetInnerHTML: { __html: SKY_INNER }
+    });
+  }
+  function SkinSync() {
+    const state = useSnapshot();
+    const backdrop = state && state.data && state.data.settings ? state.data.settings.personaBackdrop : void 0;
+    useEffect(() => {
+      const root = document.documentElement;
+      if (backdrop === false) root.setAttribute("data-tomato-backdrop", "off");
+      else root.removeAttribute("data-tomato-backdrop");
+    }, [backdrop]);
+    return null;
+  }
+  function safeInject(ctx, key, options, Component) {
+    try {
+      ctx.slots.inject(key, () => ctx.slots.register(options, Component));
+    } catch {
+    }
+  }
+  function registerSkin(ctx) {
+    applySkinPrefs();
+    const removeStyles = injectStyles();
+    const removeAmbient = injectAmbient();
+    const theme = ctx.get ? ctx.get("theme") : null;
+    const removeTokens = theme && typeof theme.overrideTokens === "function" ? theme.overrideTokens(SKIN_SOURCE, SKIN_TOKENS) : null;
+    safeInject(
+      ctx,
+      "shell.overlay",
+      { name: "shell.overlay", id: "tomato-sky", order: -1e3 },
+      SkinSky
+    );
+    safeInject(
+      ctx,
+      "sidebar.brand.mark",
+      { name: "sidebar.brand.mark" },
+      TomatoMark
+    );
+    safeInject(
+      ctx,
+      "sidebar.brand.name",
+      { name: "sidebar.brand.name" },
+      TomatoWordmark
+    );
+    safeInject(
+      ctx,
+      "conversation.hero.brand.mark",
+      { name: "conversation.hero.brand.mark" },
+      HeroMark
+    );
+    safeInject(
+      ctx,
+      "shell.overlay",
+      { name: "shell.overlay", id: "tomato-sky-sync", order: -998 },
+      SkinSync
+    );
+    safeInject(
+      ctx,
+      "settings.general.item",
+      { name: "settings.general.item", id: "tomato-skin", order: 13 },
+      TomatoSkinSettingsRow
+    );
+    const dispose2 = () => {
+      try {
+        removeStyles();
+      } catch {
+      }
+      try {
+        removeAmbient();
+      } catch {
+      }
+      try {
+        removeTokens?.();
+      } catch {
+      }
+    };
+    if (typeof ctx.effect === "function") {
+      ctx.effect(() => dispose2);
+    }
+    return dispose2;
+  }
+
   // plugin/src/client/shared/derive.js
   var pad = (n) => String(n).padStart(2, "0");
   function dayKey(ts) {
@@ -2280,7 +2546,7 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
   var PAGE_KEY = "tomato-dsh.page";
   var activePageId = null;
   var openPanelFn = null;
-  var listeners2 = /* @__PURE__ */ new Set();
+  var listeners3 = /* @__PURE__ */ new Set();
   function readStored() {
     try {
       return localStorage.getItem(PAGE_KEY);
@@ -2302,7 +2568,7 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
       localStorage.setItem(PAGE_KEY, id);
     } catch {
     }
-    for (const fn of Array.from(listeners2)) {
+    for (const fn of Array.from(listeners3)) {
       try {
         fn(id);
       } catch {
@@ -2310,8 +2576,8 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     }
   }
   function subscribeActivePage(fn) {
-    listeners2.add(fn);
-    return () => listeners2.delete(fn);
+    listeners3.add(fn);
+    return () => listeners3.delete(fn);
   }
   function bindPanelOpener(fn) {
     openPanelFn = typeof fn === "function" ? fn : null;
@@ -2684,8 +2950,8 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
       if (!settings) return;
       const target = pendingVolume !== null ? pendingVolume : settingsVolume;
       const soundVolume = Math.round(Math.min(1, Math.max(0, target)) * 100);
-      const current2 = normalizeVolume(settings.soundVolume);
-      if (current2 !== null && Math.round(current2 * 100) === soundVolume) {
+      const current3 = normalizeVolume(settings.soundVolume);
+      if (current3 !== null && Math.round(current3 * 100) === soundVolume) {
         pendingVolume = null;
         return;
       }
@@ -3308,9 +3574,9 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
   });
   var openState = false;
   var endTick = 0;
-  var listeners3 = /* @__PURE__ */ new Set();
+  var listeners4 = /* @__PURE__ */ new Set();
   function emit2() {
-    for (const fn of Array.from(listeners3)) {
+    for (const fn of Array.from(listeners4)) {
       try {
         fn();
       } catch {
@@ -3336,9 +3602,9 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     const [open, setOpen] = useState(openState);
     useEffect(() => {
       const fn = () => setOpen(openState);
-      listeners3.add(fn);
+      listeners4.add(fn);
       fn();
-      return () => listeners3.delete(fn);
+      return () => listeners4.delete(fn);
     }, []);
     return open;
   }
@@ -3346,8 +3612,8 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     const [tick, setTick] = useState(endTick);
     useEffect(() => {
       const fn = () => setTick(endTick);
-      listeners3.add(fn);
-      return () => listeners3.delete(fn);
+      listeners4.add(fn);
+      return () => listeners4.delete(fn);
     }, []);
     return tick;
   }
@@ -4622,7 +4888,7 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
       setConfirmDelete(false);
     }, [open, taskId, today, initialTitle]);
     if (!open) return null;
-    const patch = (next) => setDraft((current2) => ({ ...current2, ...next }));
+    const patch = (next) => setDraft((current3) => ({ ...current3, ...next }));
     const defaultFocus = Number(settings.focusMinutes) || 45;
     const focusValue = intOf(draft.focusMinutes, defaultFocus);
     const estimateValue = intOf(draft.estimate, 1);
@@ -7809,7 +8075,7 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
     };
     const pickTask = (task) => {
       setPicked(
-        (current2) => current2.includes(task.id) ? current2.filter((id) => id !== task.id) : [...current2, task.id]
+        (current3) => current3.includes(task.id) ? current3.filter((id) => id !== task.id) : [...current3, task.id]
       );
     };
     const toggleComplete = async (task) => {
@@ -7899,7 +8165,7 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
         clearSelection();
         notify(t("tasks.batchDeleted", { n: ids.length }), "neutral");
       } else {
-        setPicked((current2) => current2.filter((id) => !ids.includes(id)));
+        setPicked((current3) => current3.filter((id) => !ids.includes(id)));
         notify(t("tasks.deleted"), "neutral");
       }
     };
@@ -9944,8 +10210,8 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
       const rangeOfBlock = (block) => bandRange(block.start, block.end);
       const rangeOfRest = (rest) => bandRange(rest.start, rest.end);
       for (let i = 0; i < day.teaching.length; i += 1) {
-        const current2 = day.teaching[i];
-        const currentRange = { start: current2.startMin, end: current2.endMin };
+        const current3 = day.teaching[i];
+        const currentRange = { start: current3.startMin, end: current3.endMin };
         for (let j = i + 1; j < day.teaching.length; j += 1) {
           const next = day.teaching[j];
           const minutes = overlapOf(currentRange, { start: next.startMin, end: next.endMin });
@@ -9954,11 +10220,11 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
               dayIndex,
               "danger",
               t("calendar.conflictTeachingTeaching", {
-                a: teachingLabel(current2),
+                a: teachingLabel(current3),
                 b: teachingLabel(next),
                 minutes
               }),
-              `tt:${current2.raw.id}:${next.raw.id}`
+              `tt:${current3.raw.id}:${next.raw.id}`
             );
           }
         }
@@ -9969,11 +10235,11 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
               dayIndex,
               "danger",
               t("calendar.conflictTeachingBlock", {
-                a: teachingLabel(current2),
+                a: teachingLabel(current3),
                 b: block.title || t("calendar.untitled"),
                 minutes
               }),
-              `tb:${current2.raw.id}:${block.id}`
+              `tb:${current3.raw.id}:${block.id}`
             );
           }
         }
@@ -9985,10 +10251,10 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
               "danger",
               t("calendar.conflictRest", {
                 a: rest.name || t("calendar.rest"),
-                b: teachingLabel(current2),
+                b: teachingLabel(current3),
                 minutes
               }),
-              `tr:${current2.raw.id}:${rest.id}`
+              `tr:${current3.raw.id}:${rest.id}`
             );
           }
         }
@@ -10000,9 +10266,9 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
               "leaf",
               t("calendar.parallel", {
                 a: block.title || t("calendar.untitled"),
-                b: teachingLabel(current2)
+                b: teachingLabel(current3)
               }),
-              `lt:${block.id}:${current2.raw.id}`
+              `lt:${block.id}:${current3.raw.id}`
             );
           }
         }
@@ -13691,20 +13957,20 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
         notify(t("guard.appNoSpace"), "danger");
         return;
       }
-      const current2 = latestWhitelist();
-      if (current2.includes(value)) {
+      const current3 = latestWhitelist();
+      if (current3.includes(value)) {
         notify(t("guard.appExists"), "danger");
         return;
       }
-      const ok = await saveProtection({ whitelist: [...current2, value] });
+      const ok = await saveProtection({ whitelist: [...current3, value] });
       if (ok) {
         setDraft("");
         notify(t("guard.appAdded", { name: value }), "brand");
       }
     }
     async function removeApp(app) {
-      const current2 = latestWhitelist();
-      const next = current2.filter((item) => item !== app);
+      const current3 = latestWhitelist();
+      const next = current3.filter((item) => item !== app);
       const ok = await saveProtection({ whitelist: next });
       if (ok) notify(t("guard.appRemoved", { name: app }), "brand");
     }

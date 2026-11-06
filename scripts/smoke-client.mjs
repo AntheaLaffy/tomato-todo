@@ -238,6 +238,7 @@ const expectedSlots = [
   "sidebar.brand.mark",
   "sidebar.brand.name",
   "conversation.hero.brand.mark",
+  "settings.general.item",
 ];
 const got = new Set(slotRegistrations.map((r) => r.key));
 for (const key of expectedSlots) {

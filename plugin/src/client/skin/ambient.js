@@ -91,6 +91,8 @@ const ART = `
 
 const VERSE = "今天，也要慢慢向前。";
 
+import { getSkinPrefs } from "./prefs.js";
+
 const MOTES = [
   { left: "12%", top: "82%", size: 3, dur: 38, delay: 0 },
   { left: "24%", top: "68%", size: 2, dur: 46, delay: 6 },
@@ -131,8 +133,13 @@ export const SKY_INNER =
   VERSE_MARKUP +
   motesMarkup();
 
-/** 根据本地时间设置时段（晨光/白天/黄昏/夜读）。 */
+/** 根据本地时间设置时段（晨光/白天/黄昏/夜读）；手动时段优先。 */
 export function applyDaypart() {
+  const manual = getSkinPrefs().daypart;
+  if (manual !== "auto") {
+    document.documentElement.setAttribute("data-tomato-daypart", manual);
+    return manual;
+  }
   const hour = new Date().getHours();
   const part =
     hour >= 6 && hour < 11
