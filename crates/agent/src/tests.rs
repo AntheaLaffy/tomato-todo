@@ -1309,9 +1309,20 @@ fn completed_exam_study_task_wakes_the_assistant_for_homework_once() {
         engine.dispatch(action(json!({"type":"saveTask","task":{"title":"极限学习","projectId":project,"dueDate":"2026-10-12"}})), time()).unwrap();
         let id = engine.snapshot(time()).unwrap().data.tasks[0].id.clone();
         engine
+            .dispatch(
+                Action::SetMode {
+                    mode: tomato_core::Mode::ShortBreak,
+                },
+                time(),
+            )
+            .unwrap();
+        engine.dispatch(Action::StartTimer, time()).unwrap();
+        engine
             .dispatch(Action::ToggleTask { id: id.clone() }, time())
             .unwrap();
         let snapshot = engine.snapshot(time()).unwrap();
+        assert_eq!(snapshot.data.timer.mode, tomato_core::Mode::ShortBreak);
+        assert!(snapshot.data.timer.running);
         assert!(snapshot
             .data
             .education
@@ -1320,6 +1331,26 @@ fn completed_exam_study_task_wakes_the_assistant_for_homework_once() {
             .any(|event| event.id == format!("taskHomework:{id}") && event.state == "pending"));
         snapshot
     };
+    let mut focusing = agent.engine.lock().unwrap().snapshot(time()).unwrap();
+    focusing.data.timer.mode = tomato_core::Mode::Focus;
+    agent.observe(&focusing).unwrap();
+    let mut grading = agent.engine.lock().unwrap().snapshot(time()).unwrap();
+    grading.data.education.events[0].kind = "grade".into();
+    agent.observe(&grading).unwrap();
+    assert_eq!(wakes.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        agent
+            .engine
+            .lock()
+            .unwrap()
+            .snapshot(time())
+            .unwrap()
+            .data
+            .education
+            .events[0]
+            .state,
+        "pending"
+    );
     // Missing runtime fails the model turn, but the claimed event and navigation
     // signal survive; polling must not repeatedly pull the user away.
     assert!(agent.observe(&snapshot).is_err());

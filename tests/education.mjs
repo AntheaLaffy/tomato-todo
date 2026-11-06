@@ -587,17 +587,58 @@ test(
           (event) => event.id === `taskHomework:${studyTaskId}`,
         ),
       );
-      // A claimed course-homework wake also carries the original lesson context.
-      // Simulate the status signal without starting a paid model.
+      const restTask = await action({
+        type: "saveTask",
+        task: {
+          title: "休息期间完成的学习任务",
+          projectId: p,
+          dueDate: date,
+          notes: "休息前完成第3讲",
+          tags: ["极限"],
+        },
+      });
+      const restTaskId = restTask.data.tasks.find(
+        (task) => task.title === "休息期间完成的学习任务",
+      ).id;
+      const restOrdinary = await action({
+        type: "saveTask",
+        task: { title: "休息期间的普通任务", dueDate: date },
+      });
+      const restOrdinaryId = restOrdinary.data.tasks.find(
+        (task) => task.title === "休息期间的普通任务",
+      ).id;
+      await action({ type: "setMode", mode: "shortBreak" });
+      const resting = await action({ type: "startTimer" });
+      assert.equal(resting.data.timer.running, true);
+      await page.locator('[data-page="tasks"]').first().click();
+      await page.locator(`[data-toggle-task="${restOrdinaryId}"]`).click();
+      await expect(page.locator("h1")).toContainText("把想做的事，慢慢完成。");
+      await page.locator(`[data-toggle-task="${restTaskId}"]`).click();
+      await expect(page.locator("h1")).toContainText("学习助手", {
+        timeout: 2000,
+      });
+      await expect(page.locator("#agent-text")).toHaveValue(/休息前完成第3讲/);
+      const restSnapshot = await (await fetch(base + "/api/snapshot")).json();
+      assert.equal(restSnapshot.data.timer.running, true);
+      assert.equal(restSnapshot.data.timer.mode, "shortBreak");
+      assert.ok(
+        restSnapshot.data.education.events.some(
+          (event) => event.id === `taskHomework:${restTaskId}`,
+        ),
+      );
+      // A claimed course-homework wake also carries the original lesson context
+      // during a break. Simulate the status signal without starting a paid model.
       await page.locator('[data-page="tasks"]').first().click();
       const wakeStatus = await post("/api/agent", { op: "status" });
+      let wakeEventId = null;
+      let wakeSerial = wakeStatus.wakeSerial + 1;
       await page.route("**/api/agent", async (route) => {
         if (route.request().postDataJSON()?.op === "status")
           await route.fulfill({
             json: {
               ...wakeStatus,
-              wakeSerial: wakeStatus.wakeSerial + 1,
-              homeworkWakeEventId: "homework:lesson-prefill",
+              wakeSerial,
+              homeworkWakeEventId: wakeEventId,
               conversations: [
                 ...wakeStatus.conversations.map((item) => ({
                   ...item,
@@ -615,6 +656,10 @@ test(
           });
         else await route.continue();
       });
+      await page.waitForTimeout(3000);
+      await expect(page.locator("h1")).toContainText("把想做的事，慢慢完成。");
+      wakeSerial++;
+      wakeEventId = "homework:lesson-prefill";
       await expect(page.locator("h1")).toContainText("学习助手", {
         timeout: 8000,
       });
@@ -633,8 +678,17 @@ test(
         finalDraft.split(`taskHomework:${studyTaskId}`).length - 1,
         1,
       );
+      assert.equal(
+        finalDraft.split(`taskHomework:${restTaskId}`).length - 1,
+        1,
+      );
       assert.equal(finalDraft.split("homework:lesson-prefill").length - 1, 1);
+      const afterWake = await (await fetch(base + "/api/snapshot")).json();
+      assert.equal(afterWake.data.timer.running, true);
+      assert.equal(afterWake.data.timer.mode, "shortBreak");
       await page.unroute("**/api/agent");
+      await action({ type: "resetTimer" });
+      await action({ type: "setMode", mode: "focus" });
       await page.locator('[data-page="education"]').first().click();
       await expect(page.locator(".education-dashboard")).toContainText(
         "学生端",

@@ -277,6 +277,7 @@ let settingsDirty = false;
 let settingsRevision = 0;
 let settingsSave: Promise<boolean> | null = null;
 let agentWakePending = false;
+let homeworkWakePending = false;
 let revealingAgent = false;
 let agentWakeBlockedSettingsRevision: number | null = null;
 const preparedHomeworkRequests = new Set<string>();
@@ -292,8 +293,8 @@ async function revealAgent() {
     !agentWakePending ||
     revealingAgent ||
     !state ||
-    state.data.timer.running ||
-    state.data.timer.startedAt ||
+    ((state.data.timer.running || state.data.timer.startedAt) &&
+      (state.data.timer.mode === "focus" || !homeworkWakePending)) ||
     protectedNow() ||
     $("#modal-root").innerHTML
   )
@@ -308,8 +309,10 @@ async function revealAgent() {
   try {
     immersive = false;
     await navigate("agent");
-    if (page === "agent") agentWakePending = false;
-    else if (page === "settings" && settingsDirty)
+    if (page === "agent") {
+      agentWakePending = false;
+      homeworkWakePending = false;
+    } else if (page === "settings" && settingsDirty)
       agentWakeBlockedSettingsRevision = settingsRevision;
   } finally {
     revealingAgent = false;
@@ -2913,12 +2916,11 @@ document.addEventListener("click", async (e) => {
       (await act({ type: "toggleTask", id: d.toggleTask })) &&
       !wasCompleted &&
       !hadEvent &&
-      state.data.education.events.some(
-        (e) => e.id === eventId && e.state === "pending",
-      ) &&
+      state.data.education.events.some((e) => e.id === eventId) &&
       !protectedNow()
     ) {
       await prepareHomeworkDraft(eventId, state);
+      immersive = false;
       await navigate("agent");
       if (page === "agent")
         document.querySelector<HTMLTextAreaElement>("#agent-text")?.focus();
@@ -3554,10 +3556,12 @@ async function boot() {
     backdrop: () =>
       state.data.settings.personaBackdrop && !protectedNow() && !immersive,
     wake: (eventId) => {
-      if (eventId)
+      if (eventId) {
+        homeworkWakePending = true;
         void prepareHomeworkDraft(eventId).catch((error) =>
           toast(`作业请求预填失败：${error}`),
         );
+      }
       agentWakePending = true;
       void revealAgent();
     },

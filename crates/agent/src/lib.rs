@@ -802,14 +802,20 @@ impl Agent {
         let ready = {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;
             let p = &inner.store.preferences;
-            p.enabled
-                && inner.live.auth[&p.provider]["configured"] == true
-                && !inner.live.busy
-                && snapshot.data.reminder_idle()
+            p.enabled && inner.live.auth[&p.provider]["configured"] == true && !inner.live.busy
         };
         if ready {
+            let idle = snapshot.data.reminder_idle();
+            // A break is safe for homework, but unrelated scheduled teaching
+            // must still wait for a completely idle timer.
+            let resting = snapshot.data.lock.active.is_none()
+                && matches!(
+                    snapshot.data.timer.mode,
+                    tomato_core::Mode::ShortBreak | tomato_core::Mode::LongBreak
+                );
             if let Some(event) = snapshot.data.education.events.iter().find(|e| {
                 e.state == "pending"
+                    && (idle || (resting && matches!(e.kind.as_str(), "homework" | "taskHomework")))
                     && snapshot
                         .data
                         .education
