@@ -60,6 +60,33 @@ crates/agent/src/external.rs 的工具清单，语义保留、实现全部重写
 5. **收尾**：删除旧 agent/Tauri 栈；文档（README/CONTRIBUTING/CODEMAP/HANDBOOK）同步；
    CI 与打包脚本更新；sqlite 导出脚本。
 
+## 阶段 4 记录（guard 守护进程，tomato-ts-guard）
+
+移植完成：`crates/guard` 独立二进制 tomato-guard（无域无状态，HTTP 指挥），
+全部后端自旧 crates/core 的 guard_*.rs 移植，接口统一为 `Window{id,app_id,title,pid,is_focused}`
++ `windows()/focus(id)/lock_window()` + `Result<_, String>`：
+
+- **X11**（x11.rs）：EWMH 只读枚举 + _NET_ACTIVE_WINDOW 激活 + 自建全屏锁窗（番茄红、
+  WM_CLASS "tomato-guard"/_NET_WM_PID，RAII 销毁）。
+- **Wayland**（wayland.rs + wayland_surface.rs + shell.rs）：niri/Sway/Hyprland 走各自 IPC
+  socket；GNOME 走 desktop-integrations 的 Shell 扩展 studio.tomato.Guard1（保持原接口）；
+  KWin 走 /Scripting 脚本 + 唯一回调；其余 Wayland 桌面明确报不支持，绝不把 Xwayland
+  当完整保护。锁窗统一为 guard 自建的 xdg_toplevel 全屏锁面（memfd shm、番茄红、无输入
+  抓取，初始化失败经 mpsc 握手同步回报，3s 超时）。
+- **Windows**（win32.rs）：旧 guard_windows 全量 + WS_POPUP 全屏锁窗（UWP AUMID/Wine
+  回退、ApplicationFrameHost 子进程识别、ALT 激活技巧保留）。
+- **macOS**（macos.rs，tomato-ts-guard-mac 合入）：Quartz 列举 + Accessibility 激活（仅限
+  本进程）；guard 无宿主窗口，锁机不可用、专注保护降级白名单模式。
+
+HTTP 契约（API.md 已同步）：`GET /guard/status` 增 `backend` 字段（实际后端名）。
+白名单语义照旧：own pid 永远放行，其余按 app_id 精确匹配，600ms enforce tick。
+
+验证：Linux `cargo build` + `cargo test` 22 全绿；`cargo check --target x86_64-pc-windows-gnu`
+与 macos.rs 对 aarch64-apple-darwin 的编译检查零告警；Xvfb+openbox 隔离桌面冒烟通过
+（lock 200 → 全屏锁窗入 _NET_CLIENT_LIST → re-lock 替换白名单 → notify/401/unlock 全对，
+未触碰用户桌面）。留待收尾：真实硬件上的 Wayland/Windows/macOS 运行验证、GNOME 扩展
+随包安装、systemd user service / 自启（阶段 5 打包）。
+
 ## 语言问题结论（已与用户确认）
 
 - 原生只留 crates/guard 一个 Rust 小二进制（guard 的 X11/Wayland 绑定生态只有 Rust 完整）。
