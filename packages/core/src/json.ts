@@ -39,9 +39,12 @@ export function asArray(value: unknown, what: string): unknown[] {
   return value;
 }
 
-export function asOpt<T>(value: unknown, what: string, parse: (v: unknown) => T): T | null {
+/** parse 统一带 what（供 asStr/asInt 等直接传入），单参数 lambda 同样兼容。 */
+export type Parser<T> = (v: unknown, what: string) => T;
+
+export function asOpt<T>(value: unknown, what: string, parse: Parser<T>): T | null {
   if (value === null) return null;
-  return parse(value);
+  return parse(value, what);
 }
 
 /** 读取字段：缺省时应用 default；存在（含 null）时按 parse 解析。 */
@@ -49,33 +52,33 @@ export function field<T>(
   obj: Record<string, unknown>,
   key: string,
   what: string,
-  parse: (v: unknown) => T,
+  parse: Parser<T>,
   def: T,
 ): T {
   const value = obj[key];
   if (value === undefined) return def;
-  return parse(value);
+  return parse(value, what);
 }
 
 export function requiredField<T>(
   obj: Record<string, unknown>,
   key: string,
   what: string,
-  parse: (v: unknown) => T,
+  parse: Parser<T>,
 ): T {
   const value = obj[key];
   if (value === undefined) throw new AppError(`${what}缺少必填字段 ${key}`);
-  return parse(value);
+  return parse(value, what);
 }
 
-/** 枚举字符串解析（serde rename_all = "camelCase" 的取值）。 */
-export function oneOf(value: unknown, what: string, allowed: readonly string[]): string {
+/** 枚举字符串解析（serde rename_all = "camelCase" 的取值）；泛型保留字面量联合以便分支收窄。 */
+export function oneOf<T extends string>(value: unknown, what: string, allowed: readonly T[]): T {
   const s = asStr(value, what);
-  if (!allowed.includes(s)) throw new AppError(`${what}取值无效：${s}`);
-  return s;
+  if (!(allowed as readonly string[]).includes(s)) throw new AppError(`${what}取值无效：${s}`);
+  return s as T;
 }
 
 /** 字符串数组（按元素解析）。 */
-export function asStrArray(value: unknown, what: string, parse: (v: unknown) => string): string[] {
-  return asArray(value, what).map((v) => parse(v));
+export function asStrArray(value: unknown, what: string, parse: Parser<string>): string[] {
+  return asArray(value, what).map((v) => parse(v, what));
 }

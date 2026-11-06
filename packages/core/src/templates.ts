@@ -571,7 +571,7 @@ function compareIso(date: { year: number; month: number; day: number }): string 
 
 export function replaceAppData(target: AppData, source: AppData): void {
   for (const key of Object.keys(source)) {
-    (target as Record<string, unknown>)[key] = (source as Record<string, unknown>)[key];
+    (target as unknown as Record<string, unknown>)[key] = (source as unknown as Record<string, unknown>)[key];
   }
 }
 

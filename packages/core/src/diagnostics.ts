@@ -161,15 +161,16 @@ export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): An
     for (const { start, task } of timed) {
       const end = start + windowMinutes(task, data.settings);
       if (previous !== null) {
-        if (start < previous.end) {
-          const ids = [previous.task.id, task.id].sort();
+        const prev = previous;
+        if (start < prev.end) {
+          const ids = [prev.task.id, task.id].sort();
           const band =
             day === null
               ? null
               : data.blocks.find(
                   (b) =>
                     b.attention === "light" &&
-                    overlapMinutes(b, date, start, Math.min(previous.end, end)) > 0,
+                    overlapMinutes(b, date, start, Math.min(prev.end, end)) > 0,
                 );
           result.push(
             signal(
@@ -180,8 +181,8 @@ export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): An
               {
                 date,
                 taskIds: ids,
-                titles: [previous.task.title, task.title],
-                overlapMinutes: Math.min(previous.end, end) - start,
+                titles: [prev.task.title, task.title],
+                overlapMinutes: Math.min(prev.end, end) - start,
                 includesBreaks: true,
                 blockTitle: band?.title ?? null,
               },

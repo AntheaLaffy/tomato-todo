@@ -9,8 +9,14 @@ export class AppError extends Error {
   }
 }
 
-export function ensure(ok: boolean, message: string): void {
+export function ensure(ok: boolean, message: string): asserts ok {
   if (!ok) throw new AppError(message);
+}
+
+/** 对 find/map.get 等可空结果做收窄：Rust `ok_or(msg)?` 的直接对应。 */
+export function require<T>(value: T | null | undefined, message: string): T {
+  if (value === null || value === undefined) throw new AppError(message);
+  return value;
 }
 
 /** 字符数（Unicode 码点），对应 Rust `s.chars().count()`。 */

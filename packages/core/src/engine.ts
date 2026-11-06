@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { dirname } from "node:path";
 import { AppError, clone } from "./errors";
 import type { Action } from "./lib";
-import type { AppData } from "./lib";
+import { AppData } from "./lib";
 import { dateAt } from "./time";
 import { reconcileIdentities } from "./identities";
 import { readLocalData } from "./migration";

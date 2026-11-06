@@ -7,7 +7,7 @@
 //! 模块索引见 packages/core/CODEMAP.md。
 
 // 基础
-export { AppError, ensure, charCount, utf8Len, clone, deepEqual } from "./errors";
+export { AppError, ensure, require, charCount, utf8Len, clone, deepEqual } from "./errors";
 export { id } from "./ids";
 export {
   dateAt,

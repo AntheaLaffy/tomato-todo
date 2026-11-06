@@ -2,14 +2,14 @@
 //! 按提交/批改/订正索引计算动态学情摘要及掌握/计时/订正/复测分层。
 //! 对应 crates/core/src/learning.rs。
 
-import { ensure } from "./errors";
+import { AppError, ensure, require } from "./errors";
 import { asArray, asBool, asInt, asOpt, asStr, field, isObject, oneOf, rejectUnknown, requiredField } from "./json";
+import type { Education } from "./education";
 import type { AppData } from "./lib";
 import type {
   Assessment,
   CompletedStudyTask,
   Correction,
-  Education,
   Grade,
   Lesson,
   ProgressRecord,
@@ -69,13 +69,14 @@ export function validateLearning(data: AppData): void {
     ids.add(`progress|${record.id}`);
   }
   for (const correction of e.corrections) {
-    const grade = e.grades.find((g) => g.id === correction.gradeId);
-    ensure(grade !== undefined, "订正缺少批改记录");
-    const assessment = (() => {
-      const sub = e.submissions.find((s) => s.id === grade.submissionId);
-      return sub === undefined ? undefined : e.assessments.find((a) => a.id === sub.assessmentId);
-    })();
-    ensure(assessment !== undefined, "订正缺少试题");
+    const grade = require(e.grades.find((g) => g.id === correction.gradeId), "订正缺少批改记录");
+    const assessment = require(
+      (() => {
+        const sub = e.submissions.find((s) => s.id === grade.submissionId);
+        return sub === undefined ? undefined : e.assessments.find((a) => a.id === sub.assessmentId);
+      })(),
+      "订正缺少试题",
+    );
     ensure(
       !ids.has(`correction|${correction.id}`) &&
         correction.id.length > 0 &&
