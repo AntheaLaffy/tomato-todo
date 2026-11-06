@@ -47,7 +47,8 @@ instructions 简述接管入口（不再有 Pi 提示词与技能资源）。
 - `POST /guard`，body `{ "command": "lock", "whitelist": ["app-id", ...] }` → 全屏锁定 + 白名单
 - `POST /guard` `{ "command": "unlock" }`
 - `POST /guard` `{ "command": "notify", "title": ..., "body": ... }`
-- `GET /guard/status` → `{ "locked": bool, "whitelist": [...], "pid": ... }`
+- `GET /guard/status` → `{ "locked": bool, "whitelist": [...], "pid": ..., "backend": "<实际后端名>" }`
+  （backend 取 guard 实际检测到的后端显示名，如 "Sway / Wayland"、"EWMH / X11"，供 runtime 诊断）
 - guard 无长期状态；runtime 每次专注会话重发锁屏命令（guard 崩溃由 runtime 重启并重发）。
 
 ## 数据形状

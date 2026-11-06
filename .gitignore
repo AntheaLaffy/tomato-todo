@@ -1,4 +1,4 @@
-/target
+target/
 /node_modules
 /dist
 /artifacts
@@ -15,3 +15,5 @@
 # Python 缓存（scripts/ 下有几个自查/生成脚本）
 __pycache__/
 *.pyc
+node_modules/
+**/.vite/
