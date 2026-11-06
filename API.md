@@ -16,6 +16,8 @@
 - `--guard-status`：stdout 打一行 JSON 后退出。成功 `{"ok":true,"guard":{"available":true,"backend":"x11","locked":false,"whitelist":[],"pid":1234}}`；
   guard 不可达也退出 0 但 `{"ok":false,"error":"…"}`；runtime 本身不可达 = 无输出或非零退出。
 - guard 启动参数：`--serve`（127.0.0.1:43988，token 由 runtime 生成写入 guard 数据目录）、`--lock`/`--unlock` 等一次性命令。
+- guard 数据目录 = runtime 数据目录下的 `guard/` 子目录（默认 `~/.local/share/studio.tomato.todo/guard/`，
+  token 文件 `guard/token`，0600；tooling 注释里的 XDG_STATE_HOME 假设作废，以本条为准）。
 
 ## runtime HTTP API（127.0.0.1:43987）
 
