@@ -272,13 +272,16 @@ export function windowMinutes(task, settings) {
  * `提醒时刻 + 计划块时长`、仍在 `+ scrapMinutes` 重修窗口内。
  * （作废/过期由 core 的 reminderExpired 标记，这里只做展示筛选。）
  */
-export function isCatchUp(data, task, today) {
+export function isCatchUp(input, task, today) {
+  // 页面既可能传 data 也可能传整个 state；taskKinds 在 state 顶层。
+  const data = input && input.data ? input.data : input;
+  const taskKinds = (input && input.data ? input.taskKinds : input && input.taskKinds) || {};
   if (!data || !task) return false;
   const nowKey = dayKey(Date.now() / 1000);
   if (nowKey !== today) return false;
   if (task.completed || task.reminderExpired) return false;
   if (task.dueDate !== today || task.reminderTime === null) return false;
-  const kind = data.taskKinds && data.taskKinds[task.id];
+  const kind = taskKinds[task.id];
   if (kind === "habit" || task.habitId !== null || task.recurring) return false;
   const start = parseHHMM(task.reminderTime);
   if (start === null) return false;
@@ -290,10 +293,11 @@ export function isCatchUp(data, task, today) {
 }
 
 /** 当前处于待补窗口的任务（按提醒时刻升序）。 */
-export function catchUpTasks(data, today) {
+export function catchUpTasks(input, today) {
+  const data = input && input.data ? input.data : input;
   const tasks = (data && data.tasks) || [];
   return tasks
-    .filter((task) => isCatchUp(data, task, today))
+    .filter((task) => isCatchUp(input, task, today))
     .sort((a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime)));
 }
 

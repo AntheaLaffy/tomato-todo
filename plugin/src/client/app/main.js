@@ -14,7 +14,12 @@ import {
 } from "../shared/store.js";
 import * as api from "../shared/api.js";
 import { AppShell } from "./frame.js";
-import { bindPanelOpener } from "./navigation.js";
+import {
+  bindPanelOpener,
+  getActivePageId,
+  resetActivePageCache,
+  setActivePageId,
+} from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
 import "./nav-copy.js";
@@ -70,6 +75,20 @@ export function registerApp(ctx) {
   };
 
   bindPanelOpener(openPanel);
+
+  // 测试钩子：无浏览器冒烟（scripts/smoke-client.mjs）需要跨页重挂主视图；
+  // 也方便在真实页面控制台里排查导航。只有测试页显式置位时才暴露。
+  try {
+    if (typeof window !== "undefined" && window.__TOMATO_TEST__) {
+      window.__tomatoDsh = {
+        setActivePageId,
+        getActivePageId,
+        resetActivePageCache,
+      };
+    }
+  } catch {
+    /* 非浏览器环境忽略 */
+  }
 
   const pageProps = { dispatch, api };
 

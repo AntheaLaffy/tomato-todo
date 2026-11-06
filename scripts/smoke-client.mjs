@@ -105,6 +105,8 @@ const globalDocument = {
 const storage = new Map();
 const fakeWindow = {
   innerWidth: 1280,
+  // 让 app/main.js 暴露测试钩子（setActivePageId 等），逐页渲染靠它切页。
+  __TOMATO_TEST__: true,
   __ModuleLoader__: null,
   addEventListener() {},
   removeEventListener() {},
@@ -358,15 +360,33 @@ for (const { key, registration } of slotRegistrations) {
 
 // 逐页渲染主视图：AppShell 的初始页读 localStorage，所以换 key 重挂即可覆盖九页。
 const PAGE_IDS = ["focus", "tasks", "habits", "stats", "calendar", "education", "guard", "schedule", "preferences"];
+// 每页一个只有该页才出现的标记，防止「九页渲染的是同一页」这类回归。
+const PAGE_MARKERS = {
+  focus: "今天，也要慢慢向前。",
+  tasks: "把想做的事，慢慢完成。",
+  habits: "小步慢走",
+  stats: "YOUR TIME, WELL SPENT",
+  calendar: "WEEK AT A GLANCE",
+  education: "2028 年入学",
+  guard: "原生 guard",
+  schedule: "到点全屏休息",
+  preferences: "番茄钟、学习计划、提醒与数据。",
+};
 const mainRegistration = slotRegistrations.find((r) => r.key === "main");
+const nav = context.window.__tomatoDsh;
+if (!nav || typeof nav.setActivePageId !== "function") {
+  failures.push("没有暴露测试导航钩子 window.__tomatoDsh.setActivePageId");
+}
 for (const pageId of PAGE_IDS) {
-  storage.set("tomato-dsh.page", pageId);
   try {
+    nav.setActivePageId(pageId);
     const markup = ReactDOMServer.renderToStaticMarkup(
       React.createElement(mainRegistration.registration.Component, {}),
     );
     renderedBy[`page:${pageId}`] = markup;
     if (!markup || markup.length < 500) failures.push(`页面 ${pageId} 渲染为空`);
+    const marker = PAGE_MARKERS[pageId];
+    if (marker && !markup.includes(marker)) failures.push(`页面 ${pageId} 缺少标记「${marker}」（切页可能失效）`);
   } catch (e) {
     failures.push(`渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
   }

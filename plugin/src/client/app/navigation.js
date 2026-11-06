@@ -17,6 +17,11 @@ function readStored() {
   }
 }
 
+/** 清掉模块级页缓存（测试隔离 / 浏览器控制台排查用）。 */
+export function resetActivePageCache() {
+  activePageId = null;
+}
+
 /** 读取当前页；首次调用时从 localStorage 恢复。 */
 export function getActivePageId() {
   if (activePageId === null) activePageId = readStored();
