@@ -1,11 +1,14 @@
 // HTTP API（127.0.0.1:43987）：
-// - 只读端点 GET /health /api/snapshot /api/today /api/stats：允许
-//   Origin http://127.0.0.1:3080 的 CORS，供 DSH 插件 UI 直连。
-// - 写端点 POST/PATCH /api/tasks*、/api/focus*、/api/tasks/move：同 Origin 白名单
+// - 只读端点 GET /health /api/snapshot /api/today /api/stats /api/state
+//   /api/export/{plan,backup}：允许 Origin http://127.0.0.1:3080 的 CORS，
+//   供 DSH 插件 UI 直连。UI 数据面只认 /api/state（全量快照 + guard 摘要）。
+// - 写端点 POST /api/dispatch（UI 数据面，body {action}）与旧写端点
+//   POST/PATCH /api/tasks*、/api/focus*、/api/tasks/move：同 Origin 白名单
 //   （无 Origin 的非浏览器客户端放行；有 Origin 且不在白名单 → 403）。
 // - /mcp：Streamable HTTP 桩（POST JSON-RPC），Bearer token 认证（数据目录
 //   agent/connection.json），拒绝任何带 Origin 的请求；GET/SSE 未实现。
 import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import { mcpMethod, safeEqual } from "./mcp.mjs";
 import { GuardClient } from "./guard-client.ts";
 
@@ -28,11 +31,33 @@ function send(res, status, body, extraHeaders = {}) {
   res.end(text);
 }
 
-function sendApi(res, status, body) {
+function sendApi(res, status, body, extraHeaders = {}) {
   send(res, status, body, {
     "Access-Control-Allow-Origin": UI_ORIGIN,
     Vary: "Origin",
+    ...extraHeaders,
   });
+}
+
+/** 大 JSON 响应按需 gzip：全量 state 导入教学记录后可到数 MB，轮询值得压缩。 */
+function sendApiJson(req, res, status, body) {
+  const text = JSON.stringify(body);
+  if (
+    text.length > 64 * 1024 &&
+    /\bgzip\b/.test(req.headers["accept-encoding"] ?? "")
+  ) {
+    const gzip = gzipSync(text);
+    res.writeHead(status, {
+      ...JSON_HEADERS,
+      "Content-Encoding": "gzip",
+      "Content-Length": gzip.length,
+      "Access-Control-Allow-Origin": UI_ORIGIN,
+      Vary: "Origin, Accept-Encoding",
+    });
+    res.end(gzip);
+    return;
+  }
+  sendApi(res, status, body);
 }
 
 function readBody(req, limit = MAX_BODY) {
@@ -164,16 +189,111 @@ async function handleMcp(req, res, { engine, token }) {
   }
 }
 
+/** guard 摘要（API.md：不可达时只给 {available:false}，不影响整体响应）。 */
+export async function guardSummary(guard) {
+  const probe = await guard.status();
+  return probe.ok && probe.status === 200
+    ? { available: true, ...(probe.data ?? {}) }
+    : { available: false };
+}
+
+/**
+ * 由已校验的 AppData 推导 guard 应该处于的状态。
+ * 锁机时段优先（界面锁定忽略白名单）；其次进行中的专注段按保护设置锁定。
+ */
+export function desiredGuard(engine) {
+  const data = engine.data;
+  const protection = data.settings.protection;
+  if (data.lock.active !== null) {
+    return { command: "lock", whitelist: [], strict: data.lock.active.strict };
+  }
+  if (
+    data.timer.running &&
+    data.timer.mode === "focus" &&
+    protection.mode !== "off"
+  ) {
+    return {
+      command: "lock",
+      whitelist:
+        protection.mode === "whitelist" ? data.effectiveWhitelist() : [],
+      strict: protection.strict,
+    };
+  }
+  return { command: "unlock", whitelist: [], strict: false };
+}
+
+/**
+ * 同步驱动 guard，状态没变就不重复发命令。
+ * guard 不可达时保留「待重试」状态（下次 tick 再试），但同一错误只记一行日志。
+ */
+export function createGuardSync(engine, guard) {
+  let appliedKey = null;
+  let lastError = null;
+  let queue = Promise.resolve();
+  const run = async () => {
+    const desired = desiredGuard(engine);
+    const key = JSON.stringify(desired);
+    if (key === appliedKey) return;
+    const result =
+      desired.command === "lock"
+        ? await guard.lock({ whitelist: desired.whitelist })
+        : await guard.unlock();
+    if (result.ok) {
+      appliedKey = key;
+      lastError = null;
+      return;
+    }
+    if (lastError !== (result.error ?? result.status)) {
+      lastError = result.error ?? result.status;
+      console.error(
+        `guard ${desired.command} 失败：${lastError}（下一 tick 重试）`,
+      );
+    }
+  };
+  const sync = () => {
+    queue = queue.then(run, run);
+    return queue;
+  };
+  /** 状态变化（计时/设置/锁机）：不等 guard，请求先返回。 */
+  sync.fire = () => {
+    void sync();
+  };
+  return sync;
+}
+
 async function handleApi(req, res, url, ctx) {
-  const { engine, guard } = ctx;
+  const { engine, guard, syncGuard } = ctx;
   const path = url.pathname;
   const now = () => Math.floor(Date.now() / 1000);
   const method = req.method;
 
   // 只读端点：允许 DSH UI origin 跨域
   if (method === "GET") {
-    if (path === "/api/snapshot")
-      return sendApi(res, 200, engine.snapshot(now()));
+    if (path === "/api/snapshot") {
+      const guardView = await guardSummary(guard);
+      return sendApi(res, 200, { ...engine.snapshot(now()), guard: guardView });
+    }
+    if (path === "/api/state") {
+      // UI 唯一数据入口：全量快照 + 学情摘要 + guard 摘要。
+      const state = engine.state(now());
+      return sendApiJson(req, res, 200, {
+        ...state,
+        guard: await guardSummary(guard),
+      });
+    }
+    if (path === "/api/export/plan" || path === "/api/export/backup") {
+      const kind = path.endsWith("plan") ? "plan" : "backup";
+      const body =
+        kind === "plan" ? engine.exportPlan(now()) : engine.exportBackup(now());
+      const date = engine.snapshot(now()).today;
+      const filename =
+        kind === "plan"
+          ? `tomato-plan-${date}.json`
+          : `tomato-backup-${date}.json`;
+      return sendApi(res, 200, body, {
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      });
+    }
     if (path === "/api/today") {
       const view = engine.today(now());
       // 插件契约的便捷字段：dueCount=今日未完成件数，focusMinutes=今日已投入分钟。
@@ -187,6 +307,23 @@ async function handleApi(req, res, url, ctx) {
   }
 
   ensureWriteOrigin(req);
+  if (method === "POST" && path === "/api/dispatch") {
+    const body = await parseJson(req);
+    let outcome;
+    try {
+      // 严格 core Action：校验/保护规则/身份登记全部在 @tomato/core。
+      outcome = engine.applyAction(body.action, now());
+    } catch (error) {
+      return sendApi(res, 400, {
+        error: String(error?.message ?? error),
+      });
+    }
+    syncGuard.fire();
+    return sendApiJson(req, res, 200, {
+      changed: outcome.changed,
+      snapshot: { ...outcome.snapshot, guard: await guardSummary(guard) },
+    });
+  }
   if (method === "POST" && path === "/api/tasks") {
     const body = await parseJson(req);
     return sendApi(res, 201, engine.createTask(body, now()));
@@ -224,15 +361,7 @@ async function handleApi(req, res, url, ctx) {
       { taskId: body.taskId ?? null, minutes: body.minutes ?? null },
       now(),
     );
-    // runtime 指挥 guard：按保护设置重发锁屏（guard 未跑时优雅忽略）。
-    const protection = engine.settings.protection;
-    if (protection.mode !== "off" && timer.running) {
-      const whitelist =
-        protection.mode === "whitelist" ? protection.whitelist : [];
-      guard.lock({ whitelist }).then((r) => {
-        if (!r.ok) console.error(`guard lock 失败：${r.error ?? r.status}`);
-      });
-    }
+    syncGuard.fire();
     return sendApi(res, 200, { timer });
   }
   if (method === "POST" && path === "/api/focus/pause") {
@@ -240,9 +369,7 @@ async function handleApi(req, res, url, ctx) {
   }
   if (method === "POST" && path === "/api/focus/stop") {
     const result = engine.focusStop(now());
-    guard.unlock().then((r) => {
-      if (!r.ok) console.error(`guard unlock 失败：${r.error ?? r.status}`);
-    });
+    syncGuard.fire();
     return sendApi(res, 200, result);
   }
   sendApi(res, 404, { error: "Not found" });
@@ -259,8 +386,11 @@ export async function startServer({
   port = DEFAULT_PORT,
   token,
   version,
+  guardClient = null,
 }) {
-  const guard = GuardClient.fromDataDir(dataDir);
+  // guardClient 仅测试注入用：避免在真实桌面上误发锁屏命令。
+  const guard = guardClient ?? GuardClient.fromDataDir(dataDir);
+  const syncGuard = createGuardSync(engine, guard);
   const startedAt = Date.now();
   const server = createServer((req, res) => {
     let url;
@@ -278,11 +408,7 @@ export async function startServer({
         }
         if (path === "/health") {
           // guard 摘要是可选件：不可达时给 {available:false}，绝不能影响健康上报。
-          const probe = await guard.status();
-          const summary =
-            probe.ok && probe.status === 200
-              ? { available: true, ...(probe.data ?? {}) }
-              : { available: false };
+          const summary = await guardSummary(guard);
           return send(res, 200, {
             ok: true,
             name: "tomato-todo",
@@ -296,7 +422,11 @@ export async function startServer({
           return await handleMcp(req, res, { engine, token });
         }
         if (path.startsWith("/api/")) {
-          return await handleApi(req, res, url, { engine, guard });
+          return await handleApi(req, res, url, {
+            engine,
+            guard,
+            syncGuard,
+          });
         }
         send(res, 404, { error: "Not found" });
       } catch (error) {
@@ -319,6 +449,8 @@ export async function startServer({
   return {
     server,
     port: actualPort,
+    // 每秒 tick 之后由 main 调用：让 guard 跟上计时/锁机状态。
+    syncGuard: syncGuard.fire,
     close: () => new Promise((resolve) => server.close(resolve)),
   };
 }

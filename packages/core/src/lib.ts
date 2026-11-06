@@ -1384,8 +1384,32 @@ export class AppData {
         ) {
           throw new AppError("作废实例不能开始专注");
         }
+        const override =
+          action.minutes !== undefined && action.minutes !== null
+            ? action.minutes
+            : null;
+        if (override !== null) {
+          // 单次时长覆盖：网页/旧 runtime 允许临时指定本轮分钟数，不写回任务或
+          // 全局设置；只有尚未开始的专注段可覆盖。
+          if (
+            this.timer.mode !== "focus" ||
+            this.timer.running ||
+            this.timer.startedAt !== null
+          ) {
+            throw new AppError("只有尚未开始的专注可以指定单次时长");
+          }
+          if (!Number.isInteger(override) || override < 1 || override > 180) {
+            throw new AppError("单次时长需为1—180分钟");
+          }
+        }
         startTeachingTask(this, at);
         this.start(at);
+        if (override !== null) {
+          // start() 会按全局设置重算段长，覆盖必须放在它之后。
+          this.timer.durationSecs = override * 60;
+          this.timer.remainingSecs = override * 60;
+          this.timer.deadline = at + override * 60;
+        }
         break;
       }
       case "pauseTimer": {
@@ -1888,7 +1912,7 @@ export type Action =
     }
   | { type: "deleteBlock"; id: string }
   | { type: "selectTask"; id: string | null }
-  | { type: "startTimer" }
+  | { type: "startTimer"; minutes?: number | null }
   | { type: "completeFocus" }
   | { type: "pauseTimer" }
   | { type: "resetTimer" }
@@ -1944,7 +1968,7 @@ const ACTION_KEYS: Record<string, string[]> = {
   ],
   deleteBlock: ["type", "id"],
   selectTask: ["type", "id"],
-  startTimer: ["type"],
+  startTimer: ["type", "minutes"],
   completeFocus: ["type"],
   pauseTimer: ["type"],
   resetTimer: ["type"],
@@ -2137,6 +2161,16 @@ export function parseAction(raw: unknown): Action {
     case "selectTask":
       return { type, id: optStr("id") };
     case "startTimer":
+      return {
+        type,
+        minutes: field(
+          raw,
+          "minutes",
+          "动作",
+          (v) => asOpt(v, "minutes", (x) => asInt(x, "minutes")),
+          null,
+        ) as number | null,
+      };
     case "completeFocus":
     case "pauseTimer":
     case "resetTimer":

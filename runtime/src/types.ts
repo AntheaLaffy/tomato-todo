@@ -1,9 +1,9 @@
-// 番茄 Todo runtime：数据形状（桩）。
+// 番茄 Todo runtime：对外数据形状（HTTP / MCP 的 JSON 契约）。
 //
-// 以旧 src/types.ts 的 JSON 形状为起点（camelCase；日期 YYYY-MM-DD、时间 HH:MM、
-// 时间戳 Unix 秒）。@tomato/core（packages/core/src/index.ts）落地后是唯一权威，
-// 本文件由 lead 在合并时整体替换；在此之前只作为 runtime 桩的类型契约。
-// 教学（education）相关字段仅保留旧 src/education.ts 的顶层形状，内容留空。
+// @tomato/core（packages/core/src/index.ts）是唯一权威实现；runtime/src/engine.ts
+// 只是把 core 的 AppData/Snapshot 适配成这里的形状（camelCase；日期 YYYY-MM-DD、
+// 时间 HH:MM、时间戳 Unix 秒）。教学（education）字段的完整形状见 packages/core
+// 的 education.ts，这里只描述 runtime 对外暴露的部分。
 
 export type Mode = "focus" | "shortBreak" | "longBreak";
 export type GuardMode = "off" | "lock" | "whitelist";

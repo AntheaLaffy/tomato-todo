@@ -108,7 +108,7 @@ export async function main(argv) {
   const engine = Engine.open(opts.dataDir);
   ensureGuardToken(opts.dataDir);
   const connection = loadOrCreateConnection(opts.dataDir, opts.host, opts.port);
-  const { server, port } = await startServer({
+  const { server, port, syncGuard } = await startServer({
     engine,
     dataDir: opts.dataDir,
     host: opts.host,
@@ -119,11 +119,12 @@ export async function main(argv) {
   if (port !== opts.port) connection.mcpUrl = `http://${opts.host}:${port}/mcp`;
   writeConnection(opts.dataDir, connection);
 
-  // 每秒 tick：计时状态机只更新内存（落盘防抖）+ 提醒到点桩。
+  // 每秒 tick：计时到点、提醒送达、自动开工、锁机时段（都在 core.tick）+ guard
+  // 状态跟随。core 只在数据真的变化时落盘，安静时这一拍只是内存克隆。
   const interval = setInterval(() => {
     const now = Math.floor(Date.now() / 1000);
     engine.tick(now);
-    engine.tickReminders(now);
+    syncGuard();
   }, 1000);
 
   console.error(

@@ -35,35 +35,36 @@ test("open 初始化：快照形状对齐旧 src/types.ts", () => {
 
 test("createTask 校验：非法日期/空标题/越界字段被拒绝", () => {
   const engine = Engine.open(tmp(), tsAt(TODAY, "10:00"));
+  // 错误信息由 @tomato/core 产生（权威实现），此处只断言动作被拒绝。
   assert.throws(
     () => engine.createTask({ title: "  ", dueDate: TODAY }),
-    /标题不能为空/,
+    /任务名称需为/,
   );
   assert.throws(
     () => engine.createTask({ title: "x", dueDate: "2026-02-30" }),
-    /dueDate/,
+    /任务必须指定有效的计划日期/,
   );
   assert.throws(
     () =>
       engine.createTask({ title: "x", dueDate: TODAY, reminderTime: "25:00" }),
-    /reminderTime/,
+    /提醒需要计划日期和有效的 HH:MM 时间/,
   );
   assert.throws(
     () => engine.createTask({ title: "x", dueDate: TODAY, priority: 9 }),
-    /priority/,
+    /无效的优先级或预计番茄数/,
   );
   assert.throws(
     () => engine.createTask({ title: "x", dueDate: TODAY, estimate: 0 }),
-    /estimate/,
+    /无效的优先级或预计番茄数/,
   );
   assert.throws(
     () => engine.createTask({ title: "x", dueDate: TODAY, focusMinutes: 500 }),
-    /focusMinutes/,
+    /单次专注时长需为1—180分钟/,
   );
   assert.throws(
     () =>
       engine.createTask({ title: "x", dueDate: TODAY, projectId: "missing" }),
-    /项目不存在/,
+    /任务引用了不存在的项目/,
   );
 });
 
@@ -180,6 +181,8 @@ test("番茄状态机：start→pause→resume→stop 早停记未完成会话",
 test("番茄到点自动完成：记完成会话并按 autoBreak 进入休息", () => {
   const now = tsAt(TODAY, "10:00");
   const engine = Engine.open(tmp(), now);
+  // core 的 autoBreak 默认关闭（旧桩默认开）；本用例显式开启。
+  engine.dispatch({ type: "saveSettings", settings: { autoBreak: true } });
   engine.focusStart({ minutes: 25 }, now);
   engine.tick(now + 1501);
   const timer = engine.timer;
@@ -212,6 +215,7 @@ test("discard 放弃当前番茄：不记会话，回到空闲", () => {
 test("四个番茄后进入长休息（longBreakEvery=4）", () => {
   const now = tsAt(TODAY, "10:00");
   const engine = Engine.open(tmp(), now);
+  engine.dispatch({ type: "saveSettings", settings: { autoBreak: true } });
   for (let i = 0; i < 3; i++) {
     engine.focusStart({ minutes: 1 }, now + i * 3600);
     engine.tick(now + i * 3600 + 61);
@@ -237,7 +241,8 @@ test("统计：今日完成数/番茄数/连续天数与 days 回看", () => {
   const todayRow = stats.days.find((d) => d.date === TODAY);
   assert.equal(todayRow.completed, 1);
   assert.equal(todayRow.pomodoros, 1);
-  assert.equal(todayRow.seconds, 1500);
+  // 1500s 实际计时 + 1500s 完成时按预计补足的 taskEstimate（docs/BACKUP_FORMAT.md）。
+  assert.equal(todayRow.seconds, 3000);
 });
 
 test("今日视图：任务排序、逾期列表与课表时段", () => {
@@ -292,7 +297,8 @@ test("提醒桩：到点标记 reminderFired 并落盘；快照计算 pending/ex
   const pending = snap.data.tasks.find((t) => t.id === future.id);
   assert.equal(pending.reminderPending, false); // 未到点
   const expired = snap.data.tasks.find((t) => t.id === past.id);
-  assert.equal(expired.reminderExpired, true);
+  // 没有提醒时刻的任务不会因缺少精确时间作废（docs/PLAN_FORMAT.md）。
+  assert.equal(expired.reminderExpired, false);
   // 到点后 pending 生效
   snap = engine.snapshot(tsAt(TODAY, "11:01"));
   assert.equal(
@@ -349,7 +355,9 @@ test("exportPlan 剥离进度字段；exportToFile 校验文件名并返回哈�
   const parsed = JSON.parse(
     readFileSync(join(dir, "exports", "backup.json"), "utf8"),
   );
-  assert.equal(parsed.format, "tomato-todo-backup");
+  // 完整备份 v4 没有 format 标记；顶层就是 AppData。
+  assert.equal(parsed.version, 4);
+  assert.ok(Array.isArray(parsed.tasks) && Array.isArray(parsed.sessions));
 });
 
 test("dispatch：saveSettings/saveVision/saveBlock/deleteBlock/createProject/deleteTask", () => {
@@ -394,30 +402,53 @@ test("dispatch：saveSettings/saveVision/saveBlock/deleteBlock/createProject/del
         start: "14:00",
         end: "16:00",
       }),
-    /days/,
+    /星期/,
   );
   engine.dispatch({ type: "deleteBlock", id: block.id });
   assert.equal(engine.snapshot(now).data.blocks.length, 0);
 
-  const project = engine.dispatch({
-    type: "createProject",
+  // 新项目必须绑定资料目录（core 的 saveProject），旧 createProject 已退役。
+  const snapAfterProject = engine.dispatch({
+    type: "saveProject",
+    id: null,
     name: "数学",
     color: "#336699",
+    directory: engine.dataDir,
   });
+  assert.equal(snapAfterProject.changed, true);
+  const project = engine.snapshot(now).data.projects.at(-1);
   assert.equal(project.color, "#336699");
   assert.throws(
-    () => engine.dispatch({ type: "createProject", name: "x", color: "red" }),
-    /color/,
+    () =>
+      engine.dispatch({
+        type: "saveProject",
+        id: null,
+        name: "x",
+        color: "red",
+        directory: engine.dataDir,
+      }),
+    /颜色/,
+  );
+  assert.throws(
+    () =>
+      engine.dispatch({
+        type: "saveProject",
+        id: null,
+        name: "无目录",
+        color: "#336699",
+        directory: null,
+      }),
+    /资料目录/,
   );
 
   const task = engine.createTask({ title: "删", dueDate: TODAY });
   engine.dispatch({ type: "deleteTask", id: task.id });
   assert.throws(() => engine.completeTask(task.id), /任务不存在/);
 
-  assert.throws(
-    () => engine.dispatch({ type: "emergencyUnlock" }),
-    /未支持的 action/,
-  );
+  // emergencyUnlock 是合法 Action，但严格保护中由 core 拒绝（见保护规则测试）。
+  const unlocked = engine.dispatch({ type: "emergencyUnlock" });
+  assert.equal(typeof unlocked.changed, "boolean"); // 空闲时无事可解，changed=false
+  assert.equal(engine.snapshot(now).data.lock.active, null);
   assert.throws(() => engine.dispatch(undefined), /action/);
 });
 

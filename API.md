@@ -22,10 +22,11 @@
 ## runtime HTTP API（127.0.0.1:43987）
 
 浏览器只读端点（允许 `Origin: http://127.0.0.1:3080` 的 CORS，供插件 UI）：
-- `GET /api/snapshot` — 全量只读快照（形状对齐旧 src/types.ts 的 Snapshot，camelCase）
+- `GET /api/snapshot` — 全量只读快照（形状对齐旧 src/types.ts 的 Snapshot，camelCase），附带 `guard` 摘要
 - `GET /api/today` — `{ "today": "YYYY-MM-DD", "dueCount": number, "focusMinutes": number }`
 - `GET /api/stats`、`GET /health` — health 附带可选 `guard` 摘要字段
   `{"ok":true,"runtime":{"pid":…},"guard":{"available":true,"backend":"x11","locked":false,"whitelist":[],"pid":1234}}`（guard 摘要在 guard 不可达时给 `{"available":false}`，不得整体报错）
+- `GET /api/state`、`GET /api/export/plan`、`GET /api/export/backup` — 见下节（UI 数据面与导出）
 
 浏览器写端点（同 Origin 白名单；写路径也必须经 @tomato/core 的校验与保护规则）：
 - `POST /api/tasks`、`PATCH /api/tasks/:id`、`POST /api/tasks/:id/complete`、`POST /api/tasks/move`
@@ -61,6 +62,28 @@ UI 不再按页面堆端点，而是「取一份全量状态 + 提交 Action」�
   `400` + `{ "error": "…" }`（错误信息来自 @tomato/core 的 AppError，中文可读）。
   写路径同样经过 core 的校验与保护规则；`emergencyUnlock` 在严格模式下仍被拒绝。
 - 写端点在保护生效时同步驱动 guard（lock/unlock/whitelist），并每秒 tick 计时器。
+
+**导出端点（偏好设置页用）**：
+
+- `GET /api/export/plan` — `application/json`，body 为计划 v6（与 MCP `export_plan` 同内容），
+  带 `Content-Disposition: attachment; filename="tomato-plan-<today>.json"`；浏览器直接下载。
+- `GET /api/export/backup` — `application/json`，body 为完整备份 v4（`docs/BACKUP_FORMAT.md`，
+  顶层就是数据、无 `format` 标记，与 MCP `export_backup` 同内容），
+  带 `Content-Disposition: attachment; filename="tomato-backup-<today>.json"`。
+- 导入不需要新端点：UI 直接 dispatch `{type:"importPlan", plan}`（计划）或
+  `{type:"import", data}`（完整备份）。
+
+**实现备注（非契约变更）**：
+
+- `/api/state` 的 `education` 与 `studyProgress` 同源（`packages/core` 的 `summaries`），
+  是学情摘要数组；`data.education` 是全量教学记录。
+- `POST /api/dispatch` 严格按 `parseAction` 解析（未知字段/未知 type → 400），
+  返回的 `changed` 表示 core 应用后 `AppData` 序列化是否变化；无操作（如空闲时
+  `emergencyUnlock`）可为 `false`，`snapshot` 仍是最新全量状态。
+- `/api/state` 与 `/api/dispatch` 的响应体较大（导入教学记录后可到数 MB）；请求带
+  `Accept-Encoding: gzip` 时按需 gzip，形状不变。
+- MCP `dispatch` 工具保留旧 runtime Action 名（`focusStart`/`focusPause`/…）并返回
+  紧凑结果（`{changed,today,serverTime,remainingSecs,stats}`），避免把全量快照当对话文本。
 
 `GET /api/today`、`GET /api/stats`、`GET /health` 保留（MCP / 轻量探活使用）。
 

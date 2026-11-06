@@ -169,7 +169,8 @@ test("focus 端点：start → pause → stop 全链路", async () => {
   const stopped = await json("/api/focus/stop", { method: "POST", headers });
   assert.equal(stopped.status, 200);
   assert.equal(stopped.body.timer.running, false);
-  assert.equal(stopped.body.session.completed, false);
+  // 零用时不留专注记录（core：durationSecs 至少 1 秒）；有实际用时才结账。
+  assert.equal(stopped.body.session, null);
 });
 
 test("/mcp 认证：无 token 401、错 token 401、带 Origin 403、GET 405", async () => {

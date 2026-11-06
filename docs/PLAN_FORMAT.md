@@ -60,6 +60,8 @@ v6 已删除目标组、主线节点、配对和信号裁定字段。只接受 v
 
 ## 接口
 
+runtime 的 `plan.json` 以本格式为骨架（顶层仍带 `format`/`version`/`pomodoroMinutes`），但作为本机域数据源额外携带运行进度字段（`completed`/`completedAt`/`createdAt`/`reminder*`、子步骤 `done`）；导出交换时由 @tomato/core 剥离进度。`GET /api/export/plan` 返回纯计划 v6，`GET /api/export/backup` 返回完整备份 v4。
+
 预览服务 `GET /api/plan` 导出；`POST /api/action` 接收核心 Action。相关动作包括 `importPlan`、`printInstances`、`saveTemplate`（可带 `printDates`，保存印刷原子执行）、`printTemplate`（`id/dates`）、`syncTemplate`、`deleteTemplate`、`saveHabitGroup`、`saveBlock` 与 `deleteBlock`。桌面 IPC 使用相同模型与校验。
 
 ## 与应试教学的边界

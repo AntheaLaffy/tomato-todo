@@ -154,3 +154,4 @@ export * from "./guard";
 
 // Engine
 export { Engine } from "./engine";
+export type { EnginePersist } from "./engine";
