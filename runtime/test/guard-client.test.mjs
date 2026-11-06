@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GuardClient, ensureGuardToken } from "../src/guard-client.mjs";
+import { GuardClient, ensureGuardToken } from "../src/guard-client.ts";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "tomato-guard-"));
 
@@ -67,7 +67,7 @@ test("guard 进程没跑：返回 { ok:false, error }，不抛异常", async (t)
   ]) {
     const result = await call();
     assert.equal(result.ok, false);
-    assert.match(result.error, /guard 进程不可达/);
+    assert.match(result.error, /guard 不可达/);
   }
 });
 
@@ -82,7 +82,7 @@ test("超时同样优雅失败（挂起不响应的 guard）", async (t) => {
   const client = new GuardClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 200 });
   const result = await client.status();
   assert.equal(result.ok, false);
-  assert.match(result.error, /guard 进程不可达/);
+  assert.match(result.error, /guard 不可达/);
 });
 
 test("ensureGuardToken：幂等生成 token 文件，fromDataDir 读取", () => {

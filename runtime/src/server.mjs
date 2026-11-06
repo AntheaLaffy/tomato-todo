@@ -7,7 +7,7 @@
 //   agent/connection.json），拒绝任何带 Origin 的请求；GET/SSE 未实现。
 import { createServer } from "node:http";
 import { mcpMethod, safeEqual } from "./mcp.mjs";
-import { GuardClient } from "./guard-client.mjs";
+import { GuardClient } from "./guard-client.ts";
 
 export const UI_ORIGIN = "http://127.0.0.1:3080";
 export const DEFAULT_PORT = 43987;
@@ -159,7 +159,13 @@ async function handleApi(req, res, url, ctx) {
   // 只读端点：允许 DSH UI origin 跨域
   if (method === "GET") {
     if (path === "/api/snapshot") return sendApi(res, 200, engine.snapshot(now()));
-    if (path === "/api/today") return sendApi(res, 200, engine.today(now()));
+    if (path === "/api/today") {
+      const view = engine.today(now());
+      // 插件契约的便捷字段：dueCount=今日未完成件数，focusMinutes=今日已投入分钟。
+      const dueCount = view.tasks.filter((t) => !t.completed).length;
+      const focusMinutes = Math.round((view.stats?.todaySeconds ?? 0) / 60);
+      return sendApi(res, 200, { ...view, dueCount, focusMinutes });
+    }
     if (path === "/api/stats") return sendApi(res, 200, engine.stats(now()));
     sendApi(res, 404, { error: "Not found" });
     return;
@@ -234,12 +240,19 @@ export async function startServer({ engine, dataDir, host = "127.0.0.1", port = 
           return handlePreflight(req, res);
         }
         if (path === "/health") {
+          // guard 摘要是可选件：不可达时给 {available:false}，绝不能影响健康上报。
+          const probe = await guard.status();
+          const summary =
+            probe.ok && probe.status === 200
+              ? { available: true, ...(probe.data ?? {}) }
+              : { available: false };
           return send(res, 200, {
             ok: true,
             name: "tomato-todo",
             version,
             pid: process.pid,
             uptimeSecs: Math.floor((Date.now() - startedAt) / 1000),
+            guard: summary,
           });
         }
         if (path === "/mcp") {
