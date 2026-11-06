@@ -1712,7 +1712,27 @@ const APP_DATA_KEYS = [
 
 export function parseAppData(raw: unknown): AppData {
   if (!isObject(raw)) throw new AppError("数据必须是对象");
-  // AppData 本身不设 deny_unknown_fields：旧字段宽容忽略，嵌套类型各自严格。
+  // 与 Rust #[serde(deny_unknown_fields)] 对齐：顶层未知字段直接拒绝（不兼容旧协议）。
+  rejectUnknown(
+    raw,
+    [
+      "education",
+      "version",
+      "identities",
+      "tasks",
+      "blocks",
+      "templates",
+      "prints",
+      "projects",
+      "habits",
+      "visions",
+      "settings",
+      "timer",
+      "sessions",
+      "lock",
+    ],
+    "数据",
+  );
   return new AppData({
     education: field(raw, "education", "数据", parseEducation, new Education()),
     version: requiredField(raw, "version", "数据", asInt),
