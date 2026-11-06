@@ -6,6 +6,7 @@ import { Engine } from "./engine.ts";
 import { startServer, DEFAULT_PORT } from "./server.mjs";
 import { runMcpStdio } from "./mcp-stdio.mjs";
 import { ensureGuardToken, runGuardStatus } from "./guard-client.ts";
+import { startGuardSupervisor } from "./supervise.mjs";
 import { loadOrCreateConnection, writeConnection } from "./connection.mjs";
 import { VERSION } from "./version.mjs";
 
@@ -128,8 +129,12 @@ export async function main(argv) {
   console.error(
     `tomato-runtime ${VERSION} 已启动：http://${opts.host}:${port}（数据目录 ${opts.dataDir}）`,
   );
+  // 按 API.md：runtime 监督 guard——不可达时拉起、退出后带退避重启；已有
+  // 别的 guard 在跑就只旁观（不抢端口）。
+  const guardSupervisor = startGuardSupervisor({ dataDir: opts.dataDir });
   const shutdown = () => {
     clearInterval(interval);
+    guardSupervisor.stop();
     engine.flushNow();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 1000).unref();
