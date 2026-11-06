@@ -53,6 +53,27 @@ crates/agent/src/external.rs 的工具清单，语义保留、实现全部重写
    （core-port 进行中；基准：crates/core/src/tests.rs、education_tests.rs、template_tests.rs。）
 2. **runtime**：计划文件读写、域引擎接线、计时/提醒、HTTP API + /mcp + --mcp 入口；
    用 esbuild 把 @tomato/core 打进 runtime 产物（零外部依赖，随插件分发）。
+   - [runtime-port 进度 2026-11-06] 骨架已落地（分支 tomato-ts-runtime，工作树
+     .agents/worktrees/tomato-ts-runtime）：`runtime/bin/tomato-runtime`（--serve/--mcp/--data）、
+     `runtime/src/types.ts`（旧 src/types.ts 形状 + education 桩）、`runtime/src/engine.ts`
+     （内存引擎桩：plan.json 原子写 + state.json 防抖原子写、任务增删改查/完成/move、
+     番茄状态机 start/pause/resume/stop/discard、tick 每秒只更新内存、提醒到点标记桩、
+     当日快照/今日/统计、export_plan/export_backup 到 dataDir/exports/）、HTTP API
+     （/health、/api/snapshot|today|stats 只读 CORS 127.0.0.1:3080；写端点同 Origin 白名单；
+     /mcp streamable HTTP 桩：Bearer token 认证、拒 Origin、initialize/ping/tools/list/tools/call）、
+     --mcp stdio 转发桥（读 agent/connection.json 的 mcpUrl+token，未运行报中文错误）、
+     `runtime/src/guard-client.mjs`（127.0.0.1:43988，未跑时优雅返回）、
+     `runtime/scripts/bundle-core.mjs`（esbuild 打包 @tomato/core 的 TODO 脚本）。
+     测试 `node --test`（runtime/ 内）38 条全绿；Node 24 原生 TS 剥离直接跑 .ts。
+   - [偏离] `node --test runtime/test/` 在 Node 24 不接受裸目录参数，脚本用 `node --test`
+     （默认发现 test/*.test.mjs）。
+   - [偏离] 数据布局为 plan.json（计划 v6，tasks 携带运行进度字段）+ state.json
+     （settings/timer/sessions/visions/lock/education）；engine 桩接口方法级干净，
+     @tomato/core 落地后由 lead 整体替换 engine.ts 实现、types.ts 换权威类型。
+   - [遗留] 提醒调度仅「到点把 reminderFired 写进任务/快照」桩；SSE（/mcp GET）未实现；
+     export_backup 为桩形状（format/version/exportedAt/plan/state），备份 v4 全量字段待 core；
+     MCP 工具按任务书先实现 get_context/create_task/update_task/move_tasks/complete_task/
+     dispatch/export_plan/export_backup 8 个，其余（get_control_status 等）等 core 后补。
 3. **插件 UI**：composer.dock 卡片 → shell.overlay 面板（今日专注/任务/统计/设置），
    主题 token + 奶油白/番茄红设计；直连 runtime 只读 API。
 4. **guard 守护进程**：crates/guard（guard_*.rs 移植为独立二进制），runtime 指挥；

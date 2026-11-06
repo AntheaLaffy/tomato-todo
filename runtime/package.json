@@ -1,0 +1,14 @@
+{
+  "name": "@local/tomato-runtime",
+  "version": "0.13.0",
+  "private": true,
+  "type": "module",
+  "description": "番茄 Todo 随 DSH 插件分发的 Node runtime：域引擎 + 数据 + 计时/提醒 + HTTP API + MCP。零运行时依赖（仅 Node 内置）；devDependency 仅 esbuild（bundle @tomato/core）。",
+  "scripts": {
+    "test": "node --test test/",
+    "bundle": "node scripts/bundle-core.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.6"
+  }
+}
