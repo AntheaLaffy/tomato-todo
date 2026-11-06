@@ -6,6 +6,10 @@
 
 ### 变更
 
+- 界面改为「整个 DSH 的番茄皮肤」：`skin/` 用 `theme.overrideTokens` 把 `--dsw-alias-*` 换成纸色系（浅/深同源、不改用户明暗偏好），注入 `--tomato-*` 变量、组件样式、`#tomato-ambient` 氛围层（窗光/纸纹/线描书桌/漂移微粒/竖排小字/时段变化）与侧栏、会话首屏品牌位；另有常驻专注 HUD（`shell.overlay`）与全屏沉浸模式（含 Legacy 2b 结束确认）。
+- 番茄应用成为 DSH 主视图 `main` panel `tomato`：左侧九页导航（今日专注/全部任务/习惯愿景/数据统计/本周日程/应试教育/专注保护/定时锁机/偏好设置），页面源码按 `pages/` 分文件自注册；侧栏 `sidebar.panellist` 提供番茄入口。
+- 客户端改为模块化 + esbuild 构建（`plugin/src/client/` → `plugin/client.js`，`pnpm build:client`），新增无浏览器冒烟 `pnpm check:client`（假 DOM + 真 React 逐页渲染）与 `SMOKE_LIVE=1` 实时数据联调；视觉基准见 `docs/SKIN.md`。
+- UI 数据面改为「全量状态 + Action」：`GET /api/state`（engine 快照 + guard/education 摘要）与 `POST /api/dispatch`（`@tomato/core` 的 Action union，返回新快照），页面不再按功能堆端点；新增 `GET /api/export/plan`、`GET /api/export/backup` 供偏好设置导出。
 - 整体重写为 DSH 插件架构：TypeScript 领域核心（`packages/core`，唯一权威实现）+ Node 本地 runtime（`runtime/`，计划 JSON 原子写、计时与提醒、HTTP API 与 MCP）+ Rust 原生守卫（`crates/guard`，专注保护/通知/托盘）。
 - 界面迁入 DSH：composer.dock 入口卡与 shell.overlay 面板提供今日专注、任务、统计与设置，数据直连 runtime 只读 API；沿用奶油白 + 番茄红设计语言。
 - 学习助手不再内置：对话、审阅与教学全部交给 DSH，助手经 MCP（`--mcp` stdio 或 `/mcp` streamable HTTP）接管 tomato-runtime；MCP 工具语义沿用旧外部清单，实现全部重写。
