@@ -232,19 +232,33 @@ window.__ModuleLoader__.load({
     // The runtime workflow owns the endpoint shapes (API.md + README); these
     // narrowers keep the UI readable even while those shapes settle.
 
+    function normalizeGuard(g) {
+      if (!g || typeof g !== 'object') return null;
+      return {
+        available: g.available !== false,
+        backend: typeof g.backend === 'string' ? g.backend : null,
+        message: typeof g.message === 'string' ? g.message : null,
+        locked: g.locked === true,
+        whitelist: Array.isArray(g.whitelist) ? g.whitelist : [],
+        pid: typeof g.pid === 'number' ? g.pid : null,
+      };
+    }
+
     function normalizeHealth(p) {
       if (!p || typeof p !== 'object') return null;
-      const guard = p.guard && typeof p.guard === 'object' ? p.guard : null;
       return {
         ok: p.ok !== false,
         version: typeof p.version === 'string' ? p.version : null,
         service: typeof p.service === 'string' ? p.service : null,
-        guard,
+        dataDir: typeof p.dataDir === 'string' ? p.dataDir : null,
+        guard: normalizeGuard(p.guard),
       };
     }
 
     function normalizeToday(p) {
-      if (!p || typeof p !== 'object') return { today: null, dueCount: null, focusMinutes: null };
+      if (!p || typeof p !== 'object') {
+        return { today: null, dueCount: null, focusMinutes: null, tasks: null, timer: null };
+      }
       const stats = p.stats && typeof p.stats === 'object' ? p.stats : {};
       const today = typeof p.today === 'string' ? p.today : null;
       const dueCount =
@@ -257,7 +271,13 @@ window.__ModuleLoader__.load({
       if (typeof p.focusMinutes === 'number') focusMinutes = p.focusMinutes;
       else if (typeof p.todaySeconds === 'number') focusMinutes = Math.round(p.todaySeconds / 60);
       else if (typeof stats.todaySeconds === 'number') focusMinutes = Math.round(stats.todaySeconds / 60);
-      return { today, dueCount, focusMinutes };
+      return {
+        today,
+        dueCount,
+        focusMinutes,
+        tasks: Array.isArray(p.tasks) ? p.tasks : null,
+        timer: p.timer && typeof p.timer === 'object' ? p.timer : null,
+      };
     }
 
     function normalizeSnapshot(s) {
@@ -591,12 +611,12 @@ window.__ModuleLoader__.load({
             !snapshot
               ? h('div', { key: 'loading', style: { color: T.text2, fontSize: 13, padding: 8 } }, t(copy, 'loading'))
               : tab === 'focus'
-                ? h(FocusTab, { key: 'focus', copy, snap, refresh })
+                ? h(FocusTab, { key: 'focus', copy, snap, refresh, every })
                 : tab === 'tasks'
                   ? h(TasksTab, { key: 'tasks', copy, snap, refresh })
                   : tab === 'stats'
-                    ? h(StatsTab, { key: 'stats', copy, snap })
-                    : h(SettingsTab, { key: 'settings', copy, hlt }),
+                    ? h(StatsTab, { key: 'stats', copy, snap, every })
+                    : h(SettingsTab, { key: 'settings', copy, hlt, every }),
           ]),
         ]),
       ]);
