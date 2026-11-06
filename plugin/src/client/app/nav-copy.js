@@ -1,0 +1,27 @@
+// 导航与通用文案（nav 命名空间）。页面文案在各页面自己的命名空间里。
+import { registerCopy } from "../shared/copy.js";
+
+registerCopy("nav", {
+  zh: {
+    focus: "今日专注",
+    tasks: "全部任务",
+    habits: "习惯愿景",
+    stats: "数据统计",
+    calendar: "本周日程",
+    education: "应试教育",
+    guard: "专注保护",
+    schedule: "定时锁机",
+    preferences: "偏好设置",
+  },
+  en: {
+    focus: "Today",
+    tasks: "All tasks",
+    habits: "Habits & visions",
+    stats: "Statistics",
+    calendar: "This week",
+    education: "Study projects",
+    guard: "Focus guard",
+    schedule: "Scheduled lock",
+    preferences: "Preferences",
+  },
+});

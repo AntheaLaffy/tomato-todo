@@ -32,6 +32,38 @@
 - `POST /api/focus/start`、`POST /api/focus/stop`、`POST /api/focus/pause`
 - 其余写操作走 MCP（助手代劳），UI 不直接暴露
 
+### UI 数据面（插件 UI 的唯一数据入口）
+
+UI 不再按页面堆端点，而是「取一份全量状态 + 提交 Action」：
+
+- `GET /api/state` — 全量状态快照（一次拿全，UI 轮询；形状 = `engine.snapshot(now)` 的
+  JSON 序列化 + `guard` 摘要 + `education` 摘要）：
+
+  ```jsonc
+  {
+    "serverTime": 1793986227,          // Unix 秒
+    "today": "2026-11-07",
+    "taskKinds": { "<taskId>": "plain" },   // plain | habit | class | exam | reserved | teaching
+    "remainingSecs": 2700,             // 当前计时器剩余秒（不依赖 data.timer 的 deadline）
+    "data": { /* AppData：version identities tasks blocks templates prints projects
+                 habits visions settings timer sessions lock education */ },
+    "stats": { /* Stats：todaySeconds/…/days[] */ },
+    "guard": { "available": true, "backend": "niri / Wayland", "locked": false,
+               "whitelist": [], "pid": 1234 }   // guard 不可达时 {"available": false}
+  }
+  ```
+
+- `POST /api/dispatch` — body `{ "action": Action }`，`Action` 定义见
+  `packages/core/src/lib.ts` 的 union（`saveTask`/`toggleTask`/`deleteTask`/`saveHabitGroup`/
+  `saveProject`/`selectTask`/`startTimer`/`pauseTimer`/`skipTimer`/`resetTimer`/`setMode`/
+  `saveSettings`/`saveLockSchedule`/`startQuickLock`/`emergencyUnlock`/`importPlan`/…）。
+  返回 `{ "changed": bool, "snapshot": <与 GET /api/state 同形> }`；Action 校验失败返回
+  `400` + `{ "error": "…" }`（错误信息来自 @tomato/core 的 AppError，中文可读）。
+  写路径同样经过 core 的校验与保护规则；`emergencyUnlock` 在严格模式下仍被拒绝。
+- 写端点在保护生效时同步驱动 guard（lock/unlock/whitelist），并每秒 tick 计时器。
+
+`GET /api/today`、`GET /api/stats`、`GET /health` 保留（MCP / 轻量探活使用）。
+
 MCP 端点：`/mcp` streamable HTTP，Bearer token（数据目录 `agent/connection.json`，同旧桥接形状），拒绝浏览器 Origin。
 
 ## MCP 工具（--mcp 与 /mcp 同源）

@@ -71,12 +71,14 @@ UI 之外的写操作走 MCP。
 
 ## 开发
 
-- `client.js` 是浏览器端**单入口**（无打包器），是拼接产物；`src-client/`
-  是部件源（`tabs-a.js` = FocusTab+TasksTab，`tabs-b.js` = StatsTab+SettingsTab），
-  拼接契约见 [`src-client/README.md`](src-client/README.md)。改页签先改部件再重拼；
-  `src-client/` 不在 `package.json` 的 `files` 白名单里，不随包分发。
-- 自检：`node --check plugin/client.js plugin/index.js`；locale/package JSON 合法；
+- `client.js` 是**构建产物**：源码在 `src/client/`（`skin/` 皮肤、`app/` 框架与常驻
+  组件、`pages/` 九个页面、`shared/` 组件库与数据层），由 `pnpm build:client`
+  （esbuild）打成单入口 IIFE。**不要手改 client.js**。
+- 自检：`pnpm check:client`（构建 + 无浏览器冒烟：假 DOM + 真 React 渲染全部 slot）；
+  `node --check plugin/client.js plugin/index.js`；locale/package JSON 合法；
   `exports` 与 `files` 一一对应。
+- 视觉与交互规范见 [docs/SKIN.md](../docs/SKIN.md)，功能面见
+  [docs/LEGACY_FEATURES.md](../docs/LEGACY_FEATURES.md)。
 
 ## 已知局限
 
