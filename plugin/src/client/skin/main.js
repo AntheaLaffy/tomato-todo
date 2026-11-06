@@ -4,7 +4,7 @@
 import { h } from "../runtime.js";
 import { Icon } from "../shared/icons.js";
 import { injectStyles } from "./styles.js";
-import { injectAmbient } from "./ambient.js";
+import { injectAmbient, SKY_INNER } from "./ambient.js";
 import { SKIN_TOKENS, SKIN_SOURCE } from "./theme.js";
 
 /** 侧栏品牌标记（折叠态也显示）：番茄徽记。 */
@@ -58,6 +58,21 @@ function HeroMark() {
   });
 }
 
+/**
+ * 天空层：壳层可见的窗光 + 远景线描（shell.overlay，order -1000）。
+ * pointer-events 由 inline style 与样式表双重保证，绝不拦截交互；
+ * 内容全部是静态 DOM + CSS 动画，没有逐帧 JS。
+ */
+function SkinSky() {
+  return h("div", {
+    id: "tomato-sky",
+    "data-tomato-ambient": "sky",
+    "aria-hidden": "true",
+    style: { pointerEvents: "none" },
+    dangerouslySetInnerHTML: { __html: SKY_INNER },
+  });
+}
+
 function safeInject(ctx, key, options, Component) {
   try {
     ctx.slots.inject(key, () => ctx.slots.register(options, Component));
@@ -76,9 +91,31 @@ export function registerSkin(ctx) {
       ? theme.overrideTokens(SKIN_SOURCE, SKIN_TOKENS)
       : null;
 
-  safeInject(ctx, "sidebar.brand.mark", { name: "sidebar.brand.mark" }, TomatoMark);
-  safeInject(ctx, "sidebar.brand.name", { name: "sidebar.brand.name" }, TomatoWordmark);
-  safeInject(ctx, "conversation.hero.brand.mark", { name: "conversation.hero.brand.mark" }, HeroMark);
+  // 天空层先于 HUD（order 900）与沉浸层（order 900）绘制，沉浸模式会盖住它。
+  safeInject(
+    ctx,
+    "shell.overlay",
+    { name: "shell.overlay", id: "tomato-sky", order: -1000 },
+    SkinSky,
+  );
+  safeInject(
+    ctx,
+    "sidebar.brand.mark",
+    { name: "sidebar.brand.mark" },
+    TomatoMark,
+  );
+  safeInject(
+    ctx,
+    "sidebar.brand.name",
+    { name: "sidebar.brand.name" },
+    TomatoWordmark,
+  );
+  safeInject(
+    ctx,
+    "conversation.hero.brand.mark",
+    { name: "conversation.hero.brand.mark" },
+    HeroMark,
+  );
 
   const dispose = () => {
     try {
