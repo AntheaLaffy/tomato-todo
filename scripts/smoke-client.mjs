@@ -261,8 +261,22 @@ const sampleState = {
     templates: [],
     prints: [],
     projects: [{ id: "p1", name: "数学一", color: "#df7561", appWhitelist: null }],
-    habits: [],
-    visions: [],
+    habits: [
+      { id: "h1", group: "晨间", name: "早起背单词", slots: [{ kind: "daily", minutes: 20 }], missedDates: [], createdAt: 1700000000 },
+    ],
+    visions: [
+      { id: "v1", group: "方向", name: "把数学一学扎实", note: "不是周期任务，是方向" },
+    ],
+    blocks: [
+      { id: "b1", kind: "class", title: "OS 训练营", start: "20:00", end: "22:00", days: [1, 3, 5], location: "线上" },
+    ],
+    templates: [
+      { id: "tpl1", name: "每日英语", title: "英语精读 1 篇", shape: { mode: "daily" }, subtasks: [], createdAt: 1700000000 },
+    ],
+    sessions: [
+      { id: "s1", source: "timer", taskId: "t1", taskTitle: "语法加强 Day05（下）", projectName: "数学一", startedAt: 1700000000, endedAt: 1700001500, durationSecs: 1500, completed: true },
+    ],
+    education: { projects: [], events: [], summaries: [] },
     settings: {
       focusMinutes: 45,
       shortBreakMinutes: 5,
@@ -324,6 +338,23 @@ for (const { key, registration } of slotRegistrations) {
     failures.push(`渲染 ${key} 失败：${e && e.message ? e.message : e}`);
   }
 }
+
+// 逐页渲染主视图：AppShell 的初始页读 localStorage，所以换 key 重挂即可覆盖九页。
+const PAGE_IDS = ["focus", "tasks", "habits", "stats", "calendar", "education", "guard", "schedule", "preferences"];
+const mainRegistration = slotRegistrations.find((r) => r.key === "main");
+for (const pageId of PAGE_IDS) {
+  storage.set("tomato-dsh.page", pageId);
+  try {
+    const markup = ReactDOMServer.renderToStaticMarkup(
+      React.createElement(mainRegistration.registration.Component, {}),
+    );
+    renderedBy[`page:${pageId}`] = markup;
+    if (!markup || markup.length < 500) failures.push(`页面 ${pageId} 渲染为空`);
+  } catch (e) {
+    failures.push(`渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}`);
+  }
+}
+storage.delete("tomato-dsh.page");
 // 渲染主视图里的九个页面：直接触发 main 组件即可（页面由注册表提供）。
 const mainMarkup = renderedBy["main"] || "";
 if (!mainMarkup.includes("番茄 Todo")) failures.push("主视图没有渲染品牌名");
