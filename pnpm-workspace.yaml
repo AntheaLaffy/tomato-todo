@@ -1,4 +1,6 @@
 packages:
   - packages/*
+  - runtime
+  - plugin
 allowBuilds:
   esbuild: true
