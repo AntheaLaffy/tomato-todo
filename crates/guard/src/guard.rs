@@ -90,15 +90,22 @@ impl Desktop {
         }
         #[cfg(target_os = "windows")]
         {
-            return "Win32 / Windows";
+            // 与 Linux 分支一致地读 self.backend，避免平台差异下字段被闲置。
+            return match self.backend {
+                Backend::Win32 => "Win32 / Windows",
+            };
         }
         #[cfg(target_os = "macos")]
         {
-            return "Quartz / macOS Accessibility";
+            return match self.backend {
+                Backend::Quartz => "Quartz / macOS Accessibility",
+            };
         }
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         {
-            return "当前环境";
+            return match self.backend {
+                Backend::Unsupported => "当前环境",
+            };
         }
     }
 
