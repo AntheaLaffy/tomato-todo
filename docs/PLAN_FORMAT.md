@@ -1,5 +1,7 @@
 # 学习计划文件 v6
 
+> 字段形状以 packages/core 的 TypeScript 实现为准：本文件记录字段语义与边界，JSON 字段名 camelCase，形状与校验随核心实现更新。
+
 入口：**偏好设置 → 学习计划 → 导入计划 / 导出计划**。UTF-8 JSON，上限 20 MiB。机器定义见 [plan.schema.json](plan.schema.json)，通用示例见 [plan.example.json](plan.example.json)。计划交换安排配置，不交换完成进度、专注历史、计时器或本机设置。
 
 ## 日期与提醒时刻
