@@ -15,8 +15,9 @@ use std::{
     os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        mpsc, Arc,
     },
+    time::Duration,
 };
 use wayland_client::{
     delegate_noop,
@@ -58,24 +59,43 @@ impl Drop for WaylandLockSurface {
     }
 }
 
+/// 初始化超时：compositor 若在 3 秒内不回 sync（极端的挂起场景），锁面
+/// 建立失败并同步报错，绝不让 HTTP lock 假装成功。
+const SETUP_TIMEOUT: Duration = Duration::from_secs(3);
+
 pub fn lock_surface() -> AppResult<WaylandLockSurface> {
     let stop = Arc::new(AtomicBool::new(false));
     let thread_stop = Arc::clone(&stop);
+    // 初始化握手：线程内完成 connect/bind/roundtrip/全屏 commit 后经通道报
+    // 就绪；失败原因同步返回给调用方（state.lock → HTTP 500 带明确错误），
+    // 而不是「锁定成功但锁面不存在」。
+    let (ready_tx, ready_rx) = mpsc::channel();
     let thread = std::thread::Builder::new()
         .name("tomato-guard-lock".into())
-        .spawn(move || run(thread_stop))
+        .spawn(move || run(thread_stop, ready_tx))
         .map_err(|e| e.to_string())?;
-    Ok(WaylandLockSurface { stop, thread: Some(thread) })
+    match ready_rx.recv_timeout(SETUP_TIMEOUT) {
+        Ok(Ok(())) => Ok(WaylandLockSurface { stop, thread: Some(thread) }),
+        Ok(Err(error)) => Err(error),
+        // 线程提前退出（channel 断开）或初始化超时，统一报未就绪。
+        Err(_) => Err("Wayland 锁面初始化未完成（compositor 无响应或线程提前退出）".into()),
+    }
 }
 
-/// 线程入口：所有 Wayland 错误只记日志（eprintln）并结束线程。
-fn run(stop: Arc<AtomicBool>) {
-    if let Err(error) = run_inner(&stop) {
+/// 线程入口：初始化失败经通道上报；循环期错误只记日志（eprintln）并结束线程。
+fn run(stop: Arc<AtomicBool>, ready: mpsc::Sender<AppResult<()>>) {
+    let result = run_inner(&stop, &ready).map_err(|e| {
+        // 初始化期错误（Ok 尚未发出）经通道同步上报；循环期错误通道已断开，
+        // 发送失败被忽略，仅记日志。
+        let _ = ready.send(Err(e.clone()));
+        e
+    });
+    if let Err(error) = result {
         eprintln!("番茄 Todo 专注锁面：{error}");
     }
 }
 
-fn run_inner(stop: &Arc<AtomicBool>) -> AppResult<()> {
+fn run_inner(stop: &Arc<AtomicBool>, ready_tx: &mpsc::Sender<AppResult<()>>) -> AppResult<()> {
     let connection =
         Connection::connect_to_env().map_err(|e| format!("无法连接 $WAYLAND_DISPLAY：{e}"))?;
     let (globals, mut queue) =
@@ -100,13 +120,15 @@ fn run_inner(stop: &Arc<AtomicBool>) -> AppResult<()> {
     toplevel.set_title("番茄 Todo 专注锁定".into());
     toplevel.set_app_id("tomato-guard".into());
     toplevel.set_fullscreen(None);
-    surface.commit();
-
+    // shm 缓冲先于首次 commit 就绪：configure 到达时即可 attach+damage+commit。
     let (pool, buffer, map) = shm_buffer(&shm, &qh)?;
+    surface.commit();
     state.pool = Some(pool);
     state.map = Some(map);
     state.surface = Some(surface);
     state.buffer = Some(buffer);
+    // 初始化完成，向调用方报就绪（此后进入事件循环）。
+    ready_tx.send(Ok(())).map_err(|_| "锁面调用方已退出".to_string())?;
 
     while !stop.load(Ordering::Relaxed) {
         connection.flush().map_err(|e| e.to_string())?;
