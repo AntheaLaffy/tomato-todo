@@ -26,7 +26,8 @@ generated_at: 2026-11-07
 | HTTP API 与 MCP 入口 | runtime | runtime/src/server.mjs、mcp.mjs、mcp-stdio.mjs | API.md、docs/MCP.md、runtime/test/ |
 | guard 客户端与 --guard-status | runtime | runtime/src/guard-client.ts | API.md guard 命令协议、runtime/test/ |
 | DSH 插件 host 工具 | 插件 | plugin/index.js | API.md、docs/MCP.md |
-| DSH 插件 UI（入口卡/四页签面板） | 插件 | plugin/client.js（部件源在 plugin/src-client/，不随包分发） | plugin/README.md、API.md 只读端点 |
+| DSH 插件 UI 源码（皮肤/主视图/沉浸/HUD） | 插件 | plugin/src/client/（入口 entry.js；skin/ 皮肤、app/ 框架与常驻组件、pages/ 九页、shared/ 组件库与数据层；局部地图 plugin/src/client/CODEMAP.md） | docs/SKIN.md、docs/LEGACY_FEATURES.md、API.md「UI 数据面」、scripts/smoke-client.mjs |
+| DSH 插件 client 构建与冒烟 | 插件 | plugin/client.js（构建产物，pnpm build:client）、scripts/build-client.mjs、scripts/smoke-client.mjs | plugin/README.md、docs/SKIN.md |
 | 专注保护与锁屏（各桌面后端） | 原生 | crates/guard/src/（guard.rs 后端选择、x11/wayland/wayland_surface/shell/win32/macos 各后端） | API.md guard 命令协议、crates/guard/README.md |
 | GNOME Shell 桥接扩展 | 桌面集成 | desktop-integrations/ | crates/guard/src/shell.rs |
 | 数据迁移（旧 sqlite → plan.json） | 工具 | scripts/export-sqlite.mjs | scripts/export-sqlite.test.mjs |
@@ -40,7 +41,7 @@ generated_at: 2026-11-07
 | --- | --- | --- | --- |
 | packages/core/ | 业务核心 | 无（零依赖 TS） | 领域模型与规则引擎，vitest 全覆盖 |
 | runtime/ | 服务 | packages/core（合并时经 esbuild 打入 vendor/） | 数据落盘、计时/提醒、HTTP API、MCP 入口 |
-| plugin/ | DSH 插件 | runtime HTTP/MCP 契约 | host 工具 + client UI（入口卡与四页签面板） |
+| plugin/ | DSH 插件 | runtime HTTP/MCP 契约 | host 工具 + 全 DSH 番茄皮肤与九页主视图（client.js 为 esbuild 产物） |
 | crates/guard/ | 原生守卫 | 系统库 | 专注保护/锁屏/通知，受 runtime 指挥 |
 | desktop-integrations/ | 桌面集成 | GNOME Shell | 可选原生窗口桥接扩展，随 Linux 包发行 |
 | scripts/ | 构建与工具 | Node、Python | 打包、安装、迁移、手册自查 |

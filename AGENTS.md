@@ -5,10 +5,12 @@
 | 需要什么 | 去哪里 |
 | --- | --- |
 | 人用的贡献说明：环境、命令、架构、提交流程 | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 客户端改动：构建与无浏览器冒烟 | `pnpm build:client`、`pnpm check:client`（源码在 `plugin/src/client/`，`plugin/client.js` 是产物） |
 | 产品设计取舍：任务/习惯/项目/愿景、模板印刷 | [docs/DESIGN.md](docs/DESIGN.md) |
 | 进程间契约：入口、HTTP API、MCP 工具、guard 命令 | [API.md](API.md) |
 | 把 tomato-runtime 的 MCP 接入任意客户端 | [docs/MCP.md](docs/MCP.md) |
 | 读代码前的参考手册：事实、取舍理由、机制说明、语义规则与不变量、边界 | [docs/HANDBOOK/](docs/HANDBOOK/README.md)（找文件与阅读顺序看附录 [04-导航对照](docs/HANDBOOK/04-导航对照.md) 或 CODEMAP；自查：`python3 scripts/check-handbook.py`） |
+| 界面与皮肤规范：配色、氛围、九页布局、DSH 集成点 | [docs/SKIN.md](docs/SKIN.md) |
 | 计划 / 备份文件字段 | [docs/PLAN_FORMAT.md](docs/PLAN_FORMAT.md)、[docs/BACKUP_FORMAT.md](docs/BACKUP_FORMAT.md) |
 
 ## 维护者技能（.agents/skills/）
