@@ -13,7 +13,10 @@ export function validateReminderTask(task: Task): void {
   if (task.dueDate === null || !validDate(task.dueDate)) {
     throw new AppError("任务必须指定有效的计划日期");
   }
-  if (task.focusMinutes !== null && (task.focusMinutes < 1 || task.focusMinutes > 180)) {
+  if (
+    task.focusMinutes !== null &&
+    (task.focusMinutes < 1 || task.focusMinutes > 180)
+  ) {
     throw new AppError("单次专注时长需为1—180分钟");
   }
   if (task.reminderTime !== null) {
@@ -33,7 +36,8 @@ export function windowMinutes(task: Task, settings: Settings): number {
   const every = Math.max(1, settings.longBreakEvery);
   let breaks = 0;
   for (let i = 1; i < sessions; i += 1) {
-    breaks += i % every === 0 ? settings.longBreakMinutes : settings.shortBreakMinutes;
+    breaks +=
+      i % every === 0 ? settings.longBreakMinutes : settings.shortBreakMinutes;
   }
   return sessions * focus + breaks;
 }
@@ -56,7 +60,8 @@ export function pendingReminder(data: AppData): Task | null {
     if (t.completed || !t.reminderPending) continue;
     if (
       best === null ||
-      `${t.dueDate}|${t.reminderTime}|${t.id}` < `${best.dueDate}|${best.reminderTime}|${best.id}`
+      `${t.dueDate}|${t.reminderTime}|${t.id}` <
+        `${best.dueDate}|${best.reminderTime}|${best.id}`
     ) {
       best = t;
     }
@@ -71,7 +76,8 @@ export function dueAutoTask(data: AppData): Task | null {
     if (!t.reminderPending || !taskHasRoundsLeft(data, t)) continue;
     if (
       best === null ||
-      `${t.dueDate}|${t.reminderTime}|${t.id}` < `${best.dueDate}|${best.reminderTime}|${best.id}`
+      `${t.dueDate}|${t.reminderTime}|${t.id}` <
+        `${best.dueDate}|${best.reminderTime}|${best.id}`
     ) {
       best = t;
     }
@@ -92,7 +98,9 @@ export function startDueTask(data: AppData, at: number): boolean {
   if (
     !data.settings.autoStartTasks ||
     !reminderIdle(data) ||
-    data.education.assessments.some((a) => a.startedAt !== null && a.stoppedAt === null)
+    data.education.assessments.some(
+      (a) => a.startedAt !== null && a.stoppedAt === null,
+    )
   ) {
     return false;
   }
@@ -122,7 +130,9 @@ export function tickReminders(data: AppData, at: number): boolean {
         ? (() => {
             // 普通任务在计划块结束后的静态重修窗口内仍可补做；习惯窗口为 0。
             const spentAt =
-              start + windowMinutes(t, settings) + (isHabit(t) ? 0 : t.scrapMinutes);
+              start +
+              windowMinutes(t, settings) +
+              (isHabit(t) ? 0 : t.scrapMinutes);
             return past || (isToday && nowSeconds >= spentAt * 60);
           })()
         : false);
@@ -165,7 +175,11 @@ export function timerRemaining(timer: Timer, at: number): number {
 }
 
 /** 结清当前计时为一条 Timer 专注记录；非专注或零用时不做任何事。 */
-export function recordSession(data: AppData, at: number, completed: boolean): void {
+export function recordSession(
+  data: AppData,
+  at: number,
+  completed: boolean,
+): void {
   const elapsed = data.timer.durationSecs - timerRemaining(data.timer, at);
   if (data.timer.mode !== "focus" || elapsed === 0) return;
   const task = data.tasks.find((t) => t.id === data.timer.taskId);
@@ -186,7 +200,10 @@ export function recordSession(data: AppData, at: number, completed: boolean): vo
   });
 }
 
-export function resetTo(data: AppData, mode: "focus" | "shortBreak" | "longBreak"): void {
+export function resetTo(
+  data: AppData,
+  mode: "focus" | "shortBreak" | "longBreak",
+): void {
   data.timer.autoFocusBlocked = false;
   data.timer.mode = mode;
   data.timer.running = false;
@@ -196,7 +213,10 @@ export function resetTo(data: AppData, mode: "focus" | "shortBreak" | "longBreak
   data.timer.startedAt = null;
 }
 
-export function durationOf(data: AppData, mode: "focus" | "shortBreak" | "longBreak"): number {
+export function durationOf(
+  data: AppData,
+  mode: "focus" | "shortBreak" | "longBreak",
+): number {
   const minutes =
     mode === "focus"
       ? (data.tasks.find((t) => t.id === data.timer.taskId)?.focusMinutes ??

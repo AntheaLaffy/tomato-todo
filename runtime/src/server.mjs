@@ -84,7 +84,12 @@ function handlePreflight(req, res) {
 
 async function handleMcp(req, res, { engine, token }) {
   if (req.method === "GET" || req.method === "DELETE") {
-    send(res, 405, { error: "Streamable HTTP 桩仅支持 POST；SSE 未实现" }, { Allow: "POST" });
+    send(
+      res,
+      405,
+      { error: "Streamable HTTP 桩仅支持 POST；SSE 未实现" },
+      { Allow: "POST" },
+    );
     return;
   }
   if (req.method !== "POST") {
@@ -116,14 +121,23 @@ async function handleMcp(req, res, { engine, token }) {
 
   const handleOne = (msg) => {
     if (msg == null || typeof msg !== "object" || Array.isArray(msg)) {
-      return { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid Request" } };
+      return {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32600, message: "Invalid Request" },
+      };
     }
     if (msg.jsonrpc !== "2.0") {
-      return { jsonrpc: "2.0", id: msg.id ?? null, error: { code: -32600, message: "Invalid Request" } };
+      return {
+        jsonrpc: "2.0",
+        id: msg.id ?? null,
+        error: { code: -32600, message: "Invalid Request" },
+      };
     }
     if (msg.id === undefined) return null; // 通知：不回复
     const outcome = mcpMethod(engine, msg.method, msg.params ?? {});
-    if (outcome.ok) return { jsonrpc: "2.0", id: msg.id, result: outcome.result };
+    if (outcome.ok)
+      return { jsonrpc: "2.0", id: msg.id, result: outcome.result };
     return {
       jsonrpc: "2.0",
       id: msg.id,
@@ -158,7 +172,8 @@ async function handleApi(req, res, url, ctx) {
 
   // 只读端点：允许 DSH UI origin 跨域
   if (method === "GET") {
-    if (path === "/api/snapshot") return sendApi(res, 200, engine.snapshot(now()));
+    if (path === "/api/snapshot")
+      return sendApi(res, 200, engine.snapshot(now()));
     if (path === "/api/today") {
       const view = engine.today(now());
       // 插件契约的便捷字段：dueCount=今日未完成件数，focusMinutes=今日已投入分钟。
@@ -178,16 +193,30 @@ async function handleApi(req, res, url, ctx) {
   }
   if (method === "POST" && path === "/api/tasks/move") {
     const body = await parseJson(req);
-    return sendApi(res, 200, { tasks: engine.moveTasks(body.ids, body.dueDate, body.reminderTime) });
+    return sendApi(res, 200, {
+      tasks: engine.moveTasks(body.ids, body.dueDate, body.reminderTime),
+    });
   }
   let match = /^\/api\/tasks\/([^/]+)\/complete$/.exec(path);
   if (method === "POST" && match) {
-    return sendApi(res, 200, engine.completeTask(decodeURIComponent(match[1]), now()));
+    return sendApi(
+      res,
+      200,
+      engine.completeTask(decodeURIComponent(match[1]), now()),
+    );
   }
   match = /^\/api\/tasks\/([^/]+)$/.exec(path);
   if (method === "PATCH" && match) {
     const body = await parseJson(req);
-    return sendApi(res, 200, engine.updateTask(decodeURIComponent(match[1]), body.changes ?? body, now()));
+    return sendApi(
+      res,
+      200,
+      engine.updateTask(
+        decodeURIComponent(match[1]),
+        body.changes ?? body,
+        now(),
+      ),
+    );
   }
   if (method === "POST" && path === "/api/focus/start") {
     const body = await parseJson(req);
@@ -198,7 +227,8 @@ async function handleApi(req, res, url, ctx) {
     // runtime 指挥 guard：按保护设置重发锁屏（guard 未跑时优雅忽略）。
     const protection = engine.settings.protection;
     if (protection.mode !== "off" && timer.running) {
-      const whitelist = protection.mode === "whitelist" ? protection.whitelist : [];
+      const whitelist =
+        protection.mode === "whitelist" ? protection.whitelist : [];
       guard.lock({ whitelist }).then((r) => {
         if (!r.ok) console.error(`guard lock 失败：${r.error ?? r.status}`);
       });
@@ -222,7 +252,14 @@ async function handleApi(req, res, url, ctx) {
  * 启动 HTTP 服务。返回 { server, port, close }；port 传入 0 时取系统分配端口
  * （测试用），调用方需按实际端口回写 connection.json。
  */
-export async function startServer({ engine, dataDir, host = "127.0.0.1", port = DEFAULT_PORT, token, version }) {
+export async function startServer({
+  engine,
+  dataDir,
+  host = "127.0.0.1",
+  port = DEFAULT_PORT,
+  token,
+  version,
+}) {
   const guard = GuardClient.fromDataDir(dataDir);
   const startedAt = Date.now();
   const server = createServer((req, res) => {

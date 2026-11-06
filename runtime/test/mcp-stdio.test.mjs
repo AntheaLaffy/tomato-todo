@@ -15,10 +15,15 @@ const tmp = () => mkdtempSync(join(tmpdir(), "tomato-stdio-"));
 
 class StdioClient {
   constructor(args) {
-    this.proc = spawn(process.execPath, [BIN, ...args], { stdio: ["pipe", "pipe", "pipe"] });
+    this.proc = spawn(process.execPath, [BIN, ...args], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     this.stderr = "";
     this.proc.stderr.on("data", (d) => (this.stderr += d));
-    this.lines = createInterface({ input: this.proc.stdout, crlfDelay: Infinity });
+    this.lines = createInterface({
+      input: this.proc.stdout,
+      crlfDelay: Infinity,
+    });
     this.pending = new Map();
     this.nextId = 1;
     this.lines.on("line", (line) => {
@@ -41,7 +46,10 @@ class StdioClient {
   request(method, params) {
     const id = this.nextId++;
     const promise = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`请求超时：${method}`)), 5000);
+      const timer = setTimeout(
+        () => reject(new Error(`请求超时：${method}`)),
+        5000,
+      );
       this.pending.set(id, {
         resolve: (msg) => {
           clearTimeout(timer);
@@ -49,7 +57,9 @@ class StdioClient {
         },
       });
     });
-    this.proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params: params ?? {} })}\n`);
+    this.proc.stdin.write(
+      `${JSON.stringify({ jsonrpc: "2.0", id, method, params: params ?? {} })}\n`,
+    );
     return promise;
   }
 
@@ -72,13 +82,19 @@ test("--mcp 转发 initialize/ping/tools/list/tools/call 到 /mcp", async (t) =>
       let result;
       switch (body.method) {
         case "initialize":
-          result = { serverInfo: { name: "tomato-todo", version: "mock" }, capabilities: { tools: {} } };
+          result = {
+            serverInfo: { name: "tomato-todo", version: "mock" },
+            capabilities: { tools: {} },
+          };
           break;
         case "tools/list":
           result = { tools: [{ name: "get_context" }] };
           break;
         case "tools/call":
-          result = { content: [{ type: "text", text: "42" }], structuredContent: { answer: 42 } };
+          result = {
+            content: [{ type: "text", text: "42" }],
+            structuredContent: { answer: 42 },
+          };
           break;
         default:
           result = null;
@@ -93,7 +109,11 @@ test("--mcp 转发 initialize/ping/tools/list/tools/call 到 /mcp", async (t) =>
   mkdirSync(join(dir, "agent"), { recursive: true });
   writeFileSync(
     join(dir, "agent", "connection.json"),
-    JSON.stringify({ mcpUrl: `http://127.0.0.1:${port}/mcp`, token: "stdio-token", pid: 1 }),
+    JSON.stringify({
+      mcpUrl: `http://127.0.0.1:${port}/mcp`,
+      token: "stdio-token",
+      pid: 1,
+    }),
   );
 
   const client = new StdioClient(["--mcp", "--data", dir]);
@@ -102,7 +122,9 @@ test("--mcp 转发 initialize/ping/tools/list/tools/call 到 /mcp", async (t) =>
     await new Promise((resolve) => mock.close(resolve));
   });
 
-  const init = await client.request("initialize", { protocolVersion: "2025-11-25" });
+  const init = await client.request("initialize", {
+    protocolVersion: "2025-11-25",
+  });
   assert.equal(init.result.serverInfo.name, "tomato-todo");
 
   const ping = await client.request("ping");
@@ -111,12 +133,18 @@ test("--mcp 转发 initialize/ping/tools/list/tools/call 到 /mcp", async (t) =>
   const list = await client.request("tools/list");
   assert.equal(list.result.tools[0].name, "get_context");
 
-  const call = await client.request("tools/call", { name: "export_plan", arguments: { name: "x.json" } });
+  const call = await client.request("tools/call", {
+    name: "export_plan",
+    arguments: { name: "x.json" },
+  });
   assert.equal(call.result.content[0].text, "42");
   assert.equal(call.result.structuredContent.answer, 42);
 
   // 除 ping 本地应答外，其余方法全部带 Bearer token 转发到 /mcp
-  assert.deepEqual(seen.map((s) => s.method), ["initialize", "tools/list", "tools/call"]);
+  assert.deepEqual(
+    seen.map((s) => s.method),
+    ["initialize", "tools/list", "tools/call"],
+  );
   assert.ok(seen.every((s) => s.auth === "Bearer stdio-token"));
   assert.equal(client.parseErrors.length, 0);
 });
@@ -180,7 +208,10 @@ test("--mcp 连接文件缺失 → -32603；--connection 指向非本机地址�
 
   const dir2 = tmp();
   const file = join(dir2, "conn.json");
-  writeFileSync(file, JSON.stringify({ mcpUrl: "http://example.com/mcp", token: "x" }));
+  writeFileSync(
+    file,
+    JSON.stringify({ mcpUrl: "http://example.com/mcp", token: "x" }),
+  );
   const client2 = new StdioClient(["--mcp", "--connection", file]);
   t.after(async () => {
     await client2.close();

@@ -10,7 +10,11 @@ import type { Protection, Window } from "./model";
  * 本进程窗口始终放行；off 放行一切；whitelist 精确匹配 appId；
  * lock 忽略白名单。
  */
-export function allowed(window: Window, ownPid: number, protection: Protection): boolean {
+export function allowed(
+  window: Window,
+  ownPid: number,
+  protection: Protection,
+): boolean {
   if (window.pid !== null && window.pid === ownPid) {
     return true;
   }
@@ -46,7 +50,11 @@ export function selectFrameContentPid(
   children: { className: string; pid: number }[],
 ): number | null {
   for (const child of children) {
-    if (child.className === "Windows.UI.Core.CoreWindow" && child.pid !== 0 && child.pid !== hostPid) {
+    if (
+      child.className === "Windows.UI.Core.CoreWindow" &&
+      child.pid !== 0 &&
+      child.pid !== hostPid
+    ) {
       return child.pid;
     }
   }

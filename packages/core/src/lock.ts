@@ -16,9 +16,24 @@ import {
   requiredField,
 } from "./json";
 import type { ActiveLock, LockSchedule, LockState } from "./model";
-import { addDays, atLocalDate, localDateOf, minutesOf, parseDate, weekdayMonday } from "./time";
+import {
+  addDays,
+  atLocalDate,
+  localDateOf,
+  minutesOf,
+  parseDate,
+  weekdayMonday,
+} from "./time";
 
-const SCHEDULE_KEYS = ["id", "name", "start", "end", "days", "enabled", "strict"] as const;
+const SCHEDULE_KEYS = [
+  "id",
+  "name",
+  "start",
+  "end",
+  "days",
+  "enabled",
+  "strict",
+] as const;
 const ACTIVE_KEYS = ["name", "startedAt", "endsAt", "strict"] as const;
 const STATE_KEYS = ["schedules", "active", "suppressedUntil"] as const;
 
@@ -30,14 +45,27 @@ export function parseLockSchedule(raw: unknown): LockSchedule {
     name: requiredField(raw, "name", "锁机规则", asStr),
     start: requiredField(raw, "start", "锁机规则", asStr),
     end: requiredField(raw, "end", "锁机规则", asStr),
-    days: asArray(requiredField(raw, "days", "锁机规则", (v) => v), "days").map((d) => asInt(d, "锁机星期")),
+    days: asArray(
+      requiredField(raw, "days", "锁机规则", (v) => v),
+      "days",
+    ).map((d) => asInt(d, "锁机星期")),
     enabled: requiredField(raw, "enabled", "锁机规则", asBool),
     strict: field(raw, "strict", "锁机规则", asBool, false),
   };
 }
 
-export function serializeLockSchedule(s: LockSchedule): Record<string, unknown> {
-  return { id: s.id, name: s.name, start: s.start, end: s.end, days: s.days, enabled: s.enabled, strict: s.strict };
+export function serializeLockSchedule(
+  s: LockSchedule,
+): Record<string, unknown> {
+  return {
+    id: s.id,
+    name: s.name,
+    start: s.start,
+    end: s.end,
+    days: s.days,
+    enabled: s.enabled,
+    strict: s.strict,
+  };
 }
 
 export function parseActiveLock(raw: unknown): ActiveLock {
@@ -52,15 +80,32 @@ export function parseActiveLock(raw: unknown): ActiveLock {
 }
 
 export function serializeActiveLock(a: ActiveLock): Record<string, unknown> {
-  return { name: a.name, startedAt: a.startedAt, endsAt: a.endsAt, strict: a.strict };
+  return {
+    name: a.name,
+    startedAt: a.startedAt,
+    endsAt: a.endsAt,
+    strict: a.strict,
+  };
 }
 
 export function parseLockState(raw: unknown): LockState {
   if (!isObject(raw)) throw new AppError("锁机配置必须是对象");
   rejectUnknown(raw, [...STATE_KEYS], "锁机配置");
   return {
-    schedules: field(raw, "schedules", "锁机配置", (v) => asArray(v, "schedules").map(parseLockSchedule), []),
-    active: field(raw, "active", "锁机配置", (v) => (v === null ? null : parseActiveLock(v)), null) as ActiveLock | null,
+    schedules: field(
+      raw,
+      "schedules",
+      "锁机配置",
+      (v) => asArray(v, "schedules").map(parseLockSchedule),
+      [],
+    ),
+    active: field(
+      raw,
+      "active",
+      "锁机配置",
+      (v) => (v === null ? null : parseActiveLock(v)),
+      null,
+    ) as ActiveLock | null,
     suppressedUntil: field(raw, "suppressedUntil", "锁机配置", asInt, 0),
   };
 }
@@ -90,7 +135,11 @@ export function validateLock(state: LockState): void {
       throw new AppError("锁机名称需为 1–40 字符，ID 需唯一且非空");
     }
     ids.add(s.id);
-    if (minutesOf(s.start) === null || minutesOf(s.end) === null || s.start === s.end) {
+    if (
+      minutesOf(s.start) === null ||
+      minutesOf(s.end) === null ||
+      s.start === s.end
+    ) {
       throw new AppError("锁机时间需为有效 HH:MM，开始与结束不能相同");
     }
     const unique = new Set(s.days);
@@ -146,7 +195,11 @@ export function scheduledAt(state: LockState, at: number): ActiveLock | null {
       const endTime = minutesOf(s.end);
       if (startTime === null || endTime === null) continue;
       const endDate = endTime <= startTime ? addDays(date, 1) : date;
-      const start = atLocalDate(date, Math.floor(startTime / 60), startTime % 60);
+      const start = atLocalDate(
+        date,
+        Math.floor(startTime / 60),
+        startTime % 60,
+      );
       const end = atLocalDate(endDate, Math.floor(endTime / 60), endTime % 60);
       if (at >= start && at < end) {
         if (result !== null) {
@@ -154,7 +207,12 @@ export function scheduledAt(state: LockState, at: number): ActiveLock | null {
           result.endsAt = Math.max(result.endsAt, end);
           result.strict = result.strict || s.strict;
         } else {
-          result = { name: s.name, startedAt: start, endsAt: end, strict: s.strict };
+          result = {
+            name: s.name,
+            startedAt: start,
+            endsAt: end,
+            strict: s.strict,
+          };
         }
       }
     }

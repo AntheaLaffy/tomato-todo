@@ -142,7 +142,10 @@ test("任务写链路：PATCH / move / complete", async () => {
   assert.equal(moved.status, 200);
   assert.equal(moved.body.tasks[0].dueDate, "2026-11-09");
 
-  const done = await json(`/api/tasks/${id}/complete`, { method: "POST", headers });
+  const done = await json(`/api/tasks/${id}/complete`, {
+    method: "POST",
+    headers,
+  });
   assert.equal(done.status, 200);
   assert.equal(done.body.completed, true);
   assert.ok(done.body.completedAt > 0);
@@ -172,19 +175,30 @@ test("focus 端点：start → pause → stop 全链路", async () => {
 test("/mcp 认证：无 token 401、错 token 401、带 Origin 403、GET 405", async () => {
   const payload = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" });
 
-  const none = await json("/mcp", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+  const none = await json("/mcp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: payload,
+  });
   assert.equal(none.status, 401);
 
   const wrong = await json("/mcp", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer nope" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer nope",
+    },
     body: payload,
   });
   assert.equal(wrong.status, 401);
 
   const browser = await json("/mcp", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}`, Origin: UI_ORIGIN },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${TOKEN}`,
+      Origin: UI_ORIGIN,
+    },
     body: payload,
   });
   assert.equal(browser.status, 403);
@@ -194,11 +208,19 @@ test("/mcp 认证：无 token 401、错 token 401、带 Origin 403、GET 405", a
 });
 
 test("/mcp initialize / tools/list：serverInfo 与中文 instructions", async () => {
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${TOKEN}`,
+  };
   const init = await json("/mcp", {
     method: "POST",
     headers,
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25" } }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2025-11-25" },
+    }),
   });
   assert.equal(init.status, 200);
   assert.equal(init.body.result.serverInfo.name, "tomato-todo");
@@ -212,22 +234,28 @@ test("/mcp initialize / tools/list：serverInfo 与中文 instructions", async (
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
   });
   const names = list.body.result.tools.map((t) => t.name).sort();
-  assert.deepEqual(names, [
-    "complete_task",
-    "create_task",
-    "dispatch",
-    "export_backup",
-    "export_plan",
-    "get_context",
-    "move_tasks",
-    "update_task",
-  ].sort());
+  assert.deepEqual(
+    names,
+    [
+      "complete_task",
+      "create_task",
+      "dispatch",
+      "export_backup",
+      "export_plan",
+      "get_context",
+      "move_tasks",
+      "update_task",
+    ].sort(),
+  );
   const create = list.body.result.tools.find((t) => t.name === "create_task");
   assert.deepEqual(create.inputSchema.required, ["title", "dueDate"]);
 });
 
 test("/mcp tools/call 落到引擎：create_task 与 structuredContent", async () => {
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${TOKEN}`,
+  };
   const call = await json("/mcp", {
     method: "POST",
     headers,
@@ -235,7 +263,10 @@ test("/mcp tools/call 落到引擎：create_task 与 structuredContent", async (
       jsonrpc: "2.0",
       id: 3,
       method: "tools/call",
-      params: { name: "create_task", arguments: { title: "MCP 任务", dueDate: TODAY, priority: 1 } },
+      params: {
+        name: "create_task",
+        arguments: { title: "MCP 任务", dueDate: TODAY, priority: 1 },
+      },
     }),
   });
   assert.equal(call.status, 200);
@@ -251,7 +282,10 @@ test("/mcp tools/call 落到引擎：create_task 与 structuredContent", async (
 });
 
 test("/mcp tools/call：get_context / complete_task / 错误工具 isError", async () => {
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${TOKEN}`,
+  };
   const created = await json("/api/tasks", {
     method: "POST",
     headers,
@@ -261,7 +295,12 @@ test("/mcp tools/call：get_context / complete_task / 错误工具 isError", asy
   const ctx = await json("/mcp", {
     method: "POST",
     headers,
-    body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_context", arguments: {} } }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 4,
+      method: "tools/call",
+      params: { name: "get_context", arguments: {} },
+    }),
   });
   assert.ok(!ctx.body.result.isError);
   const context = ctx.body.result.structuredContent;
@@ -310,7 +349,10 @@ test("/mcp tools/call：get_context / complete_task / 错误工具 isError", asy
 });
 
 test("/mcp：非法 JSON → -32700；通知（无 id）→ 202 空响应；未知方法 → -32601", async () => {
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${TOKEN}`,
+  };
   const parse = await json("/mcp", { method: "POST", headers, body: "{" });
   assert.equal(parse.status, 200);
   assert.equal(parse.body.error.code, -32700);
@@ -318,7 +360,10 @@ test("/mcp：非法 JSON → -32700；通知（无 id）→ 202 空响应；未�
   const notify = await fetch(`${base}/mcp`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "notifications/initialized",
+    }),
   });
   assert.equal(notify.status, 202);
   assert.equal(await notify.text(), "");
@@ -332,7 +377,10 @@ test("/mcp：非法 JSON → -32700；通知（无 id）→ 202 空响应；未�
 });
 
 test("/mcp dispatch：focusDiscard 与 export_plan 文件名校验", async () => {
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${TOKEN}`,
+  };
   const discard = await json("/mcp", {
     method: "POST",
     headers,
@@ -340,7 +388,10 @@ test("/mcp dispatch：focusDiscard 与 export_plan 文件名校验", async () =>
       jsonrpc: "2.0",
       id: 9,
       method: "tools/call",
-      params: { name: "dispatch", arguments: { action: { type: "focusDiscard" } } },
+      params: {
+        name: "dispatch",
+        arguments: { action: { type: "focusDiscard" } },
+      },
     }),
   });
   assert.ok(!discard.body.result.isError);

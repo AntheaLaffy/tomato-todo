@@ -405,9 +405,29 @@ export type DispatchAction =
   | { type: "focusResume" }
   | { type: "focusStop" }
   | { type: "focusDiscard" }
-  | { type: "saveSettings"; settings: Partial<Settings> & { protection?: Partial<Settings["protection"]> } }
-  | { type: "saveVision"; id?: string | null; name: string; notes?: string; projectId?: string | null }
-  | { type: "saveBlock"; id?: string | null; title: string; days: number[]; start: string; end: string; attention?: Attention; notes?: string }
+  | {
+      type: "saveSettings";
+      settings: Partial<Settings> & {
+        protection?: Partial<Settings["protection"]>;
+      };
+    }
+  | {
+      type: "saveVision";
+      id?: string | null;
+      name: string;
+      notes?: string;
+      projectId?: string | null;
+    }
+  | {
+      type: "saveBlock";
+      id?: string | null;
+      title: string;
+      days: number[];
+      start: string;
+      end: string;
+      attention?: Attention;
+      notes?: string;
+    }
   | { type: "deleteBlock"; id: string }
   | { type: "createProject"; name: string; color?: string; directory?: string }
   | { type: "deleteTask"; id: string };

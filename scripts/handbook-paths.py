@@ -37,14 +37,11 @@ ENTRY = {
     "15-任务身份": "先读 `identities.rs` 的 `reconcile()` 与 `validate()`，再读 `lib.rs` 的 `Engine::preview_action()`；旧本地数据转换在 `migration.rs`。",
     "16-习惯与愿景": "先看 `lib.rs` 里 `Habit`、`Vision` 与 `kind()`（习惯是推导结果，不是字段），再看 `habits.rs` 的校验与 `templates.rs` 的 `printing_expired()`（宽限为 0），界面在 `src/main.ts` 的 `habitsTab()`/`visionsTab()`。",
     "17-诊断与统计": "整条链路都在 `diagnostics.rs`：`diagnose()` 先从会话算容量，再逐个产出 `Anomaly`；阈值与反问句写在同一文件；界面在 `src/main.ts` 的 `statsPage()`。",
-    "18-助手-权限与唤醒": "先读 `crates/agent/src/tools.rs` 的 `definitions(agent)`（两档工具清单就是权限边界），再读 `lib.rs` 的 `observe()`（唤醒门控与定时任务触发）与 `state.rs` 的 `Schedule()`。",
-    "19-助手-文件工作区与MCP": "先读 `crates/agent/src/files.rs`：`export()` 记来源指纹、`patch()` 是受限 JSON Patch、`candidate()` 生成差异；对外 MCP 入口在 `lib.rs` 的 `mcp_entry()`。",
     "20-数据与格式": "先读 `crates/core/src/plan.rs` 的 `PlanFile` 与 `merge_into()`（配置更新与保留进度），再读 `docs/PLAN_FORMAT.md` 与 `docs/BACKUP_FORMAT.md`（契约以文档为准）。",
     "21-安装与桌面集成": "先读 `scripts/install.py` 的 `install()`（路径、护栏、DMS 补丁与备份），再读 `src-tauri/src/desktop.rs` 的托盘与自启动实现。",
     "22-架构与工程": "从 `crates/preview/src/main.rs` 看核心如何被浏览器复用，再读 `package.json` 的脚本、`.github/workflows/`（质量门与发布）与 `scripts/build-agent.mjs`（运行包重建）。",
     "23-手部演示动画": "整块在 `src/hand.ts`：`build()` 建覆盖层、`runHandScript()` 走步骤、`field()` 负责逐字符输入时重新取目标元素；`src/hand-demo.ts` 是示范脚本，`tools.rs` 的 `show_me` 是入口。",
     "24-界面手感与音效": "先用 `src/main.ts.analysis.md` 与 `src/style.css.analysis.md` 两张索引定位，再读 `src/audio.ts` 与 `src/sound-events.ts`；设置项定义在 `crates/core/src/lib.rs` 的 `Settings`。",
-    "26-工具面与开发流程": "先读 `crates/agent/src/tools.rs`（工具清单即权限），再看 `agent/skills/` 与 `.agents/skills/` 两套技能的差别，最后读 `AGENTS.md` 的规范段。",
 }
 
 # 主要调用链：人的判断，宁少勿滥。
@@ -58,12 +55,6 @@ CHAINS = {
     "17-诊断与统计": ["`crates/agent/src/lib.rs::observe()` → `diagnose(snapshot, capacity)` → `Anomaly[]`",
                   "容量：用户填写 → 近 28 天中位数（下限 30）→ 每日番茄目标预算",
                   "界面：`src/main.ts::statsPage()` 读快照渲染投入统计与每日记录"],
-    "18-助手-权限与唤醒": ["`observe()` → `schedules.due(now)` 命中即进入任务轮次（并记 `fired_at`）",
-                      "否则每 60 秒跑 `diagnose()` → 门控（启用/自动/空闲/凭据/安静时段/当日次数）",
-                      "工具档位：`tools.rs::definitions(agent)` 决定模型看得到哪些工具"],
-    "19-助手-文件工作区与MCP": ["`export_plan`/`export_backup` → `files::export()` 记来源指纹与 `fileHash`",
-                          "`patch_file` → `files::patch()`（受限 RFC 6902，全部成功才写盘）",
-                          "`review_file` → `files::candidate()` 预检差异 → 用户批准 → `apply_file` 再核指纹"],
     "20-数据与格式": ["`PlanFile::merge_into()` → 按 ID 更新配置、保留进度与历史",
                   "`replace: true` → 整份同步前自动备份",
                   "恢复备份 → 暂停计时、停用锁机规则、清活动锁机、保留严格设置"],

@@ -94,21 +94,38 @@ export class GuardClient {
   }
 
   /** 从 runtime 数据目录构造（token 取自 <dataDir>/guard/token）。 */
-  static fromDataDir(dataDir: string, options: GuardClientOptions = {}): GuardClient {
+  static fromDataDir(
+    dataDir: string,
+    options: GuardClientOptions = {},
+  ): GuardClient {
     return new GuardClient({ token: readGuardToken(dataDir), ...options });
   }
 
   /** 全屏锁定 + 白名单；focus 会话开始 / 保护设置变化时（重）发。 */
-  lock({ whitelist = [] }: { whitelist?: string[] } = {}): Promise<GuardResult> {
-    return this.#request("/guard", { method: "POST", body: { command: "lock", whitelist } });
+  lock({
+    whitelist = [],
+  }: { whitelist?: string[] } = {}): Promise<GuardResult> {
+    return this.#request("/guard", {
+      method: "POST",
+      body: { command: "lock", whitelist },
+    });
   }
 
   unlock(): Promise<GuardResult> {
-    return this.#request("/guard", { method: "POST", body: { command: "unlock" } });
+    return this.#request("/guard", {
+      method: "POST",
+      body: { command: "unlock" },
+    });
   }
 
-  notify({ title = "", body = "" }: { title?: string; body?: string } = {}): Promise<GuardResult> {
-    return this.#request("/guard", { method: "POST", body: { command: "notify", title, body } });
+  notify({
+    title = "",
+    body = "",
+  }: { title?: string; body?: string } = {}): Promise<GuardResult> {
+    return this.#request("/guard", {
+      method: "POST",
+      body: { command: "notify", title, body },
+    });
   }
 
   status(): Promise<GuardResult> {
@@ -149,20 +166,32 @@ export class GuardClient {
       }
     }
     if (response.ok) return { ok: true, status: response.status, data };
-    return { ok: false, status: response.status, data, error: describeHttpError(data, response.status) };
+    return {
+      ok: false,
+      status: response.status,
+      data,
+      error: describeHttpError(data, response.status),
+    };
   }
 }
 
 function describeNetworkError(error: unknown, timeoutMs: number): string {
-  const e = error as { name?: string; code?: string; cause?: { code?: string }; message?: string };
-  if (e?.name === "TimeoutError" || e?.name === "AbortError") return `超时（${timeoutMs}ms）`;
+  const e = error as {
+    name?: string;
+    code?: string;
+    cause?: { code?: string };
+    message?: string;
+  };
+  if (e?.name === "TimeoutError" || e?.name === "AbortError")
+    return `超时（${timeoutMs}ms）`;
   const code = e?.cause?.code ?? e?.code;
   if (typeof code === "string" && code) return code;
   return e?.message ?? String(error);
 }
 
 function describeHttpError(data: unknown, status: number): string {
-  if (isRecord(data) && typeof data.error === "string" && data.error) return data.error;
+  if (isRecord(data) && typeof data.error === "string" && data.error)
+    return data.error;
   if (typeof data === "string" && data) return data;
   return `guard 返回 HTTP ${status}`;
 }
@@ -230,13 +259,20 @@ export async function runGuardStatus(
  *  backend：guard 侧协议当前不返回，契约示例以 "x11" 为基线；guard 一旦上报则透传。 */
 function coerceSummary(data: unknown): GuardSummary {
   const payload = isRecord(data) ? data : {};
-  const backend = typeof payload.backend === "string" && payload.backend ? payload.backend : "x11";
+  const backend =
+    typeof payload.backend === "string" && payload.backend
+      ? payload.backend
+      : "x11";
   const locked = payload.locked === true;
   const whitelist = Array.isArray(payload.whitelist)
-    ? payload.whitelist.filter((item): item is string => typeof item === "string")
+    ? payload.whitelist.filter(
+        (item): item is string => typeof item === "string",
+      )
     : [];
   const pid =
-    typeof payload.pid === "number" && Number.isInteger(payload.pid) && payload.pid >= 0
+    typeof payload.pid === "number" &&
+    Number.isInteger(payload.pid) &&
+    payload.pid >= 0
       ? payload.pid
       : 0;
   return { available: true, backend, locked, whitelist, pid };

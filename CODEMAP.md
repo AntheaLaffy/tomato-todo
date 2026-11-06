@@ -1,94 +1,50 @@
 ---
 mode: maintenance
 ignore: See Scope and Exclusions
-generated_at: 2026-10-10
+generated_at: 2026-11-07
 ---
 
-Rust 驱动的 Linux 桌面番茄任务工具。当前目录使用 Git 管理，地图按受管源码导航。
+番茄 Todo 重写后的仓库地图：DSH 插件 + TypeScript 领域核心 + Node runtime + Rust 原生守卫。
+当前目录使用 Git 管理，地图按受管源码导航。
 
 ## Scope and Exclusions
 
 | Path / pattern | Treatment | Reason |
 | --- | --- | --- |
-| target/、node_modules/、dist/、src-tauri/gen/（除 gen/android/ 维护的工程源码）、agent/node_modules/、agent/bundle/ | Excluded | 构建、依赖、生成的 ACL schema 与随包运行产物；Android 工程由局部地图纳入 |
-| artifacts/、*.sqlite3* | Excluded | 测试截图、私人课表分析与本地数据库 |
-| Cargo.lock、pnpm-lock.yaml、**/package-lock.json | Excluded | 依赖锁文件保留，但无需逐项导航 |
-| public/、src-tauri/icons/ | Boundary only | 静态二进制资源，引用由配置与视图管理 |
-| src-tauri/capabilities/ | Boundary only | 短 JSON 原生权限清单；命令变更时定向核对 |
-| CODEMAP.md、*.analysis.md | Excluded | 索引产物本身不递归纳入 |
-| .agents/skills/ | Boundary only | 随项目的维护者技能；由 AGENTS.md 与 README 指引，不逐个导航 |
-| agent/skills/ | Boundary only | 随包给学习助手按需读取的技能与练习；由 agent/CODEMAP.md 和 system-prompt.md 指引 |
+| node_modules/、packages/core/node_modules/、target/、runtime/vendor/、**/.vite/ | Excluded | 依赖、构建与缓存产物 |
+| crates/guard/Cargo.lock | Excluded | 依赖锁文件保留，无需逐项导航 |
+| public 类二进制资源、plugin/icon.svg | Boundary only | 静态资源，引用由配置与视图管理 |
+| .agents/skills/ | Boundary only | 随项目的维护者技能，由 AGENTS.md 指引 |
+| LEAD-NOTES.md | Excluded | lead 协调台账，非源码导航目标 |
 
 ## 任务指南
 
 | 任务 | Domain | Target | Also Check |
 | --- | --- | --- | --- |
-| 项目资料目录与应试教学体系 | 教学 / 智能体 / 界面 | crates/core/src/education.rs、crates/agent/src/projects.rs、src/education.ts、docs/EDUCATION.md | agent/coding.mjs、agent/skills/exam-teaching/、agent/skills/exam-authoring/、桌面/预览手动Action边界、备份Schema、education_tests.rs、tests/education.mjs |
-| 命题质量、多类型资料取材与试卷审校 | 教学 / 智能体 | agent/skills/exam-authoring/SKILL.md、agent/skills/exam-teaching/SKILL.md | docs/EDUCATION.md、tests/exam-authoring.mjs |
-| 周安排落实到今日专注 | 教学 / 任务 | crates/core/src/teaching_tasks.rs、src/main.ts 的 focusPage/taskDialog、src/education.ts | crates/core/src/education_tests.rs、plan.rs、docs/EDUCATION.md、tests/external-control.mjs |
-| 外部Agent接管与MCP工具/技能暴露 | 智能体 / 桥接 | crates/agent/src/external.rs、bridge.rs、agent/mcp.mjs | crates/agent/src/tools.rs、src/agent.ts、docs/AGENT.md、tests/external-control.mjs |
-| 项目资料搜索、大文件与失效维护 | 教学 / 文件 | src/resources.ts、crates/agent/src/resources.rs | core/src/education.rs的引用索引/清理、src-tauri/src/resources.rs、preview/src/main.rs的流式响应、tests/education.mjs |
-| 任务时间提醒与单次时长 | 业务核心 / 桌面 | crates/core/src/reminders.rs、src-tauri/src/desktop_app.rs | src/main.ts、src/types.ts、docs/PLAN_FORMAT.md、docs/HANDBOOK/12-课表与提醒.md |
-| 任务日期必填、周期星期与可选提醒 | 业务核心 / 界面 | crates/core/src/reminders.rs 的 validate、templates.rs 的 Printing/validate、src/main.ts 的 templateDialog/taskDialog | plan.rs、src/types.ts、助手 create_task、计划与备份 schema |
-| 永久 ID、任务恢复与本地 v3 升级 | 持久化 | crates/core/src/identities.rs、migration.rs、lib.rs 的 Engine | docs/HANDBOOK/15-任务身份.md、tests.rs、docs/BACKUP_FORMAT.md |
-| 习惯分组与周期印刷 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 habitsTab | templates.rs 的 materialize_templates、src/types.ts、docs/BACKUP_FORMAT.md |
-| 愿景标记 | 业务核心 / 界面 | crates/core/src/lib.rs 的 Vision、src/main.ts 的 visionsTab | src/types.ts、docs/BACKUP_FORMAT.md |
-| 模板标签、手动批量印刷、滚动预印 | 业务核心 / 界面 | crates/core/src/templates.rs、src/main.ts 的 tasksPage/templatesCard/templateDialog/printDialog | crates/core/src/plan.rs、docs/HANDBOOK/14-模板与印刷.md、src/types.ts、docs/CODEMAP.md |
-| 课表阻塞时段与课内并行 | 业务核心 / 界面 / 智能体 | crates/core/src/blocks.rs、src/main.ts 的 schedulePage/blocksCard/blockDialog | crates/core/src/diagnostics.rs、docs/HANDBOOK/12-课表与提醒.md、docs/HANDBOOK/17-诊断与统计.md、plan.rs、crates/agent/src/{tools.rs,lib.rs}、docs/PLAN_FORMAT.md |
-| 修改任务、计时、统计 | 业务核心 | crates/core/CODEMAP.md | src/types.ts 与 src/main.ts |
-| 学习计划文件导入/导出 | 文件契约 | docs/CODEMAP.md、crates/core/src/plan.rs | src/api.ts、src/types.ts、src/main.ts、桌面/预览适配层 |
-| 写作业 BGM 导入与播放 | 声音 / 界面 | src/bgm.ts、src/main.ts 的 soundDialog | src/CODEMAP.md、tests/audio.mjs、tests/integration.mjs、docs/HANDBOOK/24-界面手感与音效.md |
-| 雨声/棕噪音无声与循环 | 声音 / 桌面 | src/audio.ts、src-tauri/src/lib.rs | public/audio/LICENSE.md、Linux GStreamer bad 插件打包依赖、tests/audio.mjs、docs/HANDBOOK/24-界面手感与音效.md |
-| 关键节点音效与音量 | 声音 / 契约 | src/audio.ts、src/sound-events.ts、src/main.ts 的 accept/设置 | crates/core/src/lib.rs 的 Settings、docs/HANDBOOK/24-界面手感与音效.md、src/types.ts、docs/BACKUP_FORMAT.md、tests/audio.mjs |
-| 专注时拦截其他应用提示音 | 声音 / 桌面 | src-tauri/src/focus_audio.rs、desktop_app.rs | docs/HANDBOOK/24-界面手感与音效.md、README.md、Linux 打包依赖 |
-| 学习助手、异常诊断、联网与 MCP | 智能体 / 桌面 | crates/agent/、agent/、src/agent.ts | docs/HANDBOOK/18-助手-权限与唤醒.md、docs/HANDBOOK/19-助手-文件工作区与MCP.md、agent/mcp-config.mjs 与 agent/session.mjs 的 MCP 加载、docs/AGENT.md、crates/core/src/diagnostics.rs、tests/agent.mjs、桌面/预览桥接 |
-| 作者彩蛋、提示词原文与完整访问 | 智能体 | crates/agent/src/creator.rs、agent/session.mjs、agent/system-prompt.md | crates/agent/src/{lib.rs,state.rs}、src/agent.ts、tests/agent.mjs、docs/AGENT.md |
-| 角色头像、官方立绘与背景板 | 界面 / 契约 | src/agent.ts、src/main.ts 的 settingsPage/render/setupAgent、crates/core/src/lib.rs 的 Settings | public/personas/、src/types.ts、crates/agent/src/tools.rs 的 dispatch、tests/personas.mjs、docs/BACKUP_FORMAT.md |
-| 运行时人格与切换 | 智能体 | crates/agent/src/state.rs 的 Persona、crates/agent/src/tools.rs、agent/session.mjs | crates/agent/src/lib.rs 的 prompt_command/call、src/agent.ts 的 personas sheet、docs/AGENT.md、tests/agent.mjs |
-| Canvas 文档与 Codex ImageGen | 智能体 / 界面 | crates/agent/src/canvas.rs、src/agent-canvas.ts、agent/imagegen.mjs、src/agent-media.ts | agent/session.mjs、crates/agent/src/{lib.rs,state.rs,tools.rs}、src/agent.ts、tests/agent-workspace.mjs、docs/AGENT.md |
-| 对话历史搜索/归档、思考展示、编辑重试、分支、附件与 Markdown | 智能体 / 界面 | crates/agent/src/CODEMAP.md、agent/CODEMAP.md、src/agent.ts、src/agent-chat.ts、src/agent-markdown.ts | src/api.ts、src-tauri/src/files.rs、tests/agent.mjs、docs/AGENT.md |
-| Codex CLI 登录与第三方模型配置 | 智能体 / 界面 | agent/codex-config.mjs、agent/worker.mjs | agent/session.mjs、agent/web.mjs、src/agent.ts、tests/agent.mjs、docs/AGENT.md、scripts/build-agent.mjs |
-| 代理设置、用量失败与对话上下文超限 | 智能体 / 界面 | agent/{worker,session,codex-config}.mjs、crates/agent/src/{worker,state,lib}.rs、src/agent.ts、src/main.ts 的偏好页 | tests/agent.mjs、docs/AGENT.md |
-| 调整界面与配色 | 界面 | src/CODEMAP.md | 必要时 API 类型 |
-| 修复锁定或白名单 | 桌面 | crates/core/src/guard.rs、crates/core/src/guard_windows.rs、src-tauri/src/desktop_app.rs | crates/core/tests/guard_windows.rs、tests/windows.mjs、tests/native.mjs、src 的 guardPage |
-| 启动/打包/测试 | 构建 | README.md、CONTRIBUTING.md、package.json | src-tauri/tauri.conf.json、scripts/ |
-| 跨平台适配 | 构建 / 桌面 | docs/CROSS_PLATFORM.md、scripts/agent-runtime.mjs、src-tauri/CODEMAP.md | crates/core/src/guard.rs、crates/agent/、.github/workflows/ci.yml、src/ |
-| Linux Wayland 桌面保护 | 桌面 | crates/core/src/guard.rs、guard_wayland.rs、guard_shell.rs、desktop-integrations/CODEMAP.md | scripts/install-desktop-integration.py、tests/linux-desktops.mjs、tests/wayland.mjs、docs/CROSS_PLATFORM.md |
-| 安装/自启动/托盘/快捷栏 | 桌面 | src-tauri/src/desktop.rs、scripts/install.py | src/api.ts、src 的桌面设置、tests/native.mjs、tests/install.mjs |
-| 配置 CI/CD、发布版本 | 构建 | .github/CODEMAP.md | package.json、src-tauri/tauri.conf.json、README.md |
-| 发布到 AUR | 发布 | scripts/publish-aur.mjs、packaging/aur/ | .github/workflows/release.yml、scripts/build-agent.mjs |
-| 维护项目结构 | 维护 | AGENTS.md、各级 CODEMAP.md | .agents/skills/README.md、实际新增/删除的文件 |
-| 查实现事实 / 读代码前先看说明 | 参考手册 | docs/HANDBOOK/README.md 的覆盖表 | 各章 C/D 段（机制、语义规则与不变量）、附录 docs/HANDBOOK/04-导航对照.md、scripts/check-handbook.py |
+| 任务/习惯/模板/阻塞时段/锁机/统计的领域逻辑 | 业务核心 | packages/core/src/ 对应模块（engine.ts 为引擎入口） | docs/HANDBOOK/ 对应章、docs/PLAN_FORMAT.md、packages/core/test/ |
+| 番茄计时、提醒调度、数据落盘 | runtime | runtime/src/engine.ts | runtime/test/engine.test.mjs、API.md |
+| HTTP API 与 MCP 入口 | runtime | runtime/src/server.mjs、mcp.mjs、mcp-stdio.mjs | API.md、docs/MCP.md、runtime/test/ |
+| guard 客户端与 --guard-status | runtime | runtime/src/guard-client.ts | API.md guard 命令协议、runtime/test/ |
+| DSH 插件 host 工具 | 插件 | plugin/index.js | API.md、docs/MCP.md |
+| DSH 插件 UI（入口卡/四页签面板） | 插件 | plugin/client.js（部件源在 plugin/src-client/，不随包分发） | plugin/README.md、API.md 只读端点 |
+| 专注保护与锁屏（各桌面后端） | 原生 | crates/guard/src/（guard.rs 后端选择、x11/wayland/wayland_surface/shell/win32/macos 各后端） | API.md guard 命令协议、crates/guard/README.md |
+| GNOME Shell 桥接扩展 | 桌面集成 | desktop-integrations/ | crates/guard/src/shell.rs |
+| 数据迁移（旧 sqlite → plan.json） | 工具 | scripts/export-sqlite.mjs | scripts/export-sqlite.test.mjs |
+| 安装与自启 | 工具 | scripts/install.mjs | scripts/install.test.mjs |
+| 发布与 CI | 构建 | .github/workflows/ci.yml、packaging/aur/ | scripts/publish-aur.mjs |
+| 手册自查 | 文档 | scripts/check-handbook.py、handbook-paths.py | docs/HANDBOOK/README.md |
 
 ## 子目录
 
 | Dir | Domain | Depends On | Purpose |
 | --- | --- | --- | --- |
-| crates/ | 业务核心 | Rust 依赖 | 领域模型与本地预览服务 |
-| desktop-integrations/ | 桌面集成 | GNOME Shell | 可选原生窗口桥接扩展，随 Linux 包发行，由用户安装启用 |
-| agent/ | 智能体运行时 | Pi SDK、Node | 随包的 Pi 会话、工具集、技能、MCP 与联网实现 |
-| src-tauri/ | 原生宿主 | core、Tauri、Android SDK/NDK | 桌面/Android 入口、原生 IPC、窗口、通知与打包 |
-| src/ | 界面 | Tauri API、Lucide | TypeScript 与 CSS 界面 |
-| scripts/ | 构建 | Cargo、npm、Python | 开发服务、Linux 用户安装与 AUR 发布 |
-| packaging/ | 发布 | AUR | 发行打包模板：AUR PKGBUILD 模板与桌面入口，由 scripts/publish-aur.mjs 渲染 |
-| .github/ | 构建 | GitHub Actions、Linux/Windows/macOS、Android NDK | CI 与标签发布工作流 |
-| tests/ | 验证 | Chromium、WebKit、niri | 业务与隔离桌面集成测试 |
-| docs/ | 文件契约 / 领域设计 / 实现手册 | Rust core | 学习计划 v6 / 备份 v4 标准、Schema、通用示例，设计理念与任务身份规则；docs/HANDBOOK/ 按域记录实现事实与边界 |
-| assets/ | 展示 | — | Boundary only：README 截图，仅由 README 引用，不含代码 |
-| public/ | 资源 | Vite | Internals not indexed：本地图标、内置角色头像及生成参考（personas/）、字体及字体许可证 |
-
-## 文件
-
-| File | Domain | Function |
-| --- | --- | --- |
-| AGENTS.md | 维护 | 索引导航与隔离测试约束 |
-| README.md | 使用 | 面向安装用户的入口：卖点、界面截图、安装、桌面适配、数据与备份、文档索引 |
-| CONTRIBUTING.md | 维护 | 开发环境、命令、架构、隔离桌面测试约束与提交信息规范 |
-| Cargo.toml | 构建 | Rust workspace 与编译配置 |
-| package.json | 构建 | Node 依赖和开发/测试命令 |
-| tsconfig.json | 构建 | TypeScript 编译约束 |
-| vite.config.ts | 构建 | UI 构建与 /api 预览代理 |
-| index.html | 界面 | 页面根节点与入口 |
-| .gitignore | 维护 | 生成产物、私人分析和数据库排除 |
-| LICENSE | 维护 | MIT 许可，对应 Cargo 工作区 license 字段 |
-| CHANGELOG.md | 维护 | 版本变更与下一版本待办与关键节点音效记录 |
+| packages/core/ | 业务核心 | 无（零依赖 TS） | 领域模型与规则引擎，vitest 全覆盖 |
+| runtime/ | 服务 | packages/core（合并时经 esbuild 打入 vendor/） | 数据落盘、计时/提醒、HTTP API、MCP 入口 |
+| plugin/ | DSH 插件 | runtime HTTP/MCP 契约 | host 工具 + client UI（入口卡与四页签面板） |
+| crates/guard/ | 原生守卫 | 系统库 | 专注保护/锁屏/通知，受 runtime 指挥 |
+| desktop-integrations/ | 桌面集成 | GNOME Shell | 可选原生窗口桥接扩展，随 Linux 包发行 |
+| scripts/ | 构建与工具 | Node、Python | 打包、安装、迁移、手册自查 |
+| packaging/ | 发布 | AUR | 发行打包模板 |
+| .github/ | 构建 | GitHub Actions | CI 与发布工作流 |
+| docs/ | 契约与手册 | — | 计划/备份字段、设计理念、实现手册、MCP 接入 |
+| MIGRATION.md / API.md | 重写台账与契约 | — | 迁移阶段记录；进程间契约（HTTP/MCP/guard） |

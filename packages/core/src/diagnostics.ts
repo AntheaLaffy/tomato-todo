@@ -36,7 +36,10 @@ function median(values: number[]): number {
  * 容量是显式用户预算，否则取历史活跃日中位数，最后落到每日目标。
  * 基线是证据，不是可用时间。
  */
-export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): Anomaly[] {
+export function diagnose(
+  snapshot: Snapshot,
+  capacityMinutes: number | null,
+): Anomaly[] {
   const data = snapshot.data;
   const at = snapshot.serverTime;
   const today = parseDate(snapshot.today)!;
@@ -103,7 +106,12 @@ export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): An
         ),
       );
     }
-    if (offset === 1 && historical !== null && tasks.length > 0 && minutes * 100 < capacity * 30) {
+    if (
+      offset === 1 &&
+      historical !== null &&
+      tasks.length > 0 &&
+      minutes * 100 < capacity * 30
+    ) {
       result.push(
         signal(
           `underload/${date}`,
@@ -122,12 +130,21 @@ export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): An
       );
     }
     const timed: { start: number; task: Task }[] = tasks
-      .map((t) => ({ start: t.reminderTime !== null ? (minutesOf(t.reminderTime) ?? -1) : -1, task: t }))
+      .map((t) => ({
+        start: t.reminderTime !== null ? (minutesOf(t.reminderTime) ?? -1) : -1,
+        task: t,
+      }))
       .filter((x) => x.start >= 0)
-      .sort((a, b) => a.start - b.start || (a.task.id < b.task.id ? -1 : a.task.id > b.task.id ? 1 : 0));
+      .sort(
+        (a, b) =>
+          a.start - b.start ||
+          (a.task.id < b.task.id ? -1 : a.task.id > b.task.id ? 1 : 0),
+      );
     // 需专心的时段才构成真实冲突；水课正是并行作业的地方，保持安静。
     if (day !== null) {
-      const required = blocksOnDate(data.blocks, date).filter((b) => b.attention === "required");
+      const required = blocksOnDate(data.blocks, date).filter(
+        (b) => b.attention === "required",
+      );
       for (const { start, task } of timed) {
         const end = start + windowMinutes(task, data.settings);
         for (const band of required) {
@@ -197,7 +214,10 @@ export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): An
       previous = { end, task };
     }
   }
-  const habits = new Map<string, { scheduled: number; missed: number; ids: string[] }>();
+  const habits = new Map<
+    string,
+    { scheduled: number; missed: number; ids: string[] }
+  >();
   for (const t of data.tasks) {
     if (
       !isHabit(t) ||
@@ -263,8 +283,13 @@ export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): An
   }
   const recentDays = [...byDay.keys()].filter((d) => d >= weekStart).length;
   if (historical !== null && recentDays >= 3) {
-    const recent = [...byDay.entries()].filter(([d]) => d >= weekStart).map(([, m]) => m);
-    if (recent.reduce((n, m) => n + m, 0) * 100 < historical * recent.length * 40) {
+    const recent = [...byDay.entries()]
+      .filter(([d]) => d >= weekStart)
+      .map(([, m]) => m);
+    if (
+      recent.reduce((n, m) => n + m, 0) * 100 <
+      historical * recent.length * 40
+    ) {
       result.push(
         signal(
           "engagement/drop",
@@ -273,7 +298,10 @@ export function diagnose(snapshot: Snapshot, capacityMinutes: number | null): An
           "notice",
           {
             recentActiveDays: recent.length,
-            recentMeanMinutes: recent.length > 0 ? Math.floor(recent.reduce((n, m) => n + m, 0) / recent.length) : 0,
+            recentMeanMinutes:
+              recent.length > 0
+                ? Math.floor(recent.reduce((n, m) => n + m, 0) / recent.length)
+                : 0,
             baselineMinutes: historical,
           },
           "是否有考试、课程、身体状态或线下学习变化？先补全记录背景，再决定是否调整节奏。",

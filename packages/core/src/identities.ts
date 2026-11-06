@@ -2,7 +2,14 @@
 //! 对应 crates/core/src/identities.rs。
 
 import { AppError, ensure, utf8Len } from "./errors";
-import { asOpt, asStr, field, isObject, rejectUnknown, requiredField } from "./json";
+import {
+  asOpt,
+  asStr,
+  field,
+  isObject,
+  rejectUnknown,
+  requiredField,
+} from "./json";
 import type { AppData } from "./lib";
 import type { Identity } from "./model";
 import { parseTask, serializeTask } from "./lib";
@@ -19,12 +26,23 @@ export function parseIdentity(raw: unknown): Identity {
       if (typeof v !== "boolean") throw new AppError("retired 必须是布尔值");
       return v;
     }),
-    restoreTask: field(raw, "restoreTask", "ID 登记", (v) => asOpt(v, "restoreTask", asStr), null) as string | null,
+    restoreTask: field(
+      raw,
+      "restoreTask",
+      "ID 登记",
+      (v) => asOpt(v, "restoreTask", asStr),
+      null,
+    ) as string | null,
   };
 }
 
 export function serializeIdentity(i: Identity): Record<string, unknown> {
-  return { id: i.id, kind: i.kind, retired: i.retired, restoreTask: i.restoreTask };
+  return {
+    id: i.id,
+    kind: i.kind,
+    retired: i.retired,
+    restoreTask: i.restoreTask,
+  };
 }
 
 /** 当前活跃实体 ID → 类型。 */
@@ -78,7 +96,11 @@ const ALLOWED_KINDS = [
  * 提交前核对身份历史：删除的 ID 永久保留，恢复只能恢复登记中的原任务。
  * `restore_id` 是本次动作里正在恢复的任务 ID。
  */
-export function reconcileIdentities(before: AppData, after: AppData, restoreId: string | null): void {
+export function reconcileIdentities(
+  before: AppData,
+  after: AppData,
+  restoreId: string | null,
+): void {
   const oldActive = activeIdentities(before);
   const newActive = activeIdentities(after);
   const entries = new Map<string, Identity>();
@@ -132,7 +154,9 @@ export function reconcileIdentities(before: AppData, after: AppData, restoreId: 
       if (record.retired) {
         const sameTask = restoreId === id && kind === "task";
         if (!sameTask) {
-          throw new AppError("历史 ID 已被永久保留，不能用于新建或导入其他实体");
+          throw new AppError(
+            "历史 ID 已被永久保留，不能用于新建或导入其他实体",
+          );
         }
         record.retired = false;
         record.restoreTask = null;
@@ -152,7 +176,9 @@ export function reconcileIdentities(before: AppData, after: AppData, restoreId: 
       }
     }
   }
-  const records = [...entries.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const records = [...entries.values()].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
   after.identities = records;
 }
 

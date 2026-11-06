@@ -39,7 +39,10 @@ export function clone<T>(value: T): T {
     return value.map((v) => clone(v)) as unknown as T;
   }
   if (value !== null && typeof value === "object") {
-    const out = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>;
+    const out = Object.create(Object.getPrototypeOf(value)) as Record<
+      string,
+      unknown
+    >;
     for (const key of Object.keys(value)) {
       out[key] = clone((value as Record<string, unknown>)[key]);
     }
@@ -65,7 +68,12 @@ export function deepEqual(a: unknown, b: unknown): boolean {
     const ka = Object.keys(a);
     const kb = Object.keys(b);
     if (ka.length !== kb.length) return false;
-    return ka.every((k) => deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+    return ka.every((k) =>
+      deepEqual(
+        (a as Record<string, unknown>)[k],
+        (b as Record<string, unknown>)[k],
+      ),
+    );
   }
   return false;
 }

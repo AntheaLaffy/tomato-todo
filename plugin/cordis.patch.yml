@@ -4,15 +4,15 @@
 # 唯一需要按机器调整的字段（默认软链路径，安装脚本会创建）。
 - insert:
     - id: tomato-mcp
-      name: '@deepseek-ai/dsh-mcp-client'
+      name: "@deepseek-ai/dsh-mcp-client"
       config:
         serverName: tomato
         transport: stdio
         command: /home/fuurin/.local/bin/tomato-runtime
-        args: ['--mcp']
+        args: ["--mcp"]
         env:
           HOME: /home/fuurin
     - id: tomato-dsh
-      name: '@local/tomato-dsh'
+      name: "@local/tomato-dsh"
       config:
         tomatoBin: /home/fuurin/.local/bin/tomato-runtime

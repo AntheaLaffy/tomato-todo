@@ -21,12 +21,20 @@ const USAGE = `番茄 Todo runtime ${VERSION}（随 DSH 插件分发）
 `;
 
 export function defaultDataDir() {
-  const base = process.env.XDG_DATA_HOME || join(process.env.HOME || homedir(), ".local", "share");
+  const base =
+    process.env.XDG_DATA_HOME ||
+    join(process.env.HOME || homedir(), ".local", "share");
   return join(base, "studio.tomato.todo");
 }
 
 export function parseArgs(argv) {
-  const opts = { mode: null, dataDir: null, host: "127.0.0.1", port: DEFAULT_PORT, connectionFile: null };
+  const opts = {
+    mode: null,
+    dataDir: null,
+    host: "127.0.0.1",
+    port: DEFAULT_PORT,
+    connectionFile: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -53,7 +61,8 @@ export function parseArgs(argv) {
         break;
       case "--port": {
         const port = Number(value());
-        if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("--port 需为 0–65535");
+        if (!Number.isInteger(port) || port < 0 || port > 65535)
+          throw new Error("--port 需为 0–65535");
         opts.port = port;
         break;
       }
@@ -69,7 +78,8 @@ export function parseArgs(argv) {
         throw new Error(`未知参数：${arg}\n${USAGE}`);
     }
   }
-  if (opts.mode === null) throw new Error(`需要 --serve、--mcp 或 --guard-status\n${USAGE}`);
+  if (opts.mode === null)
+    throw new Error(`需要 --serve、--mcp 或 --guard-status\n${USAGE}`);
   if (opts.mode === "serve" && opts.connectionFile !== null) {
     throw new Error("--connection 只与 --mcp 一起使用");
   }
@@ -81,7 +91,8 @@ export async function main(argv) {
   const opts = parseArgs(argv);
 
   if (opts.mode === "mcp") {
-    const connectionFile = opts.connectionFile ?? join(opts.dataDir, "agent", "connection.json");
+    const connectionFile =
+      opts.connectionFile ?? join(opts.dataDir, "agent", "connection.json");
     return runMcpStdio({ connectionFile });
   }
 
@@ -114,7 +125,9 @@ export async function main(argv) {
     engine.tickReminders(now);
   }, 1000);
 
-  console.error(`tomato-runtime ${VERSION} 已启动：http://${opts.host}:${port}（数据目录 ${opts.dataDir}）`);
+  console.error(
+    `tomato-runtime ${VERSION} 已启动：http://${opts.host}:${port}（数据目录 ${opts.dataDir}）`,
+  );
   const shutdown = () => {
     clearInterval(interval);
     engine.flushNow();

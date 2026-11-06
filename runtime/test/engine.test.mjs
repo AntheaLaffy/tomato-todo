@@ -35,13 +35,36 @@ test("open 初始化：快照形状对齐旧 src/types.ts", () => {
 
 test("createTask 校验：非法日期/空标题/越界字段被拒绝", () => {
   const engine = Engine.open(tmp(), tsAt(TODAY, "10:00"));
-  assert.throws(() => engine.createTask({ title: "  ", dueDate: TODAY }), /标题不能为空/);
-  assert.throws(() => engine.createTask({ title: "x", dueDate: "2026-02-30" }), /dueDate/);
-  assert.throws(() => engine.createTask({ title: "x", dueDate: TODAY, reminderTime: "25:00" }), /reminderTime/);
-  assert.throws(() => engine.createTask({ title: "x", dueDate: TODAY, priority: 9 }), /priority/);
-  assert.throws(() => engine.createTask({ title: "x", dueDate: TODAY, estimate: 0 }), /estimate/);
-  assert.throws(() => engine.createTask({ title: "x", dueDate: TODAY, focusMinutes: 500 }), /focusMinutes/);
-  assert.throws(() => engine.createTask({ title: "x", dueDate: TODAY, projectId: "missing" }), /项目不存在/);
+  assert.throws(
+    () => engine.createTask({ title: "  ", dueDate: TODAY }),
+    /标题不能为空/,
+  );
+  assert.throws(
+    () => engine.createTask({ title: "x", dueDate: "2026-02-30" }),
+    /dueDate/,
+  );
+  assert.throws(
+    () =>
+      engine.createTask({ title: "x", dueDate: TODAY, reminderTime: "25:00" }),
+    /reminderTime/,
+  );
+  assert.throws(
+    () => engine.createTask({ title: "x", dueDate: TODAY, priority: 9 }),
+    /priority/,
+  );
+  assert.throws(
+    () => engine.createTask({ title: "x", dueDate: TODAY, estimate: 0 }),
+    /estimate/,
+  );
+  assert.throws(
+    () => engine.createTask({ title: "x", dueDate: TODAY, focusMinutes: 500 }),
+    /focusMinutes/,
+  );
+  assert.throws(
+    () =>
+      engine.createTask({ title: "x", dueDate: TODAY, projectId: "missing" }),
+    /项目不存在/,
+  );
 });
 
 test("createTask 默认值与原子落盘：重开引擎后任务仍在且无临时文件残留", () => {
@@ -49,7 +72,12 @@ test("createTask 默认值与原子落盘：重开引擎后任务仍在且无临
   const now = tsAt(TODAY, "10:00");
   const engine = Engine.open(dir, now);
   const task = engine.createTask(
-    { title: "写周报", dueDate: TODAY, tags: ["工作"], subtasks: [{ title: "草稿" }] },
+    {
+      title: "写周报",
+      dueDate: TODAY,
+      tags: ["工作"],
+      subtasks: [{ title: "草稿" }],
+    },
     now,
   );
   assert.equal(task.completed, false);
@@ -73,7 +101,10 @@ test("createTask 默认值与原子落盘：重开引擎后任务仍在且无临
 test("updateTask 白名单：仅允许指定字段，保留完成历史", () => {
   const engine = Engine.open(tmp(), tsAt(TODAY, "10:00"));
   const task = engine.createTask({ title: "旧", dueDate: TODAY });
-  assert.throws(() => engine.updateTask(task.id, { completed: true }), /不允许修改字段/);
+  assert.throws(
+    () => engine.updateTask(task.id, { completed: true }),
+    /不允许修改字段/,
+  );
   const updated = engine.updateTask(task.id, {
     title: "新",
     dueDate: "2026-11-07",
@@ -85,7 +116,10 @@ test("updateTask 白名单：仅允许指定字段，保留完成历史", () => 
   assert.equal(updated.dueDate, "2026-11-07");
   assert.equal(updated.reminderTime, "09:30");
   assert.equal(updated.priority, 2);
-  assert.throws(() => engine.updateTask("missing", { title: "x" }), /任务不存在/);
+  assert.throws(
+    () => engine.updateTask("missing", { title: "x" }),
+    /任务不存在/,
+  );
 });
 
 test("moveTasks 整批原子：已完成任务使整批拒绝", () => {
@@ -93,7 +127,10 @@ test("moveTasks 整批原子：已完成任务使整批拒绝", () => {
   const a = engine.createTask({ title: "a", dueDate: TODAY });
   const b = engine.createTask({ title: "b", dueDate: TODAY });
   engine.completeTask(b.id);
-  assert.throws(() => engine.moveTasks([a.id, b.id], "2026-11-08"), /已完成任务/);
+  assert.throws(
+    () => engine.moveTasks([a.id, b.id], "2026-11-08"),
+    /已完成任务/,
+  );
   const moved = engine.moveTasks([a.id], "2026-11-08", "20:00");
   assert.equal(moved[0].dueDate, "2026-11-08");
   assert.equal(moved[0].reminderTime, "20:00");
@@ -206,10 +243,22 @@ test("统计：今日完成数/番茄数/连续天数与 days 回看", () => {
 test("今日视图：任务排序、逾期列表与课表时段", () => {
   const now = tsAt(TODAY, "10:00");
   const engine = Engine.open(tmp(), now);
-  engine.createTask({ title: "早", dueDate: TODAY, reminderTime: "08:00" }, now);
-  engine.createTask({ title: "晚", dueDate: TODAY, reminderTime: "20:00" }, now);
+  engine.createTask(
+    { title: "早", dueDate: TODAY, reminderTime: "08:00" },
+    now,
+  );
+  engine.createTask(
+    { title: "晚", dueDate: TODAY, reminderTime: "20:00" },
+    now,
+  );
   engine.createTask({ title: "逾期", dueDate: "2026-11-05" }, now);
-  engine.dispatch({ type: "saveBlock", title: "课", days: [5], start: "08:00", end: "10:00" });
+  engine.dispatch({
+    type: "saveBlock",
+    title: "课",
+    days: [5],
+    start: "08:00",
+    end: "10:00",
+  });
   const view = engine.today(now);
   assert.equal(view.today, TODAY);
   assert.equal(view.tasks[0].title, "早");
@@ -223,9 +272,18 @@ test("今日视图：任务排序、逾期列表与课表时段", () => {
 test("提醒桩：到点标记 reminderFired 并落盘；快照计算 pending/expired", () => {
   const now = tsAt(TODAY, "10:00");
   const engine = Engine.open(tmp(), now);
-  const due = engine.createTask({ title: "九点提醒", dueDate: TODAY, reminderTime: "09:00" }, now);
-  const future = engine.createTask({ title: "十一点提醒", dueDate: TODAY, reminderTime: "11:00" }, now);
-  const past = engine.createTask({ title: "昨日过期", dueDate: "2026-11-05" }, now);
+  const due = engine.createTask(
+    { title: "九点提醒", dueDate: TODAY, reminderTime: "09:00" },
+    now,
+  );
+  const future = engine.createTask(
+    { title: "十一点提醒", dueDate: TODAY, reminderTime: "11:00" },
+    now,
+  );
+  const past = engine.createTask(
+    { title: "昨日过期", dueDate: "2026-11-05" },
+    now,
+  );
   engine.tickReminders(now);
   let snap = engine.snapshot(now);
   const fired = snap.data.tasks.find((t) => t.id === due.id);
@@ -237,10 +295,17 @@ test("提醒桩：到点标记 reminderFired 并落盘；快照计算 pending/ex
   assert.equal(expired.reminderExpired, true);
   // 到点后 pending 生效
   snap = engine.snapshot(tsAt(TODAY, "11:01"));
-  assert.equal(snap.data.tasks.find((t) => t.id === future.id).reminderPending, true);
+  assert.equal(
+    snap.data.tasks.find((t) => t.id === future.id).reminderPending,
+    true,
+  );
   // 落盘：重开后 reminderFired 仍在
   const reopened = Engine.open(engine.dataDir, tsAt(TODAY, "11:02"));
-  assert.equal(reopened.snapshot(now).data.tasks.find((t) => t.id === due.id).reminderFired, true);
+  assert.equal(
+    reopened.snapshot(now).data.tasks.find((t) => t.id === due.id)
+      .reminderFired,
+    true,
+  );
 });
 
 test("运行中计时跨重启恢复：deadline 已过自动补记完成会话", () => {
@@ -274,11 +339,16 @@ test("exportPlan 剥离进度字段；exportToFile 校验文件名并返回哈�
   assert.throws(() => engine.exportToFile("plan", "x.txt"), /工作区内/);
   const result = engine.exportToFile("plan", "week.json", now);
   assert.equal(result.name, "week.json");
-  assert.equal(result.bytes, Buffer.byteLength(readFileSync(join(dir, "exports", "week.json"), "utf8")));
+  assert.equal(
+    result.bytes,
+    Buffer.byteLength(readFileSync(join(dir, "exports", "week.json"), "utf8")),
+  );
   assert.match(result.fileHash, /^[0-9a-f]{64}$/);
   const backup = engine.exportToFile("backup", "backup.json", now);
   assert.match(backup.fileHash, /^[0-9a-f]{64}$/);
-  const parsed = JSON.parse(readFileSync(join(dir, "exports", "backup.json"), "utf8"));
+  const parsed = JSON.parse(
+    readFileSync(join(dir, "exports", "backup.json"), "utf8"),
+  );
   assert.equal(parsed.format, "tomato-todo-backup");
 });
 
@@ -287,34 +357,67 @@ test("dispatch：saveSettings/saveVision/saveBlock/deleteBlock/createProject/del
   const engine = Engine.open(tmp(), now);
   const settings = engine.dispatch({
     type: "saveSettings",
-    settings: { focusMinutes: 50, protection: { mode: "lock", whitelist: [], strict: true } },
+    settings: {
+      focusMinutes: 50,
+      protection: { mode: "lock", whitelist: [], strict: true },
+    },
   });
   assert.equal(settings.focusMinutes, 50);
   assert.equal(settings.protection.mode, "lock");
   assert.equal(settings.shortBreakMinutes, 5); // 未传字段保留
 
-  const vision = engine.dispatch({ type: "saveVision", name: "上岸", notes: "目标" });
+  const vision = engine.dispatch({
+    type: "saveVision",
+    name: "上岸",
+    notes: "目标",
+  });
   assert.equal(vision.name, "上岸");
-  assert.equal(engine.dispatch({ type: "saveVision", id: vision.id, name: "改" }).name, "改");
+  assert.equal(
+    engine.dispatch({ type: "saveVision", id: vision.id, name: "改" }).name,
+    "改",
+  );
 
-  const block = engine.dispatch({ type: "saveBlock", title: "实验", days: [1, 3], start: "14:00", end: "16:00" });
+  const block = engine.dispatch({
+    type: "saveBlock",
+    title: "实验",
+    days: [1, 3],
+    start: "14:00",
+    end: "16:00",
+  });
   assert.equal(block.days.length, 2);
   assert.throws(
-    () => engine.dispatch({ type: "saveBlock", title: "x", days: [8], start: "14:00", end: "16:00" }),
+    () =>
+      engine.dispatch({
+        type: "saveBlock",
+        title: "x",
+        days: [8],
+        start: "14:00",
+        end: "16:00",
+      }),
     /days/,
   );
   engine.dispatch({ type: "deleteBlock", id: block.id });
   assert.equal(engine.snapshot(now).data.blocks.length, 0);
 
-  const project = engine.dispatch({ type: "createProject", name: "数学", color: "#336699" });
+  const project = engine.dispatch({
+    type: "createProject",
+    name: "数学",
+    color: "#336699",
+  });
   assert.equal(project.color, "#336699");
-  assert.throws(() => engine.dispatch({ type: "createProject", name: "x", color: "red" }), /color/);
+  assert.throws(
+    () => engine.dispatch({ type: "createProject", name: "x", color: "red" }),
+    /color/,
+  );
 
   const task = engine.createTask({ title: "删", dueDate: TODAY });
   engine.dispatch({ type: "deleteTask", id: task.id });
   assert.throws(() => engine.completeTask(task.id), /任务不存在/);
 
-  assert.throws(() => engine.dispatch({ type: "emergencyUnlock" }), /未支持的 action/);
+  assert.throws(
+    () => engine.dispatch({ type: "emergencyUnlock" }),
+    /未支持的 action/,
+  );
   assert.throws(() => engine.dispatch(undefined), /action/);
 });
 

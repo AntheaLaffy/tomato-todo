@@ -55,7 +55,9 @@ export function mcpMethod(engine, method, params = {}) {
       }
       try {
         const value = callTool(engine, name, params?.arguments ?? {});
-        const result = { content: [{ type: "text", text: JSON.stringify(value) }] };
+        const result = {
+          content: [{ type: "text", text: JSON.stringify(value) }],
+        };
         if (value && typeof value === "object" && !Array.isArray(value)) {
           result.structuredContent = value;
         }

@@ -55,7 +55,11 @@ export function validDate(value: string): boolean {
 /** 自然日加法（可负），与夏令时无关。 */
 export function addDays(date: CalendarDate, days: number): CalendarDate {
   const t = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
-  return { year: t.getUTCFullYear(), month: t.getUTCMonth() + 1, day: t.getUTCDate() };
+  return {
+    year: t.getUTCFullYear(),
+    month: t.getUTCMonth() + 1,
+    day: t.getUTCDate(),
+  };
 }
 
 export function compareDates(a: CalendarDate, b: CalendarDate): number {
@@ -64,7 +68,9 @@ export function compareDates(a: CalendarDate, b: CalendarDate): number {
 
 /** 1 = 周一 … 7 = 周日（对应 `weekday().number_from_monday()`）。 */
 export function weekdayMonday(date: CalendarDate): number {
-  const day = new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay(); // 0 = Sunday
+  const day = new Date(
+    Date.UTC(date.year, date.month - 1, date.day),
+  ).getUTCDay(); // 0 = Sunday
   return day === 0 ? 7 : day;
 }
 
@@ -94,7 +100,9 @@ export function atLocal(
   minute: number,
   second = 0,
 ): number {
-  return Math.floor(new Date(year, month - 1, day, hour, minute, second).getTime() / 1000);
+  return Math.floor(
+    new Date(year, month - 1, day, hour, minute, second).getTime() / 1000,
+  );
 }
 
 export function atLocalDate(date: CalendarDate, hour = 0, minute = 0): number {
@@ -146,7 +154,12 @@ export function minutesOf(value: string): number | null {
   if (value.length !== 5 || value.charCodeAt(2) !== 58) return null;
   const hour = Number(value.slice(0, 2));
   const minute = Number(value.slice(3));
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour > 23 || minute > 59) {
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour > 23 ||
+    minute > 59
+  ) {
     return null;
   }
   return hour * 60 + minute;

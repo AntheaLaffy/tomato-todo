@@ -68,13 +68,17 @@ export interface Task {
 }
 
 /** 任务的管辖分类（单一权威定义，读冻结字段）。 */
-export function kindOf(task: Pick<Task, "reminderTime" | "habitId" | "recurring">): TaskKind {
+export function kindOf(
+  task: Pick<Task, "reminderTime" | "habitId" | "recurring">,
+): TaskKind {
   return task.reminderTime !== null && (task.habitId !== null || task.recurring)
     ? "habit"
     : "ordinary";
 }
 
-export function isHabit(task: Pick<Task, "reminderTime" | "habitId" | "recurring">): boolean {
+export function isHabit(
+  task: Pick<Task, "reminderTime" | "habitId" | "recurring">,
+): boolean {
   return kindOf(task) === "habit";
 }
 

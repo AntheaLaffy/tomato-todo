@@ -2,11 +2,28 @@
 //! 对应 crates/core/src/blocks.rs。
 
 import { AppError } from "./errors";
-import { asArray, asInt, asStr, field, isObject, oneOf, rejectUnknown, requiredField } from "./json";
+import {
+  asArray,
+  asInt,
+  asStr,
+  field,
+  isObject,
+  oneOf,
+  rejectUnknown,
+  requiredField,
+} from "./json";
 import type { Attention, Block } from "./model";
 import { minutesOf, parseDate, weekdayMonday } from "./time";
 
-const BLOCK_KEYS = ["id", "title", "days", "start", "end", "attention", "notes"] as const;
+const BLOCK_KEYS = [
+  "id",
+  "title",
+  "days",
+  "start",
+  "end",
+  "attention",
+  "notes",
+] as const;
 
 export function parseBlock(raw: unknown): Block {
   if (!isObject(raw)) throw new AppError("阻塞时段必须是对象");
@@ -14,12 +31,19 @@ export function parseBlock(raw: unknown): Block {
   return {
     id: requiredField(raw, "id", "阻塞时段", asStr),
     title: requiredField(raw, "title", "阻塞时段", asStr),
-    days: asArray(requiredField(raw, "days", "阻塞时段", (v) => v), "days").map((d) =>
-      asInt(d, "阻塞时段星期"),
-    ),
+    days: asArray(
+      requiredField(raw, "days", "阻塞时段", (v) => v),
+      "days",
+    ).map((d) => asInt(d, "阻塞时段星期")),
     start: requiredField(raw, "start", "阻塞时段", asStr),
     end: requiredField(raw, "end", "阻塞时段", asStr),
-    attention: field(raw, "attention", "阻塞时段", (v) => oneOf(v, "attention", ["required", "light"]), "required") as Attention,
+    attention: field(
+      raw,
+      "attention",
+      "阻塞时段",
+      (v) => oneOf(v, "attention", ["required", "light"]),
+      "required",
+    ) as Attention,
     notes: field(raw, "notes", "阻塞时段", asStr, ""),
   };
 }
@@ -37,7 +61,10 @@ export function serializeBlock(b: Block): Record<string, unknown> {
 }
 
 /** 该日期午夜起算的 `[start, end)` 分钟窗口；跨午夜时 end 超过 1440；该星期无此占用返回 null。 */
-export function band(block: Block, date: string): { start: number; end: number } | null {
+export function band(
+  block: Block,
+  date: string,
+): { start: number; end: number } | null {
   const parsed = parseDate(date);
   if (parsed === null) return null;
   if (!block.days.includes(weekdayMonday(parsed))) return null;
@@ -48,7 +75,12 @@ export function band(block: Block, date: string): { start: number; end: number }
 }
 
 /** 与同日 `[start, end)` 窗口重叠的分钟数。 */
-export function overlapMinutes(block: Block, date: string, start: number, end: number): number {
+export function overlapMinutes(
+  block: Block,
+  date: string,
+  start: number,
+  end: number,
+): number {
   const b = band(block, date);
   if (b === null) return 0;
   return Math.min(end, b.end) - Math.max(start, b.start) > 0
@@ -103,7 +135,17 @@ export function blocksOnDate(blocks: Block[], date: string): Block[] {
   return blocks
     .filter((b) => band(b, date) !== null)
     .slice()
-    .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
+    .sort((a, b) =>
+      a.start < b.start
+        ? -1
+        : a.start > b.start
+          ? 1
+          : a.title < b.title
+            ? -1
+            : a.title > b.title
+              ? 1
+              : 0,
+    );
 }
 
 /** `date` 当天需专心时段占用的分钟数（占用证据，重叠会重复计数）。 */

@@ -9,7 +9,11 @@ export function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 /** deny_unknown_fields：未知键直接拒绝（Rust 会报 unknown field）。 */
-export function rejectUnknown(obj: Record<string, unknown>, allowed: string[], what: string): void {
+export function rejectUnknown(
+  obj: Record<string, unknown>,
+  allowed: string[],
+  what: string,
+): void {
   for (const key of Object.keys(obj)) {
     if (!allowed.includes(key)) {
       throw new AppError(`未知字段：${what} 不接受 "${key}"`);
@@ -42,7 +46,11 @@ export function asArray(value: unknown, what: string): unknown[] {
 /** parse 统一带 what（供 asStr/asInt 等直接传入），单参数 lambda 同样兼容。 */
 export type Parser<T> = (v: unknown, what: string) => T;
 
-export function asOpt<T>(value: unknown, what: string, parse: Parser<T>): T | null {
+export function asOpt<T>(
+  value: unknown,
+  what: string,
+  parse: Parser<T>,
+): T | null {
   if (value === null) return null;
   return parse(value, what);
 }
@@ -72,13 +80,22 @@ export function requiredField<T>(
 }
 
 /** 枚举字符串解析（serde rename_all = "camelCase" 的取值）；泛型保留字面量联合以便分支收窄。 */
-export function oneOf<T extends string>(value: unknown, what: string, allowed: readonly T[]): T {
+export function oneOf<T extends string>(
+  value: unknown,
+  what: string,
+  allowed: readonly T[],
+): T {
   const s = asStr(value, what);
-  if (!(allowed as readonly string[]).includes(s)) throw new AppError(`${what}取值无效：${s}`);
+  if (!(allowed as readonly string[]).includes(s))
+    throw new AppError(`${what}取值无效：${s}`);
   return s as T;
 }
 
 /** 字符串数组（按元素解析）。 */
-export function asStrArray(value: unknown, what: string, parse: Parser<string>): string[] {
+export function asStrArray(
+  value: unknown,
+  what: string,
+  parse: Parser<string>,
+): string[] {
   return asArray(value, what).map((v) => parse(v, what));
 }

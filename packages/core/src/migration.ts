@@ -6,7 +6,10 @@ import { dateAt, now } from "./time";
 import { parseAppData, parseTask, serializeTask } from "./lib";
 
 function upgradeTaskValue(task: Record<string, unknown>, today: string): void {
-  const date = typeof task["createdAt"] === "number" ? dateAt(task["createdAt"] as number) : today;
+  const date =
+    typeof task["createdAt"] === "number"
+      ? dateAt(task["createdAt"] as number)
+      : today;
   delete task["goalId"];
   delete task["nodeId"];
   if (task["dueDate"] === undefined || task["dueDate"] === null) {
@@ -69,7 +72,9 @@ export function readLocalData(raw: string): import("./lib").AppData {
     const ids = value["identities"];
     if (Array.isArray(ids)) {
       value["identities"] = ids.filter(
-        (r) => isObject(r) && !["goal", "node", "signal"].includes(r["kind"] as string),
+        (r) =>
+          isObject(r) &&
+          !["goal", "node", "signal"].includes(r["kind"] as string),
       );
       for (const record of value["identities"] as Record<string, unknown>[]) {
         if (typeof record["restoreTask"] === "string") {
@@ -80,11 +85,15 @@ export function readLocalData(raw: string): import("./lib").AppData {
             throw new AppError(`数据读取失败，原文件已保留：${String(e)}`);
           }
           if (!isObject(task)) {
-            throw new AppError("数据读取失败，原文件已保留：无效的任务恢复记录");
+            throw new AppError(
+              "数据读取失败，原文件已保留：无效的任务恢复记录",
+            );
           }
           upgradeTaskValue(task, today);
           // 撤销恢复比较登记 DTO 的序列化（含键序）。
-          record["restoreTask"] = JSON.stringify(serializeTask(parseTask(task)));
+          record["restoreTask"] = JSON.stringify(
+            serializeTask(parseTask(task)),
+          );
         }
       }
     }
@@ -92,7 +101,9 @@ export function readLocalData(raw: string): import("./lib").AppData {
   try {
     return parseAppData(value);
   } catch (e) {
-    throw new AppError(`数据读取失败，原文件已保留：${e instanceof Error ? e.message : String(e)}`);
+    throw new AppError(
+      `数据读取失败，原文件已保留：${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 

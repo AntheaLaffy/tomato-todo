@@ -87,13 +87,24 @@ function calendar(t: Template): void {
  * 保存模板（可选批印刷日期）。模板按值克隆传入，对应 Rust 的按值语义：
  * 引擎侧对形状的改写（去空白、自动习惯组）不回灌测试夹具。
  */
-function save(e: Engine, t: Template, dates: (string | null)[], time: number): Snapshot {
-  return e.dispatch({ type: "saveTemplate", template: clone(t), printDates: dates }, time);
+function save(
+  e: Engine,
+  t: Template,
+  dates: (string | null)[],
+  time: number,
+): Snapshot {
+  return e.dispatch(
+    { type: "saveTemplate", template: clone(t), printDates: dates },
+    time,
+  );
 }
 
 /** 读取 docs/plan.example.json 并解析为当前版本计划（对应 Rust 的 example_plan_for_current_version）。 */
 function examplePlan(): PlanFile {
-  const raw = readFileSync(new URL("../../../docs/plan.example.json", import.meta.url), "utf8");
+  const raw = readFileSync(
+    new URL("../../../docs/plan.example.json", import.meta.url),
+    "utf8",
+  );
   return parsePlanFile(JSON.parse(raw));
 }
 
@@ -130,7 +141,10 @@ describe("模板与印刷（templates / habits）", () => {
       e.dispatch({ type: "deleteTask", id: s.data.tasks[0]!.id }, at(12, 8, 1));
       // 重启后账本仍在：删掉的实例不会重印。
       // 分歧 1：TS 解析器不认序列化器写出的 lock.active: null，重开前先还原 Rust 解析语义。
-      const persisted = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+      const persisted = JSON.parse(readFileSync(path, "utf8")) as Record<
+        string,
+        unknown
+      >;
       stripNullActive(persisted);
       writeFileSync(path, JSON.stringify(persisted, null, 2));
       e = Engine.open(path);
@@ -150,7 +164,11 @@ describe("模板与印刷（templates / habits）", () => {
     save(e, template(), [], at(12, 8, 0));
     expect(e.snapshot(at(13, 8, 0)).data.tasks).toHaveLength(0);
     const s = e.dispatch(
-      { type: "printTemplate", id: "shape", dates: ["2026-10-13", "2026-10-14", "2026-10-13"] },
+      {
+        type: "printTemplate",
+        id: "shape",
+        dates: ["2026-10-13", "2026-10-14", "2026-10-13"],
+      },
       at(13, 8, 0),
     );
     expect(s.data.tasks).toHaveLength(2);
@@ -175,7 +193,9 @@ describe("模板与印刷（templates / habits）", () => {
     expect(s.data.habits).toHaveLength(1); // 重存保留管辖。
     expect(e.snapshot(at(13, 8, 0)).data.tasks).toHaveLength(6);
     const ahead = e.snapshot(at(26, 8, 0));
-    expect(ahead.data.tasks.some((task) => task.dueDate === "2026-11-02")).toBe(true);
+    expect(ahead.data.tasks.some((task) => task.dueDate === "2026-11-02")).toBe(
+      true,
+    );
   });
 
   it("automatic_once_prints_ahead_but_does_not_reprint_after_deletion", () => {
@@ -196,22 +216,33 @@ describe("模板与印刷（templates / habits）", () => {
     const completed = s.data.tasks[0]!.id;
     const pending = s.data.tasks[1]!.id;
     e.dispatch({ type: "toggleTask", id: completed }, at(12, 8, 1));
-    e.dispatch({ type: "toggleSubtask", taskId: pending, subtaskId: "step" }, at(12, 8, 1));
+    e.dispatch(
+      { type: "toggleSubtask", taskId: pending, subtaskId: "step" },
+      at(12, 8, 1),
+    );
     t.shape.title = "新稿";
     t.shape.scrapMinutes = 60;
     const printed = save(e, t, ["2026-10-14"], at(12, 8, 2));
     expect(printed.data.tasks[0]!.title).toBe("练习");
     expect(printed.data.tasks[1]!.title).toBe("练习");
     expect(printed.data.tasks[2]!.title).toBe("新稿");
-    const synced = e.dispatch({ type: "syncTemplate", id: "shape" }, at(12, 8, 3));
+    const synced = e.dispatch(
+      { type: "syncTemplate", id: "shape" },
+      at(12, 8, 3),
+    );
     expect(synced.data.tasks[0]!.title).toBe("练习");
     expect(synced.data.tasks[0]!.completed).toBe(true);
     expect(synced.data.tasks[1]!.title).toBe("新稿");
     expect(synced.data.tasks[1]!.subtasks[0]!.done).toBe(true);
     expect(synced.data.tasks[1]!.dueDate).toBe("2026-10-13");
-    const deleted = e.dispatch({ type: "deleteTemplate", id: "shape" }, at(12, 8, 4));
+    const deleted = e.dispatch(
+      { type: "deleteTemplate", id: "shape" },
+      at(12, 8, 4),
+    );
     expect(deleted.data.tasks).toHaveLength(3);
-    expect(deleted.data.tasks.every((task) => task.templateId === null)).toBe(true);
+    expect(deleted.data.tasks.every((task) => task.templateId === null)).toBe(
+      true,
+    );
     expect(deleted.data.templates).toHaveLength(0);
     expect(deleted.data.prints).toHaveLength(0);
   });
@@ -223,20 +254,30 @@ describe("模板与印刷（templates / habits）", () => {
     weekly(bad);
     expect(() =>
       e.dispatch(
-        { type: "saveTemplate", template: clone(bad), printDates: ["2026-10-12", "2026-02-30"] },
+        {
+          type: "saveTemplate",
+          template: clone(bad),
+          printDates: ["2026-10-12", "2026-02-30"],
+        },
         at(12, 8, 0),
       ),
     ).toThrow();
     expect(e.export(at(12, 8, 0))).toBe(before);
     bad.shape.projectId = "missing";
     expect(() =>
-      e.dispatch({ type: "saveTemplate", template: clone(bad), printDates: [] }, at(12, 8, 0)),
+      e.dispatch(
+        { type: "saveTemplate", template: clone(bad), printDates: [] },
+        at(12, 8, 0),
+      ),
     ).toThrow();
     expect(e.export(at(12, 8, 0))).toBe(before);
     const tooFar = template();
     tooFar.printAheadDays = 91;
     expect(() =>
-      e.dispatch({ type: "saveTemplate", template: clone(tooFar), printDates: [] }, at(12, 8, 0)),
+      e.dispatch(
+        { type: "saveTemplate", template: clone(tooFar), printDates: [] },
+        at(12, 8, 0),
+      ),
     ).toThrow();
     expect(e.export(at(12, 8, 0))).toBe(before);
   });
@@ -285,7 +326,10 @@ describe("模板与印刷（templates / habits）", () => {
     expect(missed.data.tasks[0]!.reminderExpired).toBe(true);
     expect(missed.stats.days.at(-1)!.missed).toBe(1);
     expect(() =>
-      e.dispatch({ type: "toggleTask", id: missed.data.tasks[0]!.id }, at(12, 15, 25)),
+      e.dispatch(
+        { type: "toggleTask", id: missed.data.tasks[0]!.id },
+        at(12, 15, 25),
+      ),
     ).toThrow();
     const detach = e.dispatch(
       { type: "deleteHabit", id: missed.data.habits[0]!.id },
@@ -327,18 +371,30 @@ describe("模板与印刷（templates / habits）", () => {
     weekly(t);
     const s = save(e, t, ["2026-10-12"], at(12, 8, 0));
     const id = s.data.tasks[0]!.id;
-    e.dispatch({ type: "toggleSubtask", taskId: id, subtaskId: "step" }, at(12, 8, 1));
+    e.dispatch(
+      { type: "toggleSubtask", taskId: id, subtaskId: "step" },
+      at(12, 8, 1),
+    );
     const plan = e.data.exportPlan();
     expect(plan.version).toBe(6);
     expect(() => validatePlanFile(plan)).not.toThrow();
-    const merged = e.dispatch({ type: "importPlan", plan: clone(plan) }, at(12, 8, 2));
+    const merged = e.dispatch(
+      { type: "importPlan", plan: clone(plan) },
+      at(12, 8, 2),
+    );
     expect(merged.data.tasks[0]!.subtasks[0]!.done).toBe(true);
     expect(merged.data.tasks).toHaveLength(2);
     const fresh = engine();
-    const imported = fresh.dispatch({ type: "importPlan", plan: clone(plan) }, at(12, 8, 0));
+    const imported = fresh.dispatch(
+      { type: "importPlan", plan: clone(plan) },
+      at(12, 8, 0),
+    );
     expect(imported.data.prints).toHaveLength(1);
     expect(imported.data.tasks[0]!.subtasks[0]!.done).toBe(false);
-    fresh.dispatch({ type: "deleteTask", id: imported.data.tasks[0]!.id }, at(12, 8, 1));
+    fresh.dispatch(
+      { type: "deleteTask", id: imported.data.tasks[0]!.id },
+      at(12, 8, 1),
+    );
     const backup = parseBackup(fresh.export(at(12, 8, 1)));
     const restored = engine();
     restored.dispatch({ type: "import", data: backup }, at(12, 8, 1));
@@ -355,7 +411,9 @@ describe("模板与印刷（templates / habits）", () => {
       plan.version = version;
       const e = engine();
       const before = e.export(at(12, 8, 0));
-      expect(() => e.dispatch({ type: "importPlan", plan }, at(12, 8, 0))).toThrow();
+      expect(() =>
+        e.dispatch({ type: "importPlan", plan }, at(12, 8, 0)),
+      ).toThrow();
       expect(e.export(at(12, 8, 0))).toBe(before);
     }
   });
@@ -373,9 +431,20 @@ describe("模板与印刷（templates / habits）", () => {
       expect(s.data.templates).toHaveLength(1);
       expect(s.data.tasks).toHaveLength(4);
       expect(s.data.prints).toHaveLength(3);
-      expect(s.data.tasks.every((task) => !task.recurring && task.habitId === null)).toBe(true);
-      expect(new Set(s.data.tasks.map((task) => `${task.dueDate}|${task.reminderTime}`))).toEqual(
-        new Set(["2026-10-12|09:00", "2026-10-12|15:00", "2026-10-14|09:00", "2026-10-15|15:00"]),
+      expect(
+        s.data.tasks.every((task) => !task.recurring && task.habitId === null),
+      ).toBe(true);
+      expect(
+        new Set(
+          s.data.tasks.map((task) => `${task.dueDate}|${task.reminderTime}`),
+        ),
+      ).toEqual(
+        new Set([
+          "2026-10-12|09:00",
+          "2026-10-12|15:00",
+          "2026-10-14|09:00",
+          "2026-10-15|15:00",
+        ]),
       );
       const backup = parseBackup(e.export(at(12, 8, 1)));
       expect(() => backup.validate()).not.toThrow();
@@ -389,13 +458,19 @@ describe("模板与印刷（templates / habits）", () => {
     let t = template();
     calendar(t);
     const s = e.dispatch(
-      { type: "printInstances", shape: clone(t.shape), printing: clone(t.printing) },
+      {
+        type: "printInstances",
+        shape: clone(t.shape),
+        printing: clone(t.printing),
+      },
       at(12, 9, 30),
     );
     expect(s.data.tasks).toHaveLength(4); // 首个日期逾期但仍在重修窗口内。
     expect(s.data.templates).toHaveLength(0);
     expect(s.data.prints).toHaveLength(0);
-    expect(s.data.tasks.every((task) => task.templateId === null && !task.recurring)).toBe(true);
+    expect(
+      s.data.tasks.every((task) => task.templateId === null && !task.recurring),
+    ).toBe(true);
     expect(s.data.taskIsVoid(s.data.tasks[0]!)).toBe(false);
     e = engine();
     t = template();
@@ -427,7 +502,11 @@ describe("模板与印刷（templates / habits）", () => {
     ).toBe(true);
     expect(e.snapshot(at(19, 8, 0)).data.tasks).toHaveLength(5);
     const anchored = e.dispatch(
-      { type: "printTemplate", id: "shape", dates: ["2026-10-20", "2026-10-25"] },
+      {
+        type: "printTemplate",
+        id: "shape",
+        dates: ["2026-10-20", "2026-10-25"],
+      },
       at(19, 8, 0),
     );
     expect(anchored.data.tasks).toHaveLength(10); // 同一周期的两个锚点只印一次。
@@ -452,7 +531,11 @@ describe("模板与印刷（templates / habits）", () => {
       const t = template();
       expect(() =>
         e.dispatch(
-          { type: "printInstances", shape: clone(t.shape), printing: { kind: "calendar", slots } },
+          {
+            type: "printInstances",
+            shape: clone(t.shape),
+            printing: { kind: "calendar", slots },
+          },
           now,
         ),
       ).toThrow();
@@ -462,7 +545,10 @@ describe("模板与印刷（templates / habits）", () => {
 
   it("multiple_shapes_share_a_habit_group_without_splitting_one_shape_per_time", () => {
     const e = engine();
-    const s = e.dispatch({ type: "saveHabitGroup", id: null, name: "晨间" }, at(12, 8, 0));
+    const s = e.dispatch(
+      { type: "saveHabitGroup", id: null, name: "晨间" },
+      at(12, 8, 0),
+    );
     const group = s.data.habits[0]!.id;
     for (const id of ["exercise", "review"]) {
       const t = template();
@@ -474,16 +560,22 @@ describe("模板与印刷（templates / habits）", () => {
     expect(e.data.habits).toHaveLength(1);
     expect(e.data.templates).toHaveLength(2);
     expect(e.data.tasks).toHaveLength(4);
-    const removed = e.dispatch({ type: "deleteHabit", id: group }, at(12, 8, 1));
+    const removed = e.dispatch(
+      { type: "deleteHabit", id: group },
+      at(12, 8, 1),
+    );
     expect(removed.data.habits).toHaveLength(0);
     expect(removed.data.templates).toHaveLength(0);
     // 组没了，实例保留印刷时的来源，习惯历史不被改写。
     expect(
       removed.data.tasks.every(
-        (task) => task.habitId === null && task.templateId === null && task.recurring,
+        (task) =>
+          task.habitId === null && task.templateId === null && task.recurring,
       ),
     ).toBe(true);
-    expect(Object.values(removed.taskKinds).every((kind) => kind === "habit")).toBe(true);
+    expect(
+      Object.values(removed.taskKinds).every((kind) => kind === "habit"),
+    ).toBe(true);
   });
 
   it("printing_requires_dates_and_weekdays_independently_of_time", () => {
@@ -493,25 +585,42 @@ describe("模板与印刷（templates / habits）", () => {
     const t = template();
     t.printing = { kind: "once", date: null, time: null };
     expect(() =>
-      e.dispatch({ type: "saveTemplate", template: clone(t), printDates: [] }, now),
+      e.dispatch(
+        { type: "saveTemplate", template: clone(t), printDates: [] },
+        now,
+      ),
     ).toThrow();
     expect(() =>
       e.dispatch(
-        { type: "printInstances", shape: clone(t.shape), printing: clone(t.printing) },
+        {
+          type: "printInstances",
+          shape: clone(t.shape),
+          printing: clone(t.printing),
+        },
         now,
       ),
     ).toThrow();
     expect(e.export(now)).toBe(before);
     t.printing = { kind: "weekly", slots: [{ days: [1, 3], time: null }] };
     const id = t.id;
-    e.dispatch({ type: "saveTemplate", template: clone(t), printDates: [] }, now);
+    e.dispatch(
+      { type: "saveTemplate", template: clone(t), printDates: [] },
+      now,
+    );
     const saved = e.export(now);
-    expect(() => e.dispatch({ type: "printTemplate", id, dates: [null] }, now)).toThrow();
+    expect(() =>
+      e.dispatch({ type: "printTemplate", id, dates: [null] }, now),
+    ).toThrow();
     expect(e.export(now)).toBe(saved);
-    const s = e.dispatch({ type: "printTemplate", id, dates: ["2026-10-12"] }, now);
+    const s = e.dispatch(
+      { type: "printTemplate", id, dates: ["2026-10-12"] },
+      now,
+    );
     expect(s.data.tasks).toHaveLength(2);
     expect(
-      s.data.tasks.every((task) => task.dueDate !== null && task.reminderTime === null),
+      s.data.tasks.every(
+        (task) => task.dueDate !== null && task.reminderTime === null,
+      ),
     ).toBe(true);
     expect(s.data.tasks[0]!.dueDate).toBe("2026-10-12");
     expect(s.data.tasks[1]!.dueDate).toBe("2026-10-14");

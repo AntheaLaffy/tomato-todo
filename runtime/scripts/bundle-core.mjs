@@ -16,12 +16,16 @@ let esbuild;
 try {
   esbuild = await import("esbuild");
 } catch {
-  console.error("bundle-core: 缺少 devDependency esbuild，先运行 pnpm install --allow-build=esbuild");
+  console.error(
+    "bundle-core: 缺少 devDependency esbuild，先运行 pnpm install --allow-build=esbuild",
+  );
   process.exit(1);
 }
 
 if (!existsSync(entry)) {
-  console.error(`bundle-core: @tomato/core 尚未落地（缺 ${entry}），core-port 完成后重试。`);
+  console.error(
+    `bundle-core: @tomato/core 尚未落地（缺 ${entry}），core-port 完成后重试。`,
+  );
   process.exit(1);
 }
 

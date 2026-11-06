@@ -15,7 +15,11 @@ test("lock/unlock/notify/status 按 API.md 协议发请求", async (t) => {
     let raw = "";
     req.on("data", (c) => (raw += c));
     req.on("end", () => {
-      received.push({ path: req.url, auth: req.headers.authorization, body: raw ? JSON.parse(raw) : null });
+      received.push({
+        path: req.url,
+        auth: req.headers.authorization,
+        body: raw ? JSON.parse(raw) : null,
+      });
       res.writeHead(200, { "Content-Type": "application/json" });
       if (req.url === "/guard/status") {
         res.end(JSON.stringify({ locked: false, whitelist: [], pid: 42 }));
@@ -28,7 +32,10 @@ test("lock/unlock/notify/status 按 API.md 协议发请求", async (t) => {
   const port = mock.address().port;
   t.after(() => new Promise((resolve) => mock.close(resolve)));
 
-  const client = new GuardClient({ baseUrl: `http://127.0.0.1:${port}`, token: "guard-token" });
+  const client = new GuardClient({
+    baseUrl: `http://127.0.0.1:${port}`,
+    token: "guard-token",
+  });
   const locked = await client.lock({ whitelist: ["firefox.desktop"] });
   assert.equal(locked.ok, true);
   const unlocked = await client.unlock();
@@ -39,7 +46,10 @@ test("lock/unlock/notify/status 按 API.md 协议发请求", async (t) => {
   assert.equal(status.ok, true);
   assert.deepEqual(status.data, { locked: false, whitelist: [], pid: 42 });
 
-  assert.deepEqual(received.slice(0, 3).map((r) => r.body.command), ["lock", "unlock", "notify"]);
+  assert.deepEqual(
+    received.slice(0, 3).map((r) => r.body.command),
+    ["lock", "unlock", "notify"],
+  );
   assert.deepEqual(received[0].body.whitelist, ["firefox.desktop"]);
   assert.equal(received[2].body.title, "休息一下");
   assert.equal(received[2].body.body, "5 分钟");
@@ -79,7 +89,10 @@ test("超时同样优雅失败（挂起不响应的 guard）", async (t) => {
   const port = mock.address().port;
   t.after(() => new Promise((resolve) => mock.close(resolve)));
 
-  const client = new GuardClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 200 });
+  const client = new GuardClient({
+    baseUrl: `http://127.0.0.1:${port}`,
+    timeoutMs: 200,
+  });
   const result = await client.status();
   assert.equal(result.ok, false);
   assert.match(result.error, /guard 不可达/);

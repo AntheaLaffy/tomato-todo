@@ -72,7 +72,11 @@ import {
   teachingTask,
   validateTeachingTasks,
 } from "./teaching_tasks";
-import { validateIdentities, parseIdentity, serializeIdentity } from "./identities";
+import {
+  validateIdentities,
+  parseIdentity,
+  serializeIdentity,
+} from "./identities";
 import { exportPlan, mergePlan } from "./plan";
 import {
   deleteTemplate,
@@ -97,12 +101,25 @@ export function parseProject(raw: unknown): Project {
     id: requiredField(raw, "id", "项目", asStr),
     name: requiredField(raw, "name", "项目", asStr),
     color: requiredField(raw, "color", "项目", asStr),
-    appWhitelist: field(raw, "appWhitelist", "项目", (v) => asOpt(v, "appWhitelist", (x) => asArray(x, "appWhitelist").map((a) => asStr(a, "应用 ID"))), null) as string[] | null,
+    appWhitelist: field(
+      raw,
+      "appWhitelist",
+      "项目",
+      (v) =>
+        asOpt(v, "appWhitelist", (x) =>
+          asArray(x, "appWhitelist").map((a) => asStr(a, "应用 ID")),
+        ),
+      null,
+    ) as string[] | null,
   };
 }
 
 export function serializeProject(p: Project): Record<string, unknown> {
-  const out: Record<string, unknown> = { id: p.id, name: p.name, color: p.color };
+  const out: Record<string, unknown> = {
+    id: p.id,
+    name: p.name,
+    color: p.color,
+  };
   if (p.appWhitelist !== null) out["appWhitelist"] = p.appWhitelist;
   return out;
 }
@@ -114,12 +131,22 @@ export function parseVision(raw: unknown): Vision {
     id: requiredField(raw, "id", "愿景", asStr),
     name: requiredField(raw, "name", "愿景", asStr),
     notes: field(raw, "notes", "愿景", asStr, ""),
-    projectId: field(raw, "projectId", "愿景", (v) => asOpt(v, "projectId", asStr), null) as string | null,
+    projectId: field(
+      raw,
+      "projectId",
+      "愿景",
+      (v) => asOpt(v, "projectId", asStr),
+      null,
+    ) as string | null,
   };
 }
 
 export function serializeVision(v: Vision): Record<string, unknown> {
-  const out: Record<string, unknown> = { id: v.id, name: v.name, notes: v.notes };
+  const out: Record<string, unknown> = {
+    id: v.id,
+    name: v.name,
+    notes: v.notes,
+  };
   if (v.projectId !== null) out["projectId"] = v.projectId;
   return out;
 }
@@ -166,15 +193,51 @@ export function parseTask(raw: unknown): Task {
   rejectUnknown(raw, [...TASK_KEYS], "任务");
   return {
     id: requiredField(raw, "id", "任务", asStr),
-    templateId: field(raw, "templateId", "任务", (v) => asOpt(v, "templateId", asStr), null) as string | null,
+    templateId: field(
+      raw,
+      "templateId",
+      "任务",
+      (v) => asOpt(v, "templateId", asStr),
+      null,
+    ) as string | null,
     recurring: field(raw, "recurring", "任务", asBool, false),
     title: requiredField(raw, "title", "任务", asStr),
     notes: requiredField(raw, "notes", "任务", asStr),
-    projectId: field(raw, "projectId", "任务", (v) => asOpt(v, "projectId", asStr), null) as string | null,
-    habitId: field(raw, "habitId", "任务", (v) => asOpt(v, "habitId", asStr), null) as string | null,
-    dueDate: field(raw, "dueDate", "任务", (v) => asOpt(v, "dueDate", asStr), null) as string | null,
-    reminderTime: field(raw, "reminderTime", "任务", (v) => asOpt(v, "reminderTime", asStr), null) as string | null,
-    focusMinutes: field(raw, "focusMinutes", "任务", (v) => asOpt(v, "focusMinutes", (x) => asInt(x, "focusMinutes")), null) as number | null,
+    projectId: field(
+      raw,
+      "projectId",
+      "任务",
+      (v) => asOpt(v, "projectId", asStr),
+      null,
+    ) as string | null,
+    habitId: field(
+      raw,
+      "habitId",
+      "任务",
+      (v) => asOpt(v, "habitId", asStr),
+      null,
+    ) as string | null,
+    dueDate: field(
+      raw,
+      "dueDate",
+      "任务",
+      (v) => asOpt(v, "dueDate", asStr),
+      null,
+    ) as string | null,
+    reminderTime: field(
+      raw,
+      "reminderTime",
+      "任务",
+      (v) => asOpt(v, "reminderTime", asStr),
+      null,
+    ) as string | null,
+    focusMinutes: field(
+      raw,
+      "focusMinutes",
+      "任务",
+      (v) => asOpt(v, "focusMinutes", (x) => asInt(x, "focusMinutes")),
+      null,
+    ) as number | null,
     scrapMinutes: field(raw, "scrapMinutes", "任务", asInt, 0),
     priority: requiredField(raw, "priority", "任务", asInt),
     estimate: requiredField(raw, "estimate", "任务", asInt),
@@ -182,10 +245,28 @@ export function parseTask(raw: unknown): Task {
     reminderPending: field(raw, "reminderPending", "任务", asBool, false),
     reminderExpired: field(raw, "reminderExpired", "任务", asBool, false),
     completed: requiredField(raw, "completed", "任务", asBool),
-    completedAt: field(raw, "completedAt", "任务", (v) => asOpt(v, "completedAt", asInt), null) as number | null,
+    completedAt: field(
+      raw,
+      "completedAt",
+      "任务",
+      (v) => asOpt(v, "completedAt", asInt),
+      null,
+    ) as number | null,
     createdAt: requiredField(raw, "createdAt", "任务", asInt),
-    tags: field(raw, "tags", "任务", (v) => asArray(v, "tags").map((t) => asStr(t, "标签")), []),
-    subtasks: field(raw, "subtasks", "任务", (v) => asArray(v, "subtasks").map(parseSubtask), []),
+    tags: field(
+      raw,
+      "tags",
+      "任务",
+      (v) => asArray(v, "tags").map((t) => asStr(t, "标签")),
+      [],
+    ),
+    subtasks: field(
+      raw,
+      "subtasks",
+      "任务",
+      (v) => asArray(v, "subtasks").map(parseSubtask),
+      [],
+    ),
   };
 }
 
@@ -239,40 +320,106 @@ export function parseTaskDraft(raw: unknown): TaskDraft {
   if (!isObject(raw)) throw new AppError("任务草稿必须是对象");
   rejectUnknown(raw, [...TASK_DRAFT_KEYS], "任务草稿");
   return {
-    id: field(raw, "id", "任务草稿", (v) => asOpt(v, "id", asStr), null) as string | null,
+    id: field(raw, "id", "任务草稿", (v) => asOpt(v, "id", asStr), null) as
+      string | null,
     title: requiredField(raw, "title", "任务草稿", asStr),
     notes: field(raw, "notes", "任务草稿", asStr, ""),
-    projectId: field(raw, "projectId", "任务草稿", (v) => asOpt(v, "projectId", asStr), null) as string | null,
-    dueDate: field(raw, "dueDate", "任务草稿", (v) => asOpt(v, "dueDate", asStr), null) as string | null,
-    reminderTime: field(raw, "reminderTime", "任务草稿", (v) => asOpt(v, "reminderTime", asStr), null) as string | null,
-    focusMinutes: field(raw, "focusMinutes", "任务草稿", (v) => asOpt(v, "focusMinutes", (x) => asInt(x, "focusMinutes")), null) as number | null,
+    projectId: field(
+      raw,
+      "projectId",
+      "任务草稿",
+      (v) => asOpt(v, "projectId", asStr),
+      null,
+    ) as string | null,
+    dueDate: field(
+      raw,
+      "dueDate",
+      "任务草稿",
+      (v) => asOpt(v, "dueDate", asStr),
+      null,
+    ) as string | null,
+    reminderTime: field(
+      raw,
+      "reminderTime",
+      "任务草稿",
+      (v) => asOpt(v, "reminderTime", asStr),
+      null,
+    ) as string | null,
+    focusMinutes: field(
+      raw,
+      "focusMinutes",
+      "任务草稿",
+      (v) => asOpt(v, "focusMinutes", (x) => asInt(x, "focusMinutes")),
+      null,
+    ) as number | null,
     scrapMinutes: field(raw, "scrapMinutes", "任务草稿", asInt, 0),
     priority: field(raw, "priority", "任务草稿", asInt, 0),
     estimate: field(raw, "estimate", "任务草稿", asInt, 1),
-    tags: field(raw, "tags", "任务草稿", (v) => asArray(v, "tags").map((t) => asStr(t, "标签")), []),
-    subtasks: field(raw, "subtasks", "任务草稿", (v) => asArray(v, "subtasks").map(parseSubtask), []),
-    repeat: field(raw, "repeat", "任务草稿", (v) => oneOf(v, "repeat", ["none", "daily", "weekdays", "weekly"]), "none") as Repeat,
+    tags: field(
+      raw,
+      "tags",
+      "任务草稿",
+      (v) => asArray(v, "tags").map((t) => asStr(t, "标签")),
+      [],
+    ),
+    subtasks: field(
+      raw,
+      "subtasks",
+      "任务草稿",
+      (v) => asArray(v, "subtasks").map(parseSubtask),
+      [],
+    ),
+    repeat: field(
+      raw,
+      "repeat",
+      "任务草稿",
+      (v) => oneOf(v, "repeat", ["none", "daily", "weekdays", "weekly"]),
+      "none",
+    ) as Repeat,
   };
 }
 
 export function parseHabitSlot(raw: unknown): HabitSlot {
   if (!isObject(raw)) throw new AppError("习惯时段必须是对象");
   return {
-    days: asArray(requiredField(raw, "days", "习惯时段", (v) => v), "days").map((d) => asInt(d, "习惯星期")),
+    days: asArray(
+      requiredField(raw, "days", "习惯时段", (v) => v),
+      "days",
+    ).map((d) => asInt(d, "习惯星期")),
     time: requiredField(raw, "time", "习惯时段", asStr),
   };
 }
 
-export function parseProtection(raw: unknown): { mode: GuardMode; whitelist: string[]; strict: boolean } {
+export function parseProtection(raw: unknown): {
+  mode: GuardMode;
+  whitelist: string[];
+  strict: boolean;
+} {
   if (!isObject(raw)) throw new AppError("保护设置必须是对象");
   return {
-    mode: field(raw, "mode", "保护设置", (v) => oneOf(v, "保护 mode", ["off", "lock", "whitelist"]), "off") as GuardMode,
-    whitelist: field(raw, "whitelist", "保护设置", (v) => asArray(v, "whitelist").map((a) => asStr(a, "应用 ID")), []),
+    mode: field(
+      raw,
+      "mode",
+      "保护设置",
+      (v) => oneOf(v, "保护 mode", ["off", "lock", "whitelist"]),
+      "off",
+    ) as GuardMode,
+    whitelist: field(
+      raw,
+      "whitelist",
+      "保护设置",
+      (v) => asArray(v, "whitelist").map((a) => asStr(a, "应用 ID")),
+      [],
+    ),
     strict: field(raw, "strict", "保护设置", asBool, false),
   };
 }
 
-export function serializeProtection(p: { mode: GuardMode; whitelist: string[]; strict: boolean }): Record<string, unknown> {
+export function serializeProtection(p: {
+  mode: GuardMode;
+  whitelist: string[];
+  strict: boolean;
+}): Record<string, unknown> {
   return { mode: p.mode, whitelist: p.whitelist, strict: p.strict };
 }
 
@@ -311,7 +458,11 @@ export function parseSettings(raw: unknown): Settings {
     alwaysOnTop: requiredField(raw, "alwaysOnTop", "设置", asBool),
     theme: requiredField(raw, "theme", "设置", asStr),
     personaBackdrop: field(raw, "personaBackdrop", "设置", asBool, false),
-    protection: field(raw, "protection", "设置", parseProtection, { mode: "off", whitelist: [], strict: false }),
+    protection: field(raw, "protection", "设置", parseProtection, {
+      mode: "off",
+      whitelist: [],
+      strict: false,
+    }),
   };
 }
 
@@ -358,17 +509,54 @@ export function defaultSettings(): Settings {
 export function parseTimer(raw: unknown): Timer {
   if (!isObject(raw)) throw new AppError("计时器必须是对象");
   return {
-    mode: oneOf(requiredField(raw, "mode", "计时器", (v) => v), "计时器 mode", ["focus", "shortBreak", "longBreak"]) as Mode,
+    mode: oneOf(
+      requiredField(raw, "mode", "计时器", (v) => v),
+      "计时器 mode",
+      ["focus", "shortBreak", "longBreak"],
+    ) as Mode,
     running: requiredField(raw, "running", "计时器", asBool),
-    taskId: field(raw, "taskId", "计时器", (v) => asOpt(v, "taskId", asStr), null) as string | null,
+    taskId: field(
+      raw,
+      "taskId",
+      "计时器",
+      (v) => asOpt(v, "taskId", asStr),
+      null,
+    ) as string | null,
     durationSecs: requiredField(raw, "durationSecs", "计时器", asInt),
     remainingSecs: requiredField(raw, "remainingSecs", "计时器", asInt),
-    deadline: field(raw, "deadline", "计时器", (v) => asOpt(v, "deadline", asInt), null) as number | null,
-    startedAt: field(raw, "startedAt", "计时器", (v) => asOpt(v, "startedAt", asInt), null) as number | null,
+    deadline: field(
+      raw,
+      "deadline",
+      "计时器",
+      (v) => asOpt(v, "deadline", asInt),
+      null,
+    ) as number | null,
+    startedAt: field(
+      raw,
+      "startedAt",
+      "计时器",
+      (v) => asOpt(v, "startedAt", asInt),
+      null,
+    ) as number | null,
     cycle: requiredField(raw, "cycle", "计时器", asInt),
-    cycleDate: field(raw, "cycleDate", "计时器", (v) => asOpt(v, "cycleDate", asStr), null) as string | null,
+    cycleDate: field(
+      raw,
+      "cycleDate",
+      "计时器",
+      (v) => asOpt(v, "cycleDate", asStr),
+      null,
+    ) as string | null,
     completionSerial: requiredField(raw, "completionSerial", "计时器", asInt),
-    lastFinishedMode: field(raw, "lastFinishedMode", "计时器", (v) => asOpt(v, "lastFinishedMode", (x) => oneOf(x, "lastFinishedMode", ["focus", "shortBreak", "longBreak"])), null) as Mode | null,
+    lastFinishedMode: field(
+      raw,
+      "lastFinishedMode",
+      "计时器",
+      (v) =>
+        asOpt(v, "lastFinishedMode", (x) =>
+          oneOf(x, "lastFinishedMode", ["focus", "shortBreak", "longBreak"]),
+        ),
+      null,
+    ) as Mode | null,
     autoFocusBlocked: field(raw, "autoFocusBlocked", "计时器", asBool, false),
   };
 }
@@ -411,8 +599,20 @@ export function parseSession(raw: unknown): Session {
   if (!isObject(raw)) throw new AppError("专注记录必须是对象");
   return {
     id: requiredField(raw, "id", "专注记录", asStr),
-    source: field(raw, "source", "专注记录", (v) => oneOf(v, "source", ["timer", "taskEstimate"]), "timer") as SessionSource,
-    taskId: field(raw, "taskId", "专注记录", (v) => asOpt(v, "taskId", asStr), null) as string | null,
+    source: field(
+      raw,
+      "source",
+      "专注记录",
+      (v) => oneOf(v, "source", ["timer", "taskEstimate"]),
+      "timer",
+    ) as SessionSource,
+    taskId: field(
+      raw,
+      "taskId",
+      "专注记录",
+      (v) => asOpt(v, "taskId", asStr),
+      null,
+    ) as string | null,
     taskTitle: requiredField(raw, "taskTitle", "专注记录", asStr),
     projectName: requiredField(raw, "projectName", "专注记录", asStr),
     startedAt: requiredField(raw, "startedAt", "专注记录", asInt),
@@ -472,13 +672,19 @@ export class AppData {
     this.settings = init?.settings ?? defaultSettings();
     this.timer = init?.timer ?? defaultTimer();
     this.sessions = init?.sessions ?? [];
-    this.lock = init?.lock ?? { schedules: [], active: null, suppressedUntil: 0 };
+    this.lock = init?.lock ?? {
+      schedules: [],
+      active: null,
+      suppressedUntil: 0,
+    };
   }
 
   protected(): boolean {
     return (
       this.lock.active !== null ||
-      (this.timer.running && this.timer.mode === "focus" && this.settings.protection.mode !== "off")
+      (this.timer.running &&
+        this.timer.mode === "focus" &&
+        this.settings.protection.mode !== "off")
     );
   }
 
@@ -492,7 +698,9 @@ export class AppData {
       return this.projects.find((p) => p.id === task.projectId);
     })();
     const list = project?.appWhitelist;
-    return list !== null && list !== undefined ? [...list] : [...this.settings.protection.whitelist];
+    return list !== null && list !== undefined
+      ? [...list]
+      : [...this.settings.protection.whitelist];
   }
 
   taskIsVoid(task: Task): boolean {
@@ -532,7 +740,9 @@ export class AppData {
   refreshCycle(at: number): boolean {
     const date = dateAt(at);
     if (this.timer.cycleDate === date) return false;
-    this.timer.cycle = this.sessions.filter((s) => s.completed && dateAt(s.endedAt) === date).length;
+    this.timer.cycle = this.sessions.filter(
+      (s) => s.completed && dateAt(s.endedAt) === date,
+    ).length;
     this.timer.cycleDate = date;
     return true;
   }
@@ -541,7 +751,8 @@ export class AppData {
   tick(at: number): boolean {
     const teachingChanged = this.education.tick(at);
     const teachingTasksChanged = materializeTeachingTasks(this, at);
-    const materialized = materializeTemplates(this, at) || teachingChanged || teachingTasksChanged;
+    const materialized =
+      materializeTemplates(this, at) || teachingChanged || teachingTasksChanged;
     const remindersChanged = tickReminders(this, at);
     const changed = this.tickWithLock(at) || materialized;
     const cycleChanged = this.refreshCycle(at);
@@ -555,7 +766,9 @@ export class AppData {
     ) {
       this.resetTo("focus");
     }
-    return startDueTask(this, at) || remindersChanged || changed || cycleChanged;
+    return (
+      startDueTask(this, at) || remindersChanged || changed || cycleChanged
+    );
   }
 
   tickWithLock(at: number): boolean {
@@ -566,7 +779,10 @@ export class AppData {
     const scheduled = scheduledAt(this.lock, at);
     if (scheduled !== null) {
       if (this.lock.active !== null) {
-        scheduled.startedAt = Math.min(this.lock.active.startedAt, scheduled.startedAt);
+        scheduled.startedAt = Math.min(
+          this.lock.active.startedAt,
+          scheduled.startedAt,
+        );
         scheduled.endsAt = Math.max(this.lock.active.endsAt, scheduled.endsAt);
         scheduled.strict = scheduled.strict || this.lock.active.strict;
       }
@@ -576,7 +792,10 @@ export class AppData {
     if (this.lock.active !== null) {
       const start = this.lock.active.startedAt;
       if (this.timer.running) {
-        const stop = Math.min(Math.max(start, this.timer.startedAt ?? start), at);
+        const stop = Math.min(
+          Math.max(start, this.timer.startedAt ?? start),
+          at,
+        );
         this.tickTimer(stop);
         this.record(stop, false);
         this.resetTo("focus");
@@ -613,7 +832,10 @@ export class AppData {
           : "shortBreak"
         : "focus";
     this.resetTo(next);
-    this.timer.completionSerial = Math.min(this.timer.completionSerial + 1, Number.MAX_SAFE_INTEGER);
+    this.timer.completionSerial = Math.min(
+      this.timer.completionSerial + 1,
+      Number.MAX_SAFE_INTEGER,
+    );
     this.timer.lastFinishedMode = finished;
     const auto =
       next === "focus"
@@ -638,8 +860,14 @@ export class AppData {
     if (this.strictProtected()) {
       throw new AppError("严格模式生效中，不能提前结束或修改；到时自动解除");
     }
-    if (this.protected() && action.type !== "emergencyUnlock" && action.type !== "completeFocus") {
-      throw new AppError("专注保护中，结束前不能修改任务或计时；可提前完成番茄或紧急退出");
+    if (
+      this.protected() &&
+      action.type !== "emergencyUnlock" &&
+      action.type !== "completeFocus"
+    ) {
+      throw new AppError(
+        "专注保护中，结束前不能修改任务或计时；可提前完成番茄或紧急退出",
+      );
     }
     switch (action.type) {
       case "education": {
@@ -679,7 +907,9 @@ export class AppData {
         if (!this.reminderIdle()) {
           throw new AppError("请先结束当前计时");
         }
-        const t = this.tasks.find((x) => x.id === action.id && !x.completed && x.reminderPending);
+        const t = this.tasks.find(
+          (x) => x.id === action.id && !x.completed && x.reminderPending,
+        );
         if (t === undefined) {
           throw new AppError("提醒已失效");
         }
@@ -711,7 +941,9 @@ export class AppData {
         break;
       }
       case "saveLockSchedule": {
-        const index = this.lock.schedules.findIndex((s) => s.id === action.schedule.id);
+        const index = this.lock.schedules.findIndex(
+          (s) => s.id === action.schedule.id,
+        );
         if (index >= 0) {
           this.lock.schedules[index] = action.schedule;
         } else {
@@ -722,7 +954,9 @@ export class AppData {
         break;
       }
       case "deleteLockSchedule":
-        this.lock.schedules = this.lock.schedules.filter((s) => s.id !== action.id);
+        this.lock.schedules = this.lock.schedules.filter(
+          (s) => s.id !== action.id,
+        );
         break;
       case "startQuickLock": {
         if (action.minutes < 1 || action.minutes > 720) {
@@ -741,9 +975,12 @@ export class AppData {
       case "saveTask": {
         const d = action.task;
         if (d.id !== null && teachingTask(this, d.id) !== undefined) {
-          throw new AppError("教学待办随课程或作业安排更新，请调整对应教学安排");
+          throw new AppError(
+            "教学待办随课程或作业安排更新，请调整对应教学安排",
+          );
         }
-        const existingIndex = d.id !== null ? this.tasks.findIndex((t) => t.id === d.id) : -1;
+        const existingIndex =
+          d.id !== null ? this.tasks.findIndex((t) => t.id === d.id) : -1;
         if (d.id !== null && existingIndex < 0) {
           throw new AppError("任务不存在，可能已经被删除");
         }
@@ -757,11 +994,20 @@ export class AppData {
           projectId: d.projectId,
           habitId: old?.habitId ?? null,
           reminderFired:
-            old !== undefined && old.dueDate === d.dueDate && old.reminderTime === d.reminderTime && old.reminderFired,
+            old !== undefined &&
+            old.dueDate === d.dueDate &&
+            old.reminderTime === d.reminderTime &&
+            old.reminderFired,
           reminderPending:
-            old !== undefined && old.dueDate === d.dueDate && old.reminderTime === d.reminderTime && old.reminderPending,
+            old !== undefined &&
+            old.dueDate === d.dueDate &&
+            old.reminderTime === d.reminderTime &&
+            old.reminderPending,
           reminderExpired:
-            old !== undefined && old.dueDate === d.dueDate && old.reminderTime === d.reminderTime && old.reminderExpired,
+            old !== undefined &&
+            old.dueDate === d.dueDate &&
+            old.reminderTime === d.reminderTime &&
+            old.reminderExpired,
           scrapMinutes: d.scrapMinutes,
           focusMinutes: d.focusMinutes,
           reminderTime: d.reminderTime,
@@ -772,7 +1018,11 @@ export class AppData {
           completedAt: old?.completedAt ?? null,
           createdAt: old?.createdAt ?? at,
           tags: d.tags.map((t) => t.trim()).filter((t) => t.length > 0),
-          subtasks: d.subtasks.map((s) => ({ id: s.id, title: s.title, done: s.done })),
+          subtasks: d.subtasks.map((s) => ({
+            id: s.id,
+            title: s.title,
+            done: s.done,
+          })),
         };
         if (d.repeat !== "none") {
           const template = fromTask(task, d.repeat, at);
@@ -795,7 +1045,11 @@ export class AppData {
         }
         const task = this.tasks.find((t) => t.id === taskId);
         ensure(task !== undefined, "任务不存在");
-        const taskCopy: Task = { ...task, tags: [...task.tags], subtasks: task.subtasks.map((s) => ({ ...s })) };
+        const taskCopy: Task = {
+          ...task,
+          tags: [...task.tags],
+          subtasks: task.subtasks.map((s) => ({ ...s })),
+        };
         if (teachingTask(this, taskId) !== undefined && !taskCopy.completed) {
           completeTeachingTask(this, taskId, at);
         }
@@ -820,7 +1074,9 @@ export class AppData {
             .filter((s) => s.taskId === taskId)
             .reduce((n, s) => n + s.durationSecs, 0);
           const expected =
-            taskCopy.estimate * (taskCopy.focusMinutes ?? this.settings.focusMinutes) * 60;
+            taskCopy.estimate *
+            (taskCopy.focusMinutes ?? this.settings.focusMinutes) *
+            60;
           const missing = Math.max(0, expected - actual);
           if (missing > 0) {
             const project =
@@ -868,13 +1124,22 @@ export class AppData {
         if (this.tasks.some((t) => t.id === task.id)) {
           throw new AppError("任务已经存在");
         }
-        if (task.projectId !== null && !this.projects.some((p) => p.id === task.projectId)) {
+        if (
+          task.projectId !== null &&
+          !this.projects.some((p) => p.id === task.projectId)
+        ) {
           task.projectId = null;
         }
-        if (task.templateId !== null && !this.templates.some((t) => t.id === task.templateId)) {
+        if (
+          task.templateId !== null &&
+          !this.templates.some((t) => t.id === task.templateId)
+        ) {
           task.templateId = null;
         }
-        if (task.habitId !== null && !this.habits.some((h) => h.id === task.habitId)) {
+        if (
+          task.habitId !== null &&
+          !this.habits.some((h) => h.id === task.habitId)
+        ) {
           // 失去容器只移除管辖；冻结来源仍在，历史分类不变。
           task.habitId = null;
         }
@@ -912,14 +1177,21 @@ export class AppData {
             pastPaperIds: [],
             mockPaperIds: [],
           });
-          this.projects.push({ id: projectId, name: action.name.trim(), color: action.color, appWhitelist: null });
+          this.projects.push({
+            id: projectId,
+            name: action.name.trim(),
+            color: action.color,
+            appWhitelist: null,
+          });
         }
         break;
       }
       case "renameProjectDirectory": {
         const project = this.projects.find((x) => x.id === action.id);
         ensure(project !== undefined, "项目不存在");
-        const profile = this.education.projects.find((p) => p.projectId === action.id);
+        const profile = this.education.projects.find(
+          (p) => p.projectId === action.id,
+        );
         ensure(profile !== undefined, "项目没有绑定资料目录");
         ensure(isAbsolutePath(action.directory), "资料目录必须是绝对路径");
         project.name = action.name.trim();
@@ -930,21 +1202,29 @@ export class AppData {
       case "setProjectWhitelist": {
         const p = this.projects.find((x) => x.id === action.id);
         ensure(p !== undefined, "项目不存在");
-        p.appWhitelist = action.whitelist === null ? null : [...action.whitelist];
+        p.appWhitelist =
+          action.whitelist === null ? null : [...action.whitelist];
         break;
       }
       case "deleteProject": {
         if (this.education.semesters.some((s) => s.projectId === action.id)) {
-          throw new AppError("项目已有教学历史，请保留记录并停用应试模式；资料目录不会被删除");
+          throw new AppError(
+            "项目已有教学历史，请保留记录并停用应试模式；资料目录不会被删除",
+          );
         }
-        this.education.projects = this.education.projects.filter((p) => p.projectId !== action.id);
-        this.education.resources = this.education.resources.filter((p) => p.projectId !== action.id);
+        this.education.projects = this.education.projects.filter(
+          (p) => p.projectId !== action.id,
+        );
+        this.education.resources = this.education.resources.filter(
+          (p) => p.projectId !== action.id,
+        );
         this.projects = this.projects.filter((p) => p.id !== action.id);
         for (const task of this.tasks) {
           if (task.projectId === action.id) task.projectId = null;
         }
         for (const template of this.templates) {
-          if (template.shape.projectId === action.id) template.shape.projectId = null;
+          if (template.shape.projectId === action.id)
+            template.shape.projectId = null;
         }
         this.visions = this.visions.filter((a) => a.projectId !== action.id);
         break;
@@ -956,11 +1236,15 @@ export class AppData {
         ) {
           throw new AppError("项目排序列表与现有项目不一致");
         }
-        this.projects = action.ids.map((pid) => this.projects.find((p) => p.id === pid)!);
+        this.projects = action.ids.map((pid) =>
+          this.projects.find((p) => p.id === pid)!,
+        );
         break;
       }
       case "detachTasks": {
-        if (action.ids.some((taskId) => teachingTask(this, taskId) !== undefined)) {
+        if (
+          action.ids.some((taskId) => teachingTask(this, taskId) !== undefined)
+        ) {
           throw new AppError("教学待办须保留来源项目，请调整对应教学安排");
         }
         for (const t of this.tasks) {
@@ -995,7 +1279,10 @@ export class AppData {
           printAheadDays: 0,
           printing: {
             kind: "weekly",
-            slots: action.slots.map((s) => ({ days: [...s.days], time: s.time })),
+            slots: action.slots.map((s) => ({
+              days: [...s.days],
+              time: s.time,
+            })),
           },
           shape: {
             title: action.name.trim(),
@@ -1034,7 +1321,12 @@ export class AppData {
           a.notes = action.notes;
           a.projectId = action.projectId;
         } else {
-          this.visions.push({ id: id(), name: action.name.trim(), notes: action.notes, projectId: action.projectId });
+          this.visions.push({
+            id: id(),
+            name: action.name.trim(),
+            notes: action.notes,
+            projectId: action.projectId,
+          });
         }
         break;
       }
@@ -1068,10 +1360,16 @@ export class AppData {
         if (this.tasks.some((t) => t.id === action.id && this.taskIsVoid(t))) {
           throw new AppError("作废实例不能专注");
         }
-        if (action.id !== null && !this.tasks.some((t) => t.id === action.id && !t.completed)) {
+        if (
+          action.id !== null &&
+          !this.tasks.some((t) => t.id === action.id && !t.completed)
+        ) {
           throw new AppError("请选择一个未完成的任务");
         }
-        if (this.timer.running || timerRemaining(this.timer, at) < this.timer.durationSecs) {
+        if (
+          this.timer.running ||
+          timerRemaining(this.timer, at) < this.timer.durationSecs
+        ) {
           throw new AppError("请先结束当前计时，再切换专注任务");
         }
         this.timer.taskId = action.id;
@@ -1079,7 +1377,11 @@ export class AppData {
         break;
       }
       case "startTimer": {
-        if (this.tasks.some((t) => t.id === this.timer.taskId && this.taskIsVoid(t))) {
+        if (
+          this.tasks.some(
+            (t) => t.id === this.timer.taskId && this.taskIsVoid(t),
+          )
+        ) {
           throw new AppError("作废实例不能开始专注");
         }
         startTeachingTask(this, at);
@@ -1112,7 +1414,10 @@ export class AppData {
       }
       case "saveSettings": {
         this.settings = action.settings;
-        if (!this.timer.running && this.timer.remainingSecs === this.timer.durationSecs) {
+        if (
+          !this.timer.running &&
+          this.timer.remainingSecs === this.timer.durationSecs
+        ) {
           this.resetTo(this.timer.mode);
         }
         break;
@@ -1144,8 +1449,18 @@ export class AppData {
         }
         const today = dateAt(at);
         const examples: [string, string, number, number][] = [
-          ["梳理本周的工作计划", "把大目标拆成小步骤，让每一天都更从容。", 3, 2],
-          ["读完正在看的那一章", "关掉消息提醒，给阅读留一段完整的时间。", 2, 1],
+          [
+            "梳理本周的工作计划",
+            "把大目标拆成小步骤，让每一天都更从容。",
+            3,
+            2,
+          ],
+          [
+            "读完正在看的那一章",
+            "关掉消息提醒，给阅读留一段完整的时间。",
+            2,
+            1,
+          ],
           ["整理桌面，整理思绪", "一个舒服的环境，是专注的开始。", 1, 1],
         ];
         examples.forEach(([title, notes, priority, estimate], index) => {
@@ -1189,7 +1504,9 @@ export class AppData {
     validateBlocks(this.blocks);
     ensure(this.version === 4, "不支持此数据版本");
     ensure(
-      this.tasks.length <= 50000 && this.sessions.length <= 200000 && this.projects.length <= 500,
+      this.tasks.length <= 50000 &&
+        this.sessions.length <= 200000 &&
+        this.projects.length <= 500,
       "数据超出数量限制",
     );
     const s = this.settings;
@@ -1213,14 +1530,20 @@ export class AppData {
     for (const p of this.projects) {
       ensure(p.id.length > 0 && !projectIds.has(p.id), "项目 ID 重复或为空");
       projectIds.add(p.id);
-      ensure(p.name.trim().length > 0 && charCount(p.name) <= 40, "项目名称需为 1–40 个字符");
+      ensure(
+        p.name.trim().length > 0 && charCount(p.name) <= 40,
+        "项目名称需为 1–40 个字符",
+      );
       ensure(
         p.color.length === 7 &&
           p.color.startsWith("#") &&
           /^[0-9a-fA-F]{6}$/.test(p.color.slice(1)),
         "无效的项目颜色",
       );
-      ensure(p.appWhitelist === null || validAppIds(p.appWhitelist), "无效的项目应用白名单");
+      ensure(
+        p.appWhitelist === null || validAppIds(p.appWhitelist),
+        "无效的项目应用白名单",
+      );
     }
     const habitIds = new Set<string>();
     ensure(this.habits.length <= 500, "习惯数量超出限制");
@@ -1234,26 +1557,52 @@ export class AppData {
     for (const a of this.visions) {
       ensure(a.id.length > 0 && !visionIds.has(a.id), "愿景 ID 重复或为空");
       visionIds.add(a.id);
-      ensure(a.name.trim().length > 0 && charCount(a.name) <= 40, "愿景名称需为 1–40 个字符");
+      ensure(
+        a.name.trim().length > 0 && charCount(a.name) <= 40,
+        "愿景名称需为 1–40 个字符",
+      );
       ensure(utf8Len(a.notes) <= 50000, "愿景内容过长");
-      ensure(a.projectId === null || projectIds.has(a.projectId), "愿景引用了不存在的项目");
+      ensure(
+        a.projectId === null || projectIds.has(a.projectId),
+        "愿景引用了不存在的项目",
+      );
     }
     const taskIds = new Set<string>();
     for (const t of this.tasks) {
       this.validateReminderTask(t);
       ensure(t.id.length > 0 && !taskIds.has(t.id), "任务 ID 重复或为空");
       taskIds.add(t.id);
-      ensure(t.title.trim().length > 0 && charCount(t.title) <= 200, "任务名称需为 1–200 个字符");
       ensure(
-        utf8Len(t.notes) <= 50000 && t.tags.length <= 20 && t.tags.every((tag) => charCount(tag) <= 40),
+        t.title.trim().length > 0 && charCount(t.title) <= 200,
+        "任务名称需为 1–200 个字符",
+      );
+      ensure(
+        utf8Len(t.notes) <= 50000 &&
+          t.tags.length <= 20 &&
+          t.tags.every((tag) => charCount(tag) <= 40),
         "备注或标签过长",
       );
-      ensure(t.priority <= 3 && t.estimate >= 1 && t.estimate <= 99, "无效的优先级或预计番茄数");
+      ensure(
+        t.priority <= 3 && t.estimate >= 1 && t.estimate <= 99,
+        "无效的优先级或预计番茄数",
+      );
       ensure(t.scrapMinutes <= 10080, "重修窗口超出范围");
-      ensure(t.projectId === null || projectIds.has(t.projectId), "任务引用了不存在的项目");
-      ensure(t.habitId === null || habitIds.has(t.habitId), "任务引用了不存在的习惯");
-      ensure(t.habitId === null || t.reminderTime !== null, "习惯实例需要精确时间");
-      ensure(t.dueDate === null || (t.dueDate.length === 10 && validDate(t.dueDate)), "无效的任务日期");
+      ensure(
+        t.projectId === null || projectIds.has(t.projectId),
+        "任务引用了不存在的项目",
+      );
+      ensure(
+        t.habitId === null || habitIds.has(t.habitId),
+        "任务引用了不存在的习惯",
+      );
+      ensure(
+        t.habitId === null || t.reminderTime !== null,
+        "习惯实例需要精确时间",
+      );
+      ensure(
+        t.dueDate === null || (t.dueDate.length === 10 && validDate(t.dueDate)),
+        "无效的任务日期",
+      );
       const subs = new Set<string>();
       ensure(
         t.subtasks.length <= 200 &&
@@ -1265,11 +1614,15 @@ export class AppData {
           }),
         "无效的子任务",
       );
-      ensure(t.completed === (t.completedAt !== null), "任务完成状态与日期不一致");
+      ensure(
+        t.completed === (t.completedAt !== null),
+        "任务完成状态与日期不一致",
+      );
     }
     const t = this.timer;
     ensure(
-      t.cycleDate === null || (t.cycleDate.length === 10 && validDate(t.cycleDate)),
+      t.cycleDate === null ||
+        (t.cycleDate.length === 10 && validDate(t.cycleDate)),
       "无效的番茄周期日期",
     );
     ensure(
@@ -1312,7 +1665,10 @@ export class AppData {
     const current = parseLocalDate(today)!;
     const byDay = new Map<string, { seconds: number; pomodoros: number }>();
     for (const session of this.sessions) {
-      const entry = byDay.get(dateAt(session.endedAt)) ?? { seconds: 0, pomodoros: 0 };
+      const entry = byDay.get(dateAt(session.endedAt)) ?? {
+        seconds: 0,
+        pomodoros: 0,
+      };
       entry.seconds += session.durationSecs;
       entry.pomodoros += session.completed ? 1 : 0;
       byDay.set(dateAt(session.endedAt), entry);
@@ -1323,7 +1679,10 @@ export class AppData {
     const missedByDay = new Map<string, number>();
     for (const t of this.tasks) {
       if (t.completedAt !== null) {
-        completedByDay.set(dateAt(t.completedAt), (completedByDay.get(dateAt(t.completedAt)) ?? 0) + 1);
+        completedByDay.set(
+          dateAt(t.completedAt),
+          (completedByDay.get(dateAt(t.completedAt)) ?? 0) + 1,
+        );
       }
       if (t.reminderExpired && !t.completed && t.dueDate !== null) {
         if (kindOf(t) === "habit") {
@@ -1365,7 +1724,9 @@ export class AppData {
     return {
       todaySeconds: last.seconds,
       todayPomodoros: last.pomodoros,
-      todayCompleted: this.tasks.filter((t) => t.completedAt !== null && dateAt(t.completedAt) === today).length,
+      todayCompleted: this.tasks.filter(
+        (t) => t.completedAt !== null && dateAt(t.completedAt) === today,
+      ).length,
       totalSeconds: this.sessions.reduce((n, s) => n + s.durationSecs, 0),
       totalPomodoros: this.sessions.filter((s) => s.completed).length,
       streak,
@@ -1415,7 +1776,10 @@ export function validAppIds(list: string[]): boolean {
   return (
     list.length <= 100 &&
     list.every(
-      (a) => a.trim().length > 0 && charCount(a) <= 32768 && !Array.from(a).some((c) => isControlChar(c)),
+      (a) =>
+        a.trim().length > 0 &&
+        charCount(a) <= 32768 &&
+        !Array.from(a).some((c) => isControlChar(c)),
     )
   );
 }
@@ -1425,25 +1789,37 @@ function isControlChar(c: string): boolean {
   return code < 0x20 || (code >= 0x7f && code <= 0x9f);
 }
 
-function parseLocalDate(value: string): { year: number; month: number; day: number } | null {
+function parseLocalDate(
+  value: string,
+): { year: number; month: number; day: number } | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const year = Number(value.slice(0, 4));
   const month = Number(value.slice(5, 7));
   const day = Number(value.slice(8, 10));
   const probe = new Date(Date.UTC(year, month - 1, day));
-  if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) {
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) {
     return null;
   }
   return { year, month, day };
 }
 
-function formatLocalDate(date: { year: number; month: number; day: number }): string {
+function formatLocalDate(date: {
+  year: number;
+  month: number;
+  day: number;
+}): string {
   return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 }
 
 export function checkUserAction(action: Action): void {
   if (action.type === "education" && assistantOnly(action.command)) {
-    throw new AppError("课程、作业、试卷和批改由学习助手生成，请在对话中提出要求");
+    throw new AppError(
+      "课程、作业、试卷和批改由学习助手生成，请在对话中提出要求",
+    );
   }
 }
 
@@ -1464,8 +1840,20 @@ export type Action =
   | { type: "deleteTask"; id: string }
   | { type: "restoreTask"; task: Task }
   | { type: "toggleSubtask"; taskId: string; subtaskId: string }
-  | { type: "saveProject"; id: string | null; name: string; color: string; directory: string | null }
-  | { type: "renameProjectDirectory"; id: string; name: string; color: string; directory: string }
+  | {
+      type: "saveProject";
+      id: string | null;
+      name: string;
+      color: string;
+      directory: string | null;
+    }
+  | {
+      type: "renameProjectDirectory";
+      id: string;
+      name: string;
+      color: string;
+      directory: string;
+    }
   | { type: "setProjectWhitelist"; id: string; whitelist: string[] | null }
   | { type: "deleteProject"; id: string }
   | { type: "reorderProjects"; ids: string[] }
@@ -1480,7 +1868,13 @@ export type Action =
       slots: HabitSlot[];
     }
   | { type: "deleteHabit"; id: string }
-  | { type: "saveVision"; id: string | null; name: string; notes: string; projectId: string | null }
+  | {
+      type: "saveVision";
+      id: string | null;
+      name: string;
+      notes: string;
+      projectId: string | null;
+    }
   | { type: "deleteVision"; id: string }
   | {
       type: "saveBlock";
@@ -1538,7 +1932,16 @@ const ACTION_KEYS: Record<string, string[]> = {
   deleteHabit: ["type", "id"],
   saveVision: ["type", "id", "name", "notes", "projectId"],
   deleteVision: ["type", "id"],
-  saveBlock: ["type", "id", "title", "days", "start", "end", "attention", "notes"],
+  saveBlock: [
+    "type",
+    "id",
+    "title",
+    "days",
+    "start",
+    "end",
+    "attention",
+    "notes",
+  ],
   deleteBlock: ["type", "id"],
   selectTask: ["type", "id"],
   startTimer: ["type"],
@@ -1561,29 +1964,50 @@ const ACTION_NAMES = Object.keys(ACTION_KEYS);
 
 export function parseAction(raw: unknown): Action {
   if (!isObject(raw)) throw new AppError("动作必须是对象");
-  const type = oneOf(requiredField(raw, "type", "动作", (v) => v), "动作 type", ACTION_NAMES);
+  const type = oneOf(
+    requiredField(raw, "type", "动作", (v) => v),
+    "动作 type",
+    ACTION_NAMES,
+  );
   rejectUnknown(raw, ACTION_KEYS[type]!, "动作");
   const str = (key: string): string => requiredField(raw, key, "动作", asStr);
   const optStr = (key: string): string | null =>
     field(raw, key, "动作", (v) => asOpt(v, key, asStr), null) as string | null;
   const strs = (key: string): string[] =>
-    asArray(requiredField(raw, key, "动作", (v) => v), key).map((x) => asStr(x, key));
+    asArray(
+      requiredField(raw, key, "动作", (v) => v),
+      key,
+    ).map((x) => asStr(x, key));
   switch (type) {
     case "education":
-      return { type, command: parseCommand(requiredField(raw, "command", "动作", (v) => v)) };
+      return {
+        type,
+        command: parseCommand(requiredField(raw, "command", "动作", (v) => v)),
+      };
     case "printInstances":
       return {
         type,
         shape: parseShape(requiredField(raw, "shape", "动作", (v) => v)),
-        printing: parsePrinting(requiredField(raw, "printing", "动作", (v) => v)),
+        printing: parsePrinting(
+          requiredField(raw, "printing", "动作", (v) => v),
+        ),
       };
     case "saveTemplate":
       return {
         type,
-        template: parseTemplate(requiredField(raw, "template", "动作", (v) => v)),
-        printDates: field(raw, "printDates", "动作", (v) =>
-          asArray(v, "printDates").map((d) => (d === null ? null : asStr(d, "printDates"))),
-        [],) as (string | null)[],
+        template: parseTemplate(
+          requiredField(raw, "template", "动作", (v) => v),
+        ),
+        printDates: field(
+          raw,
+          "printDates",
+          "动作",
+          (v) =>
+            asArray(v, "printDates").map((d) =>
+              d === null ? null : asStr(d, "printDates"),
+            ),
+          [],
+        ) as (string | null)[],
       };
     case "deleteTemplate":
     case "syncTemplate":
@@ -1600,27 +2024,55 @@ export function parseAction(raw: unknown): Action {
       return {
         type,
         id: str("id"),
-        dates: asArray(requiredField(raw, "dates", "动作", (v) => v), "dates").map((d) =>
-          d === null ? null : asStr(d, "dates"),
-        ) as (string | null)[],
+        dates: asArray(
+          requiredField(raw, "dates", "动作", (v) => v),
+          "dates",
+        ).map((d) => (d === null ? null : asStr(d, "dates"))) as (
+          string | null
+        )[],
       };
     case "saveTask":
-      return { type, task: parseTaskDraft(requiredField(raw, "task", "动作", (v) => v)) };
+      return {
+        type,
+        task: parseTaskDraft(requiredField(raw, "task", "动作", (v) => v)),
+      };
     case "restoreTask":
-      return { type, task: parseTask(requiredField(raw, "task", "动作", (v) => v)) };
+      return {
+        type,
+        task: parseTask(requiredField(raw, "task", "动作", (v) => v)),
+      };
     case "toggleSubtask":
       return { type, taskId: str("taskId"), subtaskId: str("subtaskId") };
     case "saveProject":
-      return { type, id: optStr("id"), name: str("name"), color: str("color"), directory: optStr("directory") };
+      return {
+        type,
+        id: optStr("id"),
+        name: str("name"),
+        color: str("color"),
+        directory: optStr("directory"),
+      };
     case "renameProjectDirectory":
-      return { type, id: str("id"), name: str("name"), color: str("color"), directory: str("directory") };
+      return {
+        type,
+        id: str("id"),
+        name: str("name"),
+        color: str("color"),
+        directory: str("directory"),
+      };
     case "setProjectWhitelist":
       return {
         type,
         id: str("id"),
-        whitelist: field(raw, "whitelist", "动作", (v) =>
-          asOpt(v, "whitelist", (x) => asArray(x, "whitelist").map((a) => asStr(a, "whitelist"))),
-        null,) as string[] | null,
+        whitelist: field(
+          raw,
+          "whitelist",
+          "动作",
+          (v) =>
+            asOpt(v, "whitelist", (x) =>
+              asArray(x, "whitelist").map((a) => asStr(a, "whitelist")),
+            ),
+          null,
+        ) as string[] | null,
       };
     case "reorderProjects":
       return { type, ids: strs("ids") };
@@ -1628,7 +2080,11 @@ export function parseAction(raw: unknown): Action {
       return {
         type,
         ids: strs("ids"),
-        target: oneOf(requiredField(raw, "target", "动作", (v) => v), "detach target", ["project", "habit"]) as DetachTarget,
+        target: oneOf(
+          requiredField(raw, "target", "动作", (v) => v),
+          "detach target",
+          ["project", "habit"],
+        ) as DetachTarget,
       };
     case "saveHabitGroup":
       return { type, id: optStr("id"), name: str("name") };
@@ -1638,8 +2094,17 @@ export function parseAction(raw: unknown): Action {
         id: optStr("id"),
         name: str("name"),
         projectId: optStr("projectId"),
-        focusMinutes: field(raw, "focusMinutes", "动作", (v) => asOpt(v, "focusMinutes", (x) => asInt(x, "focusMinutes")), null) as number | null,
-        slots: asArray(requiredField(raw, "slots", "动作", (v) => v), "slots").map(parseHabitSlot),
+        focusMinutes: field(
+          raw,
+          "focusMinutes",
+          "动作",
+          (v) => asOpt(v, "focusMinutes", (x) => asInt(x, "focusMinutes")),
+          null,
+        ) as number | null,
+        slots: asArray(
+          requiredField(raw, "slots", "动作", (v) => v),
+          "slots",
+        ).map(parseHabitSlot),
       };
     case "saveVision":
       return {
@@ -1654,10 +2119,19 @@ export function parseAction(raw: unknown): Action {
         type,
         id: optStr("id"),
         title: str("title"),
-        days: asArray(requiredField(raw, "days", "动作", (v) => v), "days").map((d) => asInt(d, "days")),
+        days: asArray(
+          requiredField(raw, "days", "动作", (v) => v),
+          "days",
+        ).map((d) => asInt(d, "days")),
         start: str("start"),
         end: str("end"),
-        attention: field(raw, "attention", "动作", (v) => oneOf(v, "attention", ["required", "light"]), "required") as Attention,
+        attention: field(
+          raw,
+          "attention",
+          "动作",
+          (v) => oneOf(v, "attention", ["required", "light"]),
+          "required",
+        ) as Attention,
         notes: field(raw, "notes", "动作", asStr, ""),
       };
     case "selectTask":
@@ -1671,15 +2145,38 @@ export function parseAction(raw: unknown): Action {
     case "emergencyUnlock":
       return { type };
     case "setMode":
-      return { type, mode: oneOf(requiredField(raw, "mode", "动作", (v) => v), "mode", ["focus", "shortBreak", "longBreak"]) as Mode };
+      return {
+        type,
+        mode: oneOf(
+          requiredField(raw, "mode", "动作", (v) => v),
+          "mode",
+          ["focus", "shortBreak", "longBreak"],
+        ) as Mode,
+      };
     case "saveSettings":
-      return { type, settings: parseSettings(requiredField(raw, "settings", "动作", (v) => v)) };
+      return {
+        type,
+        settings: parseSettings(
+          requiredField(raw, "settings", "动作", (v) => v),
+        ),
+      };
     case "import":
-      return { type, data: parseAppData(requiredField(raw, "data", "动作", (v) => v)) };
+      return {
+        type,
+        data: parseAppData(requiredField(raw, "data", "动作", (v) => v)),
+      };
     case "importPlan":
-      return { type, plan: parsePlanFile(requiredField(raw, "plan", "动作", (v) => v)) };
+      return {
+        type,
+        plan: parsePlanFile(requiredField(raw, "plan", "动作", (v) => v)),
+      };
     case "saveLockSchedule":
-      return { type, schedule: parseLockSchedule(requiredField(raw, "schedule", "动作", (v) => v)) };
+      return {
+        type,
+        schedule: parseLockSchedule(
+          requiredField(raw, "schedule", "动作", (v) => v),
+        ),
+      };
     case "startQuickLock":
       return {
         type,
@@ -1736,27 +2233,82 @@ export function parseAppData(raw: unknown): AppData {
   return new AppData({
     education: field(raw, "education", "数据", parseEducation, new Education()),
     version: requiredField(raw, "version", "数据", asInt),
-    identities: field(raw, "identities", "数据", (v) => asArray(v, "identities").map(parseIdentity), []),
-    tasks: field(raw, "tasks", "数据", (v) => asArray(v, "tasks").map(parseTask), []),
-    blocks: field(raw, "blocks", "数据", (v) => asArray(v, "blocks").map(parseBlock), []),
-    templates: field(raw, "templates", "数据", (v) => asArray(v, "templates").map(parseTemplate), []),
-    prints: field(raw, "prints", "数据", (v) =>
-      asArray(v, "prints").map((p) => {
-        ensure(isObject(p), "印刷记录必须是对象");
-        rejectUnknown(p, ["templateId", "date"], "印刷记录");
-        return {
-          templateId: requiredField(p, "templateId", "印刷记录", asStr),
-          date: field(p, "date", "印刷记录", (d) => asOpt(d, "date", asStr), null) as string | null,
-        };
-      }),
-    [],),
-    projects: requiredField(raw, "projects", "数据", (v) => asArray(v, "projects").map(parseProject)),
-    habits: field(raw, "habits", "数据", (v) => asArray(v, "habits").map(parseHabit), []),
-    visions: field(raw, "visions", "数据", (v) => asArray(v, "visions").map(parseVision), []),
+    identities: field(
+      raw,
+      "identities",
+      "数据",
+      (v) => asArray(v, "identities").map(parseIdentity),
+      [],
+    ),
+    tasks: field(
+      raw,
+      "tasks",
+      "数据",
+      (v) => asArray(v, "tasks").map(parseTask),
+      [],
+    ),
+    blocks: field(
+      raw,
+      "blocks",
+      "数据",
+      (v) => asArray(v, "blocks").map(parseBlock),
+      [],
+    ),
+    templates: field(
+      raw,
+      "templates",
+      "数据",
+      (v) => asArray(v, "templates").map(parseTemplate),
+      [],
+    ),
+    prints: field(
+      raw,
+      "prints",
+      "数据",
+      (v) =>
+        asArray(v, "prints").map((p) => {
+          ensure(isObject(p), "印刷记录必须是对象");
+          rejectUnknown(p, ["templateId", "date"], "印刷记录");
+          return {
+            templateId: requiredField(p, "templateId", "印刷记录", asStr),
+            date: field(
+              p,
+              "date",
+              "印刷记录",
+              (d) => asOpt(d, "date", asStr),
+              null,
+            ) as string | null,
+          };
+        }),
+      [],
+    ),
+    projects: requiredField(raw, "projects", "数据", (v) =>
+      asArray(v, "projects").map(parseProject),
+    ),
+    habits: field(
+      raw,
+      "habits",
+      "数据",
+      (v) => asArray(v, "habits").map(parseHabit),
+      [],
+    ),
+    visions: field(
+      raw,
+      "visions",
+      "数据",
+      (v) => asArray(v, "visions").map(parseVision),
+      [],
+    ),
     settings: requiredField(raw, "settings", "数据", parseSettings),
     timer: requiredField(raw, "timer", "数据", parseTimer),
-    sessions: requiredField(raw, "sessions", "数据", (v) => asArray(v, "sessions").map(parseSession)),
-    lock: field(raw, "lock", "数据", parseLockState, { schedules: [], active: null, suppressedUntil: 0 }),
+    sessions: requiredField(raw, "sessions", "数据", (v) =>
+      asArray(v, "sessions").map(parseSession),
+    ),
+    lock: field(raw, "lock", "数据", parseLockState, {
+      schedules: [],
+      active: null,
+      suppressedUntil: 0,
+    }),
   });
 }
 

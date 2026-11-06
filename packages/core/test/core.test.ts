@@ -132,7 +132,9 @@ function projectWhitelist(e: Engine, id: string): string[] | null {
 }
 
 /** 见文件头分歧 #2：序列化的 `"active": null` 会让 parseLockState 报错，先去掉该键。 */
-function stripNullActive(value: Record<string, unknown>): Record<string, unknown> {
+function stripNullActive(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
   const lock = value["lock"] as Record<string, unknown> | undefined;
   if (lock !== undefined && lock["active"] === null) {
     delete lock["active"];
@@ -142,7 +144,10 @@ function stripNullActive(value: Record<string, unknown>): Record<string, unknown
 
 /** export 字符串 / 备份 JSON → AppData（绕开分歧 #2，语义不变）。 */
 function parseBackup(raw: string | Record<string, unknown>): AppData {
-  const value = typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : raw;
+  const value =
+    typeof raw === "string"
+      ? (JSON.parse(raw) as Record<string, unknown>)
+      : raw;
   return parseAppData(stripNullActive(value));
 }
 
@@ -194,7 +199,9 @@ describe("crates/core/src/tests.rs 移植", () => {
       expect(exported.settings.soundVolume).toBe(level);
     }
     const bad: Settings = { ...defaultSettings(), soundVolume: 101 };
-    expect(() => e.dispatch({ type: "saveSettings", settings: bad }, 1000)).toThrow();
+    expect(() =>
+      e.dispatch({ type: "saveSettings", settings: bad }, 1000),
+    ).toThrow();
     expect(e.snapshot(1000).data.settings.soundVolume).toBe(100);
   });
 
@@ -242,7 +249,10 @@ describe("crates/core/src/tests.rs 移植", () => {
 
   it("scheduled_sleep_crosses_midnight_and_does_not_count_as_focus", () => {
     const e = engine();
-    e.dispatch({ type: "saveLockSchedule", schedule: sleepSchedule(true) }, friday(22, 0));
+    e.dispatch(
+      { type: "saveLockSchedule", schedule: sleepSchedule(true) },
+      friday(22, 0),
+    );
     expect(e.snapshot(friday(22, 59)).data.protected()).toBe(false);
     e.dispatch({ type: "startTimer" }, friday(22, 58));
     const at = friday(23, 0);
@@ -263,14 +273,22 @@ describe("crates/core/src/tests.rs 移植", () => {
   it("ordinary_lock_can_end_once_strict_quick_lock_survives_restart", () => {
     const path = tempPath("lock.json");
     let e = Engine.open(path);
-    e.dispatch({ type: "saveLockSchedule", schedule: sleepSchedule(false) }, friday(22, 0));
+    e.dispatch(
+      { type: "saveLockSchedule", schedule: sleepSchedule(false) },
+      friday(22, 0),
+    );
     e.snapshot(friday(23, 0));
     e.dispatch({ type: "emergencyUnlock" }, friday(23, 1));
     expect(e.snapshot(friday(23, 2)).data.protected()).toBe(false);
-    e.dispatch({ type: "startQuickLock", minutes: 2, strict: true }, friday(23, 3));
+    e.dispatch(
+      { type: "startQuickLock", minutes: 2, strict: true },
+      friday(23, 3),
+    );
     e = Engine.open(path);
     expect(e.snapshot(friday(23, 4)).data.strictProtected()).toBe(true);
-    expect(() => e.dispatch({ type: "emergencyUnlock" }, friday(23, 4))).toThrow();
+    expect(() =>
+      e.dispatch({ type: "emergencyUnlock" }, friday(23, 4)),
+    ).toThrow();
     expect(e.snapshot(friday(23, 5)).data.protected()).toBe(false);
     expect(e.data.sessions).toHaveLength(0);
   });
@@ -281,15 +299,22 @@ describe("crates/core/src/tests.rs 移植", () => {
     const before = e.export(now);
     const invalid = sleepSchedule(true);
     invalid.start = "25:00";
-    expect(() => e.dispatch({ type: "saveLockSchedule", schedule: invalid }, now)).toThrow();
+    expect(() =>
+      e.dispatch({ type: "saveLockSchedule", schedule: invalid }, now),
+    ).toThrow();
     expect(e.export(now)).toBe(before);
-    e.dispatch({ type: "saveLockSchedule", schedule: sleepSchedule(true) }, now);
+    e.dispatch(
+      { type: "saveLockSchedule", schedule: sleepSchedule(true) },
+      now,
+    );
     const overlap = sleepSchedule(false);
     overlap.id = "overlap";
     overlap.days = [6];
     overlap.start = "06:00";
     overlap.end = "08:00";
-    expect(() => e.dispatch({ type: "saveLockSchedule", schedule: overlap }, now)).toThrow();
+    expect(() =>
+      e.dispatch({ type: "saveLockSchedule", schedule: overlap }, now),
+    ).toThrow();
     const backup = e.snapshot(now).data;
     const s = e.dispatch({ type: "import", data: backup }, now);
     expect(s.data.lock.schedules[0]!.enabled).toBe(false);
@@ -297,7 +322,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     const oldRaw = serializeAppData(new AppData());
     delete oldRaw["lock"];
     const oldRawSettings = oldRaw["settings"] as Record<string, unknown>;
-    const oldRawProtection = oldRawSettings["protection"] as Record<string, unknown>;
+    const oldRawProtection = oldRawSettings["protection"] as Record<
+      string,
+      unknown
+    >;
     delete oldRawProtection["strict"];
     const old = parseAppData(oldRaw);
     expect(old.lock.schedules).toHaveLength(0);
@@ -315,8 +343,14 @@ describe("crates/core/src/tests.rs 移植", () => {
 
   it("ending_a_quick_break_does_not_cancel_the_upcoming_sleep_window", () => {
     const e = engine();
-    e.dispatch({ type: "saveLockSchedule", schedule: sleepSchedule(true) }, friday(22, 0));
-    e.dispatch({ type: "startQuickLock", minutes: 30, strict: false }, friday(22, 59));
+    e.dispatch(
+      { type: "saveLockSchedule", schedule: sleepSchedule(true) },
+      friday(22, 0),
+    );
+    e.dispatch(
+      { type: "startQuickLock", minutes: 30, strict: false },
+      friday(22, 59),
+    );
     e.dispatch({ type: "emergencyUnlock" }, friday(22, 59) + 10);
     expect(e.snapshot(friday(23, 0)).data.strictProtected()).toBe(true);
   });
@@ -337,7 +371,11 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(first.data.sessions).toHaveLength(before.sessions.length);
     const task = first.data.tasks[0]!;
     e.dispatch(
-      { type: "toggleSubtask", taskId: task.id, subtaskId: task.subtasks[0]!.id },
+      {
+        type: "toggleSubtask",
+        taskId: task.id,
+        subtaskId: task.subtasks[0]!.id,
+      },
       1020,
     );
     const exported = e.snapshot(1020).data.exportPlan();
@@ -345,10 +383,17 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(exported.pomodoroMinutes).toBe(30);
     expect(exported.projects).toHaveLength(1);
     // 计划文件不带执行历史与本机设置。
-    expect(Object.prototype.hasOwnProperty.call(exported, "settings")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(exported.tasks[0]!, "completed")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(exported, "settings")).toBe(
+      false,
+    );
     expect(
-      Object.prototype.hasOwnProperty.call(exported.tasks[0]!.subtasks[0]!, "done"),
+      Object.prototype.hasOwnProperty.call(exported.tasks[0]!, "completed"),
+    ).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        exported.tasks[0]!.subtasks[0]!,
+        "done",
+      ),
     ).toBe(false);
     const second = e.dispatch({ type: "importPlan", plan: exported }, 1030);
     expect(second.data.tasks).toHaveLength(1);
@@ -359,7 +404,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(third.data.tasks[0]!.completed).toBe(true);
     expect(third.data.exportPlan().tasks).toHaveLength(0);
     const fresh = engine();
-    const imported = fresh.dispatch({ type: "importPlan", plan: exported }, 1060);
+    const imported = fresh.dispatch(
+      { type: "importPlan", plan: exported },
+      1060,
+    );
     // ceil(2*30/25)
     expect(imported.data.tasks[0]!.estimate).toBe(3);
     expect(imported.data.tasks[0]!.subtasks[0]!.done).toBe(false);
@@ -389,13 +437,14 @@ describe("crates/core/src/tests.rs 移植", () => {
     plan.tasks[0]!.estimate = 99;
     cases.push(plan);
     for (const candidate of cases) {
-      expect(() => e.dispatch({ type: "importPlan", plan: candidate }, 1000)).toThrow();
+      expect(() =>
+        e.dispatch({ type: "importPlan", plan: candidate }, 1000),
+      ).toThrow();
       expect(e.export(1000)).toBe(before);
     }
-    const json = JSON.parse(JSON.stringify(serializePlanFile(examplePlan()))) as Record<
-      string,
-      unknown
-    >;
+    const json = JSON.parse(
+      JSON.stringify(serializePlanFile(examplePlan())),
+    ) as Record<string, unknown>;
     const tasks = json["tasks"] as Record<string, unknown>[];
     (tasks[0] as Record<string, unknown>)["completed"] = true;
     expect(() => parsePlanFile(json)).toThrow();
@@ -438,7 +487,10 @@ describe("crates/core/src/tests.rs 移植", () => {
       ),
     );
     e.dispatch({ type: "importPlan", plan: update }, 1010);
-    expect(projectWhitelist(e, "english")).toEqual(["org.mozilla.firefox", "mdict"]);
+    expect(projectWhitelist(e, "english")).toEqual([
+      "org.mozilla.firefox",
+      "mdict",
+    ]);
 
     // Omitting the field keeps the local list instead of clearing it.
     const keep = parsePlanFile(
@@ -447,7 +499,10 @@ describe("crates/core/src/tests.rs 移植", () => {
       ),
     );
     e.dispatch({ type: "importPlan", plan: keep }, 1020);
-    expect(projectWhitelist(e, "english")).toEqual(["org.mozilla.firefox", "mdict"]);
+    expect(projectWhitelist(e, "english")).toEqual([
+      "org.mozilla.firefox",
+      "mdict",
+    ]);
   });
 
   it("plan_import_updates_configuration_while_keeping_progress", () => {
@@ -457,7 +512,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     d.subtasks = [{ id: "s1", title: "第一步", done: false }];
     const s = e.dispatch({ type: "saveTask", task: d }, friday(8, 0));
     const id = s.data.tasks[0]!.id;
-    e.dispatch({ type: "toggleSubtask", taskId: id, subtaskId: "s1" }, friday(9, 0));
+    e.dispatch(
+      { type: "toggleSubtask", taskId: id, subtaskId: "s1" },
+      friday(9, 0),
+    );
     const plan = e.snapshot(friday(9, 1)).data.exportPlan();
     // Editing the file must now change the plan, not be silently ignored.
     plan.tasks[0]!.title = "改过的标题";
@@ -496,7 +554,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     const e = engine();
     const settings: Settings = {
       ...defaultSettings(),
-      protection: { ...defaultSettings().protection, whitelist: ["global.app"] },
+      protection: {
+        ...defaultSettings().protection,
+        whitelist: ["global.app"],
+      },
     };
     e.dispatch({ type: "saveSettings", settings }, 1000);
     const ps = e.dispatch(
@@ -520,16 +581,28 @@ describe("crates/core/src/tests.rs 移植", () => {
     e.dispatch({ type: "selectTask", id: task }, 1000);
     // Without a dedicated list the global list still applies.
     expect(e.snapshot(1000).data.effectiveWhitelist()).toEqual(["global.app"]);
-    e.dispatch({ type: "setProjectWhitelist", id: project, whitelist: ["dict"] }, 1000);
+    e.dispatch(
+      { type: "setProjectWhitelist", id: project, whitelist: ["dict"] },
+      1000,
+    );
     expect(e.snapshot(1000).data.effectiveWhitelist()).toEqual(["dict"]);
     // Disabling falls back to the global list.
-    e.dispatch({ type: "setProjectWhitelist", id: project, whitelist: null }, 1000);
+    e.dispatch(
+      { type: "setProjectWhitelist", id: project, whitelist: null },
+      1000,
+    );
     expect(e.snapshot(1000).data.effectiveWhitelist()).toEqual(["global.app"]);
     // A blank project app ID is rejected without clobbering the stored list.
     expect(() =>
-      e.dispatch({ type: "setProjectWhitelist", id: project, whitelist: ["  "] }, 1000),
+      e.dispatch(
+        { type: "setProjectWhitelist", id: project, whitelist: ["  "] },
+        1000,
+      ),
     ).toThrow();
-    e.dispatch({ type: "setProjectWhitelist", id: project, whitelist: ["dict"] }, 1000);
+    e.dispatch(
+      { type: "setProjectWhitelist", id: project, whitelist: ["dict"] },
+      1000,
+    );
     expect(e.snapshot(1000).data.effectiveWhitelist()).toEqual(["dict"]);
   });
 
@@ -553,21 +626,32 @@ describe("crates/core/src/tests.rs 移植", () => {
       1000,
     );
     const project = ps.data.projects[ps.data.projects.length - 1]!.id;
-    e.dispatch({ type: "setProjectWhitelist", id: project, whitelist: [path] }, 1000);
-    e.dispatch({ type: "saveTask", task: { ...draft(), projectId: project } }, 1000);
+    e.dispatch(
+      { type: "setProjectWhitelist", id: project, whitelist: [path] },
+      1000,
+    );
+    e.dispatch(
+      { type: "saveTask", task: { ...draft(), projectId: project } },
+      1000,
+    );
     const raw = e.export(1000);
     const restored = engine();
     const data = parseBackup(raw);
     const snapshot = restored.dispatch({ type: "import", data }, 1000);
     expect(snapshot.data.settings.protection.whitelist).toEqual([path]);
-    expect(snapshot.data.projects.find((p) => p.id === project)!.appWhitelist).toEqual([
-      path,
-    ]);
+    expect(
+      snapshot.data.projects.find((p) => p.id === project)!.appWhitelist,
+    ).toEqual([path]);
     const plan = snapshot.data.exportPlan();
     validatePlanFile(plan);
-    expect(plan.projects.find((p) => p.id === project)!.appWhitelist).toEqual([path]);
+    expect(plan.projects.find((p) => p.id === project)!.appWhitelist).toEqual([
+      path,
+    ]);
     const invalid = structuredClone(snapshot.data.settings);
-    invalid.protection = { ...invalid.protection, whitelist: ["x".repeat(32769)] };
+    invalid.protection = {
+      ...invalid.protection,
+      whitelist: ["x".repeat(32769)],
+    };
     expect(() =>
       restored.dispatch({ type: "saveSettings", settings: invalid }, 1000),
     ).toThrow();
@@ -591,7 +675,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     e.dispatch({ type: "saveTask", task: appointment }, friday(8, 0));
     const s = e.snapshot(friday(16, 0));
     expect(
-      s.data.tasks.filter((t) => t.dueDate === "2026-10-09").every((t) => t.reminderExpired),
+      s.data.tasks
+        .filter((t) => t.dueDate === "2026-10-09")
+        .every((t) => t.reminderExpired),
     ).toBe(true);
     const day = s.stats.days.find((d) => d.date === "2026-10-09")!;
     expect(day.missed).toBe(1);
@@ -626,7 +712,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(s2.data.tasks.filter((t) => t.habitId === habit)).toHaveLength(3);
     // Deleting the habit leaves the occurrence as an ordinary timed task.
     e.dispatch({ type: "deleteHabit", id: habit }, friday(8, 2));
-    expect(e.snapshot(friday(8, 2)).data.tasks.every((t) => t.habitId === null)).toBe(true);
+    expect(
+      e.snapshot(friday(8, 2)).data.tasks.every((t) => t.habitId === null),
+    ).toBe(true);
   });
 
   it("habit_validation_rejects_duplicate_slots_and_bad_times", () => {
@@ -669,19 +757,33 @@ describe("crates/core/src/tests.rs 移植", () => {
     );
     const project = e.snapshot(1000).data.projects[0]!.id;
     e.dispatch(
-      { type: "saveVision", id: null, name: "英语一 80", notes: "", projectId: project },
+      {
+        type: "saveVision",
+        id: null,
+        name: "英语一 80",
+        notes: "",
+        projectId: project,
+      },
       1000,
     );
     expect(e.snapshot(1000).data.visions).toHaveLength(2);
     expect(() =>
       e.dispatch(
-        { type: "saveVision", id: null, name: "无效", notes: "", projectId: "missing" },
+        {
+          type: "saveVision",
+          id: null,
+          name: "无效",
+          notes: "",
+          projectId: "missing",
+        },
         1000,
       ),
     ).toThrow();
     // Deleting the owner drops its marker.
     e.dispatch({ type: "deleteProject", id: project }, 1000);
-    expect(e.snapshot(1000).data.visions.every((a) => a.projectId === null)).toBe(true);
+    expect(
+      e.snapshot(1000).data.visions.every((a) => a.projectId === null),
+    ).toBe(true);
   });
 
   it("deleting_a_habit_occurrence_does_not_regenerate_it", () => {
@@ -703,7 +805,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     e.dispatch({ type: "deleteTask", id: task }, friday(8, 1));
     const s2 = e.snapshot(friday(8, 2));
     expect(
-      s2.data.tasks.every((t) => t.habitId !== habit || t.dueDate !== "2026-10-09"),
+      s2.data.tasks.every(
+        (t) => t.habitId !== habit || t.dueDate !== "2026-10-09",
+      ),
     ).toBe(true);
   });
 
@@ -729,8 +833,12 @@ describe("crates/core/src/tests.rs 移植", () => {
     d.estimate = 1; // planned block ends 09:25
     d.scrapMinutes = 120; // repairable until 11:25
     e.dispatch({ type: "saveTask", task: d }, friday(8, 0));
-    expect(e.snapshot(friday(10, 0)).data.tasks[0]!.reminderExpired).toBe(false);
-    expect(e.snapshot(friday(11, 30)).data.tasks[0]!.reminderExpired).toBe(true);
+    expect(e.snapshot(friday(10, 0)).data.tasks[0]!.reminderExpired).toBe(
+      false,
+    );
+    expect(e.snapshot(friday(11, 30)).data.tasks[0]!.reminderExpired).toBe(
+      true,
+    );
   });
 
   it("projects_reorder_only_as_a_permutation", () => {
@@ -739,8 +847,12 @@ describe("crates/core/src/tests.rs 移植", () => {
     const reversed = [...ids].reverse();
     const s = e.dispatch({ type: "reorderProjects", ids: reversed }, 1000);
     expect(s.data.projects.map((p) => p.id)).toEqual(reversed);
-    expect(() => e.dispatch({ type: "reorderProjects", ids: ["missing"] }, 1000)).toThrow();
-    expect(() => e.dispatch({ type: "reorderProjects", ids: [ids[0]!] }, 1000)).toThrow();
+    expect(() =>
+      e.dispatch({ type: "reorderProjects", ids: ["missing"] }, 1000),
+    ).toThrow();
+    expect(() =>
+      e.dispatch({ type: "reorderProjects", ids: [ids[0]!] }, 1000),
+    ).toThrow();
   });
 
   it("protection_rejects_mutations_until_emergency_or_completion", () => {
@@ -777,7 +889,13 @@ describe("crates/core/src/tests.rs 移植", () => {
     // The whole workweek was printed at creation.
     expect(s2.data.tasks).toHaveLength(5);
     expect(new Set(s2.data.tasks.map((t) => t.dueDate!))).toEqual(
-      new Set(["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"]),
+      new Set([
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+        "2026-10-08",
+        "2026-10-09",
+      ]),
     );
     e.dispatch({ type: "toggleTask", id: taskId }, at);
     e.dispatch({ type: "toggleTask", id: taskId }, at);
@@ -870,10 +988,12 @@ describe("crates/core/src/tests.rs 移植", () => {
   it("task_completion_settles_running_focus_without_affecting_other_tasks", () => {
     const e = engine();
     const at = friday(9, 0);
-    const a = e.dispatch({ type: "saveTask", task: draft() }, at).data.tasks[0]!.id;
+    const a = e.dispatch({ type: "saveTask", task: draft() }, at).data.tasks[0]!
+      .id;
     const other = draft();
     other.focusMinutes = 10;
-    const b = e.dispatch({ type: "saveTask", task: other }, at).data.tasks[1]!.id;
+    const b = e.dispatch({ type: "saveTask", task: other }, at).data.tasks[1]!
+      .id;
     e.dispatch({ type: "selectTask", id: a }, at);
     e.dispatch({ type: "startTimer" }, at);
     const s = e.dispatch({ type: "toggleTask", id: b }, at + 120);
@@ -882,7 +1002,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     const s2 = e.dispatch({ type: "toggleTask", id: a }, at + 600);
     expect(s2.data.timer.running).toBe(false);
     expect(s2.stats.totalSeconds).toBe(4200);
-    expect(s2.data.sessions.find((x) => x.source === "timer")!.durationSecs).toBe(600);
+    expect(
+      s2.data.sessions.find((x) => x.source === "timer")!.durationSecs,
+    ).toBe(600);
     expect(s2.stats.totalPomodoros).toBe(0);
   });
 
@@ -912,7 +1034,8 @@ describe("crates/core/src/tests.rs 移植", () => {
   it("completion_credit_is_assigned_to_completion_day_without_rewriting_actual_history", () => {
     const e = engine();
     const at = friday(12, 0);
-    const taskId = e.dispatch({ type: "saveTask", task: draft() }, at).data.tasks[0]!.id;
+    const taskId = e.dispatch({ type: "saveTask", task: draft() }, at).data
+      .tasks[0]!.id;
     e.dispatch({ type: "selectTask", id: taskId }, at);
     e.dispatch({ type: "startTimer" }, at);
     e.dispatch({ type: "resetTimer" }, at + 600);
@@ -939,7 +1062,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     const at = friday(23, 0);
     for (let day = 0; day < 3; day += 1) {
       const t = at + day * 86400;
-      const taskId = e.dispatch({ type: "saveTask", task: draft() }, t).data.tasks.at(-1)!.id;
+      const taskId = e
+        .dispatch({ type: "saveTask", task: draft() }, t)
+        .data.tasks.at(-1)!.id;
       e.dispatch({ type: "toggleTask", id: taskId }, t);
     }
     const s = e.snapshot(at + 2 * 86400);
@@ -1192,7 +1317,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(() => e.dispatch({ type: "saveTask", task: d }, 1000)).toThrow();
     expect(e.data.tasks).toHaveLength(0);
     const settings: Settings = { ...defaultSettings(), longBreakEvery: 0 };
-    expect(() => e.dispatch({ type: "saveSettings", settings }, 1000)).toThrow();
+    expect(() =>
+      e.dispatch({ type: "saveSettings", settings }, 1000),
+    ).toThrow();
     expect(e.data.settings.longBreakEvery).toBe(4);
   });
 
@@ -1200,7 +1327,11 @@ describe("crates/core/src/tests.rs 移植", () => {
     const path = tempPath("reopen.json");
     {
       const e = Engine.open(path);
-      const settings: Settings = { ...defaultSettings(), autoBreak: true, autoFocus: true };
+      const settings: Settings = {
+        ...defaultSettings(),
+        autoBreak: true,
+        autoFocus: true,
+      };
       e.dispatch({ type: "saveSettings", settings }, 1000);
       e.dispatch({ type: "startTimer" }, 1000);
     }
@@ -1277,7 +1408,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(s2.data.tasks[0]!.reminderPending).toBe(true);
     expect(s2.data.pendingReminder()).toBeNull();
     e.dispatch({ type: "pauseTimer" }, friday(9, 0));
-    expect(() => e.dispatch({ type: "startReminder", id: taskId }, friday(9, 1))).toThrow();
+    expect(() =>
+      e.dispatch({ type: "startReminder", id: taskId }, friday(9, 1)),
+    ).toThrow();
     const s3 = e.dispatch({ type: "resetTimer" }, friday(9, 1));
     expect(s3.data.pendingReminder()!.id).toBe(taskId);
     const s4 = e.dispatch({ type: "startReminder", id: taskId }, friday(9, 1));
@@ -1292,7 +1425,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     const d = draft();
     d.dueDate = "2026-10-09";
     d.reminderTime = "09:00";
-    const s = e.dispatch({ type: "saveTask", task: structuredClone(d) }, friday(9, 1));
+    const s = e.dispatch(
+      { type: "saveTask", task: structuredClone(d) },
+      friday(9, 1),
+    );
     const taskId = s.data.tasks[0]!.id;
     expect(s.data.pendingReminder()).not.toBeNull();
     // There is no dismiss action: an unhandled reminder stays pending, and
@@ -1365,7 +1501,9 @@ describe("crates/core/src/tests.rs 移植", () => {
       const d = draft();
       d.dueDate = "2026-10-09";
       d.reminderTime = time;
-      expect(() => e.dispatch({ type: "saveTask", task: d }, friday(8, 0))).toThrow();
+      expect(() =>
+        e.dispatch({ type: "saveTask", task: d }, friday(8, 0)),
+      ).toThrow();
     }
     const d = draft();
     d.dueDate = null;
@@ -1375,7 +1513,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     ).toThrow();
     d.dueDate = "2026-10-09";
     e.dispatch({ type: "saveTask", task: d }, friday(8, 59));
-    e.dispatch({ type: "startQuickLock", minutes: 2, strict: false }, friday(8, 59));
+    e.dispatch(
+      { type: "startQuickLock", minutes: 2, strict: false },
+      friday(8, 59),
+    );
     expect(e.snapshot(friday(9, 0)).data.pendingReminder()).toBeNull();
     expect(e.snapshot(friday(9, 1)).data.pendingReminder()).not.toBeNull();
   });
@@ -1423,9 +1564,20 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(t.reminderTime).toBe("09:00");
     plan.version = 1;
     expect(() => validatePlanFile(plan)).toThrow();
-    const json = JSON.parse(JSON.stringify(serializeAppData(s.data))) as Record<string, unknown>;
-    const task = (json["tasks"] as Record<string, unknown>[])[0] as Record<string, unknown>;
-    for (const key of ["focusMinutes", "reminderTime", "reminderFired", "reminderPending"]) {
+    const json = JSON.parse(JSON.stringify(serializeAppData(s.data))) as Record<
+      string,
+      unknown
+    >;
+    const task = (json["tasks"] as Record<string, unknown>[])[0] as Record<
+      string,
+      unknown
+    >;
+    for (const key of [
+      "focusMinutes",
+      "reminderTime",
+      "reminderFired",
+      "reminderPending",
+    ]) {
       delete task[key];
     }
     const old = parseBackup(json);
@@ -1448,7 +1600,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(s2.data.pendingReminder()!.reminderTime).toBe("09:01");
     const bad = draft();
     bad.focusMinutes = 0;
-    expect(() => e.dispatch({ type: "saveTask", task: bad }, friday(9, 2))).toThrow();
+    expect(() =>
+      e.dispatch({ type: "saveTask", task: bad }, friday(9, 2)),
+    ).toThrow();
   });
 
   it("imported_partial_timer_keeps_remaining_time_and_defers_reminders", () => {
@@ -1487,10 +1641,9 @@ describe("crates/core/src/tests.rs 移植", () => {
     validatePlanFile(exported);
 
     // Bands are a v5 idea: a v4 file may not smuggle them in.
-    const legacyRaw = JSON.parse(JSON.stringify(serializePlanFile(exported))) as Record<
-      string,
-      unknown
-    >;
+    const legacyRaw = JSON.parse(
+      JSON.stringify(serializePlanFile(exported)),
+    ) as Record<string, unknown>;
     legacyRaw["version"] = 4;
     const legacy = parsePlanFile(legacyRaw);
     expect(() => validatePlanFile(legacy)).toThrow();
@@ -1555,13 +1708,14 @@ describe("crates/core/src/tests.rs 移植", () => {
     const s = e.dispatch({ type: "saveTask", task: draft() }, at);
     expect(s.data.tasks[0]!.reminderTime).toBeNull();
     expect(s.data.tasks[0]!.dueDate).toBe("2026-10-09");
-    const planJson = JSON.parse(JSON.stringify(serializePlanFile(examplePlan()))) as Record<
-      string,
-      unknown
-    >;
+    const planJson = JSON.parse(
+      JSON.stringify(serializePlanFile(examplePlan())),
+    ) as Record<string, unknown>;
     planJson["goals"] = [];
     expect(() => parsePlanFile(planJson)).toThrow();
-    expect(() => parseAction({ type: "saveGoal", name: "旧目标", nodes: [] })).toThrow();
+    expect(() =>
+      parseAction({ type: "saveGoal", name: "旧目标", nodes: [] }),
+    ).toThrow();
   });
 
   it("local_v3_upgrade_removes_mainlines_and_preserves_tasks_and_history", () => {
@@ -1584,10 +1738,15 @@ describe("crates/core/src/tests.rs 移植", () => {
       },
     ];
     legacy["prints"] = [{ templateId: "old-manual-template", date: null }];
-    legacy["visions"] = [{ id: "old-vision", name: "方向", goalId: "retired-goal" }];
+    legacy["visions"] = [
+      { id: "old-vision", name: "方向", goalId: "retired-goal" },
+    ];
     for (const record of legacy["identities"] as Record<string, unknown>[]) {
       if (typeof record["restoreTask"] === "string") {
-        const task = JSON.parse(record["restoreTask"]) as Record<string, unknown>;
+        const task = JSON.parse(record["restoreTask"]) as Record<
+          string,
+          unknown
+        >;
         task["goalId"] = "retired-goal";
         task["nodeId"] = "retired-node";
         task["dueDate"] = null;
@@ -1624,7 +1783,9 @@ describe("crates/core/src/tests.rs 移植", () => {
       expect(printing.time).toBeNull();
     }
     expect(
-      data.identities.every((r) => !["goal", "node", "signal"].includes(r.kind)),
+      data.identities.every(
+        (r) => !["goal", "node", "signal"].includes(r.kind),
+      ),
     ).toBe(true);
     const restoredTask = parseTask(
       JSON.parse(data.identities.find((r) => r.id === deletedId)!.restoreTask!),
@@ -1715,7 +1876,13 @@ describe("crates/core/src/tests.rs 移植", () => {
           evidence: ["课程目录"],
           rationale: "按周推进",
           milestones: [
-            { week: 1, topics: ["极限"], resourceIds: ["mock"], objective: "掌握基础", lessonCount: 1 },
+            {
+              week: 1,
+              topics: ["极限"],
+              resourceIds: ["mock"],
+              objective: "掌握基础",
+              lessonCount: 1,
+            },
           ],
         },
       ],
@@ -1746,7 +1913,9 @@ describe("crates/core/src/tests.rs 移植", () => {
               estimatedMinutes: 30,
               answer: "1",
               acceptableAlternatives: "等价推导",
-              scoring: [{ id: "p1", description: "正确使用极限法则", points: 5 }],
+              scoring: [
+                { id: "p1", description: "正确使用极限法则", points: 5 },
+              ],
             },
           ],
           publishedAt: 0,
@@ -1763,15 +1932,24 @@ describe("crates/core/src/tests.rs 移植", () => {
     e.dispatch({ type: "import", data }, friday(7, 1));
     const settings: Settings = { ...defaultSettings(), focusMinutes: 120 };
     e.dispatch({ type: "saveSettings", settings }, friday(8, 0));
-    e.dispatch({ type: "education", command: { op: "confirmPrinted", id: "exam" } }, friday(8, 10));
+    e.dispatch(
+      { type: "education", command: { op: "confirmPrinted", id: "exam" } },
+      friday(8, 10),
+    );
     e.dispatch({ type: "startTimer" }, friday(8, 15));
     const runningErr = (): void => {
-      e.dispatch({ type: "education", command: { op: "startExam", id: "exam" } }, friday(9, 0));
+      e.dispatch(
+        { type: "education", command: { op: "startExam", id: "exam" } },
+        friday(9, 0),
+      );
     };
     expect(runningErr).toThrow("请先结束当前计时或锁机，再开始考试");
     e.dispatch({ type: "pauseTimer" }, friday(9, 1));
     const pausedErr = (): void => {
-      e.dispatch({ type: "education", command: { op: "startExam", id: "exam" } }, friday(9, 2));
+      e.dispatch(
+        { type: "education", command: { op: "startExam", id: "exam" } },
+        friday(9, 2),
+      );
     };
     expect(pausedErr).toThrow("请先结束当前计时或锁机，再开始考试");
     e.dispatch({ type: "resetTimer" }, friday(9, 3));
@@ -1796,7 +1974,8 @@ describe("crates/core/src/tests.rs 移植", () => {
     const task = draft();
     task.focusMinutes = 1;
     task.estimate = 2;
-    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data.tasks[0]!.id;
+    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data
+      .tasks[0]!.id;
     e.dispatch({ type: "selectTask", id: taskId }, friday(8, 0));
     e.dispatch({ type: "startTimer" }, friday(8, 0));
     e.snapshot(friday(8, 1));
@@ -1827,7 +2006,8 @@ describe("crates/core/src/tests.rs 移植", () => {
     e.dispatch({ type: "saveSettings", settings }, friday(8, 0));
     const task = draft();
     task.focusMinutes = 1;
-    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data.tasks[0]!.id;
+    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data
+      .tasks[0]!.id;
     e.dispatch({ type: "selectTask", id: taskId }, friday(8, 0));
     e.dispatch({ type: "startTimer" }, friday(8, 0));
     e.snapshot(friday(8, 1));
@@ -1847,7 +2027,8 @@ describe("crates/core/src/tests.rs 移植", () => {
     const task = draft();
     task.reminderTime = "09:00";
     task.focusMinutes = 45;
-    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data.tasks[0]!.id;
+    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data
+      .tasks[0]!.id;
     e.dispatch({ type: "startTimer" }, friday(8, 50));
     e.dispatch({ type: "pauseTimer" }, friday(8, 51));
     const s = e.snapshot(friday(9, 0));
@@ -1865,7 +2046,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     later.focusMinutes = 1;
     later.estimate = 1;
     e.dispatch({ type: "saveTask", task: later }, friday(9, 3));
-    e.dispatch({ type: "startQuickLock", minutes: 5, strict: true }, friday(9, 59));
+    e.dispatch(
+      { type: "startQuickLock", minutes: 5, strict: true },
+      friday(9, 59),
+    );
     expect(e.snapshot(friday(10, 0)).data.timer.running).toBe(false);
     const s3 = e.snapshot(friday(10, 4));
     expect(s3.data.timer.running).toBe(false);
@@ -1886,7 +2070,8 @@ describe("crates/core/src/tests.rs 移植", () => {
     const task = draft();
     task.reminderTime = "08:02";
     task.focusMinutes = 45;
-    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data.tasks[0]!.id;
+    const taskId = e.dispatch({ type: "saveTask", task }, friday(8, 0)).data
+      .tasks[0]!.id;
     e.dispatch({ type: "startTimer" }, friday(8, 0));
     e.snapshot(friday(8, 1));
     const s = e.snapshot(friday(8, 2));
@@ -1895,7 +2080,10 @@ describe("crates/core/src/tests.rs 移植", () => {
     expect(s.remainingSecs).toBe(2700);
     const backup = parseBackup(e.export(friday(8, 2)));
     const restored = engine();
-    const s2 = restored.dispatch({ type: "import", data: backup }, friday(8, 2));
+    const s2 = restored.dispatch(
+      { type: "import", data: backup },
+      friday(8, 2),
+    );
     expect(s2.data.settings.autoStartTasks).toBe(false);
     expect(s2.data.timer.running).toBe(false);
     const oldRaw = serializeAppData(new AppData());

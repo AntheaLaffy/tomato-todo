@@ -1,22 +1,16 @@
 {
   "name": "tomato-todo-rewrite",
-  "version": "0.12.4",
+  "version": "0.13.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.10.1",
   "scripts": {
     "core:test": "pnpm --filter @tomato/core test",
-    "runtime:test": "node --test runtime/test/",
+    "runtime:test": "cd runtime && node --test",
     "build:runtime": "node scripts/build-runtime.mjs",
-    "format": "prettier --write \"packages/**/*.ts\" \"runtime/**/*.{ts,mjs}\" \"plugin/**/*.{js,json,yml}\" scripts tests",
-    "check": "pnpm core:test && pnpm runtime:test"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.10.1",
-    "dompurify": "^3.4.17",
-    "katex": "^0.19.0",
-    "lucide": "^1.53.0",
-    "marked": "^18.1.1"
+    "format": "prettier --write \"packages/**/*.ts\" \"runtime/**/*.{ts,mjs}\" \"plugin/**/*.{js,json,yml}\" \"scripts/**/*.{mjs,js}\"",
+    "check": "pnpm core:test && pnpm runtime:test",
+    "check:handbook": "python3 scripts/check-handbook.py"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

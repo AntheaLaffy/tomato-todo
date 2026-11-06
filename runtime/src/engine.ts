@@ -232,7 +232,9 @@ export class Engine {
       try {
         plan = JSON.parse(readFileSync(planFile, "utf8")) as PlanFile;
       } catch (error) {
-        throw new Error(`plan.json 读取失败：${String(error?.message ?? error)}`);
+        throw new Error(
+          `plan.json 读取失败：${String(error?.message ?? error)}`,
+        );
       }
     }
     let state = defaultState();
@@ -240,10 +242,14 @@ export class Engine {
       try {
         state = {
           ...defaultState(),
-          ...(JSON.parse(readFileSync(stateFile, "utf8")) as Partial<RuntimeState>),
+          ...(JSON.parse(
+            readFileSync(stateFile, "utf8"),
+          ) as Partial<RuntimeState>),
         };
       } catch (error) {
-        throw new Error(`state.json 读取失败：${String(error?.message ?? error)}`);
+        throw new Error(
+          `state.json 读取失败：${String(error?.message ?? error)}`,
+        );
       }
     }
     const engine = new Engine(dataDir, plan, state);
@@ -263,7 +269,10 @@ export class Engine {
 
   /** 计划立即原子落盘（写操作低频，直接同步写）。 */
   private savePlan(): void {
-    atomicWrite(join(this.dataDir, "plan.json"), JSON.stringify(this.plan, null, 2));
+    atomicWrite(
+      join(this.dataDir, "plan.json"),
+      JSON.stringify(this.plan, null, 2),
+    );
   }
 
   /** 状态立即落盘（用户动作/会话记录时调用）。 */
@@ -272,7 +281,10 @@ export class Engine {
       clearTimeout(this.stateFlushTimer);
       this.stateFlushTimer = null;
     }
-    atomicWrite(join(this.dataDir, "state.json"), JSON.stringify(this.state, null, 2));
+    atomicWrite(
+      join(this.dataDir, "state.json"),
+      JSON.stringify(this.state, null, 2),
+    );
   }
 
   /** tick 触发的防抖落盘。 */
@@ -301,12 +313,18 @@ export class Engine {
 
   createTask(input: TaskInput, now: number = nowSecs()): Task {
     const title = requireText(input.title, "标题");
-    if (!validDate(input.dueDate)) throw new Error("dueDate 必须是有效日期 YYYY-MM-DD");
+    if (!validDate(input.dueDate))
+      throw new Error("dueDate 必须是有效日期 YYYY-MM-DD");
     if (input.reminderTime != null && !validTime(input.reminderTime)) {
       throw new Error("reminderTime 必须是 HH:MM");
     }
     const focusMinutes = input.focusMinutes ?? null;
-    if (focusMinutes != null && (!Number.isInteger(focusMinutes) || focusMinutes < 1 || focusMinutes > 180)) {
+    if (
+      focusMinutes != null &&
+      (!Number.isInteger(focusMinutes) ||
+        focusMinutes < 1 ||
+        focusMinutes > 180)
+    ) {
       throw new Error("focusMinutes 需为 1–180");
     }
     const priority = input.priority ?? 0;
@@ -318,11 +336,17 @@ export class Engine {
       throw new Error("estimate 需为 1–99");
     }
     const projectId = input.projectId ?? null;
-    if (projectId != null && !this.plan.projects.some((p) => p.id === projectId)) {
+    if (
+      projectId != null &&
+      !this.plan.projects.some((p) => p.id === projectId)
+    ) {
       throw new Error("项目不存在");
     }
     const habitId = input.habitId ?? null;
-    if (habitId != null && !(this.plan.habits ?? []).some((h) => h.id === habitId)) {
+    if (
+      habitId != null &&
+      !(this.plan.habits ?? []).some((h) => h.id === habitId)
+    ) {
       throw new Error("习惯组不存在");
     }
     const tags = this.cleanTags(input.tags);
@@ -356,7 +380,11 @@ export class Engine {
     return task;
   }
 
-  updateTask(id: string, changes: Partial<TaskInput>, now: number = nowSecs()): Task {
+  updateTask(
+    id: string,
+    changes: Partial<TaskInput>,
+    now: number = nowSecs(),
+  ): Task {
     const task = this.findTask(id);
     const allowed = [
       "title",
@@ -381,29 +409,58 @@ export class Engine {
     if (next.dueDate !== undefined && !validDate(next.dueDate)) {
       throw new Error("dueDate 必须是有效日期 YYYY-MM-DD");
     }
-    if (next.reminderTime !== undefined && next.reminderTime !== null && !validTime(next.reminderTime)) {
+    if (
+      next.reminderTime !== undefined &&
+      next.reminderTime !== null &&
+      !validTime(next.reminderTime)
+    ) {
       throw new Error("reminderTime 必须是 HH:MM");
     }
-    if (next.focusMinutes !== undefined && next.focusMinutes !== null &&
-      (!Number.isInteger(next.focusMinutes) || next.focusMinutes < 1 || next.focusMinutes > 180)) {
+    if (
+      next.focusMinutes !== undefined &&
+      next.focusMinutes !== null &&
+      (!Number.isInteger(next.focusMinutes) ||
+        next.focusMinutes < 1 ||
+        next.focusMinutes > 180)
+    ) {
       throw new Error("focusMinutes 需为 1–180");
     }
-    if (next.scrapMinutes !== undefined &&
-      (!Number.isInteger(next.scrapMinutes) || next.scrapMinutes < 0 || next.scrapMinutes > 10080)) {
+    if (
+      next.scrapMinutes !== undefined &&
+      (!Number.isInteger(next.scrapMinutes) ||
+        next.scrapMinutes < 0 ||
+        next.scrapMinutes > 10080)
+    ) {
       throw new Error("scrapMinutes 需为 0–10080");
     }
-    if (next.priority !== undefined && (!Number.isInteger(next.priority) || next.priority < 0 || next.priority > 3)) {
+    if (
+      next.priority !== undefined &&
+      (!Number.isInteger(next.priority) ||
+        next.priority < 0 ||
+        next.priority > 3)
+    ) {
       throw new Error("priority 需为 0–3");
     }
-    if (next.estimate !== undefined && (!Number.isInteger(next.estimate) || next.estimate < 1 || next.estimate > 99)) {
+    if (
+      next.estimate !== undefined &&
+      (!Number.isInteger(next.estimate) ||
+        next.estimate < 1 ||
+        next.estimate > 99)
+    ) {
       throw new Error("estimate 需为 1–99");
     }
-    if (next.projectId !== undefined && next.projectId !== null &&
-      !this.plan.projects.some((p) => p.id === next.projectId)) {
+    if (
+      next.projectId !== undefined &&
+      next.projectId !== null &&
+      !this.plan.projects.some((p) => p.id === next.projectId)
+    ) {
       throw new Error("项目不存在");
     }
-    if (next.habitId !== undefined && next.habitId !== null &&
-      !(this.plan.habits ?? []).some((h) => h.id === next.habitId)) {
+    if (
+      next.habitId !== undefined &&
+      next.habitId !== null &&
+      !(this.plan.habits ?? []).some((h) => h.id === next.habitId)
+    ) {
       throw new Error("习惯组不存在");
     }
     if (next.tags !== undefined) task.tags = this.cleanTags(next.tags);
@@ -419,16 +476,26 @@ export class Engine {
     return task;
   }
 
-  moveTasks(ids: string[], dueDate: string, reminderTime?: string | null): Task[] {
+  moveTasks(
+    ids: string[],
+    dueDate: string,
+    reminderTime?: string | null,
+  ): Task[] {
     if (!Array.isArray(ids) || ids.length < 1 || ids.length > 100) {
       throw new Error("ids 需为 1–100 个任务 ID");
     }
-    if (!validDate(dueDate)) throw new Error("dueDate 必须是有效日期 YYYY-MM-DD");
-    if (reminderTime !== undefined && reminderTime !== null && !validTime(reminderTime)) {
+    if (!validDate(dueDate))
+      throw new Error("dueDate 必须是有效日期 YYYY-MM-DD");
+    if (
+      reminderTime !== undefined &&
+      reminderTime !== null &&
+      !validTime(reminderTime)
+    ) {
       throw new Error("reminderTime 必须是 HH:MM");
     }
     const tasks = ids.map((id) => this.findTask(id));
-    if (tasks.some((t) => t.completed)) throw new Error("包含已完成任务，整批不移动");
+    if (tasks.some((t) => t.completed))
+      throw new Error("包含已完成任务，整批不移动");
     for (const task of tasks) {
       task.dueDate = dueDate;
       if (reminderTime !== undefined) task.reminderTime = reminderTime;
@@ -456,22 +523,36 @@ export class Engine {
   }
 
   listTasks(
-    filter: { projectId?: string | null; completed?: boolean; offset?: number; limit?: number } = {},
+    filter: {
+      projectId?: string | null;
+      completed?: boolean;
+      offset?: number;
+      limit?: number;
+    } = {},
   ): { tasks: Task[]; total: number; offset: number; limit: number } {
     const offset = filter.offset ?? 0;
     const limit = Math.min(100, Math.max(1, filter.limit ?? 100));
     let tasks = [...this.plan.tasks];
-    if (filter.projectId !== undefined) tasks = tasks.filter((t) => t.projectId === filter.projectId);
-    if (filter.completed !== undefined) tasks = tasks.filter((t) => t.completed === filter.completed);
-    tasks.sort((a, b) =>
-      a.dueDate.localeCompare(b.dueDate) || b.priority - a.priority || a.createdAt - b.createdAt);
+    if (filter.projectId !== undefined)
+      tasks = tasks.filter((t) => t.projectId === filter.projectId);
+    if (filter.completed !== undefined)
+      tasks = tasks.filter((t) => t.completed === filter.completed);
+    tasks.sort(
+      (a, b) =>
+        a.dueDate.localeCompare(b.dueDate) ||
+        b.priority - a.priority ||
+        a.createdAt - b.createdAt,
+    );
     const total = tasks.length;
     return { tasks: tasks.slice(offset, offset + limit), total, offset, limit };
   }
 
   // ---------- 番茄计时状态机 ----------
 
-  focusStart(options: { taskId?: string | null; minutes?: number | null } = {}, now: number = nowSecs()): Timer {
+  focusStart(
+    options: { taskId?: string | null; minutes?: number | null } = {},
+    now: number = nowSecs(),
+  ): Timer {
     const prev = this.state.timer;
     // 休息段（含进行中）不记会话，可直接替换为新番茄。
     if (prev.running && prev.mode === "focus") {
@@ -505,8 +586,12 @@ export class Engine {
 
   focusPause(now: number = nowSecs()): Timer {
     const timer = this.state.timer;
-    if (!timer.running || timer.mode !== "focus") throw new Error("没有进行中的番茄");
-    timer.remainingSecs = timer.deadline != null ? Math.max(0, timer.deadline - now) : timer.remainingSecs;
+    if (!timer.running || timer.mode !== "focus")
+      throw new Error("没有进行中的番茄");
+    timer.remainingSecs =
+      timer.deadline != null
+        ? Math.max(0, timer.deadline - now)
+        : timer.remainingSecs;
     timer.running = false;
     timer.deadline = null;
     this.flushNow();
@@ -516,7 +601,8 @@ export class Engine {
   focusResume(now: number = nowSecs()): Timer {
     const timer = this.state.timer;
     if (timer.running) throw new Error("番茄已在运行");
-    if (timer.mode !== "focus" || timer.startedAt == null) throw new Error("没有可继续的番茄");
+    if (timer.mode !== "focus" || timer.startedAt == null)
+      throw new Error("没有可继续的番茄");
     if (timer.remainingSecs <= 0) throw new Error("番茄已结束，先停止");
     timer.running = true;
     // startedAt 保持原值：会话时长按实际专注时间（durationSecs - remaining）计算，
@@ -529,7 +615,8 @@ export class Engine {
   focusStop(now: number = nowSecs()): { timer: Timer; session: Session } {
     const timer = this.state.timer;
     // 允许在暂停态停止：只要开过专注段（mode=focus 且 startedAt 非空）就能结算。
-    if (timer.mode !== "focus" || timer.startedAt == null) throw new Error("没有进行中的番茄");
+    if (timer.mode !== "focus" || timer.startedAt == null)
+      throw new Error("没有进行中的番茄");
     if (timer.running && timer.deadline != null) {
       timer.remainingSecs = Math.max(0, timer.deadline - now);
     }
@@ -558,10 +645,19 @@ export class Engine {
    */
   private finishFocus(now: number, completed: boolean): Session {
     const timer = this.state.timer;
-    const remaining = timer.deadline != null ? Math.max(0, timer.deadline - now) : timer.remainingSecs;
+    const remaining =
+      timer.deadline != null
+        ? Math.max(0, timer.deadline - now)
+        : timer.remainingSecs;
     const elapsed = Math.max(0, timer.durationSecs - remaining);
-    const task = timer.taskId != null ? this.plan.tasks.find((t) => t.id === timer.taskId) : undefined;
-    const project = task?.projectId != null ? this.plan.projects.find((p) => p.id === task.projectId) : undefined;
+    const task =
+      timer.taskId != null
+        ? this.plan.tasks.find((t) => t.id === timer.taskId)
+        : undefined;
+    const project =
+      task?.projectId != null
+        ? this.plan.projects.find((p) => p.id === task.projectId)
+        : undefined;
     const session: Session = {
       id: randomUUID(),
       source: "timer",
@@ -581,7 +677,8 @@ export class Engine {
       const cycle = timer.cycle + 1;
       const long = cycle % settings.longBreakEvery === 0;
       const mode = long ? "longBreak" : "shortBreak";
-      const durationSecs = (long ? settings.longBreakMinutes : settings.shortBreakMinutes) * 60;
+      const durationSecs =
+        (long ? settings.longBreakMinutes : settings.shortBreakMinutes) * 60;
       const running = settings.autoBreak;
       next = {
         mode,
@@ -637,7 +734,8 @@ export class Engine {
     const today = localDate(now);
     let changed = false;
     for (const task of this.plan.tasks) {
-      if (task.completed || task.reminderFired || task.reminderTime == null) continue;
+      if (task.completed || task.reminderFired || task.reminderTime == null)
+        continue;
       if (task.dueDate > today) continue;
       if (now >= timeToTs(task.dueDate, task.reminderTime)) {
         task.reminderFired = true;
@@ -658,7 +756,9 @@ export class Engine {
   }
 
   private kindOf(task: Task): TaskKind {
-    return (task.habitId != null || task.recurring) && task.reminderTime != null ? "habit" : "ordinary";
+    return (task.habitId != null || task.recurring) && task.reminderTime != null
+      ? "habit"
+      : "ordinary";
   }
 
   /** 快照内联计算提醒待触发/已过期，不改写计划文件。 */
@@ -677,9 +777,10 @@ export class Engine {
   snapshot(now: number = nowSecs()): Snapshot {
     const today = localDate(now);
     const timer = this.refreshTimer(now);
-    const remainingSecs = timer.running && timer.deadline != null
-      ? Math.max(0, timer.deadline - now)
-      : timer.remainingSecs;
+    const remainingSecs =
+      timer.running && timer.deadline != null
+        ? Math.max(0, timer.deadline - now)
+        : timer.remainingSecs;
     timer.remainingSecs = remainingSecs;
     const tasks = this.plan.tasks.map((t) => this.decorateTask(t, now));
     const taskKinds: Record<string, TaskKind> = {};
@@ -730,11 +831,14 @@ export class Engine {
       .slice(0, 100);
     const weekday = new Date(now * 1000).getDay();
     const dayNum = weekday === 0 ? 7 : weekday;
-    const blocks = (this.plan.blocks ?? []).filter((b) => b.days.includes(dayNum));
+    const blocks = (this.plan.blocks ?? []).filter((b) =>
+      b.days.includes(dayNum),
+    );
     const timer = this.refreshTimer(now);
-    const remainingSecs = timer.running && timer.deadline != null
-      ? Math.max(0, timer.deadline - now)
-      : timer.remainingSecs;
+    const remainingSecs =
+      timer.running && timer.deadline != null
+        ? Math.max(0, timer.deadline - now)
+        : timer.remainingSecs;
     timer.remainingSecs = remainingSecs;
     const full = this.stats(now);
     const stats: TodayStats = {
@@ -758,9 +862,24 @@ export class Engine {
 
   stats(now: number = nowSecs()): Stats {
     const today = localDate(now);
-    const rows = new Map<string, { seconds: number; pomodoros: number; missed: number; completed: number; voided: number }>();
+    const rows = new Map<
+      string,
+      {
+        seconds: number;
+        pomodoros: number;
+        missed: number;
+        completed: number;
+        voided: number;
+      }
+    >();
     for (let i = STATS_DAYS - 1; i >= 0; i--) {
-      rows.set(dayShift(today, -i), { seconds: 0, pomodoros: 0, missed: 0, completed: 0, voided: 0 });
+      rows.set(dayShift(today, -i), {
+        seconds: 0,
+        pomodoros: 0,
+        missed: 0,
+        completed: 0,
+        voided: 0,
+      });
     }
     const rowOf = (date: string) => {
       let row = rows.get(date);
@@ -778,7 +897,11 @@ export class Engine {
     for (const task of this.plan.tasks) {
       if (task.completed && task.completedAt != null) {
         rowOf(localDate(task.completedAt)).completed += 1;
-      } else if (!task.completed && this.kindOf(task) === "habit" && task.dueDate < today) {
+      } else if (
+        !task.completed &&
+        this.kindOf(task) === "habit" &&
+        task.dueDate < today
+      ) {
         // 习惯任务漏做计缺勤（桩：只回看统计窗口内的日期）
         rowOf(task.dueDate).missed += 1;
       }
@@ -786,7 +909,13 @@ export class Engine {
     const days = [...rows.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, row]) => ({ date, ...row }));
-    const todayRow = rows.get(today) ?? { seconds: 0, pomodoros: 0, missed: 0, completed: 0, voided: 0 };
+    const todayRow = rows.get(today) ?? {
+      seconds: 0,
+      pomodoros: 0,
+      missed: 0,
+      completed: 0,
+      voided: 0,
+    };
     let totalSeconds = 0;
     let totalPomodoros = 0;
     for (const session of this.state.sessions) {
@@ -794,7 +923,9 @@ export class Engine {
       if (session.completed) totalPomodoros += 1;
     }
     const pomodoroDates = new Set(
-      this.state.sessions.filter((s) => s.completed).map((s) => localDate(s.startedAt)),
+      this.state.sessions
+        .filter((s) => s.completed)
+        .map((s) => localDate(s.startedAt)),
     );
     let streak = 0;
     let cursor = pomodoroDates.has(today) ? today : dayShift(today, -1);
@@ -835,13 +966,23 @@ export class Engine {
 
   // ---------- dispatch（MCP 单项动作，桩子集） ----------
 
-  dispatch(action: DispatchAction | undefined, now: number = nowSecs()): unknown {
-    if (action == null || typeof action !== "object" || typeof action.type !== "string") {
+  dispatch(
+    action: DispatchAction | undefined,
+    now: number = nowSecs(),
+  ): unknown {
+    if (
+      action == null ||
+      typeof action !== "object" ||
+      typeof action.type !== "string"
+    ) {
       throw new Error("action 必须带 type");
     }
     switch (action.type) {
       case "focusStart":
-        return this.focusStart({ taskId: action.taskId ?? null, minutes: action.minutes ?? null }, now);
+        return this.focusStart(
+          { taskId: action.taskId ?? null, minutes: action.minutes ?? null },
+          now,
+        );
       case "focusPause":
         return this.focusPause(now);
       case "focusResume":
@@ -876,25 +1017,50 @@ export class Engine {
       case "deleteTask":
         return this.deleteTask(action.id);
       default:
-        throw new Error(`未支持的 action.type（runtime 桩阶段）：${(action as { type: string }).type}`);
+        throw new Error(
+          `未支持的 action.type（runtime 桩阶段）：${(action as { type: string }).type}`,
+        );
     }
   }
 
-  private saveSettings(incoming: Partial<Settings> & { protection?: Partial<Settings["protection"]> }): Settings {
+  private saveSettings(
+    incoming: Partial<Settings> & {
+      protection?: Partial<Settings["protection"]>;
+    },
+  ): Settings {
     const next: Settings = { ...this.state.settings, ...incoming };
     if (incoming.protection) {
-      next.protection = { ...this.state.settings.protection, ...incoming.protection };
+      next.protection = {
+        ...this.state.settings.protection,
+        ...incoming.protection,
+      };
     }
-    if (!Number.isInteger(next.focusMinutes) || next.focusMinutes < 1 || next.focusMinutes > 180) {
+    if (
+      !Number.isInteger(next.focusMinutes) ||
+      next.focusMinutes < 1 ||
+      next.focusMinutes > 180
+    ) {
       throw new Error("focusMinutes 需为 1–180");
     }
-    if (!Number.isInteger(next.shortBreakMinutes) || next.shortBreakMinutes < 1 || next.shortBreakMinutes > 60) {
+    if (
+      !Number.isInteger(next.shortBreakMinutes) ||
+      next.shortBreakMinutes < 1 ||
+      next.shortBreakMinutes > 60
+    ) {
       throw new Error("shortBreakMinutes 需为 1–60");
     }
-    if (!Number.isInteger(next.longBreakMinutes) || next.longBreakMinutes < 1 || next.longBreakMinutes > 60) {
+    if (
+      !Number.isInteger(next.longBreakMinutes) ||
+      next.longBreakMinutes < 1 ||
+      next.longBreakMinutes > 60
+    ) {
       throw new Error("longBreakMinutes 需为 1–60");
     }
-    if (!Number.isInteger(next.longBreakEvery) || next.longBreakEvery < 1 || next.longBreakEvery > 12) {
+    if (
+      !Number.isInteger(next.longBreakEvery) ||
+      next.longBreakEvery < 1 ||
+      next.longBreakEvery > 12
+    ) {
       throw new Error("longBreakEvery 需为 1–12");
     }
     this.state.settings = next;
@@ -909,13 +1075,26 @@ export class Engine {
     return next;
   }
 
-  private saveVision(input: { id: string | null; name: string; notes: string; projectId: string | null }): Vision {
+  private saveVision(input: {
+    id: string | null;
+    name: string;
+    notes: string;
+    projectId: string | null;
+  }): Vision {
     const name = requireText(input.name, "愿景名称", 100);
-    const existing = input.id != null ? this.state.visions.find((v) => v.id === input.id) : undefined;
+    const existing =
+      input.id != null
+        ? this.state.visions.find((v) => v.id === input.id)
+        : undefined;
     if (input.id != null && !existing) throw new Error("愿景不存在");
     const vision: Vision = existing
       ? { ...existing, name, notes: input.notes, projectId: input.projectId }
-      : { id: randomUUID(), name, notes: input.notes, projectId: input.projectId };
+      : {
+          id: randomUUID(),
+          name,
+          notes: input.notes,
+          projectId: input.projectId,
+        };
     if (!existing) this.state.visions.push(vision);
     this.flushNow();
     return vision;
@@ -931,17 +1110,40 @@ export class Engine {
     notes: string;
   }): Block {
     const title = requireText(input.title, "时段标题", 40);
-    if (!Array.isArray(input.days) || input.days.length === 0 ||
+    if (
+      !Array.isArray(input.days) ||
+      input.days.length === 0 ||
       input.days.some((d) => !Number.isInteger(d) || d < 1 || d > 7) ||
-      new Set(input.days).size !== input.days.length) {
+      new Set(input.days).size !== input.days.length
+    ) {
       throw new Error("days 需为 1–7 的不重复星期列表");
     }
-    if (!validTime(input.start) || !validTime(input.end)) throw new Error("start/end 需为 HH:MM");
-    const existing = input.id != null ? (this.plan.blocks ?? []).find((b) => b.id === input.id) : undefined;
+    if (!validTime(input.start) || !validTime(input.end))
+      throw new Error("start/end 需为 HH:MM");
+    const existing =
+      input.id != null
+        ? (this.plan.blocks ?? []).find((b) => b.id === input.id)
+        : undefined;
     if (input.id != null && !existing) throw new Error("时段不存在");
     const block: Block = existing
-      ? { ...existing, title, days: input.days, start: input.start, end: input.end, attention: input.attention, notes: input.notes }
-      : { id: randomUUID(), title, days: input.days, start: input.start, end: input.end, attention: input.attention, notes: input.notes };
+      ? {
+          ...existing,
+          title,
+          days: input.days,
+          start: input.start,
+          end: input.end,
+          attention: input.attention,
+          notes: input.notes,
+        }
+      : {
+          id: randomUUID(),
+          title,
+          days: input.days,
+          start: input.start,
+          end: input.end,
+          attention: input.attention,
+          notes: input.notes,
+        };
     if (!existing) {
       this.plan.blocks = [...(this.plan.blocks ?? []), block];
     }
@@ -958,7 +1160,11 @@ export class Engine {
     return { id };
   }
 
-  private createProject(input: { name: string; color?: string; directory?: string }) {
+  private createProject(input: {
+    name: string;
+    color?: string;
+    directory?: string;
+  }) {
     const name = requireText(input.name, "项目名称", 100);
     const color = input.color ?? "#d96d55";
     if (typeof color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(color)) {
@@ -1018,14 +1224,27 @@ export class Engine {
   }
 
   /** 导出到私有工作区 dataDir/exports/，返回文件名与 sha256 指纹。 */
-  exportToFile(kind: "plan" | "backup", name: string, now: number = nowSecs()): ExportResult {
+  exportToFile(
+    kind: "plan" | "backup",
+    name: string,
+    now: number = nowSecs(),
+  ): ExportResult {
     if (typeof name !== "string" || name.length === 0 || name.length > 120) {
       throw new Error("文件名无效");
     }
-    if (basename(name) !== name || name.includes("/") || name.includes("\\") || !/^[\w.-]+\.json$/.test(name)) {
+    if (
+      basename(name) !== name ||
+      name.includes("/") ||
+      name.includes("\\") ||
+      !/^[\w.-]+\.json$/.test(name)
+    ) {
       throw new Error("仅接受工作区内的 .json 文件名，不接受目录或绝对路径");
     }
-    const content = JSON.stringify(kind === "plan" ? this.exportPlan() : this.exportBackup(now), null, 2);
+    const content = JSON.stringify(
+      kind === "plan" ? this.exportPlan() : this.exportBackup(now),
+      null,
+      2,
+    );
     const file = join(this.dataDir, "exports", name);
     atomicWrite(file, content);
     return {
@@ -1039,7 +1258,8 @@ export class Engine {
   // ---------- 内部 ----------
 
   private findTask(id: string): Task {
-    if (typeof id !== "string" || id.length === 0) throw new Error("需要任务 ID");
+    if (typeof id !== "string" || id.length === 0)
+      throw new Error("需要任务 ID");
     const task = this.plan.tasks.find((t) => t.id === id);
     if (!task) throw new Error("任务不存在");
     return task;
@@ -1058,7 +1278,15 @@ export class Engine {
 
   private cleanSubtasks(subtasks: unknown): Task["subtasks"] {
     if (subtasks === undefined) return [];
-    if (!Array.isArray(subtasks) || subtasks.some((s) => s == null || typeof s.title !== "string" || s.title.trim().length === 0)) {
+    if (
+      !Array.isArray(subtasks) ||
+      subtasks.some(
+        (s) =>
+          s == null ||
+          typeof s.title !== "string" ||
+          s.title.trim().length === 0,
+      )
+    ) {
       throw new Error("subtasks 每项需有非空 title");
     }
     if (subtasks.length > 200) throw new Error("子步骤最多 200 项");

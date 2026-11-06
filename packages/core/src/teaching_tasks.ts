@@ -9,7 +9,10 @@ import type { TeachingTask, TeachingTaskKind } from "./model";
 import { dateAt, hourMinuteString } from "./time";
 import { recordSession, resetTo, startTimer } from "./reminders";
 
-export function teachingTask(data: AppData, taskId: string): TeachingTask | undefined {
+export function teachingTask(
+  data: AppData,
+  taskId: string,
+): TeachingTask | undefined {
   return data.education.focusTasks.find((link) => link.taskId === taskId);
 }
 
@@ -28,7 +31,10 @@ export function materializeTeachingTasks(data: AppData, at: number): boolean {
     minutes: number;
   }[] = [];
   for (const lesson of data.education.lessons) {
-    if (enabled.has(lesson.projectId) && dateAt(lesson.startsAt) >= dateAt(at)) {
+    if (
+      enabled.has(lesson.projectId) &&
+      dateAt(lesson.startsAt) >= dateAt(at)
+    ) {
       sources.push({
         kind: "lesson",
         sourceId: lesson.id,
@@ -63,7 +69,10 @@ export function materializeTeachingTasks(data: AppData, at: number): boolean {
   }
   const positions = new Map<string, number>();
   data.tasks.forEach((task, i) => positions.set(task.id, i));
-  const submissions = new Map<string, { submittedAt: number; unfinished: boolean }>();
+  const submissions = new Map<
+    string,
+    { submittedAt: number; unfinished: boolean }
+  >();
   for (const submission of data.education.submissions) {
     const last = submissions.get(submission.assessmentId);
     if (last === undefined || submission.submittedAt >= last.submittedAt) {
@@ -74,9 +83,18 @@ export function materializeTeachingTasks(data: AppData, at: number): boolean {
     }
   }
   let changed = false;
-  for (const { kind, sourceId, projectId, title, notes, startsAt, minutes } of sources) {
+  for (const {
+    kind,
+    sourceId,
+    projectId,
+    title,
+    notes,
+    startsAt,
+    minutes,
+  } of sources) {
     const link = links.get(sourceId);
-    const taskId = link !== undefined && link.kind === kind ? link.taskId : undefined;
+    const taskId =
+      link !== undefined && link.kind === kind ? link.taskId : undefined;
     const position = taskId !== undefined ? positions.get(taskId) : undefined;
     if (taskId !== undefined && position === undefined) {
       continue;
@@ -157,7 +175,10 @@ export function materializeTeachingTasks(data: AppData, at: number): boolean {
         if (last === undefined || last.unfinished) return null;
         return last.submittedAt;
       })();
-      if (task.completed !== (submitted !== null) || task.completedAt !== submitted) {
+      if (
+        task.completed !== (submitted !== null) ||
+        task.completedAt !== submitted
+      ) {
         if (submitted !== null && data.timer.taskId === task.id) {
           recordSession(data, at, false);
           data.timer.taskId = null;
@@ -173,7 +194,11 @@ export function materializeTeachingTasks(data: AppData, at: number): boolean {
 }
 
 /** 明确完成课程待办 = 参与课程；作业只能从作业入口提交。 */
-export function completeTeachingTask(data: AppData, taskId: string, at: number): void {
+export function completeTeachingTask(
+  data: AppData,
+  taskId: string,
+  at: number,
+): void {
   const link = teachingTask(data, taskId);
   if (link === undefined) return;
   if (link.kind === "homework") {
@@ -183,7 +208,8 @@ export function completeTeachingTask(data: AppData, taskId: string, at: number):
   ensure(lesson !== undefined, "课程不存在");
   lesson.attended = true;
   if (lesson.progress.trim().length === 0) {
-    lesson.progress = "本人从今日专注确认课程任务完成，具体学习位置待补充；掌握情况待复测";
+    lesson.progress =
+      "本人从今日专注确认课程任务完成，具体学习位置待补充；掌握情况待复测";
   }
   if (at >= lesson.endsAt) {
     lesson.state = "ended";
@@ -196,7 +222,10 @@ export function completeTeachingTask(data: AppData, taskId: string, at: number):
 /** 自动计时不确认课程参与：只有明确开始/完成才算参与。 */
 export function startTeachingTask(data: AppData, at: number): void {
   if (data.timer.mode !== "focus") return;
-  const link = data.timer.taskId !== null ? teachingTask(data, data.timer.taskId) : undefined;
+  const link =
+    data.timer.taskId !== null
+      ? teachingTask(data, data.timer.taskId)
+      : undefined;
   if (link === undefined || link.kind !== "lesson") return;
   const lesson = data.education.lessons.find((l) => l.id === link.sourceId);
   if (lesson !== undefined) {
@@ -215,11 +244,15 @@ export function validateTeachingTasks(data: AppData): void {
     ensure(task !== undefined, "教学待办关联的任务不存在");
     const project = (() => {
       if (link.kind === "lesson") {
-        return data.education.lessons.find((l) => l.id === link.sourceId)?.projectId ?? null;
+        return (
+          data.education.lessons.find((l) => l.id === link.sourceId)
+            ?.projectId ?? null
+        );
       }
       return (
-        data.education.assessments.find((a) => a.id === link.sourceId && a.kind === "homework")
-          ?.projectId ?? null
+        data.education.assessments.find(
+          (a) => a.id === link.sourceId && a.kind === "homework",
+        )?.projectId ?? null
       );
     })();
     ensure(project !== null, "教学待办来源不存在或类型不符");

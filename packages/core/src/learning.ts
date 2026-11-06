@@ -3,7 +3,18 @@
 //! 对应 crates/core/src/learning.rs。
 
 import { AppError, ensure, require } from "./errors";
-import { asArray, asBool, asInt, asOpt, asStr, field, isObject, oneOf, rejectUnknown, requiredField } from "./json";
+import {
+  asArray,
+  asBool,
+  asInt,
+  asOpt,
+  asStr,
+  field,
+  isObject,
+  oneOf,
+  rejectUnknown,
+  requiredField,
+} from "./json";
 import type { Education } from "./education";
 import type { AppData } from "./lib";
 import type {
@@ -20,19 +31,38 @@ import { atLocalDateString, dateAt } from "./time";
 
 export function parseCompletedStudyTask(raw: unknown): CompletedStudyTask {
   if (!isObject(raw)) throw new AppError("已完成学习任务快照必须是对象");
-  rejectUnknown(raw, ["id", "projectId", "title", "notes", "topics", "completedAt"], "已完成学习任务快照");
+  rejectUnknown(
+    raw,
+    ["id", "projectId", "title", "notes", "topics", "completedAt"],
+    "已完成学习任务快照",
+  );
   return {
     id: requiredField(raw, "id", "已完成学习任务快照", asStr),
     projectId: requiredField(raw, "projectId", "已完成学习任务快照", asStr),
     title: requiredField(raw, "title", "已完成学习任务快照", asStr),
     notes: requiredField(raw, "notes", "已完成学习任务快照", asStr),
-    topics: field(raw, "topics", "已完成学习任务快照", (v) => asArray(v, "topics").map((x) => asStr(x, "知识点")), []),
+    topics: field(
+      raw,
+      "topics",
+      "已完成学习任务快照",
+      (v) => asArray(v, "topics").map((x) => asStr(x, "知识点")),
+      [],
+    ),
     completedAt: requiredField(raw, "completedAt", "已完成学习任务快照", asInt),
   };
 }
 
-export function serializeCompletedStudyTask(t: CompletedStudyTask): Record<string, unknown> {
-  return { id: t.id, projectId: t.projectId, title: t.title, notes: t.notes, topics: t.topics, completedAt: t.completedAt };
+export function serializeCompletedStudyTask(
+  t: CompletedStudyTask,
+): Record<string, unknown> {
+  return {
+    id: t.id,
+    projectId: t.projectId,
+    title: t.title,
+    notes: t.notes,
+    topics: t.topics,
+    completedAt: t.completedAt,
+  };
 }
 
 function text(s: string, max: number): boolean {
@@ -41,7 +71,11 @@ function text(s: string, max: number): boolean {
 
 export function validateLearning(data: AppData): void {
   const e = data.education;
-  ensure(e.progress.length + e.completedTasks.length + e.corrections.length <= 100000, "学习证据数量超出限制");
+  ensure(
+    e.progress.length + e.completedTasks.length + e.corrections.length <=
+      100000,
+    "学习证据数量超出限制",
+  );
   const ids = new Set<string>();
   for (const task of e.completedTasks) {
     ensure(
@@ -69,26 +103,31 @@ export function validateLearning(data: AppData): void {
     ids.add(`progress|${record.id}`);
   }
   for (const correction of e.corrections) {
-    const grade = require(e.grades.find((g) => g.id === correction.gradeId), "订正缺少批改记录");
-    const assessment = require(
-      (() => {
-        const sub = e.submissions.find((s) => s.id === grade.submissionId);
-        return sub === undefined ? undefined : e.assessments.find((a) => a.id === sub.assessmentId);
-      })(),
-      "订正缺少试题",
-    );
+    const grade = require(e.grades.find(
+      (g) => g.id === correction.gradeId,
+    ), "订正缺少批改记录");
+    const assessment = require((() => {
+      const sub = e.submissions.find((s) => s.id === grade.submissionId);
+      return sub === undefined
+        ? undefined
+        : e.assessments.find((a) => a.id === sub.assessmentId);
+    })(), "订正缺少试题");
     ensure(
       !ids.has(`correction|${correction.id}`) &&
         correction.id.length > 0 &&
         assessment.questions.some((q) => q.id === correction.questionId) &&
         Array.from(correction.explanation).length <= 8000 &&
-        (text(correction.explanation, 8000) || correction.resourceIds.length > 0) &&
+        (text(correction.explanation, 8000) ||
+          correction.resourceIds.length > 0) &&
         correction.resourceIds.every((id) =>
-          e.resources.some((r) => r.id === id && r.projectId === assessment.projectId),
+          e.resources.some(
+            (r) => r.id === id && r.projectId === assessment.projectId,
+          ),
         ) &&
         (correction.accepted !== null) === (correction.reviewedAt !== null) &&
         (correction.reviewedAt === null ||
-          (correction.reviewedAt >= correction.submittedAt && text(correction.feedback, 8000))),
+          (correction.reviewedAt >= correction.submittedAt &&
+            text(correction.feedback, 8000))),
       "订正需要原题、解释或本项目附件；检查结果必须有反馈",
     );
     ids.add(`correction|${correction.id}`);
@@ -96,9 +135,15 @@ export function validateLearning(data: AppData): void {
 }
 
 /** 进度/快照/订正历史不可删除、不可改写；确认与检查状态允许单向推进。 */
-export function validateLearningTransition(before: Education, after: Education): void {
+export function validateLearningTransition(
+  before: Education,
+  after: Education,
+): void {
   for (const record of before.progress) {
-    ensure(after.progress.some((r) => r.id === record.id), "进度历史不能删除，请新增更正记录");
+    ensure(
+      after.progress.some((r) => r.id === record.id),
+      "进度历史不能删除，请新增更正记录",
+    );
     const next = after.progress.find((r) => r.id === record.id);
     if (next !== undefined) {
       const old = { ...record };
@@ -109,12 +154,18 @@ export function validateLearningTransition(before: Education, after: Education):
   for (const record of before.completedTasks) {
     ensure(
       after.completedTasks.find((r) => r.id === record.id) !== undefined &&
-        completedTaskEquals(after.completedTasks.find((r) => r.id === record.id)!, record),
+        completedTaskEquals(
+          after.completedTasks.find((r) => r.id === record.id)!,
+          record,
+        ),
       "已完成任务的学习内容快照不可改写",
     );
   }
   for (const record of before.corrections) {
-    ensure(after.corrections.some((r) => r.id === record.id), "订正历史不能删除");
+    ensure(
+      after.corrections.some((r) => r.id === record.id),
+      "订正历史不能删除",
+    );
     const next = after.corrections.find((r) => r.id === record.id);
     if (next !== undefined) {
       const old = { ...record, resourceIds: [...record.resourceIds] };
@@ -123,7 +174,10 @@ export function validateLearningTransition(before: Education, after: Education):
         old.feedback = next.feedback;
         old.reviewedAt = next.reviewedAt;
       }
-      ensure(correctionEquals(old, next), "订正与检查历史不可改写，请新增一次订正");
+      ensure(
+        correctionEquals(old, next),
+        "订正与检查历史不可改写，请新增一次订正",
+      );
     }
   }
 }
@@ -143,7 +197,10 @@ function progressEquals(a: ProgressRecord, b: ProgressRecord): boolean {
   );
 }
 
-function completedTaskEquals(a: CompletedStudyTask, b: CompletedStudyTask): boolean {
+function completedTaskEquals(
+  a: CompletedStudyTask,
+  b: CompletedStudyTask,
+): boolean {
   return (
     a.id === b.id &&
     a.projectId === b.projectId &&
@@ -224,9 +281,14 @@ function buildSummaryIndex(e: Education): SummaryIndex {
   return index;
 }
 
-function assessmentSummary(index: SummaryIndex, a: Assessment, at: number): Record<string, unknown> {
+function assessmentSummary(
+  index: SummaryIndex,
+  a: Assessment,
+  at: number,
+): Record<string, unknown> {
   const submission = index.submissions.get(a.id) ?? null;
-  const grade = submission !== null ? (index.grades.get(submission.id) ?? null) : null;
+  const grade =
+    submission !== null ? (index.grades.get(submission.id) ?? null) : null;
   const status = (() => {
     if (grade !== null) {
       if (grade.needsReview) return "needsReview";
@@ -240,7 +302,11 @@ function assessmentSummary(index: SummaryIndex, a: Assessment, at: number): Reco
       return "graded";
     }
     if (submission !== null) return "submitted";
-    if (a.kind !== "homework" && a.startedAt === null && dateAt(at) > dateAt(a.startsAt)) {
+    if (
+      a.kind !== "homework" &&
+      a.startedAt === null &&
+      dateAt(at) > dateAt(a.startsAt)
+    ) {
       return "missed";
     }
     if (
@@ -259,7 +325,8 @@ function assessmentSummary(index: SummaryIndex, a: Assessment, at: number): Reco
       return "awaitingSubmission";
     }
     if (a.kind === "homework" && at >= a.endsAt) return "overdue";
-    if (at < a.startsAt || (a.kind !== "homework" && a.startedAt === null)) return "upcoming";
+    if (at < a.startsAt || (a.kind !== "homework" && a.startedAt === null))
+      return "upcoming";
     return "awaitingSubmission";
   })();
   return {
@@ -272,29 +339,47 @@ function assessmentSummary(index: SummaryIndex, a: Assessment, at: number): Reco
     submissionId: submission?.id ?? null,
     submittedAt: submission?.submittedAt ?? null,
     unfinished: submission !== null && submission.unfinished,
-    late: a.kind === "homework" && submission !== null && submission.submittedAt > a.endsAt,
+    late:
+      a.kind === "homework" &&
+      submission !== null &&
+      submission.submittedAt > a.endsAt,
     gradeId: grade?.id ?? null,
     gradedAt: grade?.gradedAt ?? null,
-    score: grade !== null && !grade.needsReview ? grade.awards.reduce((n, p) => n + p.awarded, 0) : null,
-    total: a.questions.reduce((n, q) => n + q.scoring.reduce((m, p) => m + p.points, 0), 0),
+    score:
+      grade !== null && !grade.needsReview
+        ? grade.awards.reduce((n, p) => n + p.awarded, 0)
+        : null,
+    total: a.questions.reduce(
+      (n, q) => n + q.scoring.reduce((m, p) => m + p.points, 0),
+      0,
+    ),
     needsReview: grade !== null && grade.needsReview,
   };
 }
 
 function examDeadline(a: Assessment): number {
-  return a.startedAt === null ? a.endsAt : a.startedAt + (a.endsAt - a.startsAt);
+  return a.startedAt === null
+    ? a.endsAt
+    : a.startedAt + (a.endsAt - a.startsAt);
 }
 
 /** 每次从当前证据推导；没有第二份会过期的摘要。 */
-export function summaries(data: AppData, at: number): Record<string, unknown>[] {
+export function summaries(
+  data: AppData,
+  at: number,
+): Record<string, unknown>[] {
   const e = data.education;
   const index = buildSummaryIndex(e);
   const out: Record<string, unknown>[] = [];
   for (const project of data.projects.filter(
     (p) =>
-      e.projects.some((s) => s.projectId === p.id) || e.progress.some((r) => r.projectId === p.id),
+      e.projects.some((s) => s.projectId === p.id) ||
+      e.progress.some((r) => r.projectId === p.id),
   )) {
-    const progress = e.progress.filter((r) => r.projectId === project.id).slice().sort((a, b) => a.recordedAt - b.recordedAt);
+    const progress = e.progress
+      .filter((r) => r.projectId === project.id)
+      .slice()
+      .sort((a, b) => a.recordedAt - b.recordedAt);
     const topics = new Set<string>();
     const latest = progress
       .slice()
@@ -314,7 +399,9 @@ export function summaries(data: AppData, at: number): Record<string, unknown>[] 
       .map((a) => index.assessmentGrades.get(a.id))
       .filter((g): g is Grade => g !== undefined);
     for (const grade of grades) {
-      const attempts = (index.retests.get(grade.id) ?? []).map((a) => assessmentSummary(index, a, at));
+      const attempts = (index.retests.get(grade.id) ?? []).map((a) =>
+        assessmentSummary(index, a, at),
+      );
       for (const error of grade.errors) {
         retests.push({
           gradeId: grade.id,
@@ -323,12 +410,16 @@ export function summaries(data: AppData, at: number): Record<string, unknown>[] 
           confirmed: error.confirmed,
           retestDate: error.retestDate,
           nextCheck: error.nextCheck,
-          correctionAccepted: index.accepted.has(`${grade.id}|${error.questionId}`),
+          correctionAccepted: index.accepted.has(
+            `${grade.id}|${error.questionId}`,
+          ),
           attempts,
         });
       }
     }
-    retests.sort((a, b) => String(a["retestDate"]).localeCompare(String(b["retestDate"])));
+    retests.sort((a, b) =>
+      String(a["retestDate"]).localeCompare(String(b["retestDate"])),
+    );
     const recentTasks = e.completedTasks
       .slice()
       .reverse()
@@ -337,19 +428,30 @@ export function summaries(data: AppData, at: number): Record<string, unknown>[] 
     const lessons = e.lessons.filter((l) => l.projectId === project.id);
     const lastLesson = lessons
       .filter((l) => l.attended)
-      .reduce<Lesson | null>((best, l) => (best === null || l.startsAt > best.startsAt ? l : best), null);
+      .reduce<Lesson | null>(
+        (best, l) => (best === null || l.startsAt > best.startsAt ? l : best),
+        null,
+      );
     const latestReview = e.reviews
       .filter((r) => r.projectId === project.id)
-      .reduce<Review | null>((best, r) => (best === null || r.date > best.date ? r : best), null);
-    const reviewTime = latestReview === null ? null : atLocalDateString(latestReview.date);
+      .reduce<Review | null>(
+        (best, r) => (best === null || r.date > best.date ? r : best),
+        null,
+      );
+    const reviewTime =
+      latestReview === null ? null : atLocalDateString(latestReview.date);
     const updated = Math.max(
       ...[
         ...latest.map((r) => r.recordedAt),
         ...recentTasks.map((r) => r.completedAt),
         ...(lastLesson !== null ? [lastLesson.startsAt] : []),
         ...(reviewTime !== null ? [reviewTime] : []),
-        ...assessments.filter((a) => typeof a["submittedAt"] === "number").map((a) => a["submittedAt"] as number),
-        ...assessments.filter((a) => typeof a["gradedAt"] === "number").map((a) => a["gradedAt"] as number),
+        ...assessments
+          .filter((a) => typeof a["submittedAt"] === "number")
+          .map((a) => a["submittedAt"] as number),
+        ...assessments
+          .filter((a) => typeof a["gradedAt"] === "number")
+          .map((a) => a["gradedAt"] as number),
         ...e.corrections
           .filter((c) => assessments.some((a) => a["gradeId"] === c.gradeId))
           .map((c) => c.reviewedAt ?? c.submittedAt),
@@ -358,7 +460,9 @@ export function summaries(data: AppData, at: number): Record<string, unknown>[] 
     );
     const taskIds = new Set<string>([
       ...data.tasks.filter((t) => t.projectId === project.id).map((t) => t.id),
-      ...e.completedTasks.filter((t) => t.projectId === project.id).map((t) => t.id),
+      ...e.completedTasks
+        .filter((t) => t.projectId === project.id)
+        .map((t) => t.id),
     ]);
     const actualSeconds = data.sessions
       .filter(
@@ -377,12 +481,18 @@ export function summaries(data: AppData, at: number): Record<string, unknown>[] 
       projectName: project.name,
       updatedAt: Number.isFinite(updated) ? updated : null,
       progress: latest.slice(0, 12),
-      progressCount: e.progress.filter((r) => r.projectId === project.id).length,
+      progressCount: e.progress.filter((r) => r.projectId === project.id)
+        .length,
       recentCompletedTasks: recentTasks,
       lastAttendedLesson:
         lastLesson === null
           ? null
-          : { id: lastLesson.id, title: lastLesson.title, progress: lastLesson.progress, state: lastLesson.state },
+          : {
+              id: lastLesson.id,
+              title: lastLesson.title,
+              progress: lastLesson.progress,
+              state: lastLesson.state,
+            },
       lessons: {
         planned: lessons.filter((l) => l.state === "planned").length,
         attended: lessons.filter((l) => l.attended).length,
@@ -394,7 +504,9 @@ export function summaries(data: AppData, at: number): Record<string, unknown>[] 
       retests: retests.slice(0, 20),
       retestCount,
       latestReview,
-      pendingEvents: e.events.filter((r) => r.projectId === project.id && r.state !== "done").length,
+      pendingEvents: e.events.filter(
+        (r) => r.projectId === project.id && r.state !== "done",
+      ).length,
       note: "计时与任务完成只说明投入或自报完成；掌握须查看答卷、批改与独立复测。空记录表示未知。",
     });
   }
