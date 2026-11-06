@@ -246,7 +246,7 @@ if (!head.children.some((n) => n.id === "tomato-skin-style")) failures.push("没
 if (!body.children.some((n) => n.id === "tomato-ambient")) failures.push("没有注入氛围层");
 
 // ---------- 渲染冒烟 ----------
-const sampleState = {
+let sampleState = {
   serverTime: Math.floor(Date.now() / 1000),
   today: new Date().toISOString().slice(0, 10),
   taskKinds: {},
@@ -315,6 +315,23 @@ const sampleState = {
   stats: { todaySeconds: 1200, todayPomodoros: 2, todayCompleted: 1, totalSeconds: 36000, totalPomodoros: 26, streak: 3, days: [] },
   guard: { available: true, backend: "niri / Wayland", locked: false, whitelist: [], pid: 1234 },
 };
+
+// SMOKE_LIVE=1：用运行中的 runtime 真实 /api/state 渲染（数据面联调）；不可达时退回样例。
+if (process.env.SMOKE_LIVE) {
+  try {
+    const res = await fetch("http://127.0.0.1:43987/api/state", { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const live = await res.json();
+    if (!live || !live.data) throw new Error("state 缺少 data 字段");
+    sampleState = live;
+    console.log(
+      `smoke-client: 使用实时 /api/state（${(live.data.tasks || []).length} 任务 / ` +
+        `${(live.data.sessions || []).length} 会话 / ${(live.data.projects || []).length} 项目）`,
+    );
+  } catch (e) {
+    console.warn(`smoke-client: 实时 /api/state 不可用（${e.message}），改用样例数据`);
+  }
+}
 
 // 让 store 拿到样本：拦截 fetch 返回 /api/state。store 在 apply 时已启动轮询，
 // 这里直接替换全局 fetch 再触发一次 refresh（refresh 在模块内已导出，用页面渲染的

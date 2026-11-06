@@ -12,7 +12,8 @@
     "check": "pnpm core:test && pnpm runtime:test",
     "check:handbook": "python3 scripts/check-handbook.py",
     "build:client": "node scripts/build-client.mjs",
-    "check:client": "node scripts/build-client.mjs && node scripts/smoke-client.mjs"
+    "check:client": "node scripts/build-client.mjs && node scripts/smoke-client.mjs",
+    "check:client:live": "node scripts/build-client.mjs && SMOKE_LIVE=1 node scripts/smoke-client.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
