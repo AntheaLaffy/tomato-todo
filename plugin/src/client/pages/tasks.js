@@ -6,8 +6,8 @@
 //
 // 写操作全部走 tryDispatch（永不抛）；批量操作逐个提交而不是伪造批量 Action，
 // 因为 core 的 saveTask/deleteTask 才是唯一权威，失败时停在第一个错误上并说明。
-// 模板 tab 是只读展示：模板编辑与印刷对话框由后续界面补全，这里先把印刷规则
-// （单次 / 日历 / 每周 + 自动或手动）说清楚。
+// 模板 tab 的编辑/印刷/同步接在 template-dialog.js 与 print-dialog.js：列表只负责
+// 展示规则摘要与行内入口，表单语义与 Action 字段都在对话框里，避免两处漂移。
 import { h, Fragment, useState } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
@@ -45,6 +45,8 @@ import {
 import { registerPage } from "../app/registry.js";
 import { openImmersive } from "../app/immersive.js";
 import { TaskDialog } from "./task-dialog.js";
+import { TemplateDialog } from "./template-dialog.js";
+import { PrintDialog } from "./print-dialog.js";
 import { SearchDialog, useSearchHotkey } from "./search.js";
 
 registerCopy("tasks", {
@@ -123,7 +125,14 @@ registerCopy("tasks", {
     templateEstimate: "预计 {n} 个番茄",
     templateFocus: "每次 {minutes}",
     templateDefaultFocus: "每次 {minutes}（默认）",
-    templatesHint: "模板编辑与印刷对话框稍后补全；这里先展示印刷规则。",
+    templatesHint: "模板保留形状与印刷规则；印刷生成的实例之后与模板互不覆盖，需要时手动同步。",
+    templatesTitle: "模板与印刷",
+    newTemplate: "新建模板",
+    editTemplate: "编辑模板",
+    printTemplateAction: "印刷模板",
+    syncTemplate: "同步形状到未完成实例",
+    templateSynced: "模板形状已同步到未完成实例",
+    syncingTemplate: "同步中…",
     emptyActive: "还没有任务，先加一件吧",
     emptyActiveHint: "写下想做的事，把第一步留给现在。",
     emptyCompleted: "每一次完成，都值得被记录",
@@ -210,7 +219,14 @@ registerCopy("tasks", {
     templateEstimate: "{n} pomodoros planned",
     templateFocus: "{minutes} per session",
     templateDefaultFocus: "{minutes} per session (default)",
-    templatesHint: "Template editing and printing dialogs come later; this view shows the printing rules.",
+    templatesHint: "Templates keep the shape and the printing rule; printed instances stay decoupled, sync them when needed.",
+    templatesTitle: "Templates & printing",
+    newTemplate: "New template",
+    editTemplate: "Edit template",
+    printTemplateAction: "Print template",
+    syncTemplate: "Sync shape to unfinished instances",
+    templateSynced: "Template shape synced to unfinished instances",
+    syncingTemplate: "Syncing…",
     emptyActive: "No tasks yet — add one",
     emptyActiveHint: "Write down one thing and start with the first step.",
     emptyCompleted: "Every finish is worth keeping",
@@ -825,7 +841,17 @@ function ProjectGroup({ group, ...rowProps }) {
 
 // ---------------------------------------------------------------- 模板视图
 
-function TemplateList({ templates, today, data, defaultFocus }) {
+function TemplateList({
+  templates,
+  today,
+  data,
+  defaultFocus,
+  onNew,
+  onEdit,
+  onPrint,
+  onSync,
+  syncingId,
+}) {
   const hint = h(
     "div",
     {
@@ -838,21 +864,55 @@ function TemplateList({ templates, today, data, defaultFocus }) {
     },
     t("tasks.templatesHint"),
   );
+  const header = h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "2px 10px 10px",
+        flexWrap: "wrap",
+      },
+    },
+    h(Icon, { name: "sparkle", size: 16, style: { color: "var(--tomato-brand-deep)" } }),
+    h(
+      "div",
+      { style: { fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)", flex: 1, minWidth: 0 } },
+      t("tasks.templatesTitle"),
+    ),
+    h(
+      Btn,
+      { variant: "soft", size: "sm", icon: "plus", onClick: onNew, disabled: !onNew },
+      t("tasks.newTemplate"),
+    ),
+  );
   if (templates.length === 0) {
     return h(
       "div",
       null,
-      h(Empty, {
-        icon: "calendar",
-        title: t("tasks.emptyTemplates"),
-        hint: t("tasks.emptyTemplatesHint"),
-      }),
+      h(
+        Empty,
+        {
+          icon: "calendar",
+          title: t("tasks.emptyTemplates"),
+          hint: t("tasks.emptyTemplatesHint"),
+          action: onNew
+            ? h(
+                Btn,
+                { variant: "primary", size: "sm", icon: "plus", onClick: onNew },
+                t("tasks.newTemplate"),
+              )
+            : null,
+        },
+      ),
       hint,
     );
   }
   return h(
     "div",
     null,
+    header,
     h(
       "div",
       { style: { display: "flex", flexDirection: "column" } },
@@ -903,6 +963,33 @@ function TemplateList({ templates, today, data, defaultFocus }) {
                 icon: template.automatic ? "refresh" : "edit",
               },
               template.automatic ? t("tasks.autoPrint") : t("tasks.manualPrint"),
+            ),
+            h("div", { style: { flex: 1 } }),
+            h(
+              "div",
+              { style: { display: "flex", alignItems: "center", gap: 2 } },
+              h(IconBtn, {
+                name: "edit",
+                size: 16,
+                box: 30,
+                title: t("tasks.editTemplate"),
+                onClick: () => onEdit?.(template),
+              }),
+              h(IconBtn, {
+                name: "play",
+                size: 16,
+                box: 30,
+                title: t("tasks.printTemplateAction"),
+                onClick: () => onPrint?.(template),
+              }),
+              h(IconBtn, {
+                name: "refresh",
+                size: 16,
+                box: 30,
+                title: syncingId === template.id ? t("tasks.syncingTemplate") : t("tasks.syncTemplate"),
+                disabled: syncingId !== null,
+                onClick: () => onSync?.(template),
+              }),
             ),
           ),
           h(
@@ -1027,6 +1114,9 @@ function TasksPage() {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveDate, setMoveDate] = useState("");
+  const [templateEditor, setTemplateEditor] = useState(null);
+  const [printDialog, setPrintDialog] = useState(null);
+  const [syncingId, setSyncingId] = useState(null);
 
   useSearchHotkey(() => setSearchOpen(true));
 
@@ -1067,6 +1157,12 @@ function TasksPage() {
   const groups = groupTasks(visible, projects, t("tasks.inbox"));
   const editingTask = editor && editor.id ? taskById(data, editor.id) : null;
   const dialogOpen = !!editor && (!editor.id || !!editingTask);
+  const editingTemplate =
+    templateEditor && templateEditor.id
+      ? templates.find((template) => template && template.id === templateEditor.id) || null
+      : null;
+  const templateDialogOpen = !!templateEditor && (!templateEditor.id || !!editingTemplate);
+  const prints = Array.isArray(data.prints) ? data.prints : [];
 
   const showToastError = (error) => notify(error || t("common.writeFailed"), "danger");
 
@@ -1260,6 +1356,26 @@ function TasksPage() {
     notify(t("tasks.added"), "brand");
   };
 
+  const openTemplate = (template) => {
+    setTemplateEditor(template && template.id ? { id: template.id } : {});
+  };
+
+  const openPrint = (template) => {
+    setPrintDialog({ templateId: template && template.id ? template.id : null });
+  };
+
+  const runSyncTemplate = async (template) => {
+    if (!template || syncingId !== null) return;
+    setSyncingId(template.id);
+    const result = await tryDispatch({ type: "syncTemplate", id: template.id });
+    setSyncingId(null);
+    if (!result.ok) {
+      showToastError(result.error);
+      return;
+    }
+    notify(t("tasks.templateSynced"), "brand");
+  };
+
   const header = h(PageHeader, {
     eyebrow: t("tasks.eyebrow"),
     title: t("tasks.headline"),
@@ -1380,6 +1496,11 @@ function TasksPage() {
             today,
             data: viewData,
             defaultFocus,
+            onNew: () => openTemplate(null),
+            onEdit: openTemplate,
+            onPrint: openPrint,
+            onSync: runSyncTemplate,
+            syncingId,
           }),
         )
       : h(
@@ -1410,6 +1531,22 @@ function TasksPage() {
       settings,
       initialTitle: editor && editor.title ? editor.title : "",
       onClose: () => setEditor(null),
+    }),
+    h(TemplateDialog, {
+      open: templateDialogOpen,
+      template: editingTemplate,
+      today,
+      data: viewData,
+      settings,
+      onClose: () => setTemplateEditor(null),
+    }),
+    h(PrintDialog, {
+      open: printDialog !== null,
+      templates,
+      prints,
+      today,
+      initialTemplateId: printDialog ? printDialog.templateId : null,
+      onClose: () => setPrintDialog(null),
     }),
     h(SearchDialog, {
       open: searchOpen,
