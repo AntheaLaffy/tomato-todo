@@ -92,33 +92,31 @@ export function registerApp(ctx) {
 
   const pageProps = { dispatch, api };
 
-  ctx.slots.inject("main", () =>
-    ctx.slots.register({ name: "main", key: "tomato" }, () => h(AppShell, pageProps)),
+  // 逐个 slot 容错：任何一个槽位在 DSH 版本差异下不存在，都不该让整块插件挂掉
+  // （皮肤与 HUD 仍是独立的可用部分）。
+  const safeInject = (key, options, Component) => {
+    try {
+      ctx.slots.inject(key, () => ctx.slots.register(options, Component));
+    } catch (e) {
+      console.warn(`[tomato] slot ${key} 注册失败：`, e && e.message ? e.message : e);
+    }
+  };
+
+  safeInject("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
+
+  safeInject(
+    "sidebar.panellist",
+    { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
+    PanelIcon,
   );
 
-  ctx.slots.inject("sidebar.panellist", () =>
-    ctx.slots.register(
-      {
-        name: "sidebar.panellist",
-        id: "tomato",
-        order: 5,
-        label: () => "番茄 Todo",
-      },
-      PanelIcon,
-    ),
+  safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-overlay", order: 900 }, () =>
+    h(AppOverlay, { openPanel }),
   );
 
-  ctx.slots.inject("shell.overlay", () =>
-    ctx.slots.register(
-      { name: "shell.overlay", id: "tomato-overlay", order: 900 },
-      () => h(AppOverlay, { openPanel }),
-    ),
-  );
-
-  ctx.slots.inject("conversation.composer.dock", () =>
-    ctx.slots.register(
-      { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
-      () => h(DockCard, { openPanel }),
-    ),
+  safeInject(
+    "conversation.composer.dock",
+    { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
+    () => h(DockCard, { openPanel }),
   );
 }

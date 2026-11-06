@@ -124,6 +124,19 @@
 时间感知：06–11 晨光（默认）；11–17 暖白；17–22 琥珀（`--tomato-ambient-hue` 滤镜）；
 22–06 夜读（低饱和 + 更暗）。用 `data-tomato-daypart` 属性切 CSS，不做 JS 重绘。
 
+**实现现状（天空层）**：DSH 的 AppFrame 用不透明 `--dsw-alias-bg-base` 铺满视口，
+注入 body 的地面层会被整块盖住。因此氛围实际分两层：
+`#tomato-ambient`（body 地面层，结构同上，壳层透明化时可见）+ `#tomato-sky`
+（注册到 `shell.overlay`、order −1000 的天空层：窗光洗层、漂移微尘、右下角线描插画，
+`pointer-events:none`、透明度 ≤ .10/.07、插画用 radial mask 从右下渐隐，中心栏不落笔触）。
+天空层叠在内容之上，是「屏幕反光」而非不透明度遮挡；正文对比度实测仍 ≥ 8:1（浅）/12:1（深）。
+两个可调参数：`--tomato-wash`（洗层）与 `--tomato-sky-art`（插画）；`prefers-reduced-motion`、
+`data-tomato-motion=lite`、`forced-colors` 全部降级。
+
+**对比度约定**：正文承载面上的文字必须 AA（≥4.5:1）。亮番茄 `#d96d55` 只用于图标/进度/链接，
+按钮底色用 `--tomato-btn-fill`（浅 `#b9573f` / 深 `#e8886c`），强调文字用 `--tomato-accent-fg`
+（浅 `#a0442f` / 深 `#e8886c`）。
+
 **渲染策略**：注入层用原生 DOM（不占 React 树），插件 dispose 时移除；CSS 集中在
 `skin/styles.js` 生成的一支 `<style id="tomato-skin">`（含 keyframes、纸纹、滚动条、
 `::selection`、`#root` 入场淡入 520ms）。**不改 DSH 类名**：所有选择器只允许

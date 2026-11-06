@@ -24,6 +24,10 @@ body{
   --tomato-brand-deep:#b9573f;
   --tomato-brand-soft:#f6e0d6;
   --tomato-on-brand:#fffaf6;
+  /* 文字承载面用更深一档的红：亮番茄只做图标/进度/链接（对比度见 docs/SKIN.md） */
+  --tomato-btn-fill:#b9573f;
+  --tomato-btn-fill-hover:#a34c34;
+  --tomato-accent-fg:#a0442f;
   --tomato-accent:#e9a178;
   --tomato-leaf:#7e9a6e;
   --tomato-sun:#d5a553;
@@ -51,6 +55,9 @@ body[data-ds-dark-theme]{
   --tomato-brand-deep:#d2705a;
   --tomato-brand-soft:#4a2f28;
   --tomato-on-brand:#241511;
+  --tomato-btn-fill:#e8886c;
+  --tomato-btn-fill-hover:#d2705a;
+  --tomato-accent-fg:#e8886c;
   --tomato-accent:#d99a72;
   --tomato-leaf:#93ab84;
   --tomato-sun:#dcb06b;

@@ -93,10 +93,17 @@ export function timerView(state) {
   const timer = data.timer || {};
   const settings = data.settings || {};
   const totalSecs = Number(timer.durationSecs) > 0 ? timer.durationSecs : (settings.focusMinutes || 45) * 60;
+  // 运行中优先用 deadline 本地插值：store 心跳每秒 emit，界面数字不依赖网络轮询。
+  const remainingFromDeadline =
+    timer.running && typeof timer.deadline === "number"
+      ? Math.max(0, Math.round(timer.deadline - Date.now() / 1000))
+      : null;
   const remaining =
-    typeof state?.remainingSecs === "number"
-      ? state.remainingSecs
-      : Math.max(0, Number(timer.remainingSecs) || totalSecs);
+    remainingFromDeadline !== null
+      ? remainingFromDeadline
+      : typeof state?.remainingSecs === "number"
+        ? state.remainingSecs
+        : Math.max(0, Number(timer.remainingSecs) || totalSecs);
   const mode = timer.mode || "focus";
   const running = !!timer.running;
   return {

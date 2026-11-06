@@ -10,6 +10,7 @@ let snapshot = null;
 let readError = null;
 let inflightRead = null;
 let pollTimer = null;
+let beatTimer = null;
 let disposed = false;
 const listeners = new Set();
 
@@ -111,7 +112,27 @@ function nextDelay() {
   const data = snapshot && snapshot.data;
   const timer = data && data.timer;
   const running = !!(timer && timer.running);
-  return running ? 1200 : 5000;
+  // 倒计时由 timer.deadline 本地插值（derive.timerView），所以专注中也不必高频请求：
+  // 大快照（任务/课时/教育数据）的解析成本远高于一次本地心跳。
+  return running ? 5000 : 8000;
+}
+
+/** 专注中每秒本地 emit 一次，让计时/HUD 不依赖网络轮询刷新。 */
+function startHeartbeat() {
+  stopHeartbeat();
+  beatTimer = setInterval(() => {
+    if (disposed) return;
+    const data = snapshot && snapshot.data;
+    const timer = data && data.timer;
+    if (timer && timer.running) emit();
+  }, 1000);
+}
+
+function stopHeartbeat() {
+  if (beatTimer !== null) {
+    clearInterval(beatTimer);
+    beatTimer = null;
+  }
 }
 
 export function startPolling() {
@@ -125,6 +146,7 @@ export function startPolling() {
     });
   };
   refresh();
+  startHeartbeat();
   pollTimer = setTimeout(tick, nextDelay());
   return stopPolling;
 }
@@ -134,6 +156,7 @@ export function stopPolling() {
     clearTimeout(pollTimer);
     pollTimer = null;
   }
+  stopHeartbeat();
 }
 
 export function dispose() {

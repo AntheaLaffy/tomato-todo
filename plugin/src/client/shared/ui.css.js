@@ -23,10 +23,10 @@ body[data-ds-dark-theme] .t-card:hover{box-shadow:0 16px 38px -18px #000000a0}
 .t-btn:disabled{opacity:.45;cursor:default;transform:none!important}
 .t-btn:active:not(:disabled){transform:translateY(1px)}
 .t-btn:focus-visible{outline:2px solid var(--tomato-brand);outline-offset:2px}
-.t-btn-primary{background:var(--tomato-brand);color:var(--tomato-on-brand);
+.t-btn-primary{background:var(--tomato-btn-fill);color:var(--tomato-on-brand);
   box-shadow:0 6px 16px -8px #b9573f73}
-.t-btn-primary:hover:not(:disabled){background:var(--tomato-brand-deep)}
-.t-btn-soft{background:var(--tomato-brand-soft);color:var(--tomato-brand-deep)}
+.t-btn-primary:hover:not(:disabled){background:var(--tomato-btn-fill-hover)}
+.t-btn-soft{background:var(--tomato-brand-soft);color:var(--tomato-accent-fg)}
 .t-btn-soft:hover:not(:disabled){background:var(--tomato-surface-3)}
 .t-btn-ghost{background:transparent;border-color:var(--tomato-line);color:var(--tomato-ink)}
 .t-btn-ghost:hover:not(:disabled){background:var(--tomato-surface-2)}
@@ -73,7 +73,7 @@ body[data-ds-dark-theme] .t-btn-danger{color:#e07f6a}
   transition:background .18s ease,color .18s ease;border:none;background:transparent;
   font-family:inherit;font-size:13.5px;text-align:left;width:100%}
 .t-navitem:hover{background:var(--tomato-surface-2);color:var(--tomato-ink)}
-.t-navitem[data-active=true]{background:var(--tomato-brand-soft);color:var(--tomato-brand-deep);
+.t-navitem[data-active=true]{background:var(--tomato-brand-soft);color:var(--tomato-accent-fg);
   font-weight:600}
 .t-navitem[data-active=true]:before{content:'';position:absolute;left:0;top:9px;bottom:9px;
   width:3px;border-radius:3px;background:var(--tomato-brand)}
