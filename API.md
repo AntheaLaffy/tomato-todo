@@ -12,13 +12,18 @@
 
 - runtime 数据目录：`~/.local/share/studio.tomato.todo/`（沿用），计划文件 `plan.json` 为唯一数据源（原子写）。
 - runtime 启动参数：`--serve`（HTTP 服务，默认 127.0.0.1:43987）、`--mcp`（stdio MCP，新进程转发到运行中的 runtime，语义同旧 mcp.mjs）、`--data <dir>`。
+另有一次性参数（插件 host 经 subprocess 调用，无 fetch 环境）：
+- `--guard-status`：stdout 打一行 JSON 后退出。成功 `{"ok":true,"guard":{"available":true,"backend":"x11","locked":false,"whitelist":[],"pid":1234}}`；
+  guard 不可达也退出 0 但 `{"ok":false,"error":"…"}`；runtime 本身不可达 = 无输出或非零退出。
 - guard 启动参数：`--serve`（127.0.0.1:43988，token 由 runtime 生成写入 guard 数据目录）、`--lock`/`--unlock` 等一次性命令。
 
 ## runtime HTTP API（127.0.0.1:43987）
 
 浏览器只读端点（允许 `Origin: http://127.0.0.1:3080` 的 CORS，供插件 UI）：
 - `GET /api/snapshot` — 全量只读快照（形状对齐旧 src/types.ts 的 Snapshot，camelCase）
-- `GET /api/today`、`GET /api/stats`、`GET /health`
+- `GET /api/today` — `{ "today": "YYYY-MM-DD", "dueCount": number, "focusMinutes": number }`
+- `GET /api/stats`、`GET /health` — health 附带可选 `guard` 摘要字段
+  `{"ok":true,"runtime":{"pid":…},"guard":{"available":true,"backend":"x11","locked":false,"whitelist":[],"pid":1234}}`（guard 摘要在 guard 不可达时给 `{"available":false}`，不得整体报错）
 
 浏览器写端点（同 Origin 白名单；写路径也必须经 @tomato/core 的校验与保护规则）：
 - `POST /api/tasks`、`PATCH /api/tasks/:id`、`POST /api/tasks/:id/complete`、`POST /api/tasks/move`
