@@ -7329,6 +7329,2040 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     }
   });
 
+  // plugin/src/client/pages/template-dialog.js
+  registerCopy("template", {
+    zh: {
+      newTitle: "新建模板",
+      editTitle: "编辑模板",
+      newSubtitle: "模板保存形状与印刷规则；实例记录每一次执行，两者互不覆盖。",
+      editSubtitle: "改模板不会改已印出的实例；需要时用「同步」更新未完成实例。",
+      title: "标题",
+      titleHint: "模板名就是标题；自动记为习惯组时也用它。",
+      titlePlaceholder: "想反复印刷的一件事",
+      project: "所属项目",
+      noProject: "不分类",
+      focusMinutes: "单次专注时长",
+      focusMinutesHint: "留空沿用设置里的 {n} 分钟",
+      estimate: "预计番茄数",
+      scrap: "重修窗口",
+      scrapHint: "计划块结束后仍可补做的分钟数；0 表示到点作废",
+      priority: "优先级",
+      tags: "标签",
+      tagsPlaceholder: "用逗号分隔，例如：数学, 错题",
+      notes: "备注",
+      notesPlaceholder: "补充资料、位置或提醒自己的话…",
+      subtasks: "子任务",
+      subtaskPlaceholder: "添加一个子任务",
+      addSubtask: "添加子任务",
+      removeSubtask: "删除子任务",
+      untouched: "未命名步骤",
+      printingTitle: "印刷规则",
+      printingHint: "规则决定实例什么时候出现；实例印出后与模板解耦。",
+      kindOnce: "单次",
+      kindCalendar: "日程",
+      kindWeekly: "每周",
+      onceDate: "印刷日期",
+      onceTime: "开始时刻",
+      timeOptional: "留空表示不定时，只进当日待办",
+      calendarHint: "同一开始时刻的日期合并到一个时段；不同时段不能共用开始时刻。",
+      addSlot: "添加时段",
+      removeSlot: "删除时段",
+      slotTime: "开始时刻",
+      slotDates: "日期",
+      addDate: "添加日期",
+      removeDate: "移除日期",
+      weeklyHint: "选中的星期在印刷时按整周展开；同一天同一时刻不能重复。",
+      weeklyDays: "印刷日",
+      weeklyAutoHabit: "每周且所有时段都有开始时刻时，core 会自动把它记为习惯组。",
+      habitNote: "这个模板已关联习惯组，开始时刻必填。",
+      automatic: "自动印刷",
+      automaticHint: "按「今天 + 提前天数」补齐遗漏；程序关闭期间不会补印。",
+      printAhead: "提前天数",
+      printAheadHint: "0–90 天",
+      printNow: "保存后立即印刷",
+      printNowOnce: "保存后立即印刷这一次",
+      printNowCalendar: "保存后立即印刷规则内的日期",
+      printNowWeekly: "保存后立即印刷本周",
+      titleRequired: "模板标题不能为空",
+      titleTooLong: "模板标题最多 200 字",
+      focusInvalid: "单次专注时长需为 1–180 分钟",
+      estimateInvalid: "预计番茄数需为 1–99",
+      scrapInvalid: "重修窗口需为 0–10080 分钟",
+      tooManyTags: "标签最多 20 个，每个不超过 40 字",
+      subtaskEmpty: "子任务名称不能为空",
+      dateRequired: "请选择印刷日期",
+      dateInvalid: "日期无效，请用 YYYY-MM-DD",
+      timeInvalid: "开始时刻需为 HH:MM",
+      needSlot: "至少需要一个时段",
+      needDays: "每个时段至少选一个星期",
+      needDates: "每个日程时段至少需要一个日期",
+      duplicateDates: "同一日期在同一时刻重复出现，请合并",
+      duplicateTime: "不同时段不能共用同一开始时刻",
+      duplicateWeekly: "同一星期同一时刻重复出现，请合并",
+      needTime: "习惯模板必须填写开始时刻",
+      mixedTime: "同一规则不能混用定时与不定时时段",
+      aheadInvalid: "提前天数需为 0–90",
+      saved: "模板已保存",
+      created: "模板已创建",
+      savedAndPrinted: "模板已保存，已提交印刷",
+      deleted: "模板已删除，实例保留",
+      deleteTitle: "删除这个模板？",
+      deleteBody: "已印出的实例会保留并解除与模板的关联；印刷记账会一起清掉，这一步不能撤销。",
+      deleteConfirm: "确认删除"
+    },
+    en: {
+      newTitle: "New template",
+      editTitle: "Edit template",
+      newSubtitle: "A template stores the shape and the printing rule; instances record each run.",
+      editSubtitle: "Editing the template won't rewrite printed instances; use Sync to update unfinished ones.",
+      title: "Title",
+      titleHint: "The title is the template name; a habit group reuses it too.",
+      titlePlaceholder: "Something worth printing again",
+      project: "Project",
+      noProject: "No project",
+      focusMinutes: "Focus per session",
+      focusMinutesHint: "Empty uses the {n} min default",
+      estimate: "Pomodoros planned",
+      scrap: "Repair window",
+      scrapHint: "Minutes still usable after the plan block; 0 voids it on time",
+      priority: "Priority",
+      tags: "Tags",
+      tagsPlaceholder: "Comma separated, e.g. math, mistakes",
+      notes: "Notes",
+      notesPlaceholder: "References, location, or a note to yourself…",
+      subtasks: "Subtasks",
+      subtaskPlaceholder: "Add a subtask",
+      addSubtask: "Add subtask",
+      removeSubtask: "Remove subtask",
+      untouched: "Untitled step",
+      printingTitle: "Printing rule",
+      printingHint: "The rule decides when instances appear; printed instances are decoupled from the template.",
+      kindOnce: "Once",
+      kindCalendar: "Calendar",
+      kindWeekly: "Weekly",
+      onceDate: "Print date",
+      onceTime: "Start time",
+      timeOptional: "Empty means no fixed time; it just joins that day",
+      calendarHint: "Dates sharing one start time go in one slot; slots can't share a start time.",
+      addSlot: "Add slot",
+      removeSlot: "Remove slot",
+      slotTime: "Start time",
+      slotDates: "Dates",
+      addDate: "Add date",
+      removeDate: "Remove date",
+      weeklyHint: "Selected weekdays expand to whole weeks when printed; one weekday/time can't repeat.",
+      weeklyDays: "Weekdays",
+      weeklyAutoHabit: "A weekly template whose slots all have start times is recorded as a habit group by core.",
+      habitNote: "This template is tied to a habit group, so start times are required.",
+      automatic: "Auto print",
+      automaticHint: "Fills gaps within today + days ahead; nothing is printed while the app is closed.",
+      printAhead: "Days ahead",
+      printAheadHint: "0–90 days",
+      printNow: "Print right after saving",
+      printNowOnce: "Print this one right after saving",
+      printNowCalendar: "Print the rule's dates right after saving",
+      printNowWeekly: "Print this week right after saving",
+      titleRequired: "Template title is required",
+      titleTooLong: "Template title must be at most 200 characters",
+      focusInvalid: "Focus per session must be 1–180 minutes",
+      estimateInvalid: "Planned pomodoros must be 1–99",
+      scrapInvalid: "Repair window must be 0–10080 minutes",
+      tooManyTags: "At most 20 tags, each under 40 characters",
+      subtaskEmpty: "Subtask title is required",
+      dateRequired: "Pick a print date",
+      dateInvalid: "Invalid date; use YYYY-MM-DD",
+      timeInvalid: "Start time must be HH:MM",
+      needSlot: "At least one slot is required",
+      needDays: "Each slot needs at least one weekday",
+      needDates: "Each calendar slot needs at least one date",
+      duplicateDates: "A date repeats at the same start time; please merge it",
+      duplicateTime: "Slots can't share a start time",
+      duplicateWeekly: "A weekday repeats at the same start time; please merge it",
+      needTime: "Habit templates require start times",
+      mixedTime: "One rule can't mix timed and untimed slots",
+      aheadInvalid: "Days ahead must be 0–90",
+      saved: "Template saved",
+      created: "Template created",
+      savedAndPrinted: "Template saved; printing submitted",
+      deleted: "Template deleted; instances kept",
+      deleteTitle: "Delete this template?",
+      deleteBody: "Printed instances stay and lose their template link; the printing ledger is cleared. This cannot be undone.",
+      deleteConfirm: "Delete"
+    }
+  });
+  var PRIORITY_KEYS2 = [
+    "priorityNone",
+    "priorityLow",
+    "priorityMedium",
+    "priorityHigh"
+  ];
+  registerCopy("template", {
+    zh: {
+      priorityNone: "无",
+      priorityLow: "低",
+      priorityMedium: "中",
+      priorityHigh: "高"
+    },
+    en: {
+      priorityNone: "None",
+      priorityLow: "Low",
+      priorityMedium: "Medium",
+      priorityHigh: "High"
+    }
+  });
+  var KINDS = ["once", "calendar", "weekly"];
+  function newId2() {
+    try {
+      if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+        return globalThis.crypto.randomUUID();
+      }
+    } catch {
+    }
+    return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  function intOf2(raw, fallback = null) {
+    if (raw === null || raw === void 0) return fallback;
+    const text = String(raw).trim();
+    if (text === "") return fallback;
+    const n = Number(text);
+    return Number.isFinite(n) ? Math.round(n) : fallback;
+  }
+  function validDate(text) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(text ?? ""))) return false;
+    const [y, m, d] = String(text).split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+  }
+  function validTime(text) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(text ?? ""));
+  }
+  function blankTemplateDraft(today) {
+    return {
+      id: null,
+      habitId: null,
+      title: "",
+      notes: "",
+      projectId: "",
+      focusMinutes: "",
+      scrapMinutes: "0",
+      priority: 0,
+      estimate: "1",
+      tagsText: "",
+      subtasks: [],
+      printingKind: "weekly",
+      onceDate: today ?? "",
+      onceTime: "",
+      weeklySlots: [{ days: [1, 2, 3, 4, 5], time: "" }],
+      calendarSlots: [{ dates: [], time: "" }],
+      automatic: false,
+      printAheadDays: "7",
+      printNow: false
+    };
+  }
+  function templateToDraft(template, today) {
+    if (!template || typeof template !== "object")
+      return blankTemplateDraft(today);
+    const shape = template.shape || {};
+    const printing = template.printing || { kind: "weekly", slots: [] };
+    const draft = blankTemplateDraft(today);
+    draft.id = template.id ?? null;
+    draft.habitId = shape.habitId ?? null;
+    draft.title = shape.title ?? "";
+    draft.notes = shape.notes ?? "";
+    draft.projectId = shape.projectId ?? "";
+    draft.focusMinutes = shape.focusMinutes === null || shape.focusMinutes === void 0 ? "" : String(shape.focusMinutes);
+    draft.scrapMinutes = String(shape.scrapMinutes ?? 0);
+    draft.priority = Number(shape.priority) || 0;
+    draft.estimate = String(Math.max(1, Number(shape.estimate) || 1));
+    draft.tagsText = Array.isArray(shape.tags) ? shape.tags.join(", ") : "";
+    draft.subtasks = Array.isArray(shape.subtasks) ? shape.subtasks.map((sub) => ({
+      id: sub.id || newId2(),
+      title: sub.title ?? ""
+    })) : [];
+    draft.automatic = !!template.automatic;
+    const ahead = Number(template.printAheadDays);
+    draft.printAheadDays = String(
+      Number.isFinite(ahead) && ahead >= 0 ? ahead : 7
+    );
+    if (KINDS.includes(printing.kind)) draft.printingKind = printing.kind;
+    if (printing.kind === "once") {
+      draft.onceDate = printing.date || today || "";
+      draft.onceTime = printing.time ?? "";
+    } else if (printing.kind === "calendar" && Array.isArray(printing.slots) && printing.slots.length > 0) {
+      draft.calendarSlots = printing.slots.map((slot) => ({
+        dates: Array.isArray(slot.dates) ? slot.dates.filter((d) => validDate(d)).sort() : [],
+        time: slot.time ?? ""
+      }));
+    } else if (printing.kind === "weekly" && Array.isArray(printing.slots) && printing.slots.length > 0) {
+      draft.weeklySlots = printing.slots.map((slot) => ({
+        days: Array.isArray(slot.days) ? slot.days.filter((d) => d >= 1 && d <= 7) : [],
+        time: slot.time ?? ""
+      }));
+    }
+    return draft;
+  }
+  function TemplateDialog({
+    open,
+    onClose,
+    template = null,
+    today = "",
+    data = {},
+    settings = {}
+  }) {
+    const templateId = template && template.id ? template.id : null;
+    const [draft, setDraft] = useState(() => templateToDraft(template, today));
+    const [dateInput, setDateInput] = useState("");
+    const [subInput, setSubInput] = useState("");
+    const [error, setError] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    useEffect(() => {
+      if (!open) return;
+      setDraft(templateToDraft(template, today));
+      setDateInput("");
+      setError(null);
+      setBusy(false);
+      setConfirmDelete(false);
+    }, [open, templateId, today]);
+    if (!open) return null;
+    const editing = templateId !== null;
+    const patch = (next) => setDraft((current3) => ({ ...current3, ...next }));
+    const projects = Array.isArray(data.projects) ? data.projects : [];
+    const defaultFocus = Number(settings.focusMinutes) || 45;
+    const weekFull = t("common.weekFull");
+    const weekLabels = Array.isArray(weekFull) ? weekFull : [];
+    const priorityOptions = PRIORITY_KEYS2.map((key, value) => ({
+      value: String(value),
+      label: t(`template.${key}`)
+    }));
+    const setKind = (kind) => {
+      if (!KINDS.includes(kind)) return;
+      patch({
+        printingKind: kind,
+        habitId: kind === "weekly" ? draft.habitId : null
+      });
+    };
+    const patchWeeklySlot = (index, next) => patch({
+      weeklySlots: draft.weeklySlots.map(
+        (slot, i) => i === index ? { ...slot, ...next } : slot
+      )
+    });
+    const toggleWeekday = (index, day) => {
+      const slot = draft.weeklySlots[index];
+      if (!slot) return;
+      const days = slot.days.includes(day) ? slot.days.filter((d) => d !== day) : [...slot.days, day].sort((a, b) => a - b);
+      patchWeeklySlot(index, { days });
+    };
+    const patchCalendarSlot = (index, next) => patch({
+      calendarSlots: draft.calendarSlots.map(
+        (slot, i) => i === index ? { ...slot, ...next } : slot
+      )
+    });
+    const addCalendarDate = (index) => {
+      const date = String(dateInput ?? "").trim();
+      if (!validDate(date)) {
+        setError(t("template.dateInvalid"));
+        return;
+      }
+      const slot = draft.calendarSlots[index];
+      if (!slot) return;
+      if (slot.dates.includes(date)) return;
+      patchCalendarSlot(index, { dates: [...slot.dates, date].sort() });
+      setDateInput("");
+    };
+    const addSubtask = () => {
+      const title = String(subInput ?? "").trim();
+      if (title === "") return;
+      patch({ subtasks: [...draft.subtasks, { id: newId2(), title }] });
+      setSubInput("");
+    };
+    const onEnter = (fn) => (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        fn();
+      }
+    };
+    const buildPrinting = () => {
+      if (draft.printingKind === "once") {
+        const date = String(draft.onceDate ?? "").trim();
+        if (date === "") return { error: t("template.dateRequired") };
+        if (!validDate(date)) return { error: t("template.dateInvalid") };
+        const time = String(draft.onceTime ?? "").trim();
+        if (time !== "" && !validTime(time))
+          return { error: t("template.timeInvalid") };
+        return {
+          printing: { kind: "once", date, time: time === "" ? null : time }
+        };
+      }
+      if (draft.printingKind === "calendar") {
+        const slots2 = draft.calendarSlots.map((slot) => ({
+          dates: Array.from(new Set(slot.dates)).sort(),
+          time: String(slot.time ?? "").trim()
+        })).filter((slot) => slot.dates.length > 0);
+        if (slots2.length === 0) return { error: t("template.needDates") };
+        const times = /* @__PURE__ */ new Set();
+        const seen2 = /* @__PURE__ */ new Set();
+        for (const slot of slots2) {
+          if (slot.time !== "" && !validTime(slot.time))
+            return { error: t("template.timeInvalid") };
+          const timeKey = slot.time === "" ? "null" : slot.time;
+          if (times.has(timeKey)) return { error: t("template.duplicateTime") };
+          times.add(timeKey);
+          for (const date of slot.dates) {
+            if (!validDate(date)) return { error: t("template.dateInvalid") };
+            const key = `${date}|${timeKey}`;
+            if (seen2.has(key)) return { error: t("template.duplicateDates") };
+            seen2.add(key);
+          }
+        }
+        return {
+          printing: {
+            kind: "calendar",
+            slots: slots2.map((slot) => ({
+              dates: slot.dates,
+              time: slot.time === "" ? null : slot.time
+            }))
+          }
+        };
+      }
+      const slots = draft.weeklySlots.map((slot) => ({
+        days: Array.from(new Set(slot.days)).sort((a, b) => a - b),
+        time: String(slot.time ?? "").trim()
+      })).filter((slot) => slot.days.length > 0);
+      if (slots.length === 0) return { error: t("template.needDays") };
+      const seen = /* @__PURE__ */ new Set();
+      const timed = slots.filter((slot) => slot.time !== "").length;
+      if (timed > 0 && timed < slots.length)
+        return { error: t("template.mixedTime") };
+      for (const slot of slots) {
+        if (slot.time !== "" && !validTime(slot.time))
+          return { error: t("template.timeInvalid") };
+        if (draft.habitId !== null && slot.time === "")
+          return { error: t("template.needTime") };
+        for (const day of slot.days) {
+          const key = `${day}|${slot.time === "" ? "null" : slot.time}`;
+          if (seen.has(key)) return { error: t("template.duplicateWeekly") };
+          seen.add(key);
+        }
+      }
+      return {
+        printing: {
+          kind: "weekly",
+          slots: slots.map((slot) => ({
+            days: slot.days,
+            time: slot.time === "" ? null : slot.time
+          }))
+        }
+      };
+    };
+    const printDatesOf = (printing) => {
+      if (!draft.printNow) return [];
+      if (printing.kind === "once") return [printing.date];
+      if (printing.kind === "calendar") {
+        return Array.from(
+          new Set(printing.slots.flatMap((slot) => slot.dates))
+        ).sort();
+      }
+      const anchor = validDate(today) ? today : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+      return [weekStart(anchor)];
+    };
+    const submit = async () => {
+      if (busy) return;
+      const title = String(draft.title ?? "").trim();
+      if (title === "") {
+        setError(t("template.titleRequired"));
+        return;
+      }
+      if (Array.from(title).length > 200) {
+        setError(t("template.titleTooLong"));
+        return;
+      }
+      const estimate = intOf2(draft.estimate, 1);
+      if (estimate === null || estimate < 1 || estimate > 99) {
+        setError(t("template.estimateInvalid"));
+        return;
+      }
+      const focusMinutes = String(draft.focusMinutes ?? "").trim() === "" ? null : intOf2(draft.focusMinutes, null);
+      if (focusMinutes !== null && (focusMinutes < 1 || focusMinutes > 180)) {
+        setError(t("template.focusInvalid"));
+        return;
+      }
+      const scrapMinutes = intOf2(draft.scrapMinutes, 0);
+      if (scrapMinutes === null || scrapMinutes < 0 || scrapMinutes > 10080) {
+        setError(t("template.scrapInvalid"));
+        return;
+      }
+      const ahead = intOf2(draft.printAheadDays, 7);
+      if (ahead === null || ahead < 0 || ahead > 90) {
+        setError(t("template.aheadInvalid"));
+        return;
+      }
+      const tags = String(draft.tagsText ?? "").split(/[,，]/).map((tag) => tag.trim()).filter((tag) => tag !== "");
+      if (tags.length > 20 || tags.some((tag) => Array.from(tag).length > 40)) {
+        setError(t("template.tooManyTags"));
+        return;
+      }
+      if (draft.subtasks.some((sub) => String(sub.title ?? "").trim() === "")) {
+        setError(t("template.subtaskEmpty"));
+        return;
+      }
+      const built = buildPrinting();
+      if (built.error) {
+        setError(built.error);
+        return;
+      }
+      const printing = built.printing;
+      const template2 = {
+        id: draft.id ?? newId2(),
+        shape: {
+          title,
+          notes: String(draft.notes ?? ""),
+          projectId: draft.projectId ? draft.projectId : null,
+          habitId: draft.habitId ?? null,
+          focusMinutes,
+          scrapMinutes,
+          priority: Number(draft.priority) || 0,
+          estimate,
+          tags,
+          subtasks: draft.subtasks.map((sub) => ({
+            id: sub.id || newId2(),
+            title: String(sub.title ?? "").trim()
+          }))
+        },
+        printing,
+        automatic: !!draft.automatic,
+        printAheadDays: ahead
+      };
+      setBusy(true);
+      setError(null);
+      const result = await tryDispatch({
+        type: "saveTemplate",
+        template: template2,
+        printDates: printDatesOf(printing)
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error || t("common.writeFailed"));
+        return;
+      }
+      notify(
+        draft.printNow ? t("template.savedAndPrinted") : editing ? t("template.saved") : t("template.created"),
+        "brand"
+      );
+      onClose?.();
+    };
+    const remove = async () => {
+      if (busy || draft.id === null) return;
+      setBusy(true);
+      setError(null);
+      const result = await tryDispatch({ type: "deleteTemplate", id: draft.id });
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error || t("common.writeFailed"));
+        return;
+      }
+      notify(t("template.deleted"), "neutral");
+      onClose?.();
+    };
+    const kindItems = [
+      { value: "once", label: t("template.kindOnce"), icon: "calendar" },
+      {
+        value: "calendar",
+        label: t("template.kindCalendar"),
+        icon: "calendarClock"
+      },
+      { value: "weekly", label: t("template.kindWeekly"), icon: "refresh" }
+    ];
+    const onceEditor = h(
+      "div",
+      { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
+      h(
+        Field,
+        { label: t("template.onceDate") },
+        h(Input, {
+          type: "date",
+          value: draft.onceDate,
+          onChange: (value) => patch({ onceDate: value })
+        })
+      ),
+      h(
+        Field,
+        { label: t("template.onceTime"), hint: t("template.timeOptional") },
+        h(Input, {
+          type: "time",
+          value: draft.onceTime,
+          onChange: (value) => patch({ onceTime: value })
+        })
+      )
+    );
+    const calendarEditor = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            lineHeight: 1.6
+          }
+        },
+        t("template.calendarHint")
+      ),
+      draft.calendarSlots.map(
+        (slot, index) => h(
+          "div",
+          {
+            key: `cal-${index}`,
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: "10px 12px",
+              borderRadius: 12,
+              background: "var(--tomato-surface-2)"
+            }
+          },
+          h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 10,
+                flexWrap: "wrap"
+              }
+            },
+            h(
+              Field,
+              { label: t("template.slotTime"), style: { flex: "0 1 150px" } },
+              h(Input, {
+                type: "time",
+                value: slot.time,
+                onChange: (value) => patchCalendarSlot(index, { time: value })
+              })
+            ),
+            h("div", { style: { flex: 1 } }),
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flex: "1 1 220px"
+                }
+              },
+              h(Input, {
+                type: "date",
+                value: dateInput,
+                onChange: setDateInput,
+                onKeyDown: onEnter(() => addCalendarDate(index)),
+                style: { flex: 1 }
+              }),
+              h(
+                Btn,
+                {
+                  variant: "soft",
+                  size: "sm",
+                  icon: "plus",
+                  onClick: () => addCalendarDate(index)
+                },
+                t("template.addDate")
+              )
+            ),
+            draft.calendarSlots.length > 1 ? h(IconBtn, {
+              name: "trash",
+              size: 15,
+              box: 30,
+              title: t("template.removeSlot"),
+              onClick: () => patch({
+                calendarSlots: draft.calendarSlots.filter(
+                  (_, i) => i !== index
+                )
+              })
+            }) : null
+          ),
+          slot.dates.length > 0 ? h(
+            "div",
+            { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+            slot.dates.map(
+              (date) => h(
+                Chip,
+                {
+                  key: date,
+                  tone: "brand",
+                  active: true,
+                  onClick: () => patchCalendarSlot(index, {
+                    dates: slot.dates.filter((d) => d !== date)
+                  })
+                },
+                `${dayLabel(date, today)} ×`
+              )
+            )
+          ) : h(
+            "div",
+            { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+            t("template.slotDates")
+          )
+        )
+      ),
+      h(
+        Btn,
+        {
+          variant: "plain",
+          size: "sm",
+          icon: "plus",
+          onClick: () => patch({
+            calendarSlots: [...draft.calendarSlots, { dates: [], time: "" }]
+          })
+        },
+        t("template.addSlot")
+      )
+    );
+    const weeklyEditor = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            lineHeight: 1.6
+          }
+        },
+        t("template.weeklyHint")
+      ),
+      draft.habitId !== null ? h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-brand-deep)",
+            lineHeight: 1.6
+          }
+        },
+        t("template.habitNote")
+      ) : null,
+      draft.weeklySlots.map(
+        (slot, index) => h(
+          "div",
+          {
+            key: `week-${index}`,
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: "10px 12px",
+              borderRadius: 12,
+              background: "var(--tomato-surface-2)"
+            }
+          },
+          h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap"
+              }
+            },
+            weekLabels.map((label, dayIndex) => {
+              const day = dayIndex + 1;
+              const selected = slot.days.includes(day);
+              return h(
+                Chip,
+                {
+                  key: day,
+                  tone: selected ? "brand" : "neutral",
+                  active: selected,
+                  onClick: () => toggleWeekday(index, day),
+                  style: { height: 28, padding: "0 10px", fontSize: 12 }
+                },
+                label
+              );
+            }),
+            h("div", { style: { flex: 1 } }),
+            draft.weeklySlots.length > 1 ? h(IconBtn, {
+              name: "trash",
+              size: 15,
+              box: 30,
+              title: t("template.removeSlot"),
+              onClick: () => patch({
+                weeklySlots: draft.weeklySlots.filter(
+                  (_, i) => i !== index
+                )
+              })
+            }) : null
+          ),
+          h(
+            Field,
+            { label: t("template.slotTime"), hint: t("template.timeOptional") },
+            h(Input, {
+              type: "time",
+              value: slot.time,
+              onChange: (value) => patchWeeklySlot(index, { time: value }),
+              style: { maxWidth: 180 }
+            })
+          )
+        )
+      ),
+      h(
+        Btn,
+        {
+          variant: "plain",
+          size: "sm",
+          icon: "plus",
+          onClick: () => patch({
+            weeklySlots: [...draft.weeklySlots, { days: [], time: "" }]
+          })
+        },
+        t("template.addSlot")
+      ),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            lineHeight: 1.6
+          }
+        },
+        t("template.weeklyAutoHabit")
+      )
+    );
+    const printNowLabel = draft.printingKind === "once" ? t("template.printNowOnce") : draft.printingKind === "calendar" ? t("template.printNowCalendar") : t("template.printNowWeekly");
+    const body = confirmDelete ? h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 14 } },
+      h(
+        "div",
+        {
+          style: {
+            padding: "14px 16px",
+            borderRadius: 13,
+            background: "var(--tomato-surface-2)",
+            color: "var(--tomato-ink-2)",
+            fontSize: 13,
+            lineHeight: 1.65
+          }
+        },
+        t("template.deleteBody")
+      ),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 13.5,
+            color: "var(--tomato-ink)",
+            fontWeight: 550
+          }
+        },
+        draft.title || t("template.untouched")
+      )
+    ) : h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 16 } },
+      h(
+        Field,
+        { label: t("template.title"), hint: t("template.titleHint") },
+        h(Input, {
+          value: draft.title,
+          onChange: (value) => patch({ title: value }),
+          placeholder: t("template.titlePlaceholder"),
+          maxLength: 200,
+          autoFocus: true
+        })
+      ),
+      h(
+        "div",
+        {
+          style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }
+        },
+        h(
+          Field,
+          { label: t("template.project") },
+          h(Select, {
+            value: draft.projectId,
+            options: [
+              { value: "", label: t("template.noProject") },
+              ...projects.map((project) => ({
+                value: project.id,
+                label: project.name
+              }))
+            ],
+            onChange: (value) => patch({ projectId: value }),
+            width: "100%"
+          })
+        ),
+        h(
+          Field,
+          { label: t("template.priority") },
+          h(Select, {
+            value: String(draft.priority),
+            options: priorityOptions,
+            onChange: (value) => patch({ priority: Number(value) }),
+            width: "100%"
+          })
+        ),
+        h(
+          Field,
+          {
+            label: t("template.focusMinutes"),
+            hint: t("template.focusMinutesHint", { n: defaultFocus })
+          },
+          h(Input, {
+            type: "number",
+            value: draft.focusMinutes,
+            onChange: (value) => patch({ focusMinutes: value }),
+            placeholder: String(defaultFocus)
+          })
+        ),
+        h(
+          Field,
+          { label: t("template.estimate") },
+          h(Input, {
+            type: "number",
+            value: draft.estimate,
+            onChange: (value) => patch({ estimate: value })
+          })
+        ),
+        h(
+          Field,
+          { label: t("template.scrap"), hint: t("template.scrapHint") },
+          h(Input, {
+            type: "number",
+            value: draft.scrapMinutes,
+            onChange: (value) => patch({ scrapMinutes: value })
+          })
+        ),
+        h(
+          Field,
+          { label: t("template.tags") },
+          h(Input, {
+            value: draft.tagsText,
+            onChange: (value) => patch({ tagsText: value }),
+            placeholder: t("template.tagsPlaceholder")
+          })
+        )
+      ),
+      h(
+        Field,
+        { label: t("template.notes") },
+        h(TextArea, {
+          value: draft.notes,
+          onChange: (value) => patch({ notes: value }),
+          placeholder: t("template.notesPlaceholder"),
+          rows: 2,
+          style: { maxHeight: 120 }
+        })
+      ),
+      h(Divider, null),
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 8 } },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 12,
+              fontWeight: 550,
+              color: "var(--tomato-ink-2)"
+            }
+          },
+          t("template.subtasks")
+        ),
+        draft.subtasks.length > 0 ? h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 4 } },
+          draft.subtasks.map(
+            (sub, index) => h(
+              "div",
+              {
+                key: sub.id ?? index,
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 9,
+                  minHeight: 32,
+                  padding: "2px 4px",
+                  borderRadius: 9
+                }
+              },
+              h(Icon, {
+                name: "grip",
+                size: 14,
+                style: { color: "var(--tomato-ink-3)" }
+              }),
+              h(
+                "div",
+                {
+                  style: {
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 13,
+                    color: "var(--tomato-ink)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                sub.title
+              ),
+              h(IconBtn, {
+                name: "x",
+                size: 14,
+                box: 28,
+                title: t("template.removeSubtask"),
+                onClick: () => patch({
+                  subtasks: draft.subtasks.filter(
+                    (_, i) => i !== index
+                  )
+                })
+              })
+            )
+          )
+        ) : h(
+          "div",
+          { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+          t("template.subtaskPlaceholder")
+        ),
+        h(
+          "div",
+          { style: { display: "flex", gap: 8, alignItems: "center" } },
+          h(Input, {
+            value: subInput,
+            onChange: setSubInput,
+            onKeyDown: onEnter(addSubtask),
+            placeholder: t("template.subtaskPlaceholder"),
+            maxLength: 200
+          }),
+          h(Btn, {
+            variant: "soft",
+            size: "sm",
+            icon: "plus",
+            title: t("template.addSubtask"),
+            onClick: addSubtask
+          })
+        )
+      ),
+      h(Divider, null),
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 10 } },
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap"
+            }
+          },
+          h(Icon, {
+            name: "calendarClock",
+            size: 16,
+            style: { color: "var(--tomato-brand-deep)" }
+          }),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 13,
+                fontWeight: 620,
+                color: "var(--tomato-ink)"
+              }
+            },
+            t("template.printingTitle")
+          )
+        ),
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              lineHeight: 1.6
+            }
+          },
+          t("template.printingHint")
+        ),
+        h(
+          "div",
+          { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+          kindItems.map(
+            (item) => h(
+              Chip,
+              {
+                key: item.value,
+                tone: draft.printingKind === item.value ? "brand" : "neutral",
+                active: draft.printingKind === item.value,
+                icon: item.icon,
+                onClick: () => setKind(item.value),
+                style: { height: 28, padding: "0 12px", fontSize: 12.5 }
+              },
+              item.label
+            )
+          )
+        ),
+        draft.printingKind === "once" ? onceEditor : draft.printingKind === "calendar" ? calendarEditor : weeklyEditor,
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "var(--tomato-surface-2)"
+            }
+          },
+          h(Toggle, {
+            checked: draft.automatic,
+            label: t("template.automatic"),
+            hint: t("template.automaticHint"),
+            onChange: (checked) => patch({ automatic: checked })
+          }),
+          h(
+            Field,
+            {
+              label: t("template.printAhead"),
+              hint: t("template.printAheadHint"),
+              inline: true
+            },
+            h(Input, {
+              type: "number",
+              value: draft.printAheadDays,
+              onChange: (value) => patch({ printAheadDays: value }),
+              style: { width: 90 }
+            })
+          ),
+          h(Toggle, {
+            checked: draft.printNow,
+            label: printNowLabel,
+            onChange: (checked) => patch({ printNow: checked })
+          })
+        )
+      ),
+      error ? h(
+        "div",
+        {
+          style: {
+            padding: "9px 12px",
+            borderRadius: 10,
+            background: "var(--tomato-brand-soft)",
+            color: "var(--tomato-brand-deep)",
+            fontSize: 12.5
+          },
+          role: "alert"
+        },
+        error
+      ) : null
+    );
+    const footer = confirmDelete ? h(
+      "div",
+      { style: { display: "flex", gap: 9, marginLeft: "auto" } },
+      h(
+        Btn,
+        {
+          variant: "ghost",
+          size: "sm",
+          onClick: () => setConfirmDelete(false),
+          disabled: busy
+        },
+        t("common.cancel")
+      ),
+      h(
+        Btn,
+        {
+          variant: "danger",
+          size: "sm",
+          icon: "trash",
+          onClick: remove,
+          disabled: busy
+        },
+        t("template.deleteConfirm")
+      )
+    ) : h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          width: "100%"
+        }
+      },
+      editing ? h(
+        Btn,
+        {
+          variant: "danger",
+          size: "sm",
+          icon: "trash",
+          onClick: () => setConfirmDelete(true),
+          disabled: busy
+        },
+        t("common.delete")
+      ) : null,
+      h("div", { style: { flex: 1 } }),
+      h(
+        Btn,
+        { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+        t("common.cancel")
+      ),
+      h(
+        Btn,
+        {
+          variant: "primary",
+          size: "sm",
+          icon: "check",
+          onClick: submit,
+          disabled: busy
+        },
+        editing ? t("common.save") : t("common.add")
+      )
+    );
+    return h(
+      Modal,
+      {
+        open,
+        onClose: () => {
+          if (!busy) onClose?.();
+        },
+        icon: confirmDelete ? "trash" : editing ? "edit" : "sparkle",
+        title: confirmDelete ? t("template.deleteTitle") : editing ? t("template.editTitle") : t("template.newTitle"),
+        subtitle: confirmDelete ? void 0 : editing ? t("template.editSubtitle") : t("template.newSubtitle"),
+        width: 660,
+        footer
+      },
+      body
+    );
+  }
+
+  // plugin/src/client/pages/print-dialog.js
+  registerCopy("print", {
+    zh: {
+      title: "印刷任务",
+      subtitle: "按模板和日期生成任务实例；已印刷过的日期会自动跳过。",
+      template: "模板",
+      untitled: "未命名模板",
+      emptyTitle: "还没有模板",
+      emptyHint: "先在任务页把一组安排保存成模板，再回来印刷。",
+      noPrinting: "这个模板没有可用的印刷规则",
+      noPrintingHint: "请先在模板编辑里设置一次性、日程表或每周循环。",
+      ruleNone: "没有印刷规则",
+      ruleOnce: "一次性 · {date}{time}",
+      ruleCalendar: "日程表 · {n} 个日期",
+      ruleWeekly: "每周 · {days}{times}",
+      daySep: "、",
+      timesSep: " · ",
+      untimed: "不定时",
+      autoLabel: "自动印刷",
+      autoHint: "按「今天 + 提前 {n} 天」补齐遗漏；程序关闭时不会补。",
+      autoOn: "已开启自动印刷",
+      autoOff: "已关闭自动印刷",
+      dates: "计划日期",
+      pickDate: "再选一天",
+      chipToday: "今天",
+      chipTomorrow: "明天",
+      chipThisWeek: "本周",
+      chipNextDays: "接下来 7 天",
+      chipAllDates: "全部规则日期（{n}）",
+      chipRuleDate: "规则日期：{date}",
+      addDate: "添加",
+      removeDate: "移除这个日期",
+      pickedEmpty: "还没有选日期；点上面的快捷日期，或手动选一天。",
+      invalidDate: "日期无效，请重新选择",
+      preview: "预览",
+      previewCount: "将生成 {n} 个任务",
+      previewNone: "没有可生成的任务",
+      previewMore: "…还有 {n} 条",
+      skipped: "将跳过",
+      skipPrinted: "已印刷：{date}",
+      skipNotInRule: "不在日程表：{date}",
+      excludedHint: "不在规则内的日期已从提交中排除，避免整批报错。",
+      pickDateFirst: "请至少选择一个日期",
+      confirm: "印刷",
+      done: "印刷完成"
+    },
+    en: {
+      title: "Print tasks",
+      subtitle: "Generate task instances from a template; dates already printed are skipped.",
+      template: "Template",
+      untitled: "Untitled template",
+      emptyTitle: "No templates yet",
+      emptyHint: "Save a group of tasks as a template on the Tasks page, then come back to print.",
+      noPrinting: "This template has no usable printing rule",
+      noPrintingHint: "Set up a one-off, calendar, or weekly rule in the template editor first.",
+      ruleNone: "No printing rule",
+      ruleOnce: "Once · {date}{time}",
+      ruleCalendar: "Calendar · {n} dates",
+      ruleWeekly: "Weekly · {days}{times}",
+      daySep: ", ",
+      timesSep: " · ",
+      untimed: "Anytime",
+      autoLabel: "Auto print",
+      autoHint: "Fills gaps for today + {n} days ahead; nothing runs while the app is closed.",
+      autoOn: "Auto print on",
+      autoOff: "Auto print off",
+      dates: "Planned dates",
+      pickDate: "Pick a day",
+      chipToday: "Today",
+      chipTomorrow: "Tomorrow",
+      chipThisWeek: "This week",
+      chipNextDays: "Next 7 days",
+      chipAllDates: "All rule dates ({n})",
+      chipRuleDate: "Rule date: {date}",
+      addDate: "Add",
+      removeDate: "Remove this date",
+      pickedEmpty: "No dates yet — tap a quick date above, or pick one.",
+      invalidDate: "Invalid date, pick another",
+      preview: "Preview",
+      previewCount: "Will create {n} tasks",
+      previewNone: "Nothing to create",
+      previewMore: "…and {n} more",
+      skipped: "Will skip",
+      skipPrinted: "Already printed: {date}",
+      skipNotInRule: "Not in calendar: {date}",
+      excludedHint: "Dates outside the rule are left out of the batch so it does not fail.",
+      pickDateFirst: "Pick at least one date",
+      confirm: "Print",
+      done: "Printing submitted"
+    }
+  });
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  var MAX_PREVIEW_ROWS = 30;
+  var CALENDAR_LOOKAHEAD_DAYS = 14;
+  var QUICK_UPCOMING_LIMIT = 7;
+  var ALL_DATES_LIMIT = 30;
+  function isDateText(value) {
+    if (typeof value !== "string" || !DATE_RE.test(value)) return false;
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(5, 7));
+    const day = Number(value.slice(8, 10));
+    const probe = new Date(year, month - 1, day);
+    return probe.getFullYear() === year && probe.getMonth() === month - 1 && probe.getDate() === day;
+  }
+  function uniqueSorted(values) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const value of Array.isArray(values) ? values : []) {
+      if (!isDateText(value) || seen.has(value)) continue;
+      seen.add(value);
+      out.push(value);
+    }
+    return out.sort();
+  }
+  function templateList(templates) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const item of Array.isArray(templates) ? templates : []) {
+      if (!item || typeof item !== "object") continue;
+      if (typeof item.id !== "string" || item.id === "" || seen.has(item.id))
+        continue;
+      seen.add(item.id);
+      out.push(item);
+    }
+    return out;
+  }
+  function shapeTitle(template) {
+    const title = template && template.shape && template.shape.title;
+    return typeof title === "string" && title.trim() !== "" ? title : t("print.untitled");
+  }
+  function printingOf(template) {
+    const rule = template && typeof template === "object" ? template.printing : null;
+    if (!rule || typeof rule !== "object") return null;
+    if (rule.kind === "once") {
+      if (!isDateText(rule.date)) return null;
+      return {
+        kind: "once",
+        date: rule.date,
+        time: typeof rule.time === "string" && rule.time !== "" ? rule.time : null
+      };
+    }
+    if (rule.kind === "calendar") {
+      const slots = [];
+      for (const slot of Array.isArray(rule.slots) ? rule.slots : []) {
+        if (!slot || typeof slot !== "object" || !Array.isArray(slot.dates))
+          continue;
+        const dates = slot.dates.filter(isDateText);
+        if (dates.length === 0) continue;
+        slots.push({
+          dates,
+          time: typeof slot.time === "string" && slot.time !== "" ? slot.time : null
+        });
+      }
+      return slots.length > 0 ? { kind: "calendar", slots } : null;
+    }
+    if (rule.kind === "weekly") {
+      const slots = [];
+      for (const slot of Array.isArray(rule.slots) ? rule.slots : []) {
+        if (!slot || typeof slot !== "object" || !Array.isArray(slot.days))
+          continue;
+        const days = slot.days.filter(
+          (day) => Number.isInteger(day) && day >= 1 && day <= 7
+        );
+        if (days.length === 0) continue;
+        slots.push({
+          days,
+          time: typeof slot.time === "string" && slot.time !== "" ? slot.time : null
+        });
+      }
+      return slots.length > 0 ? { kind: "weekly", slots } : null;
+    }
+    return null;
+  }
+  function ruleSummary(template, today) {
+    const printing = printingOf(template);
+    if (!printing) return t("print.ruleNone");
+    if (printing.kind === "once") {
+      const date = dayLabel(printing.date, today);
+      const time = printing.time ? ` ${printing.time}` : "";
+      return t("print.ruleOnce", { date, time });
+    }
+    if (printing.kind === "calendar") {
+      return t("print.ruleCalendar", { n: calendarRuleDates(printing).length });
+    }
+    const days = /* @__PURE__ */ new Set();
+    const times = /* @__PURE__ */ new Set();
+    for (const slot of printing.slots) {
+      for (const day of slot.days) days.add(day);
+      if (slot.time) times.add(slot.time);
+    }
+    const labels = t("common.weekFull");
+    const dayText = Array.from(days).sort((a, b) => a - b).map((day) => Array.isArray(labels) ? labels[day - 1] : String(day)).join(t("print.daySep"));
+    const timesText = times.size > 0 ? `${t("print.timesSep")}${Array.from(times).join(" / ")}` : "";
+    return t("print.ruleWeekly", { days: dayText || "—", times: timesText });
+  }
+  function calendarRuleDates(printing) {
+    const dates = /* @__PURE__ */ new Set();
+    for (const slot of printing.slots) {
+      for (const date of slot.dates) if (isDateText(date)) dates.add(date);
+    }
+    return Array.from(dates).sort();
+  }
+  function weeklyExpandedDates(printing, dates) {
+    const days = Array.from(
+      new Set(printing.slots.flatMap((slot) => slot.days))
+    ).sort((a, b) => a - b);
+    const expanded = [];
+    const weeks = new Set(dates.map((date) => weekStart(date)));
+    for (const monday of weeks) {
+      for (const day of days) expanded.push(addDays(monday, day - 1));
+    }
+    return uniqueSorted(expanded);
+  }
+  function timesOf(printing, date) {
+    if (printing.kind === "once") return [printing.time];
+    if (printing.kind === "calendar") {
+      const times2 = [];
+      for (const slot of printing.slots) {
+        if (slot.dates.includes(date)) times2.push(slot.time);
+      }
+      return times2;
+    }
+    const weekday = weekdayIndex(date) + 1;
+    const times = [];
+    for (const slot of printing.slots) {
+      if (slot.days.includes(weekday)) times.push(slot.time);
+    }
+    return times;
+  }
+  function printedDatesOf(prints, templateId) {
+    const out = /* @__PURE__ */ new Set();
+    if (!templateId) return out;
+    for (const item of Array.isArray(prints) ? prints : []) {
+      if (!item || item.templateId !== templateId) continue;
+      if (isDateText(item.date)) out.add(item.date);
+    }
+    return out;
+  }
+  function buildPreview(printing, pickedDates, printedDates) {
+    const rows = [];
+    const skippedPrinted = [];
+    let skippedNotInRule = [];
+    let submitDates = [];
+    if (!printing) {
+      return {
+        rows,
+        skippedPrinted,
+        skippedNotInRule,
+        submitDates,
+        taskCount: 0
+      };
+    }
+    if (printing.kind === "weekly") {
+      submitDates = pickedDates;
+      for (const date of weeklyExpandedDates(printing, pickedDates)) {
+        if (printedDates.has(date)) {
+          skippedPrinted.push(date);
+          continue;
+        }
+        const times = timesOf(printing, date);
+        if (times.length > 0) rows.push({ date, times });
+      }
+    } else if (printing.kind === "calendar") {
+      const rule = new Set(calendarRuleDates(printing));
+      submitDates = pickedDates.filter((date) => rule.has(date));
+      skippedNotInRule = pickedDates.filter((date) => !rule.has(date));
+      for (const date of submitDates) {
+        if (printedDates.has(date)) {
+          skippedPrinted.push(date);
+          continue;
+        }
+        const times = timesOf(printing, date);
+        if (times.length > 0) rows.push({ date, times });
+      }
+    } else {
+      submitDates = pickedDates;
+      for (const date of pickedDates) {
+        if (printedDates.has(date)) {
+          skippedPrinted.push(date);
+          continue;
+        }
+        rows.push({ date, times: timesOf(printing, date) });
+      }
+    }
+    const taskCount = rows.reduce((sum, row) => sum + row.times.length, 0);
+    return { rows, skippedPrinted, skippedNotInRule, submitDates, taskCount };
+  }
+  function PrintDialog({
+    open,
+    onClose,
+    templates = [],
+    prints = [],
+    today = "",
+    initialTemplateId = null
+  }) {
+    const [templateId, setTemplateId] = useState("");
+    const [picked, setPicked] = useState([]);
+    const [dateInput, setDateInput] = useState("");
+    const [autoDraft, setAutoDraft] = useState(false);
+    const [error, setError] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [autoBusy, setAutoBusy] = useState(false);
+    const baseToday = isDateText(today) ? today : todayKey();
+    const list = templateList(templates);
+    const fallbackTemplateId = list.some((item) => item.id === initialTemplateId) ? initialTemplateId : list.length > 0 ? list[0].id : "";
+    const activeTemplateId = list.some((item) => item.id === templateId) ? templateId : fallbackTemplateId;
+    const current3 = list.find((item) => item.id === activeTemplateId) || null;
+    const printing = current3 ? printingOf(current3) : null;
+    const autoOn = !!(current3 && current3.automatic);
+    useEffect(() => {
+      if (!open) return;
+      setTemplateId(fallbackTemplateId);
+      setPicked([]);
+      setDateInput("");
+      setError(null);
+      setBusy(false);
+      setAutoBusy(false);
+    }, [open, fallbackTemplateId]);
+    if (!open) return null;
+    const autoChecked = autoBusy ? autoDraft : autoOn;
+    const autoAhead = current3 ? Math.max(0, Math.round(Number(current3.printAheadDays) || 0)) : 0;
+    const printedDates = printedDatesOf(prints, current3 && current3.id);
+    const pickedSorted = uniqueSorted(picked);
+    const { rows, skippedPrinted, skippedNotInRule, submitDates, taskCount } = buildPreview(printing, pickedSorted, printedDates);
+    const addDates = (values) => {
+      const clean = uniqueSorted(values);
+      if (clean.length === 0) return;
+      setPicked((currentPicked) => uniqueSorted([...currentPicked, ...clean]));
+      setError(null);
+    };
+    const removeDate = (date) => {
+      setPicked((currentPicked) => currentPicked.filter((item) => item !== date));
+    };
+    const addFromInput = () => {
+      const value = String(dateInput ?? "").trim();
+      if (value === "") return;
+      if (!isDateText(value)) {
+        setError(t("print.invalidDate"));
+        return;
+      }
+      addDates([value]);
+      setDateInput("");
+    };
+    const chooseTemplate = (nextId) => {
+      setTemplateId(nextId);
+      setPicked([]);
+      setDateInput("");
+      setError(null);
+    };
+    const toggleAutomatic = async (next) => {
+      if (autoBusy || busy || !current3 || !printing) return;
+      setAutoDraft(!!next);
+      setAutoBusy(true);
+      setError(null);
+      const result = await tryDispatch({
+        type: "saveTemplate",
+        template: {
+          ...current3,
+          automatic: next,
+          printAheadDays: current3.printAheadDays
+        },
+        printDates: []
+      });
+      setAutoBusy(false);
+      if (!result.ok) {
+        setError(result.error || t("common.writeFailed"));
+        return;
+      }
+      notify(next ? t("print.autoOn") : t("print.autoOff"), "brand");
+    };
+    const submit = async () => {
+      if (busy) return;
+      if (!current3 || !printing) {
+        setError(t("print.noPrinting"));
+        return;
+      }
+      if (submitDates.length === 0) {
+        setError(t("print.pickDateFirst"));
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      const result = await tryDispatch({
+        type: "printTemplate",
+        id: current3.id,
+        dates: submitDates
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error || t("common.writeFailed"));
+        return;
+      }
+      notify(t("print.done"), "brand");
+      onClose?.();
+    };
+    const quickChips = [];
+    if (printing) {
+      quickChips.push({
+        key: "today",
+        label: t("print.chipToday"),
+        icon: "sun",
+        dates: [baseToday]
+      });
+      quickChips.push({
+        key: "tomorrow",
+        label: t("print.chipTomorrow"),
+        icon: "calendar",
+        dates: [addDays(baseToday, 1)]
+      });
+      if (printing.kind === "weekly") {
+        quickChips.push({
+          key: "week",
+          label: t("print.chipThisWeek"),
+          icon: "calendarClock",
+          dates: [weekStart(baseToday)]
+        });
+      }
+      if (printing.kind === "calendar") {
+        const ruleDates = calendarRuleDates(printing);
+        const horizon = addDays(baseToday, CALENDAR_LOOKAHEAD_DAYS - 1);
+        const upcoming = ruleDates.filter((date) => date >= baseToday && date <= horizon).slice(0, QUICK_UPCOMING_LIMIT);
+        if (upcoming.length > 0) {
+          quickChips.push({
+            key: "upcoming",
+            label: t("print.chipNextDays"),
+            icon: "arrowRight",
+            dates: upcoming
+          });
+        }
+        if (ruleDates.length > 0 && ruleDates.length <= ALL_DATES_LIMIT) {
+          quickChips.push({
+            key: "all",
+            label: t("print.chipAllDates", { n: ruleDates.length }),
+            icon: "filter",
+            dates: ruleDates
+          });
+        }
+      }
+      if (printing.kind === "once") {
+        quickChips.push({
+          key: "once",
+          label: t("print.chipRuleDate", {
+            date: dayLabel(printing.date, baseToday)
+          }),
+          icon: "calendarClock",
+          dates: [printing.date]
+        });
+      }
+    }
+    const shownRows = rows.slice(0, MAX_PREVIEW_ROWS);
+    const hiddenRows = rows.length - shownRows.length;
+    const hasSkipped = skippedPrinted.length > 0 || skippedNotInRule.length > 0;
+    const previewBlock = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 8 } },
+      h(SectionTitle, { icon: "eye", title: t("print.preview") }),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 13,
+            fontWeight: 550,
+            color: taskCount > 0 ? "var(--tomato-ink)" : "var(--tomato-ink-3)",
+            fontVariantNumeric: "tabular-nums"
+          }
+        },
+        taskCount > 0 ? t("print.previewCount", { n: taskCount }) : t("print.previewNone")
+      ),
+      shownRows.length > 0 ? h(
+        "div",
+        {
+          className: "t-scroll",
+          style: { maxHeight: 240, overflowY: "auto" }
+        },
+        shownRows.map(
+          (row) => h(
+            "div",
+            {
+              key: row.date,
+              style: {
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                padding: "7px 0",
+                borderBottom: "1px solid var(--tomato-line)"
+              }
+            },
+            h(
+              "div",
+              { style: { flexShrink: 0, minWidth: 0 } },
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 12.5,
+                    color: "var(--tomato-ink)",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                dayLabel(row.date, baseToday)
+              ),
+              h(
+                "div",
+                {
+                  className: "t-mono",
+                  style: {
+                    fontSize: 11,
+                    color: "var(--tomato-ink-3)",
+                    marginTop: 1
+                  }
+                },
+                row.date
+              )
+            ),
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
+                  gap: 5,
+                  flex: 1,
+                  minWidth: 0
+                }
+              },
+              row.times.map(
+                (time, index) => h(
+                  Chip,
+                  {
+                    key: `${row.date}-${index}`,
+                    tone: time ? "brand" : "neutral",
+                    icon: time ? "clock" : "sparkle"
+                  },
+                  time || t("print.untimed")
+                )
+              )
+            )
+          )
+        ),
+        hiddenRows > 0 ? h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              paddingTop: 6,
+              fontVariantNumeric: "tabular-nums"
+            }
+          },
+          t("print.previewMore", { n: hiddenRows })
+        ) : null
+      ) : null,
+      hasSkipped ? h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            marginTop: 2
+          }
+        },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              fontWeight: 550,
+              color: "var(--tomato-ink-3)"
+            }
+          },
+          t("print.skipped")
+        ),
+        h(
+          "div",
+          { style: { display: "flex", flexWrap: "wrap", gap: 5 } },
+          skippedPrinted.map(
+            (date) => h(
+              Chip,
+              { key: `printed-${date}`, tone: "neutral", icon: "check" },
+              t("print.skipPrinted", { date })
+            )
+          ),
+          skippedNotInRule.map(
+            (date) => h(
+              Chip,
+              { key: `outside-${date}`, tone: "danger", icon: "x" },
+              t("print.skipNotInRule", { date })
+            )
+          )
+        ),
+        skippedNotInRule.length > 0 ? h(
+          "div",
+          {
+            style: {
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: "var(--tomato-ink-3)"
+            }
+          },
+          t("print.excludedHint")
+        ) : null
+      ) : null
+    );
+    let body;
+    if (list.length === 0) {
+      body = h(Empty, {
+        icon: "calendar",
+        title: t("print.emptyTitle"),
+        hint: t("print.emptyHint"),
+        style: { padding: "40px 16px" }
+      });
+    } else {
+      body = h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 16 } },
+        h(
+          Field,
+          { label: t("print.template") },
+          h(Select, {
+            value: activeTemplateId,
+            options: list.map((item) => ({
+              value: item.id,
+              label: shapeTitle(item)
+            })),
+            onChange: chooseTemplate,
+            width: "100%"
+          })
+        ),
+        current3 ? h(
+          "div",
+          { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+          h(
+            Chip,
+            {
+              tone: "neutral",
+              icon: "calendarClock",
+              style: { fontVariantNumeric: "tabular-nums" }
+            },
+            ruleSummary(current3, baseToday)
+          )
+        ) : null,
+        printing ? h(Toggle, {
+          checked: autoChecked,
+          onChange: toggleAutomatic,
+          label: t("print.autoLabel"),
+          hint: t("print.autoHint", { n: autoAhead })
+        }) : null,
+        printing ? h(Divider, null) : null,
+        printing ? h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 10 } },
+          h(SectionTitle, { icon: "calendar", title: t("print.dates") }),
+          quickChips.length > 0 ? h(
+            "div",
+            { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+            quickChips.map(
+              (chip) => h(
+                Chip,
+                {
+                  key: chip.key,
+                  tone: "neutral",
+                  icon: chip.icon,
+                  active: chip.dates.length > 0 && chip.dates.every(
+                    (date) => pickedSorted.includes(date)
+                  ),
+                  onClick: () => addDates(chip.dates),
+                  // 触摸区 ≥28px：Chip 默认 22px，这里按 sm 按钮抬高。
+                  style: {
+                    height: 28,
+                    padding: "0 10px",
+                    fontSize: 12,
+                    borderRadius: 9,
+                    fontVariantNumeric: "tabular-nums"
+                  }
+                },
+                chip.label
+              )
+            )
+          ) : null,
+          h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                gap: 8,
+                alignItems: "flex-end",
+                flexWrap: "wrap"
+              }
+            },
+            h(
+              Field,
+              {
+                label: t("print.pickDate"),
+                style: { flex: "1 1 180px", minWidth: 160 }
+              },
+              h(Input, {
+                type: "date",
+                value: dateInput,
+                onChange: (value) => setDateInput(value),
+                onKeyDown: (event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addFromInput();
+                  }
+                }
+              })
+            ),
+            h(
+              Btn,
+              {
+                variant: "soft",
+                size: "md",
+                icon: "plus",
+                title: t("print.addDate"),
+                onClick: addFromInput
+              },
+              t("print.addDate")
+            )
+          ),
+          pickedSorted.length > 0 ? h(
+            "div",
+            { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+            pickedSorted.map(
+              (date) => h(
+                Btn,
+                {
+                  key: date,
+                  variant: "soft",
+                  size: "sm",
+                  iconRight: "x",
+                  title: t("print.removeDate"),
+                  onClick: () => removeDate(date)
+                },
+                h("span", { key: "label" }, dayLabel(date, baseToday)),
+                h(
+                  "span",
+                  {
+                    key: "date",
+                    className: "t-mono",
+                    style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+                  },
+                  date
+                )
+              )
+            )
+          ) : h(
+            "div",
+            { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+            t("print.pickedEmpty")
+          )
+        ) : h(Empty, {
+          icon: "calendar",
+          title: t("print.noPrinting"),
+          hint: t("print.noPrintingHint"),
+          style: { padding: "28px 16px" }
+        }),
+        printing ? h(Divider, null) : null,
+        printing ? previewBlock : null,
+        error ? h(
+          "div",
+          {
+            style: {
+              padding: "9px 12px",
+              borderRadius: 10,
+              background: "var(--tomato-brand-soft)",
+              color: "var(--tomato-brand-deep)",
+              fontSize: 12.5
+            },
+            role: "alert"
+          },
+          error
+        ) : null
+      );
+    }
+    const footer = h(
+      "div",
+      { style: { display: "flex", alignItems: "center", gap: 9, width: "100%" } },
+      h("div", { style: { flex: 1 } }),
+      h(
+        Btn,
+        {
+          variant: "plain",
+          size: "sm",
+          onClick: onClose,
+          disabled: busy || autoBusy
+        },
+        t("common.cancel")
+      ),
+      h(
+        Btn,
+        {
+          variant: "primary",
+          size: "sm",
+          icon: "check",
+          onClick: submit,
+          disabled: busy || !printing || submitDates.length === 0,
+          title: !printing ? t("print.noPrinting") : submitDates.length === 0 ? t("print.pickDateFirst") : t("print.confirm")
+        },
+        t("print.confirm")
+      )
+    );
+    return h(
+      Modal,
+      {
+        open,
+        onClose: () => {
+          if (!busy && !autoBusy) onClose?.();
+        },
+        icon: "download",
+        title: t("print.title"),
+        subtitle: t("print.subtitle"),
+        width: 620,
+        footer
+      },
+      body
+    );
+  }
+
   // plugin/src/client/pages/tasks.js
   registerCopy("tasks", {
     zh: {
@@ -7406,7 +9440,14 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       templateEstimate: "预计 {n} 个番茄",
       templateFocus: "每次 {minutes}",
       templateDefaultFocus: "每次 {minutes}（默认）",
-      templatesHint: "模板编辑与印刷对话框稍后补全；这里先展示印刷规则。",
+      templatesHint: "模板保留形状与印刷规则；印刷生成的实例之后与模板互不覆盖，需要时手动同步。",
+      templatesTitle: "模板与印刷",
+      newTemplate: "新建模板",
+      editTemplate: "编辑模板",
+      printTemplateAction: "印刷模板",
+      syncTemplate: "同步形状到未完成实例",
+      templateSynced: "模板形状已同步到未完成实例",
+      syncingTemplate: "同步中…",
       emptyActive: "还没有任务，先加一件吧",
       emptyActiveHint: "写下想做的事，把第一步留给现在。",
       emptyCompleted: "每一次完成，都值得被记录",
@@ -7493,7 +9534,14 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       templateEstimate: "{n} pomodoros planned",
       templateFocus: "{minutes} per session",
       templateDefaultFocus: "{minutes} per session (default)",
-      templatesHint: "Template editing and printing dialogs come later; this view shows the printing rules.",
+      templatesHint: "Templates keep the shape and the printing rule; printed instances stay decoupled, sync them when needed.",
+      templatesTitle: "Templates & printing",
+      newTemplate: "New template",
+      editTemplate: "Edit template",
+      printTemplateAction: "Print template",
+      syncTemplate: "Sync shape to unfinished instances",
+      templateSynced: "Template shape synced to unfinished instances",
+      syncingTemplate: "Syncing…",
       emptyActive: "No tasks yet — add one",
       emptyActiveHint: "Write down one thing and start with the first step.",
       emptyCompleted: "Every finish is worth keeping",
@@ -8035,7 +10083,17 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       )
     );
   }
-  function TemplateList({ templates, today, data, defaultFocus }) {
+  function TemplateList({
+    templates,
+    today,
+    data,
+    defaultFocus,
+    onNew,
+    onEdit,
+    onPrint,
+    onSync,
+    syncingId
+  }) {
     const hint = h(
       "div",
       {
@@ -8048,21 +10106,53 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       },
       t("tasks.templatesHint")
     );
+    const header = h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "2px 10px 10px",
+          flexWrap: "wrap"
+        }
+      },
+      h(Icon, { name: "sparkle", size: 16, style: { color: "var(--tomato-brand-deep)" } }),
+      h(
+        "div",
+        { style: { fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)", flex: 1, minWidth: 0 } },
+        t("tasks.templatesTitle")
+      ),
+      h(
+        Btn,
+        { variant: "soft", size: "sm", icon: "plus", onClick: onNew, disabled: !onNew },
+        t("tasks.newTemplate")
+      )
+    );
     if (templates.length === 0) {
       return h(
         "div",
         null,
-        h(Empty, {
-          icon: "calendar",
-          title: t("tasks.emptyTemplates"),
-          hint: t("tasks.emptyTemplatesHint")
-        }),
+        h(
+          Empty,
+          {
+            icon: "calendar",
+            title: t("tasks.emptyTemplates"),
+            hint: t("tasks.emptyTemplatesHint"),
+            action: onNew ? h(
+              Btn,
+              { variant: "primary", size: "sm", icon: "plus", onClick: onNew },
+              t("tasks.newTemplate")
+            ) : null
+          }
+        ),
         hint
       );
     }
     return h(
       "div",
       null,
+      header,
       h(
         "div",
         { style: { display: "flex", flexDirection: "column" } },
@@ -8113,6 +10203,33 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
                   icon: template.automatic ? "refresh" : "edit"
                 },
                 template.automatic ? t("tasks.autoPrint") : t("tasks.manualPrint")
+              ),
+              h("div", { style: { flex: 1 } }),
+              h(
+                "div",
+                { style: { display: "flex", alignItems: "center", gap: 2 } },
+                h(IconBtn, {
+                  name: "edit",
+                  size: 16,
+                  box: 30,
+                  title: t("tasks.editTemplate"),
+                  onClick: () => onEdit?.(template)
+                }),
+                h(IconBtn, {
+                  name: "play",
+                  size: 16,
+                  box: 30,
+                  title: t("tasks.printTemplateAction"),
+                  onClick: () => onPrint?.(template)
+                }),
+                h(IconBtn, {
+                  name: "refresh",
+                  size: 16,
+                  box: 30,
+                  title: syncingId === template.id ? t("tasks.syncingTemplate") : t("tasks.syncTemplate"),
+                  disabled: syncingId !== null,
+                  onClick: () => onSync?.(template)
+                })
               )
             ),
             h(
@@ -8225,6 +10342,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const [pendingDelete, setPendingDelete] = useState(null);
     const [moveOpen, setMoveOpen] = useState(false);
     const [moveDate, setMoveDate] = useState("");
+    const [templateEditor, setTemplateEditor] = useState(null);
+    const [printDialog, setPrintDialog] = useState(null);
+    const [syncingId, setSyncingId] = useState(null);
     useSearchHotkey(() => setSearchOpen(true));
     const data = state && state.data || {};
     const tasks = Array.isArray(data.tasks) ? data.tasks : [];
@@ -8260,6 +10380,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const groups = groupTasks(visible, projects, t("tasks.inbox"));
     const editingTask = editor && editor.id ? taskById(data, editor.id) : null;
     const dialogOpen = !!editor && (!editor.id || !!editingTask);
+    const editingTemplate = templateEditor && templateEditor.id ? templates.find((template) => template && template.id === templateEditor.id) || null : null;
+    const templateDialogOpen = !!templateEditor && (!templateEditor.id || !!editingTemplate);
+    const prints = Array.isArray(data.prints) ? data.prints : [];
     const showToastError = (error) => notify(error || t("common.writeFailed"), "danger");
     const changeTab = (next) => {
       setTab(next);
@@ -8436,6 +10559,23 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       setDraftTitle("");
       notify(t("tasks.added"), "brand");
     };
+    const openTemplate = (template) => {
+      setTemplateEditor(template && template.id ? { id: template.id } : {});
+    };
+    const openPrint = (template) => {
+      setPrintDialog({ templateId: template && template.id ? template.id : null });
+    };
+    const runSyncTemplate = async (template) => {
+      if (!template || syncingId !== null) return;
+      setSyncingId(template.id);
+      const result = await tryDispatch({ type: "syncTemplate", id: template.id });
+      setSyncingId(null);
+      if (!result.ok) {
+        showToastError(result.error);
+        return;
+      }
+      notify(t("tasks.templateSynced"), "brand");
+    };
     const header = h(PageHeader, {
       eyebrow: t("tasks.eyebrow"),
       title: t("tasks.headline"),
@@ -8541,7 +10681,12 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           templates,
           today,
           data: viewData,
-          defaultFocus
+          defaultFocus,
+          onNew: () => openTemplate(null),
+          onEdit: openTemplate,
+          onPrint: openPrint,
+          onSync: runSyncTemplate,
+          syncingId
         })
       ) : h(
         Card,
@@ -8567,6 +10712,22 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         settings,
         initialTitle: editor && editor.title ? editor.title : "",
         onClose: () => setEditor(null)
+      }),
+      h(TemplateDialog, {
+        open: templateDialogOpen,
+        template: editingTemplate,
+        today,
+        data: viewData,
+        settings,
+        onClose: () => setTemplateEditor(null)
+      }),
+      h(PrintDialog, {
+        open: printDialog !== null,
+        templates,
+        prints,
+        today,
+        initialTemplateId: printDialog ? printDialog.templateId : null,
+        onClose: () => setPrintDialog(null)
       }),
       h(SearchDialog, {
         open: searchOpen,
