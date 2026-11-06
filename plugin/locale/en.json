@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Tomato Todo",
+    "description": "Integrates Tomato Todo with the assistant: tasks, plans and focus stats can be maintained from chat, and a card under the composer opens a panel (focus, tasks, stats, settings) that talks to the local tomato runtime directly."
+  }
+}
