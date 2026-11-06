@@ -13,6 +13,8 @@ const TICK_MILLIS: u64 = 600;
 
 pub struct State {
     inner: Mutex<Inner>,
+    /// 实际后端名（构造时检测一次），随 /guard/status 返回给 runtime。
+    backend: String,
 }
 
 struct Inner {
@@ -31,6 +33,7 @@ impl State {
                 worker: None,
                 stop: None,
             }),
+            backend: guard::Desktop::detect().name().to_string(),
         }
     }
 
@@ -41,6 +44,7 @@ impl State {
             locked: inner.locked,
             whitelist,
             pid: std::process::id(),
+            backend: self.backend.clone(),
         }
     }
 
@@ -168,6 +172,7 @@ mod tests {
         assert!(!state.status().locked);
         assert!(state.status().whitelist.is_empty());
         assert_eq!(state.status().pid, std::process::id());
+        assert_eq!(state.status().backend, guard::Desktop::detect().name());
         state.unlock();
         state.unlock();
         assert!(!state.status().locked);

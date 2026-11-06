@@ -20,11 +20,14 @@ pub enum Command {
 }
 
 /// `GET /guard/status` 的响应体（形状由 API.md 固定）。
+/// backend 是实际后端名（`guard::Desktop::name()`，如 "Sway / Wayland"），
+/// 供 runtime 诊断与错误提示使用。
 #[derive(Clone, Debug, Serialize)]
 pub struct Status {
     pub locked: bool,
     pub whitelist: Vec<String>,
     pub pid: u32,
+    pub backend: String,
 }
 
 #[derive(Serialize)]
@@ -81,8 +84,16 @@ mod tests {
 
     #[test]
     fn status_json_shape() {
-        let status = Status { locked: true, whitelist: vec!["code".into()], pid: 42 };
+        let status = Status {
+            locked: true,
+            whitelist: vec!["code".into()],
+            pid: 42,
+            backend: "Sway / Wayland".into(),
+        };
         let value: serde_json::Value = serde_json::to_value(&status).unwrap();
-        assert_eq!(value, serde_json::json!({"locked": true, "whitelist": ["code"], "pid": 42}));
+        assert_eq!(
+            value,
+            serde_json::json!({"locked": true, "whitelist": ["code"], "pid": 42, "backend": "Sway / Wayland"})
+        );
     }
 }

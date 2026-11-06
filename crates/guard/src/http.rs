@@ -246,6 +246,7 @@ mod tests {
                 locked: *self.locked.lock().unwrap(),
                 whitelist: self.whitelist.lock().unwrap().clone(),
                 pid: std::process::id(),
+                backend: "mock".into(),
             }
         }
     }
@@ -320,6 +321,7 @@ mod tests {
         assert_eq!(value["locked"], true);
         assert_eq!(value["whitelist"], serde_json::json!(["code"]));
         assert_eq!(value["pid"], std::process::id());
+        assert_eq!(value["backend"], "mock");
 
         let (status, _) = route(
             Request {
