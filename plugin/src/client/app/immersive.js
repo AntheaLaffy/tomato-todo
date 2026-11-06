@@ -1,14 +1,20 @@
-// 沉浸式专注：开始专注后的全屏界面（Legacy 2a/2b）。
+// 沉浸式专注：开始专注后的全屏界面（Legacy 2a/2b，SKIN.md 4.4）。
 //
-// 打开/关闭是模块级信号（同一时刻只可能有一个沉浸层），组件订阅它；
-// overlay 宿主只负责渲染 <Immersive/>。视觉按 SKIN.md 4.4 节：巨型等宽计时、
-// 当前任务、白名单状态、提前结束与结束确认。
-import { h, useState, useEffect } from "../runtime.js";
+// 视觉：同一套纸色压暗一档的暖色渐层 + 极慢呼吸光斑，中央巨型等宽计时；不做
+// 玻璃拟态与霓虹，保持「纸与光」的夜读感。所有状态都从快照派生，写入只走
+// tryDispatch（保护/严格模式语义以 @tomato/core 为唯一权威，这里不绕过）。
+//
+// 打开/关闭是模块级信号：overlay 宿主只渲染 <Immersive/>，HUD/Dock/主视图的
+// 开始按钮都调用 openImmersive()；计时结束或被停止时本组件自动关闭。
+// ESC 不直接退出（严格模式下需要用户明确确认），右下角 minimize 可退出沉浸。
+import { h, useState, useEffect, useRef } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
-import { Ring, Btn, IconBtn, notify } from "../shared/ui.js";
+import { Btn, IconBtn, Dropdown, Modal, notify } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
-import { timerView, fmtClock, taskById, protectionView } from "../shared/derive.js";
+import { timerView, fmtClock, taskById, protectionView, toMinutes } from "../shared/derive.js";
+import { openPanelAt } from "./navigation.js";
+import { useAmbience, ensureAudio } from "./sound.js";
 
 registerCopy("imm", {
   zh: {
@@ -20,193 +26,412 @@ registerCopy("imm", {
     back: "再坚持一下",
     earlyComplete: "提前完成",
     interrupt: "结束并解锁",
-    locked: "界面锁定中",
-    lockBadge: "界面锁定中",
-    freeBadge: "自由专注",
-    whitelistBadge: "应用白名单保护中",
+    noTimeHint: "还没有专注用时，再坚持一下就能提前完成。",
+    strictWarning: "严格模式生效中：计时结束前不能提前完成或退出，到时自动解除。",
+    badgeWhitelist: "应用白名单保护中",
+    badgeLock: "界面锁定中",
+    badgeBreakLock: "休息锁机中",
+    badgeFree: "自由专注",
+    badgeRest: "休息中",
     onlyThis: "此刻，只做这一件事。",
     allowHint: "允许使用 {n} 个应用，其他应用会被切回",
+    cycle: "第 {n} / {total} 个番茄",
     schedule: "查看今天日程",
     sound: "选择背景音",
     endEarly: "有急事，提前结束",
     exit: "退出沉浸模式",
-    scheduleHint: "今天的日程在「本周日程」与「今日专注」里",
-    soundHint: "背景音选择将在偏好设置中提供",
+    pause: "暂停一下",
+    paused: "已暂停",
+    resume: "继续专注",
+    resumeRest: "继续休息",
+    skipRest: "结束休息",
+    restHint: "起来走走，喝口水。",
+    restMinutes: "这一轮休息 {n} 分钟",
+    focusLabel: "专注",
     notifyCompleted: "这一颗番茄完成了，去休息一下",
     notifyInterrupted: "本轮已中断，时长按实际记录",
+    notifyRestEnded: "休息结束，准备好再开始",
   },
   en: {
     title: "End this focus round?",
     detail:
       "If the round is done, complete the pomodoro early and take the break; focus time is recorded as actually spent. The task still needs a manual check. For a temporary interruption choose “End and unlock” — the round won't count as a full pomodoro.",
-    typeHint: "Type “结束专注” to confirm the interruption",
-    confirmPhrase: "结束专注",
+    typeHint: "Type “end focus” to confirm the interruption",
+    confirmPhrase: "end focus",
     back: "Keep going",
     earlyComplete: "Complete early",
     interrupt: "End and unlock",
-    locked: "Screen locked",
-    lockBadge: "Screen locked",
-    freeBadge: "Free focus",
-    whitelistBadge: "App whitelist active",
+    noTimeHint: "No focus time yet — a little longer and you can complete it early.",
+    strictWarning: "Strict mode is on: you can't finish or leave early until the timer ends.",
+    badgeWhitelist: "App whitelist active",
+    badgeLock: "Screen locked",
+    badgeBreakLock: "Break lock active",
+    badgeFree: "Free focus",
+    badgeRest: "On a break",
     onlyThis: "Just this one thing, right now.",
     allowHint: "{n} apps allowed; others are switched away",
+    cycle: "Pomodoro {n} of {total}",
     schedule: "Today's schedule",
     sound: "Ambient sound",
     endEarly: "Something urgent — end early",
     exit: "Leave focus mode",
-    scheduleHint: "Today's plan lives in This week and Today",
-    soundHint: "Ambient sound choices arrive with Preferences",
+    pause: "Pause",
+    paused: "Paused",
+    resume: "Resume focus",
+    resumeRest: "Resume the break",
+    skipRest: "End the break",
+    restHint: "Stand up, stretch, take a breath.",
+    restMinutes: "Break for {n} min",
+    focusLabel: "Focus",
     notifyCompleted: "Pomodoro complete — take a breather",
     notifyInterrupted: "Round interrupted; actual time recorded",
+    notifyRestEnded: "Break over — ready when you are",
   },
 });
 
+// ------------------------------------------------------------ 模块级开关信号
+
 let openState = false;
+let endTick = 0;
 const listeners = new Set();
 
 function emit() {
-  for (const fn of Array.from(listeners)) fn(openState);
+  for (const fn of Array.from(listeners)) {
+    try {
+      fn();
+    } catch {
+      /* 订阅者异常不影响其他订阅者 */
+    }
+  }
 }
 
 export function openImmersive() {
+  if (openState) return;
   openState = true;
   emit();
 }
 
 export function closeImmersive() {
+  if (!openState) return;
   openState = false;
+  emit();
+}
+
+/** 打开沉浸层并直接弹出「结束专注」确认框（HUD 的结束本轮用）。 */
+export function openEndDialog() {
+  openState = true;
+  endTick += 1;
   emit();
 }
 
 export function useImmersiveOpen() {
   const [open, setOpen] = useState(openState);
   useEffect(() => {
-    const fn = (next) => setOpen(next);
+    const fn = () => setOpen(openState);
     listeners.add(fn);
+    fn();
     return () => listeners.delete(fn);
   }, []);
   return open;
 }
 
-/** 确认结束对话框（Legacy 2b）：输入「结束专注」才允许中断。 */
-function EndDialog({ onCancel, onEarlyComplete, onInterrupt, busy, copy }) {
-  const [phrase, setPhrase] = useState("");
-  const [inputRef, setInputRef] = useState(null);
+function useEndTick() {
+  const [tick, setTick] = useState(endTick);
   useEffect(() => {
-    if (inputRef) inputRef.focus();
-  }, [inputRef]);
-  const confirmed = phrase.trim() === copy.confirmPhrase;
+    const fn = () => setTick(endTick);
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }, []);
+  return tick;
+}
+
+// ---------------------------------------------------------------- 小工具
+
+const NARROW_QUERY = 720;
+
+function useNarrow() {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < NARROW_QUERY,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onResize = () => setNarrow(window.innerWidth < NARROW_QUERY);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return narrow;
+}
+
+function useNow(active) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return undefined;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+/** 沉浸层是「夜读」的暗暖色：纸色压暗一档，仍与皮肤同源。 */
+const INK = "#fbf3e6";
+const INK_2 = "#c9b7a1";
+const INK_3 = "#8f7d6b";
+const HAIRLINE = "#ffffff12";
+
+// ------------------------------------------------------------ 结束确认（2b）
+
+function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel, onEarly, onInterrupt, onSkipRest }) {
+  const [phrase, setPhrase] = useState("");
+  const confirmed = phrase.trim() === t("imm.confirmPhrase");
+  const resting = mode !== "focus";
   return h(
-    "div",
+    Modal,
     {
-      className: "t-mask t-root",
-      style: { background: "#100b0880", zIndex: 80 },
-      onMouseDown: (e) => {
-        if (e.target === e.currentTarget) onCancel();
-      },
+      open: true,
+      onClose: onCancel,
+      icon: resting ? "coffee" : "clock",
+      title: t("imm.title"),
+      width: 500,
+      footer: resting
+        ? h(
+            "div",
+            { style: { display: "flex", gap: 9, justifyContent: "flex-end", width: "100%" } },
+            h(Btn, { size: "md", onClick: onCancel }, t("imm.back")),
+            h(
+              Btn,
+              {
+                size: "md",
+                variant: "primary",
+                icon: "check",
+                disabled: busy || strictActive,
+                onClick: onSkipRest,
+              },
+              t("imm.skipRest"),
+            ),
+          )
+        : h(
+            "div",
+            { style: { display: "flex", gap: 9, justifyContent: "flex-end", width: "100%", flexWrap: "wrap" } },
+            h(Btn, { size: "md", onClick: onCancel }, t("imm.back")),
+            h(
+              Btn,
+              {
+                size: "md",
+                variant: "soft",
+                icon: "check",
+                disabled: busy || strictActive || !canEarly,
+                title: canEarly ? t("imm.earlyComplete") : t("imm.noTimeHint"),
+                onClick: onEarly,
+              },
+              t("imm.earlyComplete"),
+            ),
+            h(
+              Btn,
+              {
+                size: "md",
+                variant: "danger",
+                icon: "unlock",
+                disabled: busy || strictActive || !confirmed,
+                onClick: onInterrupt,
+              },
+              t("imm.interrupt"),
+            ),
+          ),
     },
-    h(
-      "div",
-      { className: "t-modal", style: { width: "min(460px, 100%)", padding: "26px 26px 22px" } },
-      h("div", { style: { fontSize: 18, fontWeight: 650, color: "var(--tomato-ink)" } }, copy.title),
-      h(
-        "div",
-        { style: { fontSize: 12.5, lineHeight: 1.75, color: "var(--tomato-ink-2)", marginTop: 10 } },
-        copy.detail,
-      ),
-      h(
-        "div",
-        { style: { marginTop: 16 } },
-        h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginBottom: 6 } }, copy.typeHint),
-        h("input", {
-          ref: setInputRef,
-          value: phrase,
-          onChange: (e) => setPhrase(e.target.value),
-          placeholder: copy.confirmPhrase,
-          className: "t-root t-input",
-          style: { height: 36, fontSize: 13 },
-        }),
-      ),
-      h(
-        "div",
-        { style: { display: "flex", gap: 9, marginTop: 20, justifyContent: "flex-end" } },
-        h(Btn, { size: "md", onClick: onCancel }, copy.back),
-        h(
-          Btn,
+    h("div", { style: { fontSize: 12.5, lineHeight: 1.8, color: "var(--tomato-ink-2)" } }, t("imm.detail")),
+    focusMinutes > 0 && !resting
+      ? h(
+          "div",
+          { style: { marginTop: 8, fontSize: 12, color: "var(--tomato-ink-3)" } },
+          t("common.minutes", { n: focusMinutes }),
+        )
+      : null,
+    strictActive
+      ? h(
+          "div",
           {
-            size: "md",
-            variant: "soft",
-            icon: "check",
-            disabled: busy,
-            onClick: onEarlyComplete,
+            style: {
+              marginTop: 12,
+              padding: "9px 12px",
+              borderRadius: 10,
+              background: "var(--tomato-surface-2)",
+              border: "1px solid var(--tomato-line)",
+              color: "var(--tomato-ink-2)",
+              fontSize: 12,
+              lineHeight: 1.65,
+              display: "flex",
+              gap: 8,
+              alignItems: "flex-start",
+            },
           },
-          copy.earlyComplete,
+          h(Icon, { name: "lock", size: 15, style: { color: "var(--tomato-sun)", flex: "none", marginTop: 1 } }),
+          t("imm.strictWarning"),
+        )
+      : null,
+    resting
+      ? null
+      : h(
+          "div",
+          { style: { marginTop: 16 } },
+          h(
+            "div",
+            { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginBottom: 6 } },
+            t("imm.typeHint"),
+          ),
+          h("input", {
+            value: phrase,
+            onChange: (e) => setPhrase(e.target.value),
+            placeholder: t("imm.confirmPhrase"),
+            autoFocus: true,
+            className: "t-root t-input",
+            style: { height: 38, fontSize: 13.5 },
+          }),
+          !canEarly
+            ? h(
+                "div",
+                { style: { marginTop: 8, fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+                t("imm.noTimeHint"),
+              )
+            : null,
         ),
-        h(
-          Btn,
-          {
-            size: "md",
-            variant: "danger",
-            icon: "unlock",
-            disabled: busy || !confirmed,
-            onClick: onInterrupt,
-          },
-          copy.interrupt,
-        ),
-      ),
-    ),
   );
 }
 
+// ---------------------------------------------------------------- 主组件
+
 export function Immersive() {
   const open = useImmersiveOpen();
+  const endRequest = useEndTick();
   const state = useSnapshot();
+  const narrow = useNarrow();
+  const ambience = useAmbience();
   const [ending, setEnding] = useState(false);
+  const [soundMenu, setSoundMenu] = useState(false);
   const [busy, setBusy] = useState(false);
+  const seenEndRef = useRef(endRequest);
+
   const view = timerView(state);
   const data = (state && state.data) || {};
+  const settings = data.settings || {};
   const task = taskById(data, view.taskId);
   const protection = protectionView(state);
+  const now = useNow(view.running && open);
 
-  // 计时结束/被外部停止时自动退出沉浸层
+  const liveRemaining =
+    view.running && typeof view.timer.deadline === "number"
+      ? Math.max(0, Math.round(view.timer.deadline - now / 1000))
+      : view.remainingSecs;
+  const progress = view.totalSecs > 0 ? Math.max(0, Math.min(1, 1 - liveRemaining / view.totalSecs)) : 0;
+  const resting = view.mode !== "focus";
+  const focusMinutes = toMinutes(view.totalSecs - liveRemaining);
+  const cycleEvery = Number(settings.longBreakEvery) || 4;
+  const cycle = Number(view.cycle) || 1;
+  const lockActive = !!(data.lock && data.lock.active);
+
+  // 计时结束 / 被停止（且不是暂停）时自动让出全屏；休息模式保留轻量界面。
   useEffect(() => {
-    if (open && !view.running && view.mode !== "shortBreak" && view.mode !== "longBreak") {
-      const remaining = Number(view.timer.remainingSecs) || 0;
-      const total = Number(view.timer.durationSecs) || 0;
-      if (remaining <= 0 || total === 0) closeImmersive();
+    if (!open) return;
+    if (!view.running && !view.paused) closeImmersive();
+  }, [open, view.running, view.paused]);
+
+  // HUD「结束本轮」经模块信号请求打开结束确认框。
+  useEffect(() => {
+    if (endRequest !== seenEndRef.current) {
+      seenEndRef.current = endRequest;
+      if (open) setEnding(true);
     }
-  }, [open, view.running, view.mode, view.timer.remainingSecs]);
+  }, [endRequest, open]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) {
+      setEnding(false);
+      setSoundMenu(false);
+    }
+  }, [open]);
 
-  const copy = {
-    title: t("imm.title"),
-    detail: t("imm.detail"),
-    typeHint: t("imm.typeHint"),
-    confirmPhrase: t("imm.confirmPhrase"),
-    back: t("imm.back"),
-    earlyComplete: t("imm.earlyComplete"),
-    interrupt: t("imm.interrupt"),
-  };
-
-  const act = async (action, then) => {
+  const act = async (action, done) => {
     setBusy(true);
     const res = await tryDispatch(action);
     setBusy(false);
     if (!res.ok) {
       notify(res.error || t("common.writeFailed"), "danger");
-      return;
+      return false;
     }
-    then?.();
+    done?.();
+    return true;
   };
 
-  const badge = protection.locked
-    ? t("imm.locked")
-    : protection.active && protection.mode === "whitelist"
-      ? t("imm.whitelistBadge", { n: protection.effectiveWhitelist.length })
-      : protection.active
-        ? t("imm.lockBadge")
-        : t("imm.freeBadge");
+  const resume = async () => {
+    ensureAudio();
+    await act({ type: "startTimer" });
+  };
+
+  const skipRest = async () => {
+    const ok = await act({ type: "skipTimer" }, () => {
+      setEnding(false);
+      closeImmersive();
+      notify(t("imm.notifyRestEnded"), "neutral");
+    });
+    return ok;
+  };
+
+  const earlyComplete = () =>
+    act({ type: "completeFocus" }, () => {
+      setEnding(false);
+      notify(t("imm.notifyCompleted"), "brand");
+      // 自动进休息时保持沉浸层（轻量休息界面）；否则由自动关闭逻辑收尾。
+    });
+
+  const interrupt = () =>
+    act({ type: "emergencyUnlock" }, () => {
+      setEnding(false);
+      closeImmersive();
+      notify(t("imm.notifyInterrupted"), "neutral");
+    });
+
+  const goSchedule = () => {
+    closeImmersive();
+    openPanelAt("calendar");
+  };
+
+  if (!open) return null;
+
+  const badge = (() => {
+    if (lockActive) return { icon: "moon", text: t("imm.badgeBreakLock") };
+    if (protection.locked) return { icon: "lock", text: t("imm.badgeLock") };
+    if (protection.focusing && protection.mode === "whitelist") {
+      return { icon: "shield", text: t("imm.badgeWhitelist") };
+    }
+    if (protection.focusing && protection.mode === "lock") {
+      return { icon: "shield", text: t("imm.badgeLock") };
+    }
+    if (resting) return { icon: "coffee", text: t("imm.badgeRest") };
+    return { icon: "sparkle", text: t("imm.badgeFree") };
+  })();
+
+  const whitelistCount = protection.effectiveWhitelist.length;
+  const showAllowHint = protection.focusing && protection.mode === "whitelist";
+
+  const strictActive = !!(
+    (data.lock && data.lock.active && data.lock.active.strict) ||
+    (view.running && view.mode === "focus" && protection.mode !== "off" && protection.strict)
+  );
+  const canEarly = !resting && view.remainingSecs < view.totalSecs;
+
+  const soundKind = ambience.kind || "silent";
+  const soundKindLabel =
+    soundKind === "rain" ? t("sound.rain") : soundKind === "brown" ? t("sound.brown") : "";
+  // 静音时显示入口名，播放中带上当前音色，一眼知道「现在在放什么」。
+  const soundLabel = soundKindLabel === "" ? t("imm.sound") : `${t("imm.sound")} · ${soundKindLabel}`;
+  const soundItems = ["rain", "brown", "silent"].map((kind) => ({
+    id: kind,
+    icon: kind === soundKind ? "check" : kind === "silent" ? "mute" : "sound",
+    label:
+      (kind === "rain" ? t("sound.rain") : kind === "brown" ? t("sound.brown") : t("sound.silent")) +
+      (kind === soundKind ? " ·" : ""),
+    onClick: () => ambience.setKind(kind),
+  }));
 
   return h(
     "div",
@@ -220,92 +445,218 @@ export function Immersive() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background:
-          "radial-gradient(120% 100% at 50% -10%, #3a2a20 0%, #241a14 46%, #16100d 100%)",
-        color: "#f4ead9",
-        padding: "28px 24px",
+        overflow: "hidden",
+        background: "radial-gradient(120% 120% at 50% -18%, #3a2a20 0%, #251b14 46%, #16100c 100%)",
+        color: INK,
       },
     },
+    // 极慢呼吸光斑（两个不同相位；reduced-motion 由 .t-pulse 的全局规则关掉）
+    h("div", {
+      className: "t-pulse",
+      "aria-hidden": "true",
+      style: {
+        position: "absolute",
+        top: "-26%",
+        left: "-14%",
+        width: "74vmax",
+        height: "74vmax",
+        borderRadius: "50%",
+        pointerEvents: "none",
+        background: "radial-gradient(circle, #e8886c14 0%, #e8886c00 62%)",
+        filter: "blur(30px)",
+        animation: "t-breathe 9s ease-in-out infinite",
+      },
+    }),
+    h("div", {
+      className: "t-pulse",
+      "aria-hidden": "true",
+      style: {
+        position: "absolute",
+        right: "-18%",
+        bottom: "-30%",
+        width: "66vmax",
+        height: "66vmax",
+        borderRadius: "50%",
+        pointerEvents: "none",
+        background: "radial-gradient(circle, #f3d9c80d 0%, #f3d9c800 60%)",
+        filter: "blur(36px)",
+        animation: "t-breathe 13s ease-in-out infinite 1.6s",
+      },
+    }),
+    // 底部极细进度：不抢计时数字的视觉重心
+    h(
+      "div",
+      {
+        "aria-hidden": "true",
+        style: { position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: "#ffffff0a" },
+      },
+      h("div", {
+        style: {
+          height: "100%",
+          width: `${progress * 100}%`,
+          background: "#e8886c66",
+          transition: "width 1s linear",
+        },
+      }),
+    ),
+    // 顶部状态徽章
     h(
       "div",
       {
         style: {
           position: "absolute",
-          top: 26,
+          top: narrow ? 18 : 26,
+          left: "50%",
+          transform: "translateX(-50%)",
           display: "flex",
           alignItems: "center",
           gap: 8,
           padding: "7px 15px",
           borderRadius: 22,
-          border: "1px solid #ffffff1f",
+          border: `1px solid ${HAIRLINE}`,
           background: "#ffffff0d",
           fontSize: 12,
           letterSpacing: ".02em",
           color: "#e8d8c2",
+          maxWidth: "calc(100vw - 120px)",
+          whiteSpace: "nowrap",
         },
       },
-      h(Icon, { name: protection.locked ? "lock" : "shield", size: 14 }),
-      badge,
+      h(Icon, { name: badge.icon, size: 14 }),
+      badge.text,
     ),
+    // 中央：巨型等宽计时 + 一句话 + 任务名
     h(
       "div",
-      { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 18, marginTop: 8 } },
-      h(
-        Ring,
-        {
-          value: view.progress,
-          size: 300,
-          stroke: 8,
-          color: "#e8886c",
-          track: "#ffffff14",
-          pulse: view.running,
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: narrow ? 12 : 18,
+          padding: narrow ? "0 18px" : "0 32px",
+          maxWidth: 900,
+          width: "100%",
+          textAlign: "center",
         },
-        h(
-          "div",
-          { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6 } },
-          h(
-            "div",
-            {
-              className: "t-mono",
-              style: {
-                fontSize: 58,
-                fontWeight: 300,
-                letterSpacing: "-.02em",
-                color: "#fbf3e6",
-                lineHeight: 1,
-              },
-            },
-            fmtClock(view.remainingSecs),
-          ),
-          h(
-            "div",
-            { style: { fontSize: 12.5, color: "#c9b7a1", letterSpacing: ".04em" } },
-            t("imm.onlyThis"),
-          ),
-        ),
+      },
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            letterSpacing: ".22em",
+            textTransform: "uppercase",
+            color: INK_3,
+            opacity: 0.9,
+          },
+        },
+        resting ? t("imm.badgeRest") : t("imm.focusLabel"),
       ),
-      task
-        ? h("div", { style: { fontSize: 18, fontWeight: 600, color: "#f0d9c6", textAlign: "center" } }, task.title)
-        : null,
-      protection.active && protection.mode === "whitelist"
+      h(
+        "div",
+        {
+          className: "t-mono",
+          style: {
+            fontSize: "clamp(96px, 16vw, 160px)",
+            fontWeight: 250,
+            letterSpacing: "-.035em",
+            lineHeight: 1,
+            color: view.paused ? "#cbbca8" : INK,
+            textShadow: "0 8px 40px #00000059",
+            transition: "color .4s ease",
+            fontVariantNumeric: "tabular-nums",
+          },
+        },
+        fmtClock(liveRemaining),
+      ),
+      view.paused
         ? h(
             "div",
-            { style: { fontSize: 12, color: "#b9a793" } },
-            t("imm.allowHint", { n: protection.effectiveWhitelist.length }),
+            {
+              style: {
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "5px 13px",
+                borderRadius: 18,
+                border: `1px solid ${HAIRLINE}`,
+                background: "#ffffff0d",
+                fontSize: 12,
+                color: INK_2,
+              },
+            },
+            h(Icon, { name: "pause", size: 13 }),
+            t("imm.paused"),
+          )
+        : h(
+            "div",
+            { style: { fontSize: narrow ? 13 : 14.5, color: INK_2, letterSpacing: ".04em", lineHeight: 1.7 } },
+            resting ? t("imm.restHint") : t("imm.onlyThis"),
+          ),
+      task && !resting
+        ? h(
+            "div",
+            {
+              style: {
+                fontSize: narrow ? 16 : 20,
+                fontWeight: 600,
+                color: "var(--tomato-brand)",
+                lineHeight: 1.45,
+                maxWidth: "min(760px, 82vw)",
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              },
+            },
+            task.title,
+          )
+        : null,
+      resting
+        ? h(
+            "div",
+            { style: { fontSize: 12.5, color: INK_3 } },
+            t("imm.restMinutes", { n: toMinutes(view.totalSecs) }),
+          )
+        : null,
+      showAllowHint
+        ? h(
+            "div",
+            { style: { fontSize: 12.5, color: INK_3, letterSpacing: ".01em" } },
+            t("imm.allowHint", { n: whitelistCount }),
+          )
+        : null,
+      view.paused
+        ? h(
+            Btn,
+            {
+              variant: "soft",
+              size: "md",
+              icon: "play",
+              onClick: resume,
+              disabled: busy,
+              style: { marginTop: 4 },
+            },
+            resting ? t("imm.resumeRest") : t("imm.resume"),
           )
         : null,
     ),
+    // 底部动作区（休息模式只留日程与结束休息）
     h(
       "div",
       {
         style: {
           position: "absolute",
-          bottom: 30,
+          left: "50%",
+          transform: "translateX(-50%)",
+          bottom: narrow ? 76 : 34,
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          flexWrap: "wrap",
           justifyContent: "center",
+          gap: narrow ? 6 : 10,
+          flexWrap: "wrap",
+          width: "calc(100vw - 40px)",
         },
       },
       h(
@@ -314,62 +665,110 @@ export function Immersive() {
           size: "sm",
           variant: "plain",
           icon: "calendar",
-          style: { color: "#c9b7a1" },
-          onClick: () => notify(t("imm.scheduleHint"), "neutral"),
+          style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+          onClick: goSchedule,
         },
         t("imm.schedule"),
       ),
-      h(
-        Btn,
-        {
-          size: "sm",
-          variant: "plain",
-          icon: "sound",
-          style: { color: "#c9b7a1" },
-          onClick: () => notify(t("imm.soundHint"), "neutral"),
-        },
-        t("imm.sound"),
-      ),
-      h(
-        Btn,
-        {
-          size: "sm",
-          variant: "plain",
-          style: { color: "#d8b7a2" },
-          onClick: () => setEnding(true),
-        },
-        t("imm.endEarly"),
-      ),
+      !resting
+        ? h(
+            "div",
+            { style: { position: "relative", display: "inline-flex" } },
+            h(
+              Btn,
+              {
+                size: "sm",
+                variant: "plain",
+                icon: soundKind === "silent" ? "mute" : "sound",
+                style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+                onClick: () => {
+                  ensureAudio();
+                  setSoundMenu((v) => !v);
+                },
+              },
+              soundLabel,
+            ),
+            h(Dropdown, {
+              open: soundMenu,
+              onClose: () => setSoundMenu(false),
+              items: soundItems,
+              align: "left",
+              width: 208,
+              style: { top: "auto", bottom: "calc(100% + 8px)", left: "auto", right: 0 },
+            }),
+          )
+        : null,
+      !resting
+        ? h(
+            Btn,
+            {
+              size: "sm",
+              variant: "plain",
+              style: { color: "#d8b7a2", background: "transparent", border: `1px solid ${HAIRLINE}` },
+              onClick: () => setEnding(true),
+            },
+            t("imm.endEarly"),
+          )
+        : h(
+            Btn,
+            {
+              size: "sm",
+              variant: "plain",
+              icon: "check",
+              style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+              disabled: busy || strictActive,
+              title: strictActive ? t("imm.strictWarning") : undefined,
+              onClick: skipRest,
+            },
+            t("imm.skipRest"),
+          ),
     ),
+    // 左下：轮次信息（安静地放，不抢焦点）
+    !narrow
+      ? h(
+          "div",
+          {
+            style: {
+              position: "absolute",
+              left: 26,
+              bottom: 30,
+              fontSize: 11,
+              letterSpacing: ".02em",
+              color: INK_3,
+            },
+          },
+          t("imm.cycle", { n: cycle, total: cycleEvery }),
+        )
+      : null,
+    // 右下角：退出沉浸模式（不结束计时；严格模式下只是离开全屏）
     h(
       "div",
-      { style: { position: "absolute", top: 22, right: 22 } },
+      { style: { position: "absolute", right: narrow ? 14 : 24, bottom: narrow ? 16 : 24, display: "flex" } },
       h(IconBtn, {
         name: "minimize",
         size: 18,
-        box: 34,
+        box: 36,
         title: t("imm.exit"),
-        style: { color: "#c9b7a1" },
+        style: {
+          color: INK_2,
+          border: `1px solid ${HAIRLINE}`,
+          background: "#ffffff0a",
+          borderRadius: 12,
+        },
         onClick: closeImmersive,
       }),
     ),
     ending
       ? h(EndDialog, {
-          copy,
+          strictActive,
+          canEarly,
           busy,
+          focusMinutes,
+          mode: view.mode,
           onCancel: () => setEnding(false),
-          onEarlyComplete: () =>
-            act({ type: "completeFocus" }, () => {
-              setEnding(false);
-              closeImmersive();
-              notify(t("imm.notifyCompleted"), "brand");
-            }),
-          onInterrupt: () =>
-            act({ type: "resetTimer" }, () => {
-              setEnding(false);
-              closeImmersive();
-              notify(t("imm.notifyInterrupted"), "neutral");
-            }),
+          onEarly: earlyComplete,
+          onInterrupt: interrupt,
+          onSkipRest: skipRest,
         })
       : null,
   );
