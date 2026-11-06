@@ -60,7 +60,7 @@ export function parseLockState(raw: unknown): LockState {
   rejectUnknown(raw, [...STATE_KEYS], "锁机配置");
   return {
     schedules: field(raw, "schedules", "锁机配置", (v) => asArray(v, "schedules").map(parseLockSchedule), []),
-    active: field(raw, "active", "锁机配置", (v) => parseActiveLock(v), null) as ActiveLock | null,
+    active: field(raw, "active", "锁机配置", (v) => (v === null ? null : parseActiveLock(v)), null) as ActiveLock | null,
     suppressedUntil: field(raw, "suppressedUntil", "锁机配置", asInt, 0),
   };
 }
@@ -68,7 +68,8 @@ export function parseLockState(raw: unknown): LockState {
 export function serializeLockState(s: LockState): Record<string, unknown> {
   return {
     schedules: s.schedules.map(serializeLockSchedule),
-    active: s.active === null ? null : serializeActiveLock(s.active),
+    // 与 Rust skip_serializing_if 对齐：无活动锁机时省略键，而不是写 "active": null。
+    ...(s.active === null ? {} : { active: serializeActiveLock(s.active) }),
     suppressedUntil: s.suppressedUntil,
   };
 }
