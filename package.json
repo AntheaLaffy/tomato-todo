@@ -1,38 +1,15 @@
 {
-  "name": "tomato-todo",
+  "name": "tomato-todo-rewrite",
   "version": "0.12.4",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.10.1",
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "dev:ui": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
-    "desktop": "tauri dev",
-    "android:init": "tauri android init --ci",
-    "android:build": "tauri android build",
-    "android:dev": "tauri android dev",
-    "desktop:build": "pnpm run agent:build && tauri build --no-bundle",
-    "desktop:package": "pnpm run agent:build && tauri build",
-    "desktop:deb": "pnpm run agent:build && tauri build --bundles deb",
-    "test": "pnpm run agent:build && cargo test -p tomato-core -p tomato-agent -p tomato-todo && cargo build -p tomato-preview && pnpm run build && node --test tests/education.mjs tests/exam-authoring.mjs tests/external-control.mjs tests/audio.mjs tests/integration.mjs tests/personas.mjs tests/install.mjs tests/agent.mjs tests/agent-workspace.mjs tests/agent-runtime.mjs",
-    "test:x11:app": "pnpm run agent:build && pnpm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/x11.mjs --app",
-    "test:windows": "node tests/windows.mjs",
-    "test:android": "node tests/android.mjs",
-    "test:x11": "node tests/x11.mjs",
-    "test:linux-desktops": "node tests/linux-desktops.mjs",
-    "test:wayland": "node tests/wayland.mjs",
-    "test:native": "pnpm run agent:build && pnpm run build && TAURI_CONFIG='{\"build\":{\"devUrl\":null}}' cargo build -p tomato-todo && node tests/native.mjs",
-    "format": "cargo fmt --all && prettier --write src scripts tests package.json",
-    "format:check": "cargo fmt --all --check && prettier --check \"src/**/*.{ts,css}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" package.json",
-    "check": "pnpm run agent:build && tsc --noEmit && cargo clippy --workspace --all-targets -- -D warnings",
-    "desktop:install": "python3 scripts/install.py",
-    "test:install": "node --test tests/install.mjs",
-    "agent:build": "node scripts/build-agent.mjs",
-    "check:handbook": "python3 scripts/handbook-paths.py && python3 scripts/handbook-tests.py && python3 scripts/handbook-backlog.py && python3 scripts/handbook-stats.py && python3 scripts/check-handbook.py",
-    "handbook:stats": "python3 scripts/handbook-stats.py",
-    "handbook:paths": "python3 scripts/handbook-paths.py",
-    "core:test": "pnpm --filter @tomato/core test"
+    "core:test": "pnpm --filter @tomato/core test",
+    "runtime:test": "node --test runtime/test/",
+    "build:runtime": "node scripts/build-runtime.mjs",
+    "format": "prettier --write \"packages/**/*.ts\" \"runtime/**/*.{ts,mjs}\" \"plugin/**/*.{js,json,yml}\" scripts tests",
+    "check": "pnpm core:test && pnpm runtime:test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
@@ -42,19 +19,19 @@
     "marked": "^18.1.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
-    "@tauri-apps/cli": "^2.12.1",
-    "@types/katex": "^0.16.8",
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.9",
-    "typescript": "^5.9.3",
-    "vite": "^8.3.4"
+    "typescript": "^5.9.3"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "runtime",
+    "plugin"
   ],
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
     ]
-  }
+  },
+  "description": "番茄 Todo 重写：DSH 插件 + Node runtime + 原生守卫"
 }
