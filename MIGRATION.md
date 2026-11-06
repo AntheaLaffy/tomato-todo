@@ -81,6 +81,24 @@ crates/agent/src/external.rs 的工具清单，语义保留、实现全部重写
 5. **收尾**：删除旧 agent/Tauri 栈；文档（README/CONTRIBUTING/CODEMAP/HANDBOOK）同步；
    CI 与打包脚本更新；sqlite 导出脚本。
 
+### 阶段 3 进度（tomato-ts-plugin 分支，2026-11-07）
+
+- `plugin/` 骨架已入库：package.json（@local/tomato-dsh v2）、cordis.patch.yml
+  （tomato-mcp MCP 行 + 插件行）、host index.js（tomato_today / tomato_guard_status
+  工具，经 `tomato-runtime --mcp` / `--guard-status` 一次性子进程探询，不常驻）、
+  client.js 单入口（composer.dock 入口卡 + shell.overlay 四页签面板）、
+  locale、icon、README。
+- 四页签完成：FocusTab（番茄计时环 UI，GET /api/today 3s 轮询，POST
+  /api/focus/start|pause|stop 骨架）、TasksTab（任务列表 + 完成勾选 POST
+  /api/tasks/:id/complete + 新建 POST /api/tasks）、StatsTab（五张数字卡 + 近七天
+  条形图，GET /api/stats）、SettingsTab（GET /health 只读展示 runtime/guard/dataDir）。
+  全部 React.createElement、样式走 `--dsw-alias-*` token、奶油白/番茄红仅作作品
+  图形色，中英双语文案。
+- 页签由两个并行 worktree 的部件源（plugin/src-client/tabs-a.js、tabs-b.js）拼进
+  client.js 单入口；拼接契约见 plugin/src-client/README.md，src-client 不随包分发。
+- 待办：与 runtime 工作流核对 /api/today、/api/stats、/health 字段形状（client 侧
+  已做容忍式收窄）；在真实 DSH 里做面板视觉验收；guard 可用后核对锁定状态展示。
+
 ## 语言问题结论（已与用户确认）
 
 - 原生只留 crates/guard 一个 Rust 小二进制（guard 的 X11/Wayland 绑定生态只有 Rust 完整）。
