@@ -1732,7 +1732,7 @@ function SettingsTab({ copy, hlt, every }) {
 }
 
     return {
-      inject: ['slots'],
+      inject: ['slots', 'timer'],
       apply(ctx) {
         const copy = pickCopy(ctx);
         // One store per apply: both slot entries share it, and a plugin reload
