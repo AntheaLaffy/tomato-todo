@@ -6,7 +6,7 @@
 （示例里的 JSESSIONID 都是占位）。账号密码只存在于工作区 `mcp/libseat/.env`，
 该目录整体被 `.gitignore` 排除，不入库。
 
-做它的起因是 `docs/AGENT.md` 的「助手作为 MCP 客户端」缺一个真实例子：助手要核实
+做它的起因是给学习助手接 MCP 服务器缺一个真实例子：助手要核实
 座位、开放时间这类外部事实，而不是靠猜；站点登录又卡在图形验证码上，于是顺带把
 「人/模型读图到底有多准」量了一遍。
 
@@ -197,9 +197,9 @@ cp .env.example .env
 $EDITOR .env                         # LIBSEAT_USER / LIBSEAT_PASS，默认 CAS 登录
 ```
 
-软件内置助手侧也接同一份配置（与 `state.json` 同目录的 `mcp.json`，形状见 `docs/AGENT.md`），
+接入 DSH 的 MCP 客户端配置（`mcpServers`，DSH 自身的 MCP 设置），
 工具名会变成 `mcp__seat__*` 这类；`env` 里传 `LIBSEAT_ENV_FILE` 指向 `.env` 即可。
-注意助手的自动唤醒轮次不加载任何 MCP 服务器，座位这类服务器只在用户主动发起的对话里连接。
+注意助手的自动任务轮次不加载外部 MCP 服务器，座位这类服务器只在用户主动发起的对话里连接。
 
 ## 复现
 

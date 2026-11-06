@@ -1,109 +1,71 @@
-# 自建 MCP 服务器指南
+# 把 tomato-runtime 的 MCP 接入任意客户端
 
-学习助手可以通过 [MCP](https://modelcontextprotocol.io/) 调用**你自己写的服务器**，把座位预约、图书馆、教务、订阅这类外部系统接进对话。本文讲怎么写一个服务器并挂进来；应用侧的字段与行为以随包 MCP 客户端的校验器为准，助手如何调度见 [AGENT.md](AGENT.md)。
+`tomato-runtime` 自带一个 MCP 服务器。DSH 插件用它把番茄 Todo 挂成对话工具；任何 MCP 客户端（Claude Desktop、Codex、另一个 DSH 实例等）也能以同样方式接入。它连接的是**正在运行的 runtime**，共享同一份计划数据，不另开数据库；runtime 关闭后不可操作。初始化返回 `serverInfo.name = tomato-todo`，`instructions` 简述接管入口。
 
-先分清两个方向，别搞混：
+两条入口，同一份工具：
 
-- **把番茄 Todo 当 MCP 服务器**（外部客户端连正在运行的软件）：见 [AGENT.md](AGENT.md) 的「外部 MCP」。
-- **给助手接一个 MCP 服务器**（本文）：助手作为客户端，连接你配置的程序。
+- **stdio**：`tomato-runtime --mcp`——spawn 即代理到运行中 runtime 的 `/mcp`，换行分隔 JSON-RPC，每次调用重读连接文件。
+- **streamable HTTP**：`http://127.0.0.1:43987/mcp`，Bearer token 认证，拒绝浏览器 Origin；无会话的 JSON 响应实现，通知返回 202，不提供 SSE，GET 返回 405。
 
-外部Agent接管软件的本机入口是 `tomato-todo --mcp`；也可使用私有连接文件里的 `mcpUrl` 和令牌走标准HTTP。接管指南、技能和参考文件已作为MCP resources/prompts暴露，`list_skills`、`get_education` 让没有资源浏览界面的客户端也能发现并使用。需要暂停内置自动执行时显式 `set_external_control`，结束后归还；具体字段和数据边界见上述外部MCP说明。
+## 配置示例
 
-## 最小可用服务器
-
-stdio 传输，一个工具就够跑通。用官方 SDK（Node 版，例子见 [modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk)）：
-
-```js
-#!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-
-const server = new McpServer({ name: "demo", version: "0.1.0" });
-
-server.registerTool(
-  "demo_add",
-  {
-    title: "两数相加",
-    description: "返回 a + b。说明输入 schema 与返回形状的最小示例。",
-    inputSchema: { a: z.number(), b: z.number() },
-  },
-  async ({ a, b }) => ({ content: [{ type: "text", text: String(a + b) }] }),
-);
-
-await server.connect(new StdioServerTransport());
-```
-
-三条硬规矩：
-
-- **stdout 只准写 JSON-RPC**（换行分隔）。日志、调试、进度一律走 stderr 或文件；往 stdout 打一行就会让协议解析失败。
-- 工具的 `description` 会被模型读到，写清**做什么、什么时候用**；`inputSchema` 用 zod，参数名和描述尽量具体。
-- 出错返回 `{ isError: true, content: [{ type: "text", text: "..." }] }`，别把异常直接抛到传输层。长任务就跑到完成，不要自己加超时（应用会按配置的 `timeout` 处理）。
-
-## 挂进应用
-
-配置写在**数据目录下 `agent/mcp.json`**（和 `state.json`、`connection.json` 同目录），用的是各家客户端通用、Codex 同款的 `mcpServers` 形状，现成配置可以直接抄：
+stdio（多数桌面客户端的 `mcpServers` 形状）：
 
 ```json
 {
   "mcpServers": {
-    "demo": {
-      "command": "/usr/bin/node",
-      "args": ["/home/me/demo-mcp/server.mjs"],
-      "env": { "DEMO_TOKEN": "..." },
-      "exposure": "codemode",
-      "description": "演示服务器：两数相加"
+    "tomato": {
+      "command": "/path/to/runtime/bin/tomato-runtime",
+      "args": ["--mcp"]
     }
   }
 }
 ```
 
-也可以让助手代劳，不用手改文件：
+streamable HTTP：从连接文件读出 `mcpUrl` 与令牌后：
 
-- `add_mcp_server { name, command, args, env, exposure, description }`，语义同 `codex mcp add`；`url` 换成 streamable HTTP 时同理。
-- `remove_mcp_server { name }`、`list_mcp_servers`（列出名称、启用状态、exposure、启动命令/URL、来源，以及校验和连接错误）。
+```json
+{
+  "mcpServers": {
+    "tomato": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:43987/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
 
-只有这份 `mcp.json` 会被加载：工作区是可被模型写入的，绝不能在那里定义服务器，所以项目级 `.pi/mcp.json` 被忽略。**配置在每次用户对话新建会话时读取**——改完文件后开一轮新对话（或直接用 `add_mcp_server`）即生效。
+## token 与连接文件
 
-## 字段
+- **位置**：数据目录下的 `agent/connection.json`，默认 `~/.local/share/studio.tomato.todo/agent/connection.json`；runtime 用 `--data` 指定数据目录时跟着走。
+- **内容**：当前实例的本机 MCP 地址（`mcpUrl`）与随机认证令牌；**runtime 每次重启都会更新**，stdio 入口每次调用重读该文件，适合稳定的本机客户端配置。
+- **边界**：只监听 127.0.0.1；HTTP 端点要求 `Authorization: Bearer <token>`，并拒绝浏览器 Origin——浏览器侧请走面板只读 API（见 [API.md](../API.md)）。
+- 令牌不要写进客户端配置的描述、日志或版本库；能读到连接文件的人才能连上 runtime。
 
-校验器接受的字段（`SERVER_NAME` = 字母、数字、`_`、`-`）：
+## 工具清单语义
 
-| 字段 | 说明 |
+工具语义沿用旧番茄 Todo 的外部清单（名称不变，实现在 @tomato/core 之上全部重写）：
+
+| 工具 | 语义 |
 | --- | --- |
-| `command` / `args` / `env` / `cwd` | stdio 传输：启动哪个程序、参数、环境变量、工作目录。`command` 与 `args` 力求绝对路径。 |
-| `url` / `headers` / `oauth` / `auth` | streamable HTTP：`headers` 支持 `${ENV}` 占位；服务器回 401 且没有 `Authorization` 时走 OAuth；`auth: { provider }` 改用某个 `/login` provider 的令牌。 |
-| `type` | `stdio` / `http` / `streamable-http`；旧的 `sse` 已不支持。 |
-| `exposure` | `codemode`（默认）、`deferred`、`direct`、`hidden`；旧名 `codemode-deferred` 等同于 `codemode`。 |
-| `toolExposure` | 按工具名单独覆盖 exposure，例如把某个危险工具降成 `deferred`。 |
-| `enabled` | 默认 `true`；`false` 单独停用，不用删配置。 |
-| `timeout` | 正数秒。 |
-| `description` | 一句话说明，会出现在 `list_mcp_servers` 里，帮助模型判断该不该用。 |
+| `get_control_status` | 当前接管/自动执行状态、本机实际授权目录等，接管入口 |
+| `get_context` | 当前实例上下文：今日待办、课表阻塞时段等，接管入口 |
+| `set_external_control` | `controller: "客户端名称"` 暂停内置自动执行；`controller: null` 归还 |
+| `create_task` / `update_task` / `move_tasks` / `complete_task` | 普通任务的增、改、移、完成 |
+| `dispatch` | 番茄、设置、愿景、保护等单项动作 |
+| `export_plan` / `export_backup` | 把计划/备份导出为文件，大批改动的起点 |
+| `review_file` / `apply_file` | 改动走「导出 → 审阅 → 应用」，保留来源与哈希校验 |
+| `get_education` | 按 `collection/projectId/id` 分页读完整教学记录 |
+| education 写工具 | 保存学期、课程、题卷、提交、评分与复盘 |
 
-**exposure 怎么选**：应用用的是策展过的工具清单，默认的 `codemode` 只在代码里调用，`deferred` 由 `tool_search` 按需加载——两者都不会撑大工具声明，也不会让只读轮次凭空多出外部能力；`direct` 必须把工具名显式写进工具清单才会声明，这里一般用不到。配成 `hidden` 的工具不暴露给模型。
-
-## 工具名、资源与调试
-
-- 工具的完整名是 `mcp__<服务器>__<工具>`，其中服务器名里的 `-` 会变成 `_`。上面的例子即 `mcp__demo__demo_add`。
-- 服务器暴露的 resource 用 Codex 同款工具读取：`list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource`。
-- 配置坏了不会静默失败：`list_mcp_servers` 会把校验错误一起报出来；服务器自己发的 `notifications/message` 追加到同目录的 `mcp.log`。
-- 传输由随包运行时自带的 MCP 客户端处理，你不需要在服务器里关心连接管理。
+接管顺序：先 `get_control_status` 与 `get_context`；普通任务用 create/update/move/complete；单项动作走 `dispatch`；大批改动走 `export_plan` / `export_backup` → 改文件 → `review_file` → `apply_file`；教学先 `get_education` 再 education 写工具。需要独立负责后续教学、定时与复盘时，用 `set_external_control(controller=你的名称)` 暂停内置自动执行，完成后 `controller=null` 归还——这是显式的执行归属：不会中断正在执行的请求，也没有自动过期，不新增调度层、轮次上限或重试循环。
 
 ## 安全与边界
 
-- **服务器以你的身份、在编程沙箱之外运行**。`command` 会执行任意程序，`add_mcp_server` 因而只在用户明确要求时使用——只挂你自己信任的服务器。
-- **只在用户主动发起的对话里连接**。异常自动唤醒不加载任何 MCP 服务器（座位、下单这类不该在无人确认时被唤醒）。
-- 密钥放 `env`，或让服务器读自己拥有的文件；不要写进 `description`（会进模型上下文）或日志。HTTP 的 `headers` 可以用 `${ENV}` 从环境变量取。
-- 会话生命周期：每次请求新建会话时连接服务器，会话结束（含应用退出）时一起关闭，不残留后台进程。别指望服务器跨调用保留内存状态，要持久化就落盘。
-- 工具对番茄 Todo 数据做的事仍受应用的保护规则约束（严格模式、不可逆裁定、来源与文件哈希校验），服务器绕不开。
+- 传输只在本机：127.0.0.1 + token + 拒绝浏览器 Origin。
+- 所有写入仍经 @tomato/core 的校验与保护规则（严格模式、来源与文件哈希校验），客户端绕不开。
+- 外部客户端不能紧急解锁或提前完成番茄：紧急退出与提前完成由用户在界面操作。
+- 客户端以你的本机身份执行写操作，只接你信任的客户端。
 
-## 一个真实例子：图书馆座位预约
-
-随实验一起写的 `libseat` 服务器（华南农业大学图书馆座位预约）展示了几个值得复用的模式：CAS 登录后拿业务会话、验证码图片**内联回给模型/人**再带 `captcha` 参数重试、按「会话/查询/预约/站点功能」分组的工具命名、以及可插拔的验证码求解器。接口还原、失败重试数学与求解器契约见 [LIBSEAT_MCP.md](LIBSEAT_MCP.md)。它运行时安装、不入库（含账号凭据），可作为你自己项目的结构参考。
-
-## 排错
-
-- 连不上：先 `list_mcp_servers` 看校验/连接错误，再查同目录 `mcp.log`。
-- 工具不出现：确认 `enabled` 没关、服务器名合法、`exposure` 不是 `hidden`；`direct` 需要显式声明工具名。
-- 协议报错：检查服务器有没有往 stdout 写了非 JSON 的内容（最常见的原因）。
-- 找不到 `node`：`command` 用绝对路径；应用的随包运行时在 `agent/bin/node`，自建服务器建议指向你自己控制的 Node。
+给 DSH 接外部 MCP 服务器（座位、图书馆这类系统）是 DSH 自身的 MCP 配置；一个真实服务器的结构与读图实验见 [LIBSEAT_MCP.md](LIBSEAT_MCP.md)。
