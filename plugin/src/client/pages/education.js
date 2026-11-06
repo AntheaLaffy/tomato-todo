@@ -1,15 +1,2694 @@
-// 页面桩：应试教育。lead 占位，由对应页面工作流替换实现（导出自己的 Page + registerPage）。
+// 应试教育：学习项目总览与项目详情。
+//
+// 数据面：快照的 data.education（教学域）+ data.projects / data.tasks /
+// data.visions / data.settings。页面自己从 assessment/submission/grade/
+// correction 证据派生「待交 / 待订正 / 待复核」与作业状态，不依赖 runtime
+// 的 summaries（旧快照可能没有它），也不 import core（客户端半只拿快照）。
+//
+// 写操作只发用户可发的 Action：selectTask + startTimer、toggleTask、
+// education.confirmProgress、education.retryEvent。课程/作业/批改/复盘等
+// 命令是 assistantOnly，页面只展示，不伪造表单。
+import { h, useState } from "../runtime.js";
+import { t, registerCopy } from "../shared/copy.js";
+import {
+  PageHeader,
+  Card,
+  SectionTitle,
+  Btn,
+  IconBtn,
+  Chip,
+  Dot,
+  Badge,
+  Bar,
+  Empty,
+  Skeleton,
+  Stat,
+  Check,
+  notify,
+} from "../shared/ui.js";
+import { useSnapshot, tryDispatch, refresh } from "../shared/store.js";
+import {
+  addDays,
+  dayKey,
+  taskById,
+  projectById,
+  projectColor,
+} from "../shared/derive.js";
 import { registerPage } from "../app/registry.js";
-import { makeStub } from "./stub.js";
 
-registerPage(
-  makeStub({
-    id: "education",
-    order: 60,
-    icon: "education",
-    ns: "education",
-    titleKey: "nav.education",
-    zhTitle: "应试教育",
-    enTitle: "Study projects",
-  }),
-);
+registerCopy("education", {
+  zh: {
+    eyebrow: "番茄 Todo",
+    title: "应试教育",
+    subtitle: "目标 130+，2028 年入学，初试 2027-12-18 预估。",
+    refreshTitle: "刷新",
+    loading: "正在读取教学计划…",
+    projectsTitle: "学习项目",
+    projectsHint: "{n} 个",
+    emptyProjectsTitle: "还没有学习项目",
+    emptyProjectsHint:
+      "学习项目由对话中的学习助手创建并绑定资料目录，这里负责展示与执行。",
+    targetLabel: "目标",
+    examMode: "应试模式",
+    examDateLabel: "考试日期",
+    countdownLabel: "考试倒计时",
+    countdownNone: "未设置考试日期",
+    countdownToday: "就在今天",
+    daysUnit: "天",
+    daysPast: "已过 {n} 天",
+    unnamedProject: "未命名项目",
+    resourcesCount: "{n} 份资料",
+    latestProgressLabel: "最新学情",
+    noProgress: "还没有学情记录",
+    viewDetail: "查看详情",
+    todayTasks: "今日学习任务",
+    todayTasksHint: "{n} 项",
+    startFocus: "开始专注",
+    focusStarted: "已开始专注",
+    noTodayTasks: "今天没有安排学习任务。",
+    lessonKind: "课程",
+    homeworkKind: "作业",
+    studyTaskKind: "学习",
+    reminderLabel: "提醒 {time}",
+    focusMinutesLabel: "{n} 分钟",
+    estimateLabel: "预计 {n} 个番茄",
+    needsAttention: "需要处理",
+    attentionHint: "{n} 项",
+    pendingSubmit: "待交",
+    pendingCorrection: "待订正",
+    pendingReview: "待复核",
+    nothingPending: "暂时没有待交、待订正或待复核的事项。",
+    causeLabel: "错因",
+    retestLabel: "复测 {date}",
+    deadlineLabel: "截止 {date}",
+    timeUnknown: "时间未定",
+    nextWeek: "接下来一周",
+    weekLessons: "待上课",
+    weekResources: "相关资料",
+    weekAssessments: "课程与考试",
+    nextWeekEmpty: "这一周没有课程、资料或考试安排。",
+    topicsCount: "{n} 个知识点",
+    recentProgress: "最近学到哪里",
+    confirm: "确认",
+    confirmed: "已确认",
+    sourceUser: "自己记录",
+    sourceAssistant: "学习助手",
+    stateStudied: "学过",
+    statePracticing: "练习中",
+    stateNeedsReview: "需复习",
+    unnamedTopic: "未命名知识点",
+    back: "返回",
+    projectMissing: "这个学习项目已不存在。",
+    directory: "资料目录",
+    directoryEmpty: "未绑定资料目录",
+    syllabusLabel: "考纲",
+    pastPapersCount: "真题 {n} 份",
+    mockPapersCount: "模拟题 {n} 份",
+    resourceGroups: "资料分类",
+    resourceList: "资料列表",
+    resourceEmpty: "还没有资料。资料由学习助手导入并授权目录。",
+    progressHistory: "学情记录",
+    completedTasksTitle: "最近完成的学习任务",
+    completedTasksEmpty: "还没有完成记录。",
+    statResources: "资料总数",
+    statLessons: "已上课",
+    statAssessments: "作业与考试",
+    statProgress: "学习记录",
+    semesterTitle: "学期进度",
+    semesterEmpty: "还没有学期计划。",
+    revisionLabel: "第 {n} 版",
+    weekLabel: "第 {n} 周",
+    milestoneLessons: "{n} 节课",
+    weeksProgress: "已进行 {n} / {m} 周",
+    assessmentsTitle: "作业与考试",
+    assessmentsEmpty: "没有作业或考试。",
+    reviewsTitle: "每日复盘",
+    reviewsEmpty: "还没有每日复盘。",
+    findingsLabel: "发现",
+    actionsLabel: "行动",
+    eventsTitle: "教学事件",
+    eventsEmpty: "没有教学事件。",
+    retryEvent: "重试",
+    eventPending: "待处理",
+    eventRunning: "进行中",
+    eventDone: "已完成",
+    eventState: "状态：{state}",
+    whitelistTitle: "应用白名单",
+    whitelistGeneric: "使用通用白名单",
+    whitelistEmpty: "白名单为空",
+    visionTitle: "愿景",
+    visionEmpty: "还没有关联愿景。",
+    projectTasksTitle: "项目任务",
+    projectTasksEmpty: "这个项目还没有任务。",
+    openTasks: "未完成",
+    doneTasks: "已完成",
+    statusUpcoming: "未开始",
+    statusMissed: "已错过",
+    statusInProgress: "进行中",
+    statusAwaiting: "待交",
+    statusOverdue: "已逾期",
+    statusSubmitted: "已提交",
+    statusCorrectionDue: "待订正",
+    statusNeedsReview: "待复核",
+    statusGraded: "已批改",
+    kindWeeklyExam: "周测",
+    kindMockExam: "模拟考",
+    kindRetest: "复测",
+    resourceKindSyllabus: "考纲",
+    resourceKindCourse: "课程",
+    resourceKindBook: "教材",
+    resourceKindPastPaper: "真题",
+    resourceKindMockPaper: "模拟题",
+    resourceKindReference: "参考",
+    resourceKindAttachment: "附件",
+    resourceKindAnswerSheet: "答卷",
+  },
+  en: {
+    eyebrow: "Tomato Todo",
+    title: "Study projects",
+    subtitle: "Goal 130+, enrolling 2028; first exam estimated for 2027-12-18.",
+    refreshTitle: "Refresh",
+    loading: "Loading the study plan…",
+    projectsTitle: "Study projects",
+    projectsHint: "{n}",
+    emptyProjectsTitle: "No study projects yet",
+    emptyProjectsHint:
+      "The study assistant creates projects and binds their folders in conversation; this page shows and runs them.",
+    targetLabel: "Target",
+    examMode: "Exam mode",
+    examDateLabel: "Exam date",
+    countdownLabel: "Exam countdown",
+    countdownNone: "No exam date",
+    countdownToday: "Today",
+    daysUnit: "days",
+    daysPast: "{n} days ago",
+    unnamedProject: "Untitled project",
+    resourcesCount: "{n} resources",
+    latestProgressLabel: "Latest progress",
+    noProgress: "No progress yet",
+    viewDetail: "View details",
+    todayTasks: "Today's study tasks",
+    todayTasksHint: "{n}",
+    startFocus: "Start focus",
+    focusStarted: "Focus started",
+    noTodayTasks: "No study tasks scheduled today.",
+    lessonKind: "Lesson",
+    homeworkKind: "Homework",
+    studyTaskKind: "Study",
+    reminderLabel: "Remind {time}",
+    focusMinutesLabel: "{n} min",
+    estimateLabel: "{n} planned pomodoros",
+    needsAttention: "Needs attention",
+    attentionHint: "{n}",
+    pendingSubmit: "To submit",
+    pendingCorrection: "To correct",
+    pendingReview: "Needs review",
+    nothingPending: "Nothing to submit, correct, or review right now.",
+    causeLabel: "Cause",
+    retestLabel: "Retest {date}",
+    deadlineLabel: "Due {date}",
+    timeUnknown: "Time TBD",
+    nextWeek: "Next seven days",
+    weekLessons: "Lessons",
+    weekResources: "Related resources",
+    weekAssessments: "Courses & exams",
+    nextWeekEmpty: "No lessons, resources, or exams this week.",
+    topicsCount: "{n} topics",
+    recentProgress: "Recently studied",
+    confirm: "Confirm",
+    confirmed: "Confirmed",
+    sourceUser: "Self-recorded",
+    sourceAssistant: "Assistant",
+    stateStudied: "Studied",
+    statePracticing: "Practicing",
+    stateNeedsReview: "Review",
+    unnamedTopic: "Untitled topic",
+    back: "Back",
+    projectMissing: "This study project no longer exists.",
+    directory: "Resource folder",
+    directoryEmpty: "No folder bound",
+    syllabusLabel: "Syllabus",
+    pastPapersCount: "{n} past papers",
+    mockPapersCount: "{n} mock papers",
+    resourceGroups: "By kind",
+    resourceList: "Resources",
+    resourceEmpty:
+      "No resources yet. The assistant imports them and authorizes the folder.",
+    progressHistory: "Progress records",
+    completedTasksTitle: "Recently completed study tasks",
+    completedTasksEmpty: "No completed study tasks yet.",
+    statResources: "Resources",
+    statLessons: "Lessons attended",
+    statAssessments: "Assessments",
+    statProgress: "Progress records",
+    semesterTitle: "Semester progress",
+    semesterEmpty: "No semester plan yet.",
+    revisionLabel: "v{n}",
+    weekLabel: "Week {n}",
+    milestoneLessons: "{n} lessons",
+    weeksProgress: "{n} of {m} weeks",
+    assessmentsTitle: "Assessments",
+    assessmentsEmpty: "No assessments.",
+    reviewsTitle: "Daily reviews",
+    reviewsEmpty: "No daily reviews yet.",
+    findingsLabel: "Findings",
+    actionsLabel: "Actions",
+    eventsTitle: "Teaching events",
+    eventsEmpty: "No teaching events.",
+    retryEvent: "Retry",
+    eventPending: "Pending",
+    eventRunning: "Running",
+    eventDone: "Done",
+    eventState: "State: {state}",
+    whitelistTitle: "App whitelist",
+    whitelistGeneric: "Using the general whitelist",
+    whitelistEmpty: "Whitelist is empty",
+    visionTitle: "Vision",
+    visionEmpty: "No linked vision yet.",
+    projectTasksTitle: "Project tasks",
+    projectTasksEmpty: "No tasks in this project yet.",
+    openTasks: "Open",
+    doneTasks: "Done",
+    statusUpcoming: "Upcoming",
+    statusMissed: "Missed",
+    statusInProgress: "In progress",
+    statusAwaiting: "To submit",
+    statusOverdue: "Overdue",
+    statusSubmitted: "Submitted",
+    statusCorrectionDue: "To correct",
+    statusNeedsReview: "Needs review",
+    statusGraded: "Graded",
+    kindWeeklyExam: "Weekly exam",
+    kindMockExam: "Mock exam",
+    kindRetest: "Retest",
+    resourceKindSyllabus: "Syllabus",
+    resourceKindCourse: "Course",
+    resourceKindBook: "Book",
+    resourceKindPastPaper: "Past paper",
+    resourceKindMockPaper: "Mock paper",
+    resourceKindReference: "Reference",
+    resourceKindAttachment: "Attachment",
+    resourceKindAnswerSheet: "Answer sheet",
+  },
+});
+
+// ---------------------------------------------------------------- 纯函数
+
+const RESOURCE_KINDS = [
+  "syllabus",
+  "course",
+  "book",
+  "pastPaper",
+  "mockPaper",
+  "reference",
+  "attachment",
+  "answerSheet",
+];
+
+const RESOURCE_KIND_COPY = {
+  syllabus: "resourceKindSyllabus",
+  course: "resourceKindCourse",
+  book: "resourceKindBook",
+  pastPaper: "resourceKindPastPaper",
+  mockPaper: "resourceKindMockPaper",
+  reference: "resourceKindReference",
+  attachment: "resourceKindAttachment",
+  answerSheet: "resourceKindAnswerSheet",
+};
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function numOr(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function strOr(value, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function hasTs(value) {
+  const n = Number(value);
+  // 上限避免异常时间戳让 Date 进入 Invalid Date 后渲染出 NaN。
+  return Number.isFinite(n) && n > 0 && n < 1e12;
+}
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+function clockOf(ts) {
+  if (!hasTs(ts)) return "";
+  const d = new Date(Number(ts) * 1000);
+  if (!Number.isFinite(d.getTime())) return "";
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function fmtDateTime(ts) {
+  if (!hasTs(ts)) return t("education.timeUnknown");
+  return `${dayKey(Number(ts))} ${clockOf(ts)}`;
+}
+
+function fmtRange(startSecs, endSecs) {
+  if (!hasTs(startSecs)) return t("education.timeUnknown");
+  const startDay = dayKey(Number(startSecs));
+  const start = clockOf(startSecs);
+  if (!hasTs(endSecs)) return `${startDay} ${start}`;
+  const endDay = dayKey(Number(endSecs));
+  const end = clockOf(endSecs);
+  return endDay === startDay
+    ? `${startDay} ${start}–${end}`
+    : `${startDay} ${start} – ${endDay} ${end}`;
+}
+
+function sortDesc(list, key) {
+  return asArray(list)
+    .slice()
+    .sort((a, b) => numOr(b && b[key], 0) - numOr(a && a[key], 0));
+}
+
+function sortAsc(list, key) {
+  return asArray(list)
+    .slice()
+    .sort((a, b) => numOr(a && a[key], 0) - numOr(b && b[key], 0));
+}
+
+/** 旧 runtime 可能给 education:{projects:[],events:[],summaries:[]}，全部容错。 */
+function normalizeEducation(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const list = (key) =>
+    asArray(src[key]).filter((item) => item && typeof item === "object");
+  return {
+    focusTasks: list("focusTasks"),
+    projects: list("projects"),
+    resources: list("resources"),
+    semesters: list("semesters"),
+    semesterHistory: list("semesterHistory"),
+    lessons: list("lessons"),
+    assessments: list("assessments"),
+    submissions: list("submissions"),
+    grades: list("grades"),
+    reviews: list("reviews"),
+    events: list("events"),
+    completedTasks: list("completedTasks"),
+    progress: list("progress"),
+    corrections: list("corrections"),
+  };
+}
+
+/** 最新提交 / 最新批改 / 已接受的订正，语义对齐 learning.ts 的摘要索引。 */
+function buildIndex(edu) {
+  const submissionOf = new Map();
+  for (const submission of edu.submissions) {
+    const old = submissionOf.get(submission.assessmentId);
+    if (
+      old === undefined ||
+      numOr(submission.submittedAt, 0) >= numOr(old.submittedAt, 0)
+    ) {
+      submissionOf.set(submission.assessmentId, submission);
+    }
+  }
+  const gradeOf = new Map();
+  for (const grade of edu.grades) {
+    const old = gradeOf.get(grade.submissionId);
+    if (
+      old === undefined ||
+      numOr(grade.gradedAt, 0) >= numOr(old.gradedAt, 0)
+    ) {
+      gradeOf.set(grade.submissionId, grade);
+    }
+  }
+  const accepted = new Set();
+  for (const correction of edu.corrections) {
+    if (correction && correction.accepted === true) {
+      accepted.add(`${correction.gradeId}|${correction.questionId}`);
+    }
+  }
+  return { submissionOf, gradeOf, accepted };
+}
+
+function examDeadline(assessment) {
+  const starts = numOr(assessment.startsAt, 0);
+  const ends = numOr(assessment.endsAt, 0);
+  return hasTs(assessment.startedAt)
+    ? Number(assessment.startedAt) + (ends - starts)
+    : ends;
+}
+
+/** 本地派生作业/考试状态；与 core learning.ts 的 assessmentSummary 同序。 */
+function assessmentStatus(assessment, index, at) {
+  const submission = index.submissionOf.get(assessment.id) || null;
+  const grade = submission ? index.gradeOf.get(submission.id) || null : null;
+  if (grade !== null) {
+    if (grade.needsReview === true) return "needsReview";
+    const errors = asArray(grade.errors);
+    const pending = errors.some(
+      (error) =>
+        error && !index.accepted.has(`${grade.id}|${error.questionId}`),
+    );
+    return pending ? "correctionDue" : "graded";
+  }
+  if (submission !== null) return "submitted";
+  const kind = assessment.kind;
+  const started = hasTs(assessment.startedAt);
+  if (
+    kind !== "homework" &&
+    !started &&
+    hasTs(assessment.startsAt) &&
+    dayKey(at) > dayKey(Number(assessment.startsAt))
+  ) {
+    return "missed";
+  }
+  if (
+    kind !== "homework" &&
+    started &&
+    !hasTs(assessment.stoppedAt) &&
+    at < examDeadline(assessment)
+  ) {
+    return "inProgress";
+  }
+  if (
+    kind !== "homework" &&
+    started &&
+    (hasTs(assessment.stoppedAt) || at >= examDeadline(assessment))
+  ) {
+    return "awaitingSubmission";
+  }
+  if (kind === "homework" && at >= numOr(assessment.endsAt, 0))
+    return "overdue";
+  if (at < numOr(assessment.startsAt, 0) || (kind !== "homework" && !started))
+    return "upcoming";
+  return "awaitingSubmission";
+}
+
+function statusLabel(status) {
+  const map = {
+    upcoming: "statusUpcoming",
+    missed: "statusMissed",
+    inProgress: "statusInProgress",
+    awaitingSubmission: "statusAwaiting",
+    overdue: "statusOverdue",
+    submitted: "statusSubmitted",
+    correctionDue: "statusCorrectionDue",
+    needsReview: "statusNeedsReview",
+    graded: "statusGraded",
+  };
+  return map[status] ? t(`education.${map[status]}`) : status;
+}
+
+function statusTone(status) {
+  if (status === "overdue" || status === "missed") return "danger";
+  if (
+    status === "awaitingSubmission" ||
+    status === "correctionDue" ||
+    status === "needsReview"
+  ) {
+    return "sun";
+  }
+  if (status === "inProgress") return "brand";
+  if (status === "graded") return "leaf";
+  return "neutral";
+}
+
+function assessmentKindLabel(kind) {
+  if (kind === "homework") return t("education.homeworkKind");
+  if (kind === "weeklyExam") return t("education.kindWeeklyExam");
+  if (kind === "mockExam") return t("education.kindMockExam");
+  if (kind === "retest") return t("education.kindRetest");
+  return strOr(kind, t("education.studyTaskKind"));
+}
+
+function resourceKindLabel(kind) {
+  const key = RESOURCE_KIND_COPY[kind];
+  return key ? t(`education.${key}`) : strOr(kind);
+}
+
+function progressStateLabel(state) {
+  if (state === "studied") return t("education.stateStudied");
+  if (state === "practicing") return t("education.statePracticing");
+  if (state === "needsReview") return t("education.stateNeedsReview");
+  return strOr(state);
+}
+
+function progressStateTone(state) {
+  if (state === "studied") return "leaf";
+  if (state === "practicing") return "brand";
+  if (state === "needsReview") return "sun";
+  return "neutral";
+}
+
+function progressSourceLabel(source) {
+  if (source === "assistant") return t("education.sourceAssistant");
+  return t("education.sourceUser");
+}
+
+function eventStateLabel(state) {
+  if (state === "pending") return t("education.eventPending");
+  if (state === "running") return t("education.eventRunning");
+  if (state === "done") return t("education.eventDone");
+  return t("education.eventState", { state: strOr(state) });
+}
+
+function eventStateTone(state) {
+  if (state === "done") return "leaf";
+  if (state === "running") return "brand";
+  return "sun";
+}
+
+function gradeScore(grade) {
+  let total = 0;
+  for (const award of asArray(grade && grade.awards)) {
+    total += numOr(award && award.awarded, 0);
+  }
+  return total;
+}
+
+function assessmentTotal(assessment) {
+  let total = 0;
+  for (const question of asArray(assessment && assessment.questions)) {
+    for (const point of asArray(question && question.scoring)) {
+      total += numOr(point && point.points, 0);
+    }
+  }
+  return total;
+}
+
+function pendingCorrections(grade, index) {
+  if (grade === null || grade === undefined) return [];
+  return asArray(grade.errors).filter(
+    (error) => error && !index.accepted.has(`${grade.id}|${error.questionId}`),
+  );
+}
+
+/** `YYYY-MM-DD` → UTC 毫秒（只用于天数差，避免夏令时抖动）。 */
+function dateValue(key) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(strOr(key));
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return Date.UTC(year, month - 1, day);
+}
+
+function daysFromTo(fromKey, toKey) {
+  const from = dateValue(fromKey);
+  const to = dateValue(toKey);
+  if (from === null || to === null) return null;
+  return Math.round((to - from) / 86400000);
+}
+
+function semesterWeeks(semester, today) {
+  const span = daysFromTo(semester.startDate, semester.endDate);
+  const total = Math.max(1, Math.ceil(numOr(span, 0) / 7));
+  const elapsed = numOr(daysFromTo(semester.startDate, today), 0);
+  const done = Math.max(0, Math.min(total, Math.floor(elapsed / 7)));
+  return { total, done };
+}
+
+// ---------------------------------------------------------------- 小组件
+
+const ROW = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "9px 0",
+  borderBottom: "1px solid var(--tomato-line)",
+};
+
+const META = {
+  display: "flex",
+  alignItems: "center",
+  gap: 7,
+  flexWrap: "wrap",
+  marginTop: 3,
+  fontSize: 11,
+  color: "var(--tomato-ink-3)",
+};
+
+function mutedText(text) {
+  return h(
+    "div",
+    {
+      style: {
+        fontSize: 12,
+        color: "var(--tomato-ink-3)",
+        lineHeight: 1.6,
+        padding: "6px 0",
+      },
+    },
+    text,
+  );
+}
+
+function subHeading(text, count) {
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        margin: "12px 0 2px",
+      },
+    },
+    h(
+      "div",
+      {
+        style: { fontSize: 12, fontWeight: 600, color: "var(--tomato-ink-2)" },
+      },
+      text,
+    ),
+    count ? h(Badge, { tone: "neutral" }, String(count)) : null,
+  );
+}
+
+function InfoPill({ label, value }) {
+  return h(
+    "div",
+    { style: { minWidth: 0 } },
+    h(
+      "div",
+      {
+        style: { fontSize: 11, color: "var(--tomato-ink-3)", marginBottom: 3 },
+      },
+      label,
+    ),
+    h(
+      "div",
+      {
+        style: {
+          fontSize: 13,
+          fontWeight: 550,
+          color: "var(--tomato-ink)",
+          wordBreak: "break-word",
+        },
+      },
+      value,
+    ),
+  );
+}
+
+function Countdown({ examDate, today }) {
+  const days = daysFromTo(today, examDate);
+  if (days === null) {
+    return h(
+      "div",
+      { style: { fontSize: 13, color: "var(--tomato-ink-3)", paddingTop: 4 } },
+      t("education.countdownNone"),
+    );
+  }
+  if (days === 0) {
+    return h(
+      "div",
+      {
+        style: {
+          fontSize: 22,
+          fontWeight: 620,
+          color: "var(--tomato-brand-deep)",
+          paddingTop: 2,
+        },
+      },
+      t("education.countdownToday"),
+    );
+  }
+  if (days > 0) {
+    return h(
+      "div",
+      { style: { display: "flex", alignItems: "baseline", gap: 6 } },
+      h(
+        "span",
+        {
+          className: "t-mono",
+          style: {
+            fontSize: 34,
+            fontWeight: 620,
+            lineHeight: 1,
+            color: "var(--tomato-brand-deep)",
+          },
+        },
+        String(days),
+      ),
+      h(
+        "span",
+        { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+        t("education.daysUnit"),
+      ),
+    );
+  }
+  return h(
+    "div",
+    {
+      style: {
+        fontSize: 14,
+        fontWeight: 600,
+        color: "var(--tomato-ink-3)",
+        paddingTop: 6,
+      },
+    },
+    t("education.daysPast", { n: Math.abs(days) }),
+  );
+}
+
+function ProgressRow({ record, onConfirm }) {
+  const topic = strOr(record.topic, t("education.unnamedTopic"));
+  const position = strOr(record.position);
+  return h(
+    "div",
+    { style: ROW },
+    h(
+      Chip,
+      { tone: progressStateTone(record.state) },
+      progressStateLabel(record.state),
+    ),
+    h(
+      "div",
+      { style: { flex: 1, minWidth: 0 } },
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 13,
+            color: "var(--tomato-ink)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          },
+        },
+        topic,
+      ),
+      h(
+        "div",
+        { style: META },
+        position
+          ? h("span", { style: { color: "var(--tomato-ink-2)" } }, position)
+          : null,
+        h("span", null, fmtDateTime(record.recordedAt)),
+        h("span", null, progressSourceLabel(record.source)),
+        record.confirmed === true
+          ? h(Badge, { tone: "leaf" }, t("education.confirmed"))
+          : null,
+      ),
+    ),
+    record.confirmed === true
+      ? null
+      : h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "check",
+            onClick: () => onConfirm(record.id),
+          },
+          t("education.confirm"),
+        ),
+  );
+}
+
+function TeachingTaskRow({ task, data, onToggle, onFocus }) {
+  const project = projectById(data, task.projectId);
+  const projectName = project ? strOr(project.name) : "";
+  const meta = [];
+  if (strOr(task.reminderTime)) {
+    meta.push(t("education.reminderLabel", { time: task.reminderTime }));
+  }
+  if (
+    Number.isFinite(Number(task.focusMinutes)) &&
+    Number(task.focusMinutes) > 0
+  ) {
+    meta.push(
+      t("education.focusMinutesLabel", { n: Number(task.focusMinutes) }),
+    );
+  }
+  if (Number.isFinite(Number(task.estimate)) && Number(task.estimate) > 0) {
+    meta.push(t("education.estimateLabel", { n: Number(task.estimate) }));
+  }
+  if (projectName) meta.push(projectName);
+  return h(
+    "div",
+    { style: ROW },
+    h(Check, {
+      checked: task.completed === true,
+      onChange: () => onToggle(task.id),
+      label: strOr(task.title),
+    }),
+    h(Dot, { color: projectColor(data, task.projectId) }),
+    h(
+      "div",
+      { style: { flex: 1, minWidth: 0 } },
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 13.5,
+            color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+            textDecoration: task.completed ? "line-through" : "none",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          },
+        },
+        strOr(task.title),
+      ),
+      h(
+        "div",
+        { style: META },
+        h(
+          Chip,
+          { tone: "neutral" },
+          task.kind === "lesson"
+            ? t("education.lessonKind")
+            : t("education.homeworkKind"),
+        ),
+        meta.map((text, index) => h("span", { key: index }, text)),
+      ),
+    ),
+    task.completed
+      ? null
+      : h(
+          Btn,
+          {
+            variant: "soft",
+            size: "sm",
+            icon: "play",
+            onClick: () => onFocus(task.id),
+          },
+          t("education.startFocus"),
+        ),
+  );
+}
+
+function AssessmentRow({ assessment, index, at }) {
+  const status = assessmentStatus(assessment, index, at);
+  const submission = index.submissionOf.get(assessment.id) || null;
+  const grade = submission ? index.gradeOf.get(submission.id) || null : null;
+  const total = assessmentTotal(assessment);
+  const score = grade !== null ? gradeScore(grade) : null;
+  return h(
+    "div",
+    { style: ROW },
+    h(
+      "div",
+      { style: { flex: 1, minWidth: 0 } },
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 13,
+            color: "var(--tomato-ink)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          },
+        },
+        strOr(assessment.title, t("education.unnamedProject")),
+      ),
+      h(
+        "div",
+        { style: META },
+        h(Chip, { tone: "neutral" }, assessmentKindLabel(assessment.kind)),
+        h("span", null, fmtRange(assessment.startsAt, assessment.endsAt)),
+        h(
+          "span",
+          null,
+          t("education.topicsCount", {
+            n: asArray(assessment.questions).length,
+          }),
+        ),
+      ),
+    ),
+    score !== null
+      ? h(
+          "span",
+          {
+            className: "t-mono",
+            style: { fontSize: 12, color: "var(--tomato-ink-2)" },
+          },
+          total > 0 ? `${score} / ${total}` : String(score),
+        )
+      : null,
+    h(Chip, { tone: statusTone(status) }, statusLabel(status)),
+  );
+}
+
+function ProjectTaskRow({ task, onToggle }) {
+  return h(
+    "div",
+    { style: ROW },
+    h(Check, {
+      checked: task.completed === true,
+      onChange: () => onToggle(task.id),
+      label: strOr(task.title),
+    }),
+    h(
+      "div",
+      { style: { flex: 1, minWidth: 0 } },
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 13,
+            color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+            textDecoration: task.completed ? "line-through" : "none",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          },
+        },
+        strOr(task.title),
+      ),
+      h(
+        "div",
+        { style: META },
+        task.dueDate ? h("span", null, String(task.dueDate)) : null,
+        strOr(task.reminderTime)
+          ? h(
+              "span",
+              null,
+              t("education.reminderLabel", { time: task.reminderTime }),
+            )
+          : null,
+        Number.isFinite(Number(task.focusMinutes)) &&
+          Number(task.focusMinutes) > 0
+          ? h(
+              "span",
+              null,
+              t("education.focusMinutesLabel", {
+                n: Number(task.focusMinutes),
+              }),
+            )
+          : null,
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------- 项目详情
+
+export function ProjectDetail({
+  data,
+  edu,
+  study,
+  project,
+  today,
+  at,
+  index,
+  onBack,
+}) {
+  const projectId = strOr(study.projectId);
+  const color = projectColor(data, projectId);
+  const name =
+    project && strOr(project.name)
+      ? project.name
+      : t("education.unnamedProject");
+  const settings =
+    data.settings && typeof data.settings === "object" ? data.settings : {};
+  const protection =
+    settings.protection && typeof settings.protection === "object"
+      ? settings.protection
+      : {};
+
+  const resources = edu.resources.filter(
+    (item) => item.projectId === projectId,
+  );
+  const sortedResources = resources.slice().sort((a, b) => {
+    const ai = RESOURCE_KINDS.indexOf(a.kind);
+    const bi = RESOURCE_KINDS.indexOf(b.kind);
+    return (
+      (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) ||
+      strOr(a.title).localeCompare(strOr(b.title))
+    );
+  });
+  const progress = sortDesc(
+    edu.progress.filter((item) => item.projectId === projectId),
+    "recordedAt",
+  );
+  const completedTasks = sortDesc(
+    edu.completedTasks.filter((item) => item.projectId === projectId),
+    "completedAt",
+  ).slice(0, 5);
+  const semesters = edu.semesters.filter(
+    (item) => item.projectId === projectId,
+  );
+  const assessments = sortAsc(
+    edu.assessments.filter((item) => item.projectId === projectId),
+    "startsAt",
+  );
+  const reviews = edu.reviews
+    .filter((item) => item.projectId === projectId)
+    .slice()
+    .sort((a, b) => strOr(b.date).localeCompare(strOr(a.date)));
+  const events = sortDesc(
+    edu.events.filter((item) => item.projectId === projectId),
+    "createdAt",
+  );
+  const lessons = edu.lessons.filter((item) => item.projectId === projectId);
+  const attendedLessons = lessons.filter(
+    (item) => item.attended === true || item.state === "ended",
+  ).length;
+  const projectTasks = asArray(data.tasks).filter(
+    (task) => task.projectId === projectId,
+  );
+  const openTasks = projectTasks
+    .filter((task) => task.completed !== true)
+    .sort((a, b) => strOr(a.dueDate).localeCompare(strOr(b.dueDate)));
+  const doneTasks = sortDesc(
+    projectTasks.filter((task) => task.completed === true),
+    "completedAt",
+  );
+  const visions = asArray(data.visions).filter(
+    (vision) =>
+      vision &&
+      (vision.projectId === projectId ||
+        (study.visionId !== null &&
+          study.visionId !== undefined &&
+          vision.id === study.visionId)),
+  );
+  const projectWhitelist =
+    project && Array.isArray(project.appWhitelist)
+      ? project.appWhitelist
+      : null;
+  const genericWhitelist = asArray(protection.whitelist);
+
+  const onConfirm = async (id) => {
+    const result = await tryDispatch({
+      type: "education",
+      command: { op: "confirmProgress", id },
+    });
+    if (!result.ok) notify(result.error, "danger");
+  };
+
+  const onRetry = async (id) => {
+    const result = await tryDispatch({
+      type: "education",
+      command: { op: "retryEvent", id },
+    });
+    if (!result.ok) notify(result.error, "danger");
+  };
+
+  const onToggle = async (id) => {
+    const result = await tryDispatch({ type: "toggleTask", id });
+    if (!result.ok) notify(result.error, "danger");
+  };
+
+  const kindCounts = {};
+  for (const resource of resources) {
+    const kind = strOr(resource.kind, "other");
+    kindCounts[kind] = (kindCounts[kind] || 0) + 1;
+  }
+  const resourceKindCount = RESOURCE_KINDS.filter(
+    (kind) => kindCounts[kind],
+  ).length;
+
+  const headerCard = h(
+    Card,
+    { pad: 22 },
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 18,
+          flexWrap: "wrap",
+        },
+      },
+      h(
+        "div",
+        { style: { flex: 1, minWidth: 240 } },
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 9,
+              marginBottom: 12,
+              flexWrap: "wrap",
+            },
+          },
+          h(Dot, { color, size: 10 }),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 22,
+                fontWeight: 650,
+                color: "var(--tomato-ink)",
+                lineHeight: 1.25,
+              },
+            },
+            name,
+          ),
+          study.examMode === true
+            ? h(Chip, { tone: "brand" }, t("education.examMode"))
+            : null,
+        ),
+        h(
+          "div",
+          { style: { display: "flex", gap: 22, flexWrap: "wrap" } },
+          study.target
+            ? h(InfoPill, {
+                label: t("education.targetLabel"),
+                value: study.target,
+              })
+            : null,
+          study.examDate
+            ? h(InfoPill, {
+                label: t("education.examDateLabel"),
+                value: study.examDate,
+              })
+            : null,
+        ),
+      ),
+      h(
+        "div",
+        { style: { textAlign: "right", minWidth: 120 } },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 11,
+              color: "var(--tomato-ink-3)",
+              marginBottom: 5,
+            },
+          },
+          t("education.countdownLabel"),
+        ),
+        h(Countdown, { examDate: study.examDate, today }),
+      ),
+    ),
+  );
+
+  const statsRow = h(
+    "div",
+    {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: 14,
+        marginBottom: 16,
+      },
+    },
+    h(Stat, {
+      icon: "folder",
+      label: t("education.statResources"),
+      value: resources.length,
+      tone: "brand",
+      style: { minWidth: 0 },
+    }),
+    h(Stat, {
+      icon: "education",
+      label: t("education.statLessons"),
+      value: attendedLessons,
+      tone: "leaf",
+      style: { minWidth: 0 },
+    }),
+    h(Stat, {
+      icon: "tasks",
+      label: t("education.statAssessments"),
+      value: assessments.length,
+      tone: "sun",
+      style: { minWidth: 0 },
+    }),
+    h(Stat, {
+      icon: "stats",
+      label: t("education.statProgress"),
+      value: progress.length,
+      tone: "plum",
+      style: { minWidth: 0 },
+    }),
+  );
+
+  const directoryCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, { icon: "folder", title: t("education.directory") }),
+    h(
+      "div",
+      {
+        className: "t-mono",
+        style: {
+          fontSize: 12,
+          lineHeight: 1.6,
+          color: "var(--tomato-ink-2)",
+          background: "var(--tomato-surface-2)",
+          borderRadius: 9,
+          padding: "9px 11px",
+          wordBreak: "break-all",
+        },
+      },
+      strOr(study.directory) || t("education.directoryEmpty"),
+    ),
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+          marginTop: 12,
+        },
+      },
+      study.examMode === true
+        ? h(Chip, { tone: "brand" }, t("education.examMode"))
+        : null,
+      study.syllabusId
+        ? h(
+            Chip,
+            { tone: "neutral", icon: "tag" },
+            `${t("education.syllabusLabel")} ${study.syllabusId}`,
+          )
+        : null,
+      h(
+        Chip,
+        { tone: "neutral" },
+        t("education.pastPapersCount", {
+          n: asArray(study.pastPaperIds).length,
+        }),
+      ),
+      h(
+        Chip,
+        { tone: "neutral" },
+        t("education.mockPapersCount", {
+          n: asArray(study.mockPaperIds).length,
+        }),
+      ),
+    ),
+  );
+
+  const resourcesCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "folder",
+      title: t("education.resourceList"),
+      hint: t("education.resourcesCount", { n: resources.length }),
+    }),
+    resources.length === 0
+      ? mutedText(t("education.resourceEmpty"))
+      : h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 0 } },
+          subHeading(t("education.resourceGroups"), resourceKindCount),
+          h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+                marginBottom: 10,
+              },
+            },
+            RESOURCE_KINDS.map((kind) =>
+              kindCounts[kind]
+                ? h(
+                    Chip,
+                    { key: kind, tone: "neutral" },
+                    `${resourceKindLabel(kind)} ${kindCounts[kind]}`,
+                  )
+                : null,
+            ),
+          ),
+          h(
+            "div",
+            {
+              className: "t-scroll",
+              style: { maxHeight: 360, overflowY: "auto", paddingRight: 4 },
+            },
+            sortedResources.map((resource, resourceIndex) =>
+              h(
+                "div",
+                { key: resource.id || `resource-${resourceIndex}`, style: ROW },
+                h(
+                  "div",
+                  { style: { flex: 1, minWidth: 0 } },
+                  h(
+                    "div",
+                    {
+                      style: {
+                        fontSize: 13,
+                        color: "var(--tomato-ink)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      },
+                    },
+                    strOr(resource.title),
+                  ),
+                  h(
+                    "div",
+                    { style: META },
+                    h(
+                      Chip,
+                      { tone: "neutral" },
+                      resourceKindLabel(resource.kind),
+                    ),
+                    strOr(resource.source)
+                      ? h("span", null, strOr(resource.source))
+                      : null,
+                    strOr(resource.edition)
+                      ? h("span", null, strOr(resource.edition))
+                      : null,
+                    h(
+                      "span",
+                      null,
+                      t("education.topicsCount", {
+                        n: asArray(resource.topics).length,
+                      }),
+                    ),
+                  ),
+                  asArray(resource.topics).length > 0
+                    ? h(
+                        "div",
+                        {
+                          style: {
+                            fontSize: 11,
+                            color: "var(--tomato-ink-3)",
+                            marginTop: 3,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          },
+                        },
+                        asArray(resource.topics).join(" · "),
+                      )
+                    : null,
+                ),
+              ),
+            ),
+          ),
+        ),
+  );
+
+  const progressCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "stats",
+      title: t("education.progressHistory"),
+      hint: t("education.attentionHint", { n: progress.length }),
+    }),
+    progress.length === 0
+      ? mutedText(t("education.noProgress"))
+      : progress
+          .slice(0, 10)
+          .map((record, recordIndex) =>
+            h(ProgressRow, {
+              key: record.id || `progress-${recordIndex}`,
+              record,
+              onConfirm,
+            }),
+          ),
+  );
+
+  const completedCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "check",
+      title: t("education.completedTasksTitle"),
+    }),
+    completedTasks.length === 0
+      ? mutedText(t("education.completedTasksEmpty"))
+      : completedTasks.map((item, itemIndex) =>
+          h(
+            "div",
+            { key: item.id || `completed-${itemIndex}`, style: ROW },
+            h(
+              "div",
+              { style: { flex: 1, minWidth: 0 } },
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 13,
+                    color: "var(--tomato-ink)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  },
+                },
+                strOr(item.title, t("education.unnamedProject")),
+              ),
+              h(
+                "div",
+                { style: META },
+                h("span", null, fmtDateTime(item.completedAt)),
+                asArray(item.topics).length > 0
+                  ? h(
+                      "span",
+                      null,
+                      t("education.topicsCount", {
+                        n: asArray(item.topics).length,
+                      }),
+                    )
+                  : null,
+              ),
+              strOr(item.notes)
+                ? h(
+                    "div",
+                    {
+                      style: {
+                        fontSize: 11.5,
+                        color: "var(--tomato-ink-3)",
+                        marginTop: 3,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      },
+                    },
+                    item.notes,
+                  )
+                : null,
+            ),
+          ),
+        ),
+  );
+
+  const semesterCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, { icon: "calendar", title: t("education.semesterTitle") }),
+    semesters.length === 0
+      ? mutedText(t("education.semesterEmpty"))
+      : semesters.map((semester, semesterIndex) => {
+          const weeks = semesterWeeks(semester, today);
+          return h(
+            "div",
+            {
+              key: semester.id || `semester-${semesterIndex}`,
+              style: { padding: "8px 0 14px" },
+            },
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                },
+              },
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: "var(--tomato-ink)",
+                    flex: 1,
+                    minWidth: 0,
+                  },
+                },
+                strOr(semester.title, t("education.unnamedProject")),
+              ),
+              h(
+                Chip,
+                { tone: "neutral" },
+                t("education.revisionLabel", {
+                  n: numOr(semester.revision, 1),
+                }),
+              ),
+              h(
+                "span",
+                {
+                  className: "t-mono",
+                  style: { fontSize: 11, color: "var(--tomato-ink-3)" },
+                },
+                t("education.weeksProgress", { n: weeks.done, m: weeks.total }),
+              ),
+            ),
+            h(
+              "div",
+              {
+                style: {
+                  fontSize: 11,
+                  color: "var(--tomato-ink-3)",
+                  marginTop: 3,
+                },
+              },
+              `${strOr(semester.startDate)} – ${strOr(semester.endDate)}`,
+            ),
+            h(Bar, {
+              value: weeks.done,
+              max: weeks.total,
+              height: 6,
+              style: { marginTop: 8, marginBottom: 8 },
+            }),
+            asArray(semester.milestones).map((milestone, milestoneIndex) =>
+              h(
+                "div",
+                {
+                  key: milestoneIndex,
+                  style: {
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 9,
+                    padding: "6px 0",
+                    borderBottom: "1px solid var(--tomato-line)",
+                  },
+                },
+                h(
+                  Chip,
+                  { tone: "brand" },
+                  t("education.weekLabel", { n: numOr(milestone.week, 0) }),
+                ),
+                h(
+                  "div",
+                  { style: { flex: 1, minWidth: 0 } },
+                  h(
+                    "div",
+                    {
+                      style: {
+                        fontSize: 12.5,
+                        color: "var(--tomato-ink-2)",
+                        lineHeight: 1.5,
+                      },
+                    },
+                    asArray(milestone.topics).join(" · "),
+                  ),
+                  strOr(milestone.objective)
+                    ? h(
+                        "div",
+                        {
+                          style: {
+                            fontSize: 11.5,
+                            color: "var(--tomato-ink-3)",
+                            marginTop: 2,
+                            lineHeight: 1.5,
+                          },
+                        },
+                        milestone.objective,
+                      )
+                    : null,
+                ),
+                h(
+                  "span",
+                  {
+                    style: {
+                      fontSize: 11,
+                      color: "var(--tomato-ink-3)",
+                      flex: "none",
+                    },
+                  },
+                  t("education.milestoneLessons", {
+                    n: numOr(milestone.lessonCount, 0),
+                  }),
+                ),
+              ),
+            ),
+          );
+        }),
+  );
+
+  const assessmentsCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "tasks",
+      title: t("education.assessmentsTitle"),
+      hint: t("education.attentionHint", { n: assessments.length }),
+    }),
+    assessments.length === 0
+      ? mutedText(t("education.assessmentsEmpty"))
+      : assessments.map((assessment, assessmentIndex) =>
+          h(AssessmentRow, {
+            key: assessment.id || `assessment-${assessmentIndex}`,
+            assessment,
+            index,
+            at,
+          }),
+        ),
+  );
+
+  const reviewsCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, { icon: "edit", title: t("education.reviewsTitle") }),
+    reviews.length === 0
+      ? mutedText(t("education.reviewsEmpty"))
+      : reviews.map((review, reviewIndex) =>
+          h(
+            "div",
+            {
+              key: review.id || `review-${reviewIndex}`,
+              style: {
+                padding: "8px 0",
+                borderBottom: "1px solid var(--tomato-line)",
+              },
+            },
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                },
+              },
+              h(
+                "span",
+                {
+                  className: "t-mono",
+                  style: { fontSize: 11.5, color: "var(--tomato-ink-3)" },
+                },
+                strOr(review.date),
+              ),
+              h(
+                "span",
+                { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+                t("education.findingsLabel"),
+              ),
+            ),
+            h(
+              "div",
+              {
+                style: {
+                  fontSize: 12.5,
+                  color: "var(--tomato-ink-2)",
+                  lineHeight: 1.6,
+                  marginTop: 3,
+                },
+              },
+              strOr(review.findings),
+            ),
+            asArray(review.actions).length > 0
+              ? h(
+                  "div",
+                  {
+                    style: {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      flexWrap: "wrap",
+                      marginTop: 5,
+                    },
+                  },
+                  h(
+                    "span",
+                    { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+                    t("education.actionsLabel"),
+                  ),
+                  asArray(review.actions).map((action, actionIndex) =>
+                    h(
+                      Chip,
+                      { key: actionIndex, tone: "neutral" },
+                      strOr(action),
+                    ),
+                  ),
+                )
+              : null,
+          ),
+        ),
+  );
+
+  const eventsCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, { icon: "bell", title: t("education.eventsTitle") }),
+    events.length === 0
+      ? mutedText(t("education.eventsEmpty"))
+      : events.map((event, eventIndex) =>
+          h(
+            "div",
+            { key: event.id || `event-${eventIndex}`, style: ROW },
+            h(
+              Chip,
+              { tone: eventStateTone(event.state) },
+              eventStateLabel(event.state),
+            ),
+            h(
+              "div",
+              { style: { flex: 1, minWidth: 0 } },
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 12.5,
+                    color: "var(--tomato-ink)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  },
+                },
+                strOr(event.kind, t("education.unnamedTopic")),
+              ),
+              h(
+                "div",
+                { style: META },
+                h("span", null, fmtDateTime(event.createdAt)),
+              ),
+            ),
+            event.state !== "done"
+              ? h(
+                  Btn,
+                  {
+                    variant: "ghost",
+                    size: "sm",
+                    icon: "refresh",
+                    onClick: () => onRetry(event.id),
+                  },
+                  t("education.retryEvent"),
+                )
+              : null,
+          ),
+        ),
+  );
+
+  const whitelistList =
+    projectWhitelist !== null ? projectWhitelist : genericWhitelist;
+  const whitelistCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "shield",
+      title: t("education.whitelistTitle"),
+      hint: projectWhitelist === null ? t("education.whitelistGeneric") : null,
+    }),
+    whitelistList.length === 0
+      ? mutedText(t("education.whitelistEmpty"))
+      : h(
+          "div",
+          { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+          whitelistList.map((appId, appIndex) =>
+            h(
+              Chip,
+              {
+                key: `${strOr(appId)}-${appIndex}`,
+                tone: "neutral",
+                style: { fontFamily: "ui-monospace, monospace" },
+              },
+              strOr(appId),
+            ),
+          ),
+        ),
+  );
+
+  const visionCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, { icon: "leaf", title: t("education.visionTitle") }),
+    visions.length === 0
+      ? mutedText(t("education.visionEmpty"))
+      : visions.map((vision, visionIndex) =>
+          h(
+            "div",
+            {
+              key: vision.id || `vision-${visionIndex}`,
+              style: { padding: "6px 0" },
+            },
+            h(
+              "div",
+              {
+                style: {
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--tomato-ink)",
+                },
+              },
+              strOr(vision.name, t("education.unnamedProject")),
+            ),
+            strOr(vision.notes)
+              ? h(
+                  "div",
+                  {
+                    style: {
+                      fontSize: 12,
+                      color: "var(--tomato-ink-3)",
+                      marginTop: 2,
+                      lineHeight: 1.6,
+                    },
+                  },
+                  vision.notes,
+                )
+              : null,
+          ),
+        ),
+  );
+
+  const tasksCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "tasks",
+      title: t("education.projectTasksTitle"),
+      hint: t("education.attentionHint", { n: projectTasks.length }),
+    }),
+    projectTasks.length === 0
+      ? mutedText(t("education.projectTasksEmpty"))
+      : h(
+          "div",
+          {
+            className: "t-scroll",
+            style: { maxHeight: 320, overflowY: "auto", paddingRight: 4 },
+          },
+          openTasks.length > 0
+            ? subHeading(t("education.openTasks"), openTasks.length)
+            : null,
+          openTasks.map((task, taskIndex) =>
+            h(ProjectTaskRow, {
+              key: task.id || `open-${taskIndex}`,
+              task,
+              onToggle,
+            }),
+          ),
+          doneTasks.length > 0
+            ? subHeading(t("education.doneTasks"), doneTasks.length)
+            : null,
+          doneTasks.map((task, taskIndex) =>
+            h(ProjectTaskRow, {
+              key: task.id || `done-${taskIndex}`,
+              task,
+              onToggle,
+            }),
+          ),
+        ),
+  );
+
+  return h(
+    "div",
+    { className: "t-root" },
+    h(
+      Btn,
+      {
+        variant: "ghost",
+        icon: "arrowLeft",
+        onClick: onBack,
+        style: { marginBottom: 12 },
+      },
+      t("education.back"),
+    ),
+    headerCard,
+    h("div", { style: { height: 16 } }),
+    statsRow,
+    h(
+      "div",
+      {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+          gap: 16,
+          alignItems: "start",
+        },
+      },
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            minWidth: 0,
+          },
+        },
+        directoryCard,
+        resourcesCard,
+        semesterCard,
+        assessmentsCard,
+        reviewsCard,
+        eventsCard,
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            minWidth: 0,
+          },
+        },
+        progressCard,
+        completedCard,
+        whitelistCard,
+        visionCard,
+        tasksCard,
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------- 页面
+
+export function EducationPage() {
+  const state = useSnapshot();
+  const [detailId, setDetailId] = useState(null);
+
+  if (state === null) {
+    return h(
+      "div",
+      { className: "t-root" },
+      h(PageHeader, {
+        eyebrow: t("education.eyebrow"),
+        title: t("education.title"),
+        subtitle: t("education.subtitle"),
+        actions: h(IconBtn, {
+          name: "refresh",
+          title: t("education.refreshTitle"),
+          onClick: () => refresh(),
+        }),
+      }),
+      h(
+        Card,
+        { pad: 22 },
+        h(SectionTitle, {
+          icon: "education",
+          title: t("education.projectsTitle"),
+          hint: t("education.loading"),
+        }),
+        h(Skeleton, { w: "62%", h: 15 }),
+        h(Skeleton, { w: "42%", h: 15, style: { marginTop: 10 } }),
+        h(Skeleton, { w: "76%", h: 15, style: { marginTop: 10 } }),
+        h(Skeleton, { w: "30%", h: 15, style: { marginTop: 10 } }),
+      ),
+    );
+  }
+
+  const data = state.data && typeof state.data === "object" ? state.data : {};
+  const edu = normalizeEducation(data.education);
+  const at = hasTs(state.serverTime)
+    ? Number(state.serverTime)
+    : Math.floor(Date.now() / 1000);
+  const today = strOr(state.today) || dayKey(at);
+  const index = buildIndex(edu);
+
+  const header = h(PageHeader, {
+    eyebrow: t("education.eyebrow"),
+    title: t("education.title"),
+    subtitle: t("education.subtitle"),
+    actions: h(IconBtn, {
+      name: "refresh",
+      title: t("education.refreshTitle"),
+      onClick: () => refresh(),
+    }),
+  });
+
+  if (detailId !== null) {
+    const study =
+      edu.projects.find((item) => item.projectId === detailId) || null;
+    if (study === null) {
+      return h(
+        "div",
+        { className: "t-root" },
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            icon: "arrowLeft",
+            onClick: () => setDetailId(null),
+            style: { marginBottom: 12 },
+          },
+          t("education.back"),
+        ),
+        h(
+          Card,
+          { flat: true, pad: 6 },
+          h(Empty, {
+            icon: "education",
+            title: t("education.projectMissing"),
+            action: h(
+              Btn,
+              { variant: "soft", onClick: () => setDetailId(null) },
+              t("education.back"),
+            ),
+          }),
+        ),
+      );
+    }
+    return h(ProjectDetail, {
+      data,
+      edu,
+      study,
+      project: projectById(data, detailId),
+      today,
+      at,
+      index,
+      onBack: () => setDetailId(null),
+    });
+  }
+
+  const startFocus = async (taskId) => {
+    const selected = await tryDispatch({ type: "selectTask", id: taskId });
+    if (!selected.ok) {
+      notify(selected.error, "danger");
+      return;
+    }
+    const started = await tryDispatch({ type: "startTimer" });
+    if (!started.ok) {
+      notify(started.error, "danger");
+      return;
+    }
+    notify(t("education.focusStarted"), "brand");
+  };
+
+  const toggleTask = async (taskId) => {
+    const result = await tryDispatch({ type: "toggleTask", id: taskId });
+    if (!result.ok) notify(result.error, "danger");
+  };
+
+  const confirmProgress = async (recordId) => {
+    const result = await tryDispatch({
+      type: "education",
+      command: { op: "confirmProgress", id: recordId },
+    });
+    if (!result.ok) notify(result.error, "danger");
+  };
+
+  // ---- 项目卡片
+  const projectCards = edu.projects.map((study, projectIndex) => {
+    const project = projectById(data, strOr(study.projectId));
+    const name =
+      project && strOr(project.name)
+        ? project.name
+        : t("education.unnamedProject");
+    const color = projectColor(data, study.projectId);
+    const resources = edu.resources.filter(
+      (item) => item.projectId === study.projectId,
+    );
+    const latest = sortDesc(
+      edu.progress.filter((item) => item.projectId === study.projectId),
+      "recordedAt",
+    )[0];
+    return h(
+      Card,
+      { key: strOr(study.projectId) || `project-${projectIndex}`, pad: 18 },
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 12 } },
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            },
+          },
+          h(Dot, { color, size: 9 }),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 15,
+                fontWeight: 620,
+                color: "var(--tomato-ink)",
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              },
+            },
+            name,
+          ),
+          study.examMode === true
+            ? h(Chip, { tone: "brand" }, t("education.examMode"))
+            : null,
+        ),
+        study.target
+          ? h(
+              "div",
+              {
+                style: {
+                  fontSize: 11.5,
+                  color: "var(--tomato-ink-3)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                },
+              },
+              `${t("education.targetLabel")} ${study.target}`,
+            )
+          : null,
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: 12,
+            },
+          },
+          h(
+            "div",
+            null,
+            h(
+              "div",
+              {
+                style: {
+                  fontSize: 10.5,
+                  color: "var(--tomato-ink-3)",
+                  marginBottom: 4,
+                  letterSpacing: ".06em",
+                },
+              },
+              t("education.countdownLabel"),
+            ),
+            h(Countdown, { examDate: study.examDate, today }),
+          ),
+          h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+              },
+            },
+            h(
+              Chip,
+              { tone: "neutral" },
+              t("education.resourcesCount", { n: resources.length }),
+            ),
+          ),
+        ),
+        h(
+          "div",
+          { style: { minHeight: 36 } },
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 10.5,
+                color: "var(--tomato-ink-3)",
+                marginBottom: 3,
+              },
+            },
+            t("education.latestProgressLabel"),
+          ),
+          latest
+            ? h(
+                "div",
+                {
+                  style: {
+                    fontSize: 12.5,
+                    color: "var(--tomato-ink-2)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  },
+                },
+                `${strOr(latest.topic, t("education.unnamedTopic"))}${
+                  strOr(latest.position) ? ` · ${latest.position}` : ""
+                }`,
+              )
+            : h(
+                "div",
+                { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+                t("education.noProgress"),
+              ),
+        ),
+        h(
+          Btn,
+          {
+            variant: "soft",
+            size: "sm",
+            iconRight: "arrowRight",
+            onClick: () => setDetailId(study.projectId),
+            style: { alignSelf: "flex-start" },
+          },
+          t("education.viewDetail"),
+        ),
+      ),
+    );
+  });
+
+  const projectsSection = h(
+    "div",
+    { style: { marginBottom: 16 } },
+    h(SectionTitle, {
+      icon: "education",
+      title: t("education.projectsTitle"),
+      hint: t("education.projectsHint", { n: edu.projects.length }),
+    }),
+    edu.projects.length === 0
+      ? h(
+          Card,
+          { flat: true, pad: 6 },
+          h(Empty, {
+            icon: "education",
+            title: t("education.emptyProjectsTitle"),
+            hint: t("education.emptyProjectsHint"),
+          }),
+        )
+      : h(
+          "div",
+          {
+            style: {
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+              gap: 14,
+            },
+          },
+          projectCards,
+        ),
+  );
+
+  // ---- 今日学习任务
+  const todayItems = [];
+  for (const link of edu.focusTasks) {
+    const task = taskById(data, link.taskId);
+    if (!task) continue;
+    const due = strOr(task.dueDate);
+    if (
+      due === today ||
+      (due !== "" && due < today && task.completed !== true)
+    ) {
+      todayItems.push({ link, task });
+    }
+  }
+  todayItems.sort((a, b) => {
+    const ac = a.task.completed === true ? 1 : 0;
+    const bc = b.task.completed === true ? 1 : 0;
+    if (ac !== bc) return ac - bc;
+    return strOr(a.task.reminderTime).localeCompare(strOr(b.task.reminderTime));
+  });
+
+  const todayCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "focus",
+      title: t("education.todayTasks"),
+      hint: t("education.todayTasksHint", { n: todayItems.length }),
+    }),
+    todayItems.length === 0
+      ? h(Empty, {
+          icon: "focus",
+          title: t("education.noTodayTasks"),
+          style: { padding: "24px 12px" },
+        })
+      : todayItems.map(({ link, task }) =>
+          h(TeachingTaskRow, {
+            key: task.id,
+            task: { ...task, kind: link.kind },
+            data,
+            onToggle: toggleTask,
+            onFocus: startFocus,
+          }),
+        ),
+  );
+
+  // ---- 需要处理
+  const pendingSubmit = [];
+  const pendingCorrection = [];
+  const pendingReview = [];
+  for (const assessment of edu.assessments) {
+    const status = assessmentStatus(assessment, index, at);
+    const submission = index.submissionOf.get(assessment.id) || null;
+    const grade = submission ? index.gradeOf.get(submission.id) || null : null;
+    if (
+      submission === null &&
+      (status === "awaitingSubmission" ||
+        status === "overdue" ||
+        status === "missed")
+    ) {
+      pendingSubmit.push({ assessment, status });
+    }
+    if (grade !== null) {
+      if (grade.needsReview === true) pendingReview.push({ assessment, grade });
+      for (const error of pendingCorrections(grade, index)) {
+        pendingCorrection.push({ assessment, grade, error });
+      }
+    }
+  }
+
+  const attentionRow = (key, color, title, kind, timeText, note, status) =>
+    h(
+      "div",
+      { key, style: ROW },
+      h(Dot, { color: color || "var(--tomato-ink-3)" }),
+      h(
+        "div",
+        { style: { flex: 1, minWidth: 0 } },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 12.5,
+              color: "var(--tomato-ink)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            },
+          },
+          title,
+        ),
+        h(
+          "div",
+          { style: META },
+          h(Chip, { tone: "neutral" }, kind),
+          timeText ? h("span", null, timeText) : null,
+          note
+            ? h("span", { style: { color: "var(--tomato-ink-2)" } }, note)
+            : null,
+        ),
+      ),
+      status
+        ? h(Chip, { tone: statusTone(status) }, statusLabel(status))
+        : null,
+    );
+
+  const attentionTotal =
+    pendingSubmit.length + pendingCorrection.length + pendingReview.length;
+  const attentionCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "bell",
+      title: t("education.needsAttention"),
+      hint: t("education.attentionHint", { n: attentionTotal }),
+    }),
+    attentionTotal === 0
+      ? mutedText(t("education.nothingPending"))
+      : h(
+          "div",
+          null,
+          pendingSubmit.length > 0
+            ? h(
+                "div",
+                null,
+                subHeading(t("education.pendingSubmit"), pendingSubmit.length),
+                pendingSubmit.map(({ assessment, status }, submitIndex) =>
+                  attentionRow(
+                    `submit-${assessment.id || submitIndex}`,
+                    projectColor(data, assessment.projectId),
+                    strOr(assessment.title, t("education.unnamedProject")),
+                    assessmentKindLabel(assessment.kind),
+                    t("education.deadlineLabel", {
+                      date: fmtDateTime(assessment.endsAt),
+                    }),
+                    "",
+                    status,
+                  ),
+                ),
+              )
+            : null,
+          pendingCorrection.length > 0
+            ? h(
+                "div",
+                null,
+                subHeading(
+                  t("education.pendingCorrection"),
+                  pendingCorrection.length,
+                ),
+                pendingCorrection.map(
+                  ({ assessment, grade, error }, errorIndex) => {
+                    const note = [
+                      strOr(error.cause)
+                        ? `${t("education.causeLabel")} ${error.cause}`
+                        : "",
+                      strOr(error.retestDate)
+                        ? t("education.retestLabel", { date: error.retestDate })
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    return attentionRow(
+                      `correction-${grade.id}-${error.questionId}-${errorIndex}`,
+                      projectColor(data, assessment.projectId),
+                      strOr(assessment.title, t("education.unnamedProject")),
+                      assessmentKindLabel(assessment.kind),
+                      fmtDateTime(grade.gradedAt),
+                      note,
+                      "correctionDue",
+                    );
+                  },
+                ),
+              )
+            : null,
+          pendingReview.length > 0
+            ? h(
+                "div",
+                null,
+                subHeading(t("education.pendingReview"), pendingReview.length),
+                pendingReview.map(({ assessment, grade }, reviewIndex) =>
+                  attentionRow(
+                    `review-${grade.id || reviewIndex}`,
+                    projectColor(data, assessment.projectId),
+                    strOr(assessment.title, t("education.unnamedProject")),
+                    assessmentKindLabel(assessment.kind),
+                    fmtDateTime(grade.gradedAt),
+                    "",
+                    "needsReview",
+                  ),
+                ),
+              )
+            : null,
+        ),
+  );
+
+  // ---- 接下来一周
+  const weekEnd = addDays(today, 7);
+  const inWeek = (ts) => {
+    if (!hasTs(ts)) return false;
+    const key = dayKey(Number(ts));
+    return key >= today && key < weekEnd;
+  };
+  const weekLessons = sortAsc(
+    edu.lessons.filter((lesson) => inWeek(lesson.startsAt)),
+    "startsAt",
+  );
+  const weekAssessments = sortAsc(
+    edu.assessments.filter((assessment) => inWeek(assessment.startsAt)),
+    "startsAt",
+  );
+  const relatedResourceIds = new Set();
+  for (const lesson of weekLessons) {
+    for (const resourceId of asArray(lesson.resourceIds))
+      relatedResourceIds.add(resourceId);
+  }
+  const weekResources = edu.resources.filter((resource) =>
+    relatedResourceIds.has(resource.id),
+  );
+
+  const weekCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, { icon: "calendarClock", title: t("education.nextWeek") }),
+    weekLessons.length + weekAssessments.length + weekResources.length === 0
+      ? mutedText(t("education.nextWeekEmpty"))
+      : h(
+          "div",
+          null,
+          weekLessons.length > 0
+            ? h(
+                "div",
+                null,
+                subHeading(t("education.weekLessons"), weekLessons.length),
+                weekLessons.map((lesson, lessonIndex) =>
+                  h(
+                    "div",
+                    { key: lesson.id || `lesson-${lessonIndex}`, style: ROW },
+                    h(
+                      "span",
+                      {
+                        className: "t-mono",
+                        style: {
+                          fontSize: 11.5,
+                          color: "var(--tomato-ink-3)",
+                          flex: "none",
+                        },
+                      },
+                      fmtRange(lesson.startsAt, lesson.endsAt),
+                    ),
+                    h(
+                      "div",
+                      { style: { flex: 1, minWidth: 0 } },
+                      h(
+                        "div",
+                        {
+                          style: {
+                            fontSize: 12.5,
+                            color: "var(--tomato-ink)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          },
+                        },
+                        strOr(lesson.title, t("education.unnamedTopic")),
+                      ),
+                      h(
+                        "div",
+                        { style: META },
+                        h(Chip, { tone: "neutral" }, t("education.lessonKind")),
+                        h(
+                          "span",
+                          null,
+                          t("education.topicsCount", {
+                            n: asArray(lesson.topics).length,
+                          }),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : null,
+          weekResources.length > 0
+            ? h(
+                "div",
+                null,
+                subHeading(t("education.weekResources"), weekResources.length),
+                h(
+                  "div",
+                  {
+                    style: {
+                      display: "flex",
+                      gap: 6,
+                      flexWrap: "wrap",
+                      paddingTop: 4,
+                    },
+                  },
+                  weekResources.map((resource, resourceIndex) =>
+                    h(
+                      Chip,
+                      {
+                        key: resource.id || `week-resource-${resourceIndex}`,
+                        tone: "neutral",
+                      },
+                      `${strOr(resource.title)} · ${resourceKindLabel(resource.kind)}`,
+                    ),
+                  ),
+                ),
+              )
+            : null,
+          weekAssessments.length > 0
+            ? h(
+                "div",
+                null,
+                subHeading(
+                  t("education.weekAssessments"),
+                  weekAssessments.length,
+                ),
+                weekAssessments.map((assessment, assessmentIndex) =>
+                  h(
+                    "div",
+                    {
+                      key:
+                        assessment.id || `week-assessment-${assessmentIndex}`,
+                      style: ROW,
+                    },
+                    h(
+                      "span",
+                      {
+                        className: "t-mono",
+                        style: {
+                          fontSize: 11.5,
+                          color: "var(--tomato-ink-3)",
+                          flex: "none",
+                        },
+                      },
+                      fmtRange(assessment.startsAt, assessment.endsAt),
+                    ),
+                    h(
+                      "div",
+                      { style: { flex: 1, minWidth: 0 } },
+                      h(
+                        "div",
+                        {
+                          style: {
+                            fontSize: 12.5,
+                            color: "var(--tomato-ink)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          },
+                        },
+                        strOr(assessment.title, t("education.unnamedProject")),
+                      ),
+                      h(
+                        "div",
+                        { style: META },
+                        h(
+                          Chip,
+                          { tone: "neutral" },
+                          assessmentKindLabel(assessment.kind),
+                        ),
+                        h(
+                          "span",
+                          null,
+                          t("education.topicsCount", {
+                            n: asArray(assessment.questions).length,
+                          }),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : null,
+        ),
+  );
+
+  // ---- 最近学到哪里
+  const recentProgress = sortDesc(edu.progress, "recordedAt").slice(0, 6);
+  const progressCard = h(
+    Card,
+    { pad: 22 },
+    h(SectionTitle, {
+      icon: "stats",
+      title: t("education.recentProgress"),
+      hint: t("education.attentionHint", { n: edu.progress.length }),
+    }),
+    recentProgress.length === 0
+      ? mutedText(t("education.noProgress"))
+      : recentProgress.map((record, recordIndex) =>
+          h(ProgressRow, {
+            key: record.id || `progress-${recordIndex}`,
+            record,
+            onConfirm: confirmProgress,
+          }),
+        ),
+  );
+
+  return h(
+    "div",
+    { className: "t-root" },
+    header,
+    projectsSection,
+    h(
+      "div",
+      {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+          gap: 16,
+          alignItems: "start",
+        },
+      },
+      todayCard,
+      attentionCard,
+    ),
+    h("div", { style: { height: 16 } }),
+    h(
+      "div",
+      {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+          gap: 16,
+          alignItems: "start",
+        },
+      },
+      weekCard,
+      progressCard,
+    ),
+  );
+}
+
+registerPage({
+  id: "education",
+  order: 60,
+  icon: "education",
+  titleKey: "nav.education",
+  Component: EducationPage,
+});
