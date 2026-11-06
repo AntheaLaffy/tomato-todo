@@ -332,6 +332,51 @@ fn released_answers_and_rubrics_are_immutable_and_grades_use_evidence() {
     assert!(data.education.events.iter().any(|e| e.kind == "review"));
 }
 #[test]
+fn assistant_adds_only_missing_paper_times_before_grading() {
+    let mut data = fixture();
+    finish_lesson(&mut data);
+    let mut packet = assessment(&data, "homework");
+    let mut second = packet["assessment"]["questions"][0].clone();
+    second["id"] = json!("q2");
+    second["scoring"][0]["id"] = json!("p2");
+    packet["assessment"]["questions"]
+        .as_array_mut()
+        .unwrap()
+        .push(second);
+    command(&mut data, packet, at(2, 10, 0)).unwrap();
+    command(&mut data, json!({"op":"submit","submission":{"id":"paper","assessmentId":"assessment","submittedAt":0,"resourceIds":[],"answers":"答题卡已写完成时刻","unfinished":false,"questionTimes":[{"questionId":"q1","localTime":"18:42"}]}}), at(7, 19, 1)).unwrap();
+    let supplement = json!({"op":"recordQuestionTimes","id":"paper","questionTimes":[{"questionId":"q2","localTime":"18:51"}]});
+    let manual: Command = serde_json::from_value(supplement.clone()).unwrap();
+    assert!(crate::check_user_action(&crate::Action::Education { command: manual }).is_err());
+    let mut invalid = supplement.clone();
+    invalid["questionTimes"][0]["localTime"] = json!("06:51 PM");
+    assert!(command(&mut data, invalid, at(7, 19, 2)).is_err());
+    assert_eq!(data.education.submissions[0].question_times.len(), 1);
+    assert_eq!(
+        data.education.submissions[0].question_times[0].local_time,
+        "18:42"
+    );
+    command(&mut data, supplement.clone(), at(7, 19, 2)).unwrap();
+    assert_eq!(
+        data.education.submissions[0].question_times[0].local_time,
+        "18:42"
+    );
+    assert_eq!(
+        data.education.submissions[0].question_times[1].local_time,
+        "18:51"
+    );
+    assert!(command(&mut data, supplement, at(7, 19, 3)).is_err());
+    let mut modified = data.education.clone();
+    modified.submissions[0].question_times[1].local_time = "18:52".into();
+    assert!(validate_transition(&data.education, &modified).is_err());
+    let mut modified = data.education.clone();
+    modified.submissions[0].answers = "篡改答卷".into();
+    assert!(validate_transition(&data.education, &modified).is_err());
+    let grade = json!({"op":"grade","grade":{"id":"grade","submissionId":"paper","assessmentRevision":1,"gradedAt":0,"awards":[{"questionId":"q1","pointId":"p1","awarded":5,"evidence":"答题卡写明极限法则"},{"questionId":"q2","pointId":"p2","awarded":5,"evidence":"答题卡写明极限法则"}],"errors":[],"needsReview":false,"feedback":"正确"}});
+    command(&mut data, grade, at(7, 19, 4)).unwrap();
+    assert!(command(&mut data, json!({"op":"recordQuestionTimes","id":"paper","questionTimes":[{"questionId":"q2","localTime":"18:52"}]}), at(7, 19, 5)).is_err());
+}
+#[test]
 fn exam_requires_printing_stops_at_deadline_and_collects_paper() {
     let mut data = fixture();
     finish_lesson(&mut data);
@@ -358,6 +403,106 @@ fn exam_requires_printing_stops_at_deadline_and_collects_paper() {
     data.tick(at(7, 22, 5));
     assert_eq!(data.education.assessments[0].stopped_at, Some(at(7, 22, 0)));
     assert!(command(&mut data,json!({"op":"submit","submission":{"id":"sub","assessmentId":"assessment","submittedAt":0,"resourceIds":[],"answers":"1","unfinished":false,"questionTimes":[]}}),at(7,22,5)).is_err());
+}
+#[test]
+fn exam_start_is_flexible_within_day_but_duration_and_submission_are_separate() {
+    let mut data = fixture();
+    finish_lesson(&mut data);
+    let packet = assessment(&data, "mockExam");
+    command(&mut data, packet, at(6, 10, 0)).unwrap();
+    command(
+        &mut data,
+        json!({"op":"confirmPrinted","id":"assessment"}),
+        at(6, 18, 0),
+    )
+    .unwrap();
+    assert!(command(
+        &mut data,
+        json!({"op":"startExam","id":"assessment"}),
+        at(6, 23, 0)
+    )
+    .is_err());
+    let mut evening = data.clone();
+    command(
+        &mut data,
+        json!({"op":"startExam","id":"assessment"}),
+        at(7, 9, 0),
+    )
+    .unwrap();
+    assert_eq!(data.education.assessments[0].exam_deadline(), at(7, 12, 0));
+    data.tick(at(7, 11, 59));
+    assert_eq!(data.education.assessments[0].stopped_at, None);
+    data.tick(at(7, 12, 1));
+    assert_eq!(data.education.assessments[0].stopped_at, Some(at(7, 12, 0)));
+    assert_eq!(
+        crate::learning::summaries(&data, at(7, 12, 1))[0]["assessments"][0]["status"],
+        "awaitingSubmission"
+    );
+    command(&mut data,json!({"op":"submit","submission":{"id":"later-paper","assessmentId":"assessment","submittedAt":0,"resourceIds":["mock"],"answers":"停笔时的答卷","unfinished":false,"questionTimes":[]}}),at(9,11,0)).unwrap();
+    let summary = crate::learning::summaries(&data, at(9, 11, 0));
+    assert_eq!(summary[0]["assessments"][0]["status"], "submitted");
+    assert_eq!(summary[0]["assessments"][0]["late"], false);
+
+    command(
+        &mut evening,
+        json!({"op":"startExam","id":"assessment"}),
+        at(7, 23, 30),
+    )
+    .unwrap();
+    assert_eq!(
+        evening.education.assessments[0].exam_deadline(),
+        at(8, 2, 30)
+    );
+    evening.tick(at(8, 2, 29));
+    assert_eq!(evening.education.assessments[0].stopped_at, None);
+    evening.tick(at(8, 2, 31));
+    assert_eq!(
+        evening.education.assessments[0].stopped_at,
+        Some(at(8, 2, 30))
+    );
+    assert_eq!(
+        crate::learning::summaries(&evening, at(8, 2, 31))[0]["assessments"][0]["status"],
+        "awaitingSubmission"
+    );
+    let mut missed = fixture();
+    finish_lesson(&mut missed);
+    let packet = assessment(&missed, "mockExam");
+    command(&mut missed, packet, at(6, 10, 0)).unwrap();
+    assert_eq!(
+        crate::learning::summaries(&missed, at(7, 23, 59))[0]["assessments"][0]["status"],
+        "upcoming"
+    );
+    assert_eq!(
+        crate::learning::summaries(&missed, at(8, 0, 0))[0]["assessments"][0]["status"],
+        "missed"
+    );
+    assert!(command(
+        &mut missed,
+        json!({"op":"startExam","id":"assessment"}),
+        at(8, 0, 0)
+    )
+    .is_err());
+
+    let mut late_publish = fixture();
+    finish_lesson(&mut late_publish);
+    let packet = assessment(&late_publish, "mockExam");
+    command(&mut late_publish, packet, at(7, 22, 30)).unwrap();
+    command(
+        &mut late_publish,
+        json!({"op":"confirmPrinted","id":"assessment"}),
+        at(7, 22, 31),
+    )
+    .unwrap();
+    command(
+        &mut late_publish,
+        json!({"op":"startExam","id":"assessment"}),
+        at(7, 23, 0),
+    )
+    .unwrap();
+    assert_eq!(
+        late_publish.education.assessments[0].exam_deadline(),
+        at(8, 2, 0)
+    );
 }
 #[test]
 fn teaching_events_and_rubrics_survive_sqlite_restart() {

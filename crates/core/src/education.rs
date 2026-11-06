@@ -169,6 +169,14 @@ pub struct Assessment {
     pub started_at: Option<i64>,
     pub stopped_at: Option<i64>,
 }
+impl Assessment {
+    /// The scheduled interval supplies the duration; the actual start starts the clock.
+    pub fn exam_deadline(&self) -> i64 {
+        self.started_at.map_or(self.ends_at, |start| {
+            start.saturating_add(self.ends_at.saturating_sub(self.starts_at))
+        })
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Submission {
@@ -280,6 +288,11 @@ pub enum Command {
     Submit {
         submission: Submission,
     },
+    RecordQuestionTimes {
+        id: String,
+        #[serde(rename = "questionTimes")]
+        question_times: Vec<QuestionTime>,
+    },
     Grade {
         grade: Grade,
     },
@@ -318,6 +331,7 @@ impl Command {
                 | Self::SaveLesson { .. }
                 | Self::PublishAssessment { .. }
                 | Self::Grade { .. }
+                | Self::RecordQuestionTimes { .. }
                 | Self::SaveReview { .. }
                 | Self::FinishEvent { .. }
                 | Self::ClaimEvent { .. }
@@ -488,9 +502,9 @@ impl Education {
         for a in &mut self.assessments {
             if (a.kind == AssessmentKind::Homework || a.started_at.is_some())
                 && a.stopped_at.is_none()
-                && at >= a.ends_at
+                && at >= a.exam_deadline()
             {
-                a.stopped_at = Some(a.ends_at);
+                a.stopped_at = Some(a.exam_deadline());
                 changed = true;
             }
         }
@@ -717,7 +731,14 @@ impl Education {
                     !self.assessments.iter().any(|a| a.id == assessment.id),
                     "已发布题目和评分标准不可修改；请发布新 ID 的修订版",
                 )?;
-                check(assessment.ends_at > at, "不能发布已截止的作业或试卷")?;
+                check(
+                    if assessment.kind == AssessmentKind::Homework {
+                        assessment.ends_at > at
+                    } else {
+                        crate::date_at(assessment.starts_at) >= crate::date_at(at)
+                    },
+                    "不能发布已截止的作业或已过考试日期的试卷",
+                )?;
                 assessment.semester_revision = self
                     .semesters
                     .iter()
@@ -755,9 +776,8 @@ impl Education {
                     a.kind != AssessmentKind::Homework
                         && a.printed_at.is_some()
                         && a.started_at.is_none()
-                        && at >= a.starts_at
-                        && at < a.ends_at,
-                    "请先打印试卷与答题卡，并在考试窗口开始考试",
+                        && crate::date_at(at) == crate::date_at(a.starts_at),
+                    "请先打印试卷与答题卡，并在考试安排当天开始考试",
                 )?;
                 a.started_at = Some(at);
             }
@@ -807,6 +827,28 @@ impl Education {
                 let source = submission.id.clone();
                 self.submissions.push(submission);
                 self.event(&project, "grade", &source, at);
+            }
+            Command::RecordQuestionTimes { id, question_times } => {
+                check(!question_times.is_empty(), "没有需要补录的完成时刻")?;
+                check(
+                    !self.grades.iter().any(|g| g.submission_id == id),
+                    "已批改的答卷不能补录完成时刻",
+                )?;
+                let submission = self
+                    .submissions
+                    .iter_mut()
+                    .find(|s| s.id == id)
+                    .ok_or("提交版本不存在")?;
+                check(
+                    question_times.iter().all(|t| {
+                        !submission
+                            .question_times
+                            .iter()
+                            .any(|existing| existing.question_id == t.question_id)
+                    }),
+                    "已有的完成时刻不能覆盖",
+                )?;
+                submission.question_times.extend(question_times);
             }
             Command::Grade { mut grade } => {
                 check(
@@ -1312,8 +1354,15 @@ pub fn validate_transition(before: &Education, after: &Education) -> AppResult<(
                 .submissions
                 .iter()
                 .find(|b| b.id == s.id)
-                .is_some_and(|b| b == s),
-            "提交历史不可改写",
+                .is_some_and(|b| {
+                    let mut old = s.clone();
+                    old.question_times = b.question_times.clone();
+                    old == *b
+                        && b.question_times.starts_with(&s.question_times)
+                        && (b.question_times.len() == s.question_times.len()
+                            || !before.grades.iter().any(|g| g.submission_id == s.id))
+                }),
+            "提交历史不可改写；只能在批改前补充缺失的完成时刻",
         )?;
     }
     for g in &before.grades {

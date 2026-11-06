@@ -319,6 +319,7 @@ const assessmentStates: Record<string, string> = {
   needsReview: "批改待复核",
   correctionDue: "待订正",
   graded: "已批改",
+  missed: "已错过开考",
   overdue: "已到期，待提交",
   inProgress: "考试中",
 };
@@ -342,14 +343,17 @@ function assessmentRow(a: Assessment, e: Education, at: number): string {
     total: a.questions
       .flatMap((q) => q.scoring)
       .reduce((n, p) => n + p.points, 0),
-    late: !!latest && latest.submittedAt > a.endsAt,
+    late: a.kind === "homework" && !!latest && latest.submittedAt > a.endsAt,
     unfinished: latest?.unfinished,
   };
   const exam = a.kind !== "homework";
   const started = a.startedAt !== null;
   const stopped = a.stoppedAt !== null;
   const grades = subs.flatMap((s) => index.grades.get(s.id) || []);
-  return `<article class="study-row" data-assessment-id="${esc(a.id)}"><h3>${esc(a.title)} · ${esc(assessmentKinds[a.kind] || a.kind)}</h3><p><strong>${esc(assessmentStates[status?.status || ""] || "待处理")}</strong>${status?.score !== null && status?.score !== undefined ? ` · ${status.score} / ${status.total}分` : ""}${status?.late ? " · 逾期提交" : ""}${status?.unfinished ? " · 含未完成部分" : ""}</p><p>${when(a.startsAt)} — ${when(a.endsAt)}${stopped ? " · 已停笔，请交卷" : ""}</p><p>${esc(a.instructions)}</p>${a.retestOfGradeId ? "<p>独立复测：关联原始批改，成绩单独记录。</p>" : ""}<details${exam && started && !stopped ? " open" : ""}><summary>查看题目</summary>${a.questions.map((q) => `<p><strong>${esc(q.id)}${q.extension ? "（拓展）" : ""}</strong> ${esc(q.prompt)}</p>${resourceLinks(q.sourceIds, e.resources, "题目来源")}`).join("")}</details><div class="button-row"><button class="button secondary small-button" data-paper="${esc(a.id)}">下载可打印试卷和答题卡</button>${exam ? `<button class="button secondary small-button" data-printed="${esc(a.id)}" ${a.printedAt ? "disabled" : ""}>${a.printedAt ? "已确认打印" : "确认打印完成"}</button>${!started ? `<button class="button secondary small-button" data-exam-start="${esc(a.id)}" ${!a.printedAt || at < a.startsAt || at >= a.endsAt ? "disabled" : ""}>开始考试</button>` : !stopped ? `<button class="button secondary small-button" data-exam-end="${esc(a.id)}">提前停笔并交卷</button>` : ""}` : ""}${!exam || stopped ? `<button class="button secondary small-button" data-study-submit="${esc(a.id)}" ${at < a.startsAt ? "disabled" : ""}>${subs.length ? "重交新版本" : exam ? "提交答题卡" : "交作业"}</button>` : ""}</div><p>${subs.length}次提交 · ${grades.length}次批改</p>${subs.map((s, i) => `<details><summary>第${i + 1}次提交 · ${when(s.submittedAt)}${s.submittedAt > a.endsAt ? " · 逾期" : ""}${s.unfinished ? " · 未完成" : ""}</summary><p>${esc(s.answers || "以附件为准")}</p><p>答卷附件 ${s.resourceIds.length} 份</p>${resourceLinks(s.resourceIds, e.resources, "答卷附件")}${s.questionTimes.map((t) => `<p>${esc(t.questionId)}：${esc(t.localTime)}</p>`).join("")}</details>`).join("")}${grades
+  const timing = exam
+    ? `${dateOnly(a.startsAt)} 当天可开考 · 限时 ${Math.round((a.endsAt - a.startsAt) / 60)} 分钟（从实际开考起算）${started ? ` · ${when(a.startedAt!)} 开考，${when(examDeadline(a))} 停笔` : ""}`
+    : `${when(a.startsAt)} — ${when(a.endsAt)}`;
+  return `<article class="study-row" data-assessment-id="${esc(a.id)}"><h3>${esc(a.title)} · ${esc(assessmentKinds[a.kind] || a.kind)}</h3><p><strong>${status.status === "awaitingSubmission" && exam ? "已停笔，待交卷" : esc(assessmentStates[status.status] || "待处理")}</strong>${status?.score !== null && status?.score !== undefined ? ` · ${status.score} / ${status.total}分` : ""}${status?.late ? " · 逾期提交" : ""}${status?.unfinished ? " · 含未完成部分" : ""}</p><p>${timing}${stopped ? " · 已停笔，请交卷" : ""}</p><p>${esc(a.instructions)}</p>${a.retestOfGradeId ? "<p>独立复测：关联原始批改，成绩单独记录。</p>" : ""}<details${exam && started && !stopped ? " open" : ""}><summary>查看题目</summary>${a.questions.map((q) => `<p><strong>${esc(q.id)}${q.extension ? "（拓展）" : ""}</strong> ${esc(q.prompt)}</p>${resourceLinks(q.sourceIds, e.resources, "题目来源")}`).join("")}</details><div class="button-row"><button class="button secondary small-button" data-paper="${esc(a.id)}">下载可打印试卷和答题卡</button>${exam ? `<button class="button secondary small-button" data-printed="${esc(a.id)}" ${a.printedAt || (!started && dateOnly(at) > dateOnly(a.startsAt)) ? "disabled" : ""}>${a.printedAt ? "已确认打印" : "确认打印完成"}</button>${!started ? `<button class="button secondary small-button" data-exam-start="${esc(a.id)}" ${!a.printedAt || dateOnly(at) !== dateOnly(a.startsAt) ? "disabled" : ""}>开始考试</button>` : !stopped ? `<button class="button secondary small-button" data-exam-end="${esc(a.id)}">提前停笔并交卷</button>` : ""}` : ""}${!exam || stopped ? `<button class="button secondary small-button" data-study-submit="${esc(a.id)}" ${at < a.startsAt ? "disabled" : ""}>${subs.length ? "重交新版本" : exam ? "提交答题卡" : "交作业"}</button>` : ""}</div><p>${subs.length}次提交 · ${grades.length}次批改</p>${subs.map((s, i) => `<details><summary>第${i + 1}次提交 · ${when(s.submittedAt)}${a.kind === "homework" && s.submittedAt > a.endsAt ? " · 逾期" : ""}${s.unfinished ? " · 未完成" : ""}</summary><p>${esc(s.answers || "以附件为准")}</p><p>答卷附件 ${s.resourceIds.length} 份</p>${resourceLinks(s.resourceIds, e.resources, "答卷附件")}${s.questionTimes.map((t) => `<p>${esc(t.questionId)}：${esc(t.localTime)}</p>`).join("")}</details>`).join("")}${grades
     .map(
       (g) =>
         `<details><summary>${g.needsReview ? "待复核，分数未定" : "已批改"} · ${g.awards.reduce((n, p) => n + p.awarded, 0)}分 · ${when(g.gradedAt)}</summary><p>${esc(g.feedback)}</p>${g.awards.map((p) => `<p>${esc(p.questionId)} / ${esc(p.pointId)}：${p.awarded}分 · ${esc(p.evidence)}</p>`).join("")}${g.errors
@@ -379,12 +383,15 @@ const statusLabels: Record<string, string> = {
   needsReview: "待复核",
   correctionDue: "待订正",
   graded: "已批改",
+  missed: "缺考",
   overdue: "逾期未交",
 };
 const dateOnly = (seconds: number) => {
   const d = new Date(seconds * 1000);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
+const examDeadline = (a: Assessment) =>
+  a.startedAt === null ? a.endsAt : a.startedAt + a.endsAt - a.startsAt;
 const shiftDate = (value: string, days: number) => {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
@@ -400,6 +407,15 @@ const dateDistance = (from: string, to: string) => {
 function dashboardAssessmentStatus(a: Assessment, snapshot: Snapshot) {
   return assessmentState(a, snapshot.data.education, snapshot.serverTime);
 }
+// A never-started exam cannot be taken after its window closes. Keep its
+// record in the project, not in the student's actionable queue.
+function actionableAssessment(a: Assessment, snapshot: Snapshot) {
+  return (
+    a.kind === "homework" ||
+    a.startedAt !== null ||
+    snapshot.today <= dateOnly(a.startsAt)
+  );
+}
 function assessmentState(a: Assessment, e: Education, at: number) {
   const index = teachingIndex(e);
   const submission = index.latestSubmission.get(a.id);
@@ -413,9 +429,28 @@ function assessmentState(a: Assessment, e: Education, at: number) {
     return "correctionDue";
   if (grade) return "graded";
   if (submission) return "submitted";
-  if (a.kind !== "homework" && a.startedAt && !a.stoppedAt) return "inProgress";
-  if (a.stoppedAt || at >= a.endsAt) return "overdue";
-  if (at < a.startsAt) return "upcoming";
+  if (
+    a.kind !== "homework" &&
+    !a.startedAt &&
+    dateOnly(at) > dateOnly(a.startsAt)
+  )
+    return "missed";
+  if (
+    a.kind !== "homework" &&
+    a.startedAt &&
+    !a.stoppedAt &&
+    at < examDeadline(a)
+  )
+    return "inProgress";
+  if (
+    a.kind !== "homework" &&
+    a.startedAt &&
+    (a.stoppedAt || at >= examDeadline(a))
+  )
+    return "awaitingSubmission";
+  if (a.kind === "homework" && at >= a.endsAt) return "overdue";
+  if (at < a.startsAt || (a.kind !== "homework" && !a.startedAt))
+    return "upcoming";
   return "awaitingSubmission";
 }
 const assessmentPriority = (status: string) =>
@@ -439,7 +474,7 @@ function dashboardAssessmentLine(
   return `<article class="education-dashboard-row"><div><strong>${esc(a.title)}</strong><small>${esc(assessmentKinds[a.kind] || a.kind)} · ${when(a.startsAt)}–${when(a.endsAt)}${detail ? ` · ${esc(detail)}` : ""}</small>${resourceLinks(
     a.questions.flatMap((q) => q.sourceIds),
     resources,
-  )}</div><span class="education-status status-${esc(status)}">${esc(statusLabels[status] || "待处理")}</span><button class="text-button" data-page="project:${esc(a.projectId)}">查看</button></article>`;
+  )}</div><span class="education-status status-${esc(status)}">${status === "awaitingSubmission" && a.kind !== "homework" ? "待交卷" : esc(statusLabels[status] || "待处理")}</span><button class="text-button" data-open-assessment="${esc(a.id)}">${a.kind === "homework" ? "打开作业" : "打开测评"}</button></article>`;
 }
 function teacherAssessmentLine(a: Assessment, snapshot: Snapshot) {
   const e = snapshot.data.education;
@@ -500,6 +535,7 @@ function studentDashboard(
     .filter(
       (a) =>
         a.projectId === project.id &&
+        actionableAssessment(a, snapshot) &&
         followupStatuses.has(dashboardAssessmentStatus(a, snapshot)),
     )
     .sort(
@@ -513,7 +549,7 @@ function studentDashboard(
       (a) =>
         a.projectId === project.id &&
         dashboardAssessmentStatus(a, snapshot) === "upcoming" &&
-        a.startsAt >= snapshot.serverTime &&
+        dateOnly(a.startsAt) >= snapshot.today &&
         dateOnly(a.startsAt) < end,
     )
     .sort((a, b) => a.startsAt - b.startsAt);
@@ -523,7 +559,18 @@ function studentDashboard(
       (task) =>
         task.projectId === project.id &&
         !task.completed &&
-        task.dueDate <= snapshot.today,
+        task.dueDate === snapshot.today &&
+        !task.reminderExpired &&
+        !e.focusTasks?.some(
+          (link) =>
+            link.taskId === task.id &&
+            (link.kind === "homework" ||
+              e.lessons.some(
+                (lesson) =>
+                  lesson.id === link.sourceId &&
+                  lesson.endsAt <= snapshot.serverTime,
+              )),
+        ),
     )
     .sort(
       (a, b) =>
@@ -531,7 +578,7 @@ function studentDashboard(
         (a.reminderTime || "99:99").localeCompare(b.reminderTime || "99:99"),
     )
     .slice(0, 4);
-  return `<section class="education-dashboard-project"><div class="education-dashboard-project-head"><div><span class="eyebrow">学习项目</span><h2>${esc(project.name)}</h2><p>${esc(study.target || "应试目标尚未填写")}</p></div>${dashboardProjectLink(project.id)}</div><section class="education-dashboard-today"><h3>今日学习任务</h3>${todayTasks.map((task) => `<article class="education-dashboard-row"><div><strong>${esc(task.title)}</strong><small>${task.dueDate < snapshot.today ? "逾期" : "今天"}${task.reminderTime ? ` · ${esc(task.reminderTime)}` : ""} · ${task.estimate} 个番茄</small></div><button class="button secondary small-button" data-focus-task="${esc(task.id)}">开始专注</button></article>`).join("") || `<p class="subtle">今天没有未完成的项目任务。</p>`}</section><div class="education-dashboard-columns"><section><h3>需要处理</h3>${
+  return `<section class="education-dashboard-project"><div class="education-dashboard-project-head"><div><span class="eyebrow">学习项目</span><h2>${esc(project.name)}</h2><p>${esc(study.target || "应试目标尚未填写")}</p></div>${dashboardProjectLink(project.id)}</div><section class="education-dashboard-today"><h3>今日学习任务</h3>${todayTasks.map((task) => `<article class="education-dashboard-row"><div><strong>${esc(task.title)}</strong><small>今天${task.reminderTime ? ` · ${esc(task.reminderTime)}` : ""} · ${task.estimate} 个番茄</small></div><button class="button secondary small-button" data-focus-task="${esc(task.id)}">开始专注</button></article>`).join("") || `<p class="subtle">今天没有未完成的项目任务。</p>`}</section><div class="education-dashboard-columns"><section><h3>需要处理</h3>${
     followups
       .slice(0, 4)
       .map((a) =>
@@ -552,7 +599,7 @@ function studentDashboard(
       .map((a) => dashboardAssessmentLine(a, "upcoming", "", e.resources))
       .join("") ||
     (!lessons.length ? `<p class="subtle">暂无排定课程或考试。</p>` : "")
-  }</section></div><section class="education-dashboard-progress"><h3>最近学到哪里</h3>${progress.map((r) => `<article class="education-dashboard-row"><div><strong>${esc(r.topic)} · ${esc(progressStates[r.state] || r.state)}</strong><small>${esc(r.position)} · ${esc(r.evidence)}</small></div><span class="education-status">${r.confirmed ? "已确认" : "待确认"}</span></article>`).join("") || `<p class="subtle">暂无登记的学习进度。</p>`}</section><div class="education-dashboard-actions"><button class="button secondary small-button" data-teaching-question="${esc(project.id)}">问老师下一步怎么学</button>${dashboardProjectLink(project.id, "查看全部学情与资料")}</div></section>`;
+  }</section></div><section class="education-dashboard-progress"><h3>最近学到哪里</h3>${progress.map((r) => `<article class="education-dashboard-row"><div><strong>${esc(r.topic)} · ${esc(progressStates[r.state] || r.state)}</strong><small>${esc(r.position)} · ${esc(r.evidence)}</small></div><span class="education-status">${r.confirmed ? "已确认" : "待确认"}</span></article>`).join("") || `<p class="subtle">暂无登记的学习进度。</p>`}</section><div class="education-dashboard-actions"><button class="button secondary small-button" data-teaching-question="${esc(project.id)}">和学习助手规划下一步</button>${dashboardProjectLink(project.id, "查看全部学情与资料")}</div></section>`;
 }
 function teacherDashboard(
   snapshot: Snapshot,
@@ -623,6 +670,7 @@ function teacherDashboard(
     .filter(
       (a) =>
         a.projectId === project.id &&
+        actionableAssessment(a, snapshot) &&
         pendingStatuses.has(dashboardAssessmentStatus(a, snapshot)),
     )
     .sort(
@@ -748,22 +796,19 @@ export function educationCard(snapshot: Snapshot, project: Project): string {
    .join("")}</details></section>`;
 }
 export function printablePaper(a: Assessment): string {
-  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>${esc(a.title)}</title><style>body{font:16px serif;line-height:1.7;margin:20mm}article{break-inside:avoid;margin-bottom:18mm}section{break-before:page}.space{height:65mm;border-bottom:1px solid #aaa}small{display:block}</style><h1>${esc(a.title)}</h1><p>试卷ID：${esc(a.id)} · v${a.revision} · ${when(a.startsAt)} — ${when(a.endsAt)}</p><p>${esc(a.instructions)}</p>${a.questions.map((q) => `<article><h2>${esc(q.id)}${q.extension ? "（拓展）" : ""}（${q.scoring.reduce((n, p) => n + p.points, 0)}分）</h2><p style="white-space:pre-wrap">${esc(q.prompt)}</p></article>`).join("")}<section><h1>答题卡</h1><p>姓名：____________　试卷：${esc(a.id)}　日期：____________</p><p>每题完成后记录本机显示的当地时刻，精确到时、分；考试结束立即停笔并拍照上传。</p>${a.questions.map((q) => `<article><h2>${esc(q.id)}</h2><small>完成时刻：____:____　返回修改时刻：____:____</small><div class="space"></div></article>`).join("")}</section></html>`;
+  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>${esc(a.title)}</title><style>body{font:16px serif;line-height:1.7;margin:20mm}article{break-inside:avoid;margin-bottom:18mm}section{break-before:page}.space{height:65mm;border-bottom:1px solid #aaa}small{display:block}</style><h1>${esc(a.title)}</h1><p>试卷ID：${esc(a.id)} · v${a.revision} · ${a.kind === "homework" ? `${when(a.startsAt)} — ${when(a.endsAt)}` : `考试日 ${dateOnly(a.startsAt)} · 从当日实际开考起限时 ${Math.round((a.endsAt - a.startsAt) / 60)} 分钟`}</p><p>${esc(a.instructions)}</p>${a.questions.map((q) => `<article><h2>${esc(q.id)}${q.extension ? "（拓展）" : ""}（${q.scoring.reduce((n, p) => n + p.points, 0)}分）</h2><p style="white-space:pre-wrap">${esc(q.prompt)}</p></article>`).join("")}<section><h1>答题卡</h1><p>姓名：____________　试卷：${esc(a.id)}　日期：____________</p><p>每题完成后用24小时制记录本地时刻（HH:MM），精确到时、分；考试结束立即停笔并拍照上传。</p>${a.questions.map((q) => `<article><h2>${esc(q.id)}</h2><small>完成时刻：____:____　返回修改时刻：____:____</small><div class="space"></div></article>`).join("")}</section></html>`;
 }
 export function educationFocusExams(snapshot: Snapshot): string {
   const e = snapshot.data.education;
   const exams = e.assessments.filter(
     (a) =>
       a.kind !== "homework" &&
-      new Date(a.startsAt * 1000).toLocaleDateString("sv-SE") <=
-        snapshot.today &&
-      (new Date(a.startsAt * 1000).toLocaleDateString("sv-SE") ===
-        snapshot.today ||
-        a.startedAt) &&
+      dateOnly(a.startsAt) <= snapshot.today &&
+      (dateOnly(a.startsAt) === snapshot.today || a.startedAt !== null) &&
       !e.submissions.some((s) => s.assessmentId === a.id && !s.unfinished),
   );
   if (!exams.length) return "";
-  return `<section class="card"><div class="card-heading"><h2>今日测评 <span class="count-label">${exams.length}</span></h2></div>${exams.map((a) => `<article class="study-row"><strong>${esc(a.title)}</strong><p>${when(a.startsAt)} — ${when(a.endsAt)}</p><button class="button secondary small-button" data-open-assessment="${esc(a.id)}">${a.startedAt ? (a.stoppedAt ? "提交答题卡" : "查看进行中的考试") : "查看试卷与开考"}</button></article>`).join("")}</section>`;
+  return `<section class="card"><div class="card-heading"><h2>今日测评 <span class="count-label">${exams.length}</span></h2></div>${exams.map((a) => `<article class="study-row"><strong>${esc(a.title)}</strong><p>${a.startedAt ? `${when(a.startedAt)} 开考 · ${when(examDeadline(a))} 停笔` : `${dateOnly(a.startsAt)} 当天可开考 · 限时 ${Math.round((a.endsAt - a.startsAt) / 60)} 分钟`}</p><button class="button secondary small-button" data-open-assessment="${esc(a.id)}">${a.startedAt ? (a.stoppedAt || snapshot.serverTime >= examDeadline(a) ? "提交答题卡" : "查看进行中的考试") : "查看试卷与开考"}</button></article>`).join("")}</section>`;
 }
 
 function openAssessment(
@@ -900,7 +945,7 @@ export function mountEducation(
     .forEach((el) => {
       el.onclick = () =>
         hooks.ask(
-          `请读取exam-teaching技能和项目${el.dataset.teachingQuestion}的最新学情，结合本周课程与作业，给我明确的下一步学习建议；未知处先核实，不推定掌握。`,
+          `请读取exam-teaching技能和项目${el.dataset.teachingQuestion}的最新学情、实际任务、课程、作业提交/批改/订正和考试状态，结合本周安排，告诉我现在能做什么、下一步怎么学；已过窗口的课程或未开考考试不要当成可补做事项，未知处先核实，不推定掌握。`,
         );
     });
   document
@@ -926,7 +971,7 @@ export function mountEducation(
   });
   bind("[data-teaching-request]", async (el) =>
     hooks.ask(
-      `请读取 exam-teaching 技能，为项目 ${el.dataset.teachingRequest} 核对愿景、考纲、真题、模拟题和资源。结合学情与联网查证的同科目经验，制定有依据的学期进度并安排课程、周末周考。跨项目每天上午4节、下午2至4节，每节45分钟；19–22点为晚自习，固定课程计入当晚学习负荷并减少作业；按get_study_progress中的最新实际学情备课，复盘时间服从我的作息。缺少条件先向我补齐。`,
+      `请读取 exam-teaching 技能，为项目 ${el.dataset.teachingRequest} 核对愿景、考纲、真题、模拟题和资源。结合学情与联网查证的同科目经验，制定有依据的学期进度并安排课程、周末周考（安排考试日期与固定时长，学生当天自选开考时刻，到时停笔，停笔后自行交卷）。跨项目每天上午4节、下午2至4节，每节45分钟；19–22点为晚自习，固定课程计入当晚学习负荷并减少作业；按get_study_progress中的最新实际学情备课，复盘时间服从我的作息。缺少条件先向我补齐。`,
     ),
   );
   bind("[data-lesson-resources]", async (el) => {
@@ -1127,10 +1172,20 @@ export function mountEducation(
       (a) => a.id === el.dataset.studySubmit,
     )!;
     hooks.modal(
-      `<h2 id="modal-title">提交 ${esc(a.title)}</h2><form id="study-submit-form"><label class="form-field"><span>文字答案 / 提交说明</span><textarea name="answers"></textarea></label><label class="form-field"><span>上传答题卡照片或文件</span><input type="file" name="files" multiple></label>${a.questions.map((q) => `<label class="form-field"><span>${esc(q.id)} 完成时刻（本机HH:MM）</span><input type="time" name="time:${esc(q.id)}"></label>`).join("")}<label><input type="checkbox" name="unfinished">本次未完成</label><p>每次重交保存新版本；截止后仍可提交，会记录真实提交时间。</p><p id="study-submit-status" role="status"></p><div class="modal-actions"><button type="button" id="study-submit-cancel" class="button secondary">取消</button><button class="button primary" type="submit">提交并等待批改</button></div></form>`,
+      `<h2 id="modal-title">提交 ${esc(a.title)}</h2><form id="study-submit-form"><label class="form-field"><span>文字答案 / 提交说明</span><textarea name="answers"></textarea></label><label class="form-field"><span>上传答题卡照片或文件</span><input type="file" name="files" multiple></label><details class="study-question-times"><summary>补充逐题完成时刻（可选）</summary><p>答题卡已写时刻就不用重复填；交卷后助手会在批改时尝试识别并补录。识别不清的题保持空缺并告知你；若要自行补充，请在提交前填写 24 小时制 HH:MM。</p>${a.questions.map((q) => `<label class="form-field"><span>${esc(q.id)} 完成时刻（可选）</span><input type="text" name="time:${esc(q.id)}" inputmode="numeric" pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" placeholder="例如 18:51" title="请输入24小时制时刻，例如 18:51" autocomplete="off"></label>`).join("")}</details><label><input type="checkbox" name="unfinished">本次未完成</label><p>每次重交保存新版本；${a.kind !== "homework" ? "停笔后可自行决定何时交卷；不得超出考试时长继续答题。" : "截止后仍可提交，会记录真实提交时间。"}</p><p id="study-submit-status" role="status"></p><div class="modal-actions"><button type="button" id="study-submit-cancel" class="button secondary">取消</button><button class="button primary" type="submit">提交并等待批改</button></div></form>`,
     );
     document.getElementById("study-submit-cancel")!.onclick = hooks.close;
     const form = document.querySelector<HTMLFormElement>("#study-submit-form")!;
+    const times = form.querySelector<HTMLDetailsElement>(
+      ".study-question-times",
+    )!;
+    form.addEventListener(
+      "invalid",
+      (event) => {
+        if (times.contains(event.target as Node)) times.open = true;
+      },
+      true,
+    );
     const submissionId = crypto.randomUUID();
     const ids: string[] = [];
     const uploaded = new Set<File>();
@@ -1169,6 +1224,9 @@ export function mountEducation(
             },
           });
           hooks.close();
+          hooks.ask(
+            `请读取 exam-teaching 技能，批改项目 ${a.projectId} 的「${a.title}」本次提交（submissionId: ${submissionId}，教学事件 grade:${submissionId}）。先检查事件状态和已有批改；如果后台已在处理或已经批改，不要重复执行。读取答卷及附件，只补录能辨认且尚未记录的逐题完成时刻；依据发布时的答案和评分点批改，保存正式批改后完成事件。识别不清的内容请说明，不要猜测。`,
+          );
         } finally {
           delete form.dataset.saving;
           button.disabled = false;
@@ -1214,10 +1272,10 @@ async function upload(file: File, projectId: string): Promise<{ id: string }> {
 
 export function educationBanner(snapshot: Snapshot): string {
   const exam = snapshot.data.education.assessments.find(
-    (a) => a.startedAt && !a.stoppedAt,
+    (a) => a.startedAt && !a.stoppedAt && snapshot.serverTime < examDeadline(a),
   );
   if (exam)
-    return `<section class="reminder-banner"><strong>考试中：${esc(exam.title)} · 本机时间 <span class="teaching-local-clock"></span> · 剩余 <span class="teaching-remaining" data-ends-at="${exam.endsAt}"></span></strong><p>请独立作答，每题完成后在纸质答题卡填写本机HH:MM时刻。${when(exam.endsAt)}停笔，随后拍照上传。</p><button class="text-button" data-page="project:${esc(exam.projectId)}">查看考试与提交入口</button></section>`;
+    return `<section class="reminder-banner"><strong>考试中：${esc(exam.title)} · 本机时间 <span class="teaching-local-clock"></span> · 剩余 <span class="teaching-remaining" data-ends-at="${examDeadline(exam)}"></span></strong><p>请独立作答，每题完成后在纸质答题卡填写本机HH:MM时刻。${when(examDeadline(exam))}停笔，随后拍照上传。</p><button class="text-button" data-page="project:${esc(exam.projectId)}">查看考试与提交入口</button></section>`;
   const lesson = snapshot.data.education.lessons.find(
     (l) => l.state === "active",
   );
@@ -1226,17 +1284,23 @@ export function educationBanner(snapshot: Snapshot): string {
       ?.flatMap((p) =>
         p.assessments.map((a) => ({ ...a, projectId: p.projectId })),
       )
-      .find((a) =>
-        [
-          "awaitingSubmission",
-          "submitted",
-          "needsReview",
-          "correctionDue",
-          "overdue",
-        ].includes(a.status),
+      .find(
+        (a) =>
+          [
+            "awaitingSubmission",
+            "submitted",
+            "needsReview",
+            "correctionDue",
+            "overdue",
+          ].includes(a.status) &&
+          snapshot.data.education.assessments.some(
+            (assessment) =>
+              assessment.id === a.id &&
+              actionableAssessment(assessment, snapshot),
+          ),
       );
     return pending
-      ? `<section class="reminder-banner"><strong>${esc(pending.title)} · ${esc(assessmentStates[pending.status])}</strong><button class="text-button" data-page="project:${esc(pending.projectId)}">打开作业、批改与订正</button></section>`
+      ? `<section class="reminder-banner"><strong>${esc(pending.title)} · ${pending.status === "awaitingSubmission" && pending.kind !== "homework" ? "已停笔，待交卷" : esc(assessmentStates[pending.status])}</strong><button class="text-button" data-page="project:${esc(pending.projectId)}">打开作业、批改与订正</button></section>`
       : "";
   }
   return lesson

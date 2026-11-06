@@ -31,7 +31,8 @@
     "agent:build": "node scripts/build-agent.mjs",
     "check:handbook": "python3 scripts/handbook-paths.py && python3 scripts/handbook-tests.py && python3 scripts/handbook-backlog.py && python3 scripts/handbook-stats.py && python3 scripts/check-handbook.py",
     "handbook:stats": "python3 scripts/handbook-stats.py",
-    "handbook:paths": "python3 scripts/handbook-paths.py"
+    "handbook:paths": "python3 scripts/handbook-paths.py",
+    "core:test": "pnpm --filter @tomato/core test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
@@ -47,5 +48,13 @@
     "prettier": "^3.9.9",
     "typescript": "^5.9.3",
     "vite": "^8.3.4"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

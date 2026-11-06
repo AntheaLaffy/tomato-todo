@@ -263,19 +263,32 @@ fn assessment_summary(
         }
     } else if submission.is_some() {
         "submitted"
-    } else if a.kind != AssessmentKind::Homework && a.started_at.is_some() && a.stopped_at.is_none()
+    } else if a.kind != AssessmentKind::Homework
+        && a.started_at.is_none()
+        && crate::date_at(at) > crate::date_at(a.starts_at)
+    {
+        "missed"
+    } else if a.kind != AssessmentKind::Homework
+        && a.started_at.is_some()
+        && a.stopped_at.is_none()
+        && at < a.exam_deadline()
     {
         "inProgress"
-    } else if a.stopped_at.is_some() || at >= a.ends_at {
+    } else if a.kind != AssessmentKind::Homework
+        && a.started_at.is_some()
+        && (a.stopped_at.is_some() || at >= a.exam_deadline())
+    {
+        "awaitingSubmission"
+    } else if a.kind == AssessmentKind::Homework && at >= a.ends_at {
         "overdue"
-    } else if at < a.starts_at {
+    } else if at < a.starts_at || (a.kind != AssessmentKind::Homework && a.started_at.is_none()) {
         "upcoming"
     } else {
         "awaitingSubmission"
     };
     json!({"id":a.id,"title":a.title,"kind":a.kind,"status":status,"startsAt":a.starts_at,"endsAt":a.ends_at,
         "submissionId":submission.map(|s| &s.id),"submittedAt":submission.map(|s| s.submitted_at),
-        "unfinished":submission.is_some_and(|s| s.unfinished),"late":submission.is_some_and(|s| s.submitted_at > a.ends_at),
+        "unfinished":submission.is_some_and(|s| s.unfinished),"late":a.kind == AssessmentKind::Homework && submission.is_some_and(|s| s.submitted_at > a.ends_at),
         "gradeId":grade.map(|g| &g.id),"gradedAt":grade.map(|g| g.graded_at),
         "score":grade.filter(|g| !g.needs_review).map(|g| g.awards.iter().map(|p| p.awarded).sum::<u32>()),
         "total":a.questions.iter().flat_map(|q| &q.scoring).map(|p| p.points).sum::<u32>(),
