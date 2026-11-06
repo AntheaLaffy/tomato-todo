@@ -22,9 +22,15 @@
 
 ### 质量
 
-- 领域核心 109 条测试逐条移植自 Rust（crates/core 的 tests/education_tests/template_tests），tsc strict 全绿；
-  runtime 60 条、工具脚本 18 条、guard 22 条测试全绿；guard 另通过 Xvfb+openbox 隔离桌面冒烟
+- 领域核心 115 条测试（109 条逐条移植自 Rust + runtime 桥接 6 条），tsc strict 全绿；
+  runtime 75 条、工具脚本 24 条、guard 22 条测试全绿；guard 另通过 Xvfb+openbox 隔离桌面冒烟
   与 Windows/macOS 交叉编译检查。
+- 客户端无浏览器冒烟 `pnpm check:client`：假 DOM + 真 React 逐页渲染九个主视图页面、HUD/沉浸层/
+  入口卡与皮肤注入；`pnpm check:client:live` 用运行中 runtime 的真实 `/api/state` 联调。
+- 真实数据导入验证：70 任务（12 完成）/110 专注记录/6105 身份/6 项目/13 课表时段 + 教育域
+  （82 课程、4774 资源、5 学期）；导入前自动备份，旧 `tomato.sqlite3` 未改动。
+- `/api/state` 默认投影 228KB（gzip 52KB），`?full=1` 返回完整数据；轮询在客户端降频并靠
+  `timer.deadline` 本地插值，专注中不依赖网络刷新倒计时。
 
 ### 破坏性变更
 
