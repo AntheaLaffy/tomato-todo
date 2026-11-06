@@ -6,19 +6,17 @@ import { h, useState, useEffect, useRef } from "../runtime.js";
 import { t } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import { IconBtn, Ring, ToastHost } from "../shared/ui.js";
-import { useSnapshot, refresh as refreshStore, startPolling } from "../shared/store.js";
+import { useSnapshot, refresh as refreshStore } from "../shared/store.js";
 import { todayKey, timerView, greeting } from "../shared/derive.js";
 import { pageList } from "./registry.js";
-
-const PAGE_STORAGE_KEY = "tomato-dsh.page";
+import {
+  getActivePageId,
+  setActivePageId,
+  subscribeActivePage,
+} from "./navigation.js";
 
 function loadActivePage(pages) {
-  let saved = null;
-  try {
-    saved = localStorage.getItem(PAGE_STORAGE_KEY);
-  } catch {
-    saved = null;
-  }
+  const saved = getActivePageId();
   if (saved && pages.some((page) => page.id === saved)) return saved;
   return pages.length > 0 ? pages[0].id : null;
 }
@@ -240,17 +238,11 @@ export function AppShell(props) {
   const narrow = useViewportNarrow();
   const active = pages.find((page) => page.id === activeId) ?? pages[0] ?? null;
 
-  const select = (id) => {
-    setActiveId(id);
-    try {
-      localStorage.setItem(PAGE_STORAGE_KEY, id);
-    } catch {
-      /* 隐私模式下忽略 */
-    }
-  };
+  // 跨模块导航：沉浸层等外部入口经 navigation.js 切页。
+  useEffect(() => subscribeActivePage(setActiveId), []);
 
   useEffect(() => {
-    if (active === null && pages.length > 0) setActiveId(pages[0].id);
+    if (active === null && pages.length > 0) setActivePageId(pages[0].id);
   }, [pages.length]);
 
   const badges = {};
@@ -275,7 +267,7 @@ export function AppShell(props) {
     h(NavColumn, {
       pages,
       activeId: active ? active.id : null,
-      onSelect: select,
+      onSelect: setActivePageId,
       state,
       compact: narrow,
       badges,

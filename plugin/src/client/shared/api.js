@@ -60,6 +60,18 @@ export function postDispatch(action, opts) {
   return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
 }
 
+/**
+ * 导出计划 v6 / 备份 v4（JSON，浏览器端由页面负责 Blob 下载）。
+ * 端点在 data-runtime 落地前会 404，页面用 typeof fn === "function" + 错误行降级。
+ */
+export function getExportPlan(opts) {
+  return request("/api/export/plan", { timeoutMs: 15000, ...opts });
+}
+
+export function getExportBackup(opts) {
+  return request("/api/export/backup", { timeoutMs: 30000, ...opts });
+}
+
 /** guard 与 runtime 健康摘要（GET /health）。 */
 export function getHealth(opts) {
   return request("/health", opts);

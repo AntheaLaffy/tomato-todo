@@ -292,7 +292,7 @@ let sampleState = {
       alwaysOnTop: false,
       theme: "light",
       personaBackdrop: true,
-      protection: { mode: "whitelist", strict: false, allowedApps: ["firefox"] },
+      protection: { mode: "whitelist", strict: false, whitelist: ["firefox"] },
     },
     timer: {
       mode: "focus",

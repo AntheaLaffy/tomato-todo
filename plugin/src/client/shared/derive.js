@@ -212,24 +212,115 @@ export function focusTrail(data, n = 12) {
     .slice(0, n);
 }
 
-/** 保护状态：是否锁定/白名单保护中。 */
+/**
+ * 保护状态：是否锁定/白名单保护中。
+ * Protection 形状以 @tomato/core 为准：{mode:'off'|'lock'|'whitelist', whitelist, strict}。
+ * 项目专属白名单（Project.appWhitelist 非 null）替代通用白名单，与 core 的
+ * AppData.effectiveWhitelist() 语义一致。
+ */
 export function protectionView(state) {
   const data = (state && state.data) || {};
   const settings = data.settings || {};
-  const protection = settings.protection || { mode: "off", allowedApps: [] };
+  const protection = settings.protection || { mode: "off", whitelist: [], strict: false };
   const timer = timerView(state);
   const guard = (state && state.guard) || { available: false };
   const focusing = timer.running && timer.mode === "focus";
   const active = focusing && protection.mode !== "off";
+  const task = taskById(data, timer.taskId);
+  const project = task && task.projectId ? projectById(data, task.projectId) : null;
+  const projectList = project && Array.isArray(project.appWhitelist) ? project.appWhitelist : null;
   return {
     mode: protection.mode || "off",
     strict: !!protection.strict,
     active,
     locked: !!guard.locked,
-    whitelist: protection.allowedApps || [],
+    whitelist: Array.isArray(protection.whitelist) ? protection.whitelist : [],
     effectiveWhitelist:
-      active && protection.mode === "whitelist" ? protection.allowedApps || [] : [],
+      active && protection.mode === "whitelist"
+        ? projectList !== null
+          ? projectList
+          : Array.isArray(protection.whitelist)
+            ? protection.whitelist
+            : []
+        : [],
     guard,
     focusing,
   };
+}
+
+// ---------------------------------------------------------------- 待补队列
+
+/**
+ * 计划块时长（分钟）：与 @tomato/core reminders.windowMinutes 语义一致。
+ * 客户端只用于显示「待补窗口」，写入与作废判定仍以 core 为唯一权威。
+ */
+export function windowMinutes(task, settings) {
+  const focus = task && task.focusMinutes != null ? task.focusMinutes : (settings && settings.focusMinutes) || 45;
+  const sessions = Math.max(1, Number(task && task.estimate) || 1);
+  const every = Math.max(1, Number(settings && settings.longBreakEvery) || 4);
+  const shortBreak = Number(settings && settings.shortBreakMinutes) || 5;
+  const longBreak = Number(settings && settings.longBreakMinutes) || 15;
+  let breaks = 0;
+  for (let i = 1; i < sessions; i += 1) breaks += i % every === 0 ? longBreak : shortBreak;
+  return sessions * focus + breaks;
+}
+
+/**
+ * 待补判定：普通任务、未完成、未作废、到期=今天，且现在已过
+ * `提醒时刻 + 计划块时长`、仍在 `+ scrapMinutes` 重修窗口内。
+ * （作废/过期由 core 的 reminderExpired 标记，这里只做展示筛选。）
+ */
+export function isCatchUp(data, task, today) {
+  if (!data || !task) return false;
+  const nowKey = dayKey(Date.now() / 1000);
+  if (nowKey !== today) return false;
+  if (task.completed || task.reminderExpired) return false;
+  if (task.dueDate !== today || task.reminderTime === null) return false;
+  const kind = data.taskKinds && data.taskKinds[task.id];
+  if (kind === "habit" || task.habitId !== null || task.recurring) return false;
+  const start = parseHHMM(task.reminderTime);
+  if (start === null) return false;
+  if (task.scrapMinutes <= 0) return false;
+  const elapsed = new Date();
+  const nowSecs = elapsed.getHours() * 3600 + elapsed.getMinutes() * 60 + elapsed.getSeconds();
+  const end = start + windowMinutes(task, data.settings) * 60;
+  return nowSecs > end && nowSecs < end + task.scrapMinutes * 60;
+}
+
+/** 当前处于待补窗口的任务（按提醒时刻升序）。 */
+export function catchUpTasks(data, today) {
+  const tasks = (data && data.tasks) || [];
+  return tasks
+    .filter((task) => isCatchUp(data, task, today))
+    .sort((a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime)));
+}
+
+/** 今天完成的任务（completedAt 落在今天；旧数据无 completedAt 时回退到期日）。 */
+export function completedOn(data, today) {
+  const tasks = (data && data.tasks) || [];
+  return tasks.filter((task) => {
+    if (!task.completed) return false;
+    if (task.completedAt != null) return dayKey(task.completedAt) === today;
+    return task.dueDate === today;
+  });
+}
+
+/** 任务已完成的番茄轮数（source==='timer' 且完成的 session）。 */
+export function taskRounds(data, taskId) {
+  const sessions = (data && data.sessions) || [];
+  if (!taskId) return 0;
+  return sessions.filter(
+    (session) => session.source === "timer" && session.completed && session.taskId === taskId,
+  ).length;
+}
+
+/** 日期的人读标签：今天/昨天/明天，其余「M 月 D 日」。 */
+export function dayLabel(date, today) {
+  if (!date) return "";
+  if (date === today) return t("common.today");
+  if (today && date === addDays(today, -1)) return t("common.yesterday");
+  if (today && date === addDays(today, 1)) return t("common.tomorrow");
+  const parts = date.split("-").map(Number);
+  if (parts.length !== 3) return date;
+  return t("common.monthDay", { m: parts[1], d: parts[2] });
 }

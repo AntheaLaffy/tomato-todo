@@ -14,6 +14,7 @@ import {
 } from "../shared/store.js";
 import * as api from "../shared/api.js";
 import { AppShell } from "./frame.js";
+import { bindPanelOpener } from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
 import "./nav-copy.js";
@@ -67,6 +68,8 @@ export function registerApp(ctx) {
       /* DSH 版本差异时忽略 */
     }
   };
+
+  bindPanelOpener(openPanel);
 
   const pageProps = { dispatch, api };
 
