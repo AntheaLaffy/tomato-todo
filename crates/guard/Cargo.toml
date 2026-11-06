@@ -1,0 +1,40 @@
+[package]
+name = "tomato-guard"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "番茄 Todo 专注保护守护进程：全屏锁定、应用白名单与系统通知，供 tomato-runtime 经 HTTP 指挥。无域无状态。"
+
+# 独立工作区：根 Cargo.toml 由 lead 在合并时加入 workspace members。
+# 合并时请删除本 [workspace] 段（或把 crates/guard 放入根 workspace exclude）。
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11rb = "0.13"
+gio = "0.18"
+wayland-client = "0.31"
+wayland-protocols = "0.32"
+memmap2 = "0.9"
+libc = "0.2"
+notify-rust = "4"
+uuid = { version = "1", features = ["v4"] }
+tempfile = "3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_Storage_Packaging_Appx", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+notify-rust = "4"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+notify-rust = "4"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = true
+lto = "thin"

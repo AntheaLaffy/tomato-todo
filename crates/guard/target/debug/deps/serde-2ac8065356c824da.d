@@ -1,0 +1,14 @@
+/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/deps/serde-2ac8065356c824da.d: /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/build/serde-c8451a9059985dd0/out/private.rs
+
+/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/deps/libserde-2ac8065356c824da.rlib: /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/build/serde-c8451a9059985dd0/out/private.rs
+
+/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/deps/libserde-2ac8065356c824da.rmeta: /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/build/serde-c8451a9059985dd0/out/private.rs
+
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/build/serde-c8451a9059985dd0/out/private.rs:
+
+# env-dep:OUT_DIR=/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/build/serde-c8451a9059985dd0/out

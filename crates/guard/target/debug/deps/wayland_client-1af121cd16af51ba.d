@@ -1,0 +1,10 @@
+/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/deps/wayland_client-1af121cd16af51ba.d: /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/lib.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/conn.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/event_queue.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/globals.rs
+
+/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/deps/libwayland_client-1af121cd16af51ba.rlib: /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/lib.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/conn.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/event_queue.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/globals.rs
+
+/home/fuurin/code/todo/.agents/worktrees/tomato-ts-guard/crates/guard/target/debug/deps/libwayland_client-1af121cd16af51ba.rmeta: /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/lib.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/conn.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/event_queue.rs /home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/globals.rs
+
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/lib.rs:
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/conn.rs:
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/event_queue.rs:
+/home/fuurin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-client-0.31.15/src/globals.rs:
