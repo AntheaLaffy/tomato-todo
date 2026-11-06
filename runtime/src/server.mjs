@@ -189,6 +189,34 @@ async function handleMcp(req, res, { engine, token }) {
   }
 }
 
+const RESOURCE_LITE_KEYS = ["id", "projectId", "title", "kind", "path"];
+
+/**
+ * UI 数据面投影：默认省略 data.identities（永久 ID 登记，UI 不读，导入后约 1MB）
+ * 与教学资源明细（完整导入后约 1.4MB）；`?full=1` 返回完整 identities，
+ * `?education=lite` 给目录字段（id/projectId/title/kind/path），
+ * `?education=full` 给完整教学资源。只做浅拷贝投影，不改 engine 内部状态。
+ */
+export function projectUiState(
+  state,
+  { full = false, education = "none" } = {},
+) {
+  const data = { ...state.data };
+  if (!full) delete data.identities;
+  if (education !== "full") {
+    const resources =
+      education === "lite"
+        ? data.education.resources.map((resource) => {
+            const out = {};
+            for (const key of RESOURCE_LITE_KEYS) out[key] = resource[key];
+            return out;
+          })
+        : [];
+    data.education = { ...data.education, resources };
+  }
+  return { ...state, data };
+}
+
 /** guard 摘要（API.md：不可达时只给 {available:false}，不影响整体响应）。 */
 export async function guardSummary(guard) {
   const probe = await guard.status();
@@ -261,6 +289,20 @@ export function createGuardSync(engine, guard) {
   return sync;
 }
 
+/**
+ * UI 数据面的查询开关：
+ * - `?full=1` 返回完整 data.identities（默认略去）；
+ * - 教学资源默认不返回明细，`?education=lite` 给目录字段，`?education=full` 给完整记录。
+ */
+function uiStateOptions(url) {
+  const education = url.searchParams.get("education");
+  return {
+    full: url.searchParams.get("full") === "1",
+    education:
+      education === "full" ? "full" : education === "lite" ? "lite" : "none",
+  };
+}
+
 async function handleApi(req, res, url, ctx) {
   const { engine, guard, syncGuard } = ctx;
   const path = url.pathname;
@@ -275,7 +317,8 @@ async function handleApi(req, res, url, ctx) {
     }
     if (path === "/api/state") {
       // UI 唯一数据入口：全量快照 + 学情摘要 + guard 摘要。
-      const state = engine.state(now());
+      // 默认省略 identities，需要时 ?full=1；教学资源可 ?education=lite。
+      const state = projectUiState(engine.state(now()), uiStateOptions(url));
       return sendApiJson(req, res, 200, {
         ...state,
         guard: await guardSummary(guard),
@@ -319,9 +362,10 @@ async function handleApi(req, res, url, ctx) {
       });
     }
     syncGuard.fire();
+    const snapshot = projectUiState(outcome.snapshot, uiStateOptions(url));
     return sendApiJson(req, res, 200, {
       changed: outcome.changed,
-      snapshot: { ...outcome.snapshot, guard: await guardSummary(guard) },
+      snapshot: { ...snapshot, guard: await guardSummary(guard) },
     });
   }
   if (method === "POST" && path === "/api/tasks") {

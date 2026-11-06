@@ -8,7 +8,12 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Engine } from "../src/engine.ts";
-import { startServer, UI_ORIGIN, desiredGuard } from "../src/server.mjs";
+import {
+  startServer,
+  UI_ORIGIN,
+  desiredGuard,
+  projectUiState,
+} from "../src/server.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "tomato-state-"));
 const TOKEN = "state-token";
@@ -87,8 +92,9 @@ test("GET /api/state：全量快照 + 学情摘要 + guard 摘要（不可达给
   assert.ok(Array.isArray(body.education));
   assert.deepEqual(body.guard, { available: false });
   assert.ok(Array.isArray(body.data.tasks));
+  // UI 数据面默认省略 identities（UI 不读；导入后近 1MB），?full=1 才返回。
+  assert.ok(!("identities" in body.data), "默认不应返回 data.identities");
   for (const key of [
-    "identities",
     "projects",
     "habits",
     "blocks",
@@ -104,6 +110,59 @@ test("GET /api/state：全量快照 + 学情摘要 + guard 摘要（不可达给
     assert.ok(key in body.data, `state.data 缺少 ${key}`);
   }
   assert.ok(body.stats.days.length > 0);
+});
+
+test("GET /api/state?full=1：返回完整 identities；projectUiState 投影正确", async () => {
+  const full = await json("/api/state?full=1");
+  assert.equal(full.status, 200);
+  assert.ok(Array.isArray(full.body.data.identities));
+
+  // 纯函数投影：identities 默认略去、full 保留；教学资源默认不返回明细，
+  // ?education=lite 给目录字段，?education=full 才带 topics/source/edition。
+  const fake = {
+    today: "2026-11-07",
+    serverTime: 1,
+    data: {
+      identities: [
+        { id: "i1", kind: "task", retired: false, restoreTask: null },
+      ],
+      tasks: [],
+      education: {
+        resources: [
+          {
+            id: "r1",
+            projectId: "p1",
+            title: "资料",
+            kind: "book",
+            path: "a.pdf",
+            source: "src",
+            edition: "1",
+            topics: ["t"],
+          },
+        ],
+      },
+    },
+  };
+  const normal = projectUiState(fake);
+  assert.ok(!("identities" in normal.data));
+  assert.deepEqual(normal.data.education.resources, []);
+  assert.deepEqual(Object.keys(normal).sort(), ["data", "serverTime", "today"]);
+
+  const lite = projectUiState(fake, { education: "lite" });
+  assert.deepEqual(Object.keys(lite.data.education.resources[0]), [
+    "id",
+    "projectId",
+    "title",
+    "kind",
+    "path",
+  ]);
+  assert.equal(lite.data.education.resources[0].topics, undefined);
+
+  const fullView = projectUiState(fake, { full: true, education: "full" });
+  assert.equal(fullView.data.identities.length, 1);
+  assert.equal(fullView.data.education.resources[0].topics[0], "t");
+  // 投影不能改到原对象。
+  assert.equal(fake.data.education.resources[0].topics.length, 1);
 });
 
 test("POST /api/dispatch：saveTask 成功、非法 Action 400、未知字段 400", async () => {
@@ -405,6 +464,31 @@ test("POST /api/dispatch：education Action 走 core 校验（不是未知动作
   assert.equal(result.status, 400);
   assert.doesNotMatch(result.body.error, /动作 type/);
   assert.match(result.body.error, /课程|教学/);
+});
+
+test("GET /api/state：教学资源默认不返回明细，?education=lite / =full 分级返回", async () => {
+  const normal = await json("/api/state");
+  assert.equal(normal.status, 200);
+  // 默认不返回教学资源明细（目录/统计页需要时显式请求）。
+  assert.deepEqual(normal.body.data.education.resources, []);
+  assert.ok(Array.isArray(normal.body.data.education.lessons));
+
+  const lite = await json("/api/state?education=lite");
+  assert.equal(lite.status, 200);
+  assert.ok(Array.isArray(lite.body.data.education.resources));
+  for (const resource of lite.body.data.education.resources) {
+    assert.deepEqual(Object.keys(resource), [
+      "id",
+      "projectId",
+      "title",
+      "kind",
+      "path",
+    ]);
+  }
+
+  const full = await json("/api/state?education=full");
+  assert.equal(full.status, 200);
+  assert.ok(Array.isArray(full.body.data.education.resources));
 });
 
 test("GET /api/export/plan 与 /api/export/backup：Content-Disposition 与数据形状", async () => {

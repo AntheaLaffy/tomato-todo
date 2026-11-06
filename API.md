@@ -82,6 +82,15 @@ UI 不再按页面堆端点，而是「取一份全量状态 + 提交 Action」�
   `emergencyUnlock`）可为 `false`，`snapshot` 仍是最新全量状态。
 - `/api/state` 与 `/api/dispatch` 的响应体较大（导入教学记录后可到数 MB）；请求带
   `Accept-Encoding: gzip` 时按需 gzip，形状不变。
+- UI 数据面默认**省略 `data.identities`**（永久 ID 登记，插件 UI 不读；完整导入后约 1MB）。
+  需要完整数据时加 `?full=1`（MCP/助手侧要核对 ID 历史时用），它同时作用于
+  `/api/state` 与 `/api/dispatch` 返回的 `snapshot`（两者保持同形）。
+- 教学资源按层级返回（完整导入后资源明细约 1.4MB，UI 默认不需要）：
+  - 默认：`data.education.resources` 为空数组（课程/试卷/学期等其它教学字段仍完整）；
+  - `?education=lite`：`resources` 只保留 `{id, projectId, title, kind, path}`；
+  - `?education=full`：完整 `topics`/`source`/`edition`。
+  统计/目录页需要资源清单时用 `lite`，需要完整记录时用 `full`。
+  默认 `/api/state` 未压缩约 0.2MB（完整导入后）；`?full=1&education=full` 才返回完整数据。
 - MCP `dispatch` 工具保留旧 runtime Action 名（`focusStart`/`focusPause`/…）并返回
   紧凑结果（`{changed,today,serverTime,remainingSecs,stats}`），避免把全量快照当对话文本。
 
