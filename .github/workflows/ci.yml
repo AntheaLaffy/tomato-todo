@@ -73,9 +73,13 @@ jobs:
           if [ -d runtime ]; then pnpm exec prettier --check "runtime/**/*.{ts,mjs}"; fi
           if [ -d plugin ]; then pnpm exec prettier --check "plugin/**/*.{js,json,yml}"; fi
 
-      # 迁移自测：与 scripts/export-sqlite.mjs 同批落地，防止导出语义漂移。
-      - name: SQLite export migration test
-        run: node --test scripts/export-sqlite.test.mjs
+      # 迁移/导入/安装自测：防止数据导出、旧备份导入与安装布局语义漂移。
+      - name: Tooling tests
+        run: pnpm test:tools
+
+      # 客户端构建 + 无浏览器冒烟（假 DOM + 真 React 渲染七个 slot 与九个页面）。
+      - name: Build client and smoke
+        run: pnpm check:client
 
       # 只做校验，不跑会重写文件的三条生成器：行数会随每次代码改动变化，
       # 让它们在 CI 里改文件既没意义也会把无关 PR 变红。

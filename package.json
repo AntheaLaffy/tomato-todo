@@ -9,16 +9,19 @@
     "runtime:test": "cd runtime && node --test",
     "build:runtime": "node scripts/build-runtime.mjs",
     "format": "prettier --write \"packages/**/*.ts\" \"runtime/**/*.{ts,mjs}\" \"plugin/**/*.{js,json,yml}\" \"scripts/**/*.{mjs,js}\"",
-    "check": "pnpm core:test && pnpm runtime:test",
+    "check": "pnpm core:test && pnpm runtime:test && pnpm check:client",
     "check:handbook": "python3 scripts/check-handbook.py",
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs && node scripts/smoke-client.mjs",
-    "check:client:live": "node scripts/build-client.mjs && SMOKE_LIVE=1 node scripts/smoke-client.mjs"
+    "check:client:live": "node scripts/build-client.mjs && SMOKE_LIVE=1 node scripts/smoke-client.mjs",
+    "test:tools": "node --test scripts/export-sqlite.test.mjs scripts/import-backup.test.mjs scripts/install.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
     "prettier": "^3.9.9",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "workspaces": [
     "packages/*",

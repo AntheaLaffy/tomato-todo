@@ -1,0 +1,7 @@
+# 构建产物：由构建脚本写，格式化只会制造无意义 diff。
+plugin/client.js
+runtime/vendor/
+dist/
+target/
+node_modules/
+pnpm-lock.yaml
