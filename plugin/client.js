@@ -2098,7 +2098,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     }, [enabled]);
     return enabled ? id : null;
   }
-  function personaStyle(position) {
+  function personaStyle(position, opacity = 1) {
     return {
       position,
       right: "max(10px, 1.6vw)",
@@ -2111,6 +2111,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       pointerEvents: "none",
       userSelect: "none",
       zIndex: 1,
+      opacity,
       filter: "drop-shadow(0 16px 26px #3a241524)",
       // 只在最左缘做很短的过渡，避免边界生硬；主体完全实心。
       WebkitMaskImage: "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
@@ -2128,7 +2129,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       alt: "",
       "aria-hidden": "true",
       draggable: false,
-      style: personaStyle("fixed")
+      style: personaStyle("fixed", 0.55)
     });
   }
   function PersonaBoard() {
@@ -2140,7 +2141,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       alt: "",
       "aria-hidden": "true",
       draggable: false,
-      style: { ...personaStyle("absolute"), zIndex: 0 }
+      style: { ...personaStyle("absolute", 1), zIndex: 0 }
     });
   }
 

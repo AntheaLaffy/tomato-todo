@@ -94,8 +94,12 @@ function usePersonaEnabled() {
   return enabled ? id : null;
 }
 
-/** 立绘样式：不做整体透明——不压卡片时必须实心（用户要求）。 */
-function personaStyle(position) {
+/**
+ * 立绘样式。
+ * - 番茄页（absolute，卡片后面）：实心，被卡片挡住的地方自然不可见。
+ * - DSH 页面（fixed，浮在内容上）：整体半透明，像水印一样不挡内容。
+ */
+function personaStyle(position, opacity = 1) {
   return {
     position,
     right: "max(10px, 1.6vw)",
@@ -108,6 +112,7 @@ function personaStyle(position) {
     pointerEvents: "none",
     userSelect: "none",
     zIndex: 1,
+    opacity,
     filter: "drop-shadow(0 16px 26px #3a241524)",
     // 只在最左缘做很短的过渡，避免边界生硬；主体完全实心。
     WebkitMaskImage:
@@ -132,7 +137,7 @@ export function PersonaBackdrop() {
     alt: "",
     "aria-hidden": "true",
     draggable: false,
-    style: personaStyle("fixed"),
+    style: personaStyle("fixed", 0.55),
   });
 }
 
@@ -150,6 +155,6 @@ export function PersonaBoard() {
     alt: "",
     "aria-hidden": "true",
     draggable: false,
-    style: { ...personaStyle("absolute"), zIndex: 0 },
+    style: { ...personaStyle("absolute", 1), zIndex: 0 },
   });
 }
