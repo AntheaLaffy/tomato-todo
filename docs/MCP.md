@@ -49,17 +49,17 @@ streamable HTTP：从连接文件读出 `mcpUrl` 与令牌后：
 
 | 工具 | 语义 |
 | --- | --- |
-| `get_control_status` | 当前接管/自动执行状态、本机实际授权目录等，接管入口 |
-| `get_context` | 当前实例上下文：今日待办、课表阻塞时段等，接管入口 |
-| `set_external_control` | `controller: "客户端名称"` 暂停内置自动执行；`controller: null` 归还 |
-| `create_task` / `update_task` / `move_tasks` / `complete_task` | 普通任务的增、改、移、完成 |
-| `dispatch` | 番茄、设置、愿景、保护等单项动作 |
-| `export_plan` / `export_backup` | 把计划/备份导出为文件，大批改动的起点 |
-| `review_file` / `apply_file` | 改动走「导出 → 审阅 → 应用」，保留来源与哈希校验 |
+| `get_context` | 当前实例上下文：今日待办、课表阻塞时段、学情摘要、统计与诊断，接管入口 |
+| `get_tasks` | 按 `projectId`/`completed` 分页读任务 |
+| `get_study_progress` | 按科目读学情摘要与分页进度历史 |
 | `get_education` | 按 `collection/projectId/id` 分页读完整教学记录 |
-| education 写工具 | 保存学期、课程、题卷、提交、评分与复盘 |
+| `education` | `command.op` 保存学期、课程、作业、考试、答卷、批改、订正与学情 |
+| `create_task` / `update_task` / `move_tasks` / `complete_task` | 普通任务的增、改、移、完成 |
+| `dispatch` | 番茄、设置、愿景、课表等单项 Action |
+| `export_plan` / `export_backup` | 把计划/备份导出为文件，大批改动的起点 |
+| `apply_file` | 按 `fileHash` 应用导出的计划 v6 / 备份 v4，带来源与哈希校验 |
 
-接管顺序：先 `get_control_status` 与 `get_context`；普通任务用 create/update/move/complete；单项动作走 `dispatch`；大批改动走 `export_plan` / `export_backup` → 改文件 → `review_file` → `apply_file`；教学先 `get_education` 再 education 写工具。需要独立负责后续教学、定时与复盘时，用 `set_external_control(controller=你的名称)` 暂停内置自动执行，完成后 `controller=null` 归还——这是显式的执行归属：不会中断正在执行的请求，也没有自动过期，不新增调度层、轮次上限或重试循环。
+接管顺序：先 `get_context`；普通任务用 create/update/move/complete；单项动作走 `dispatch`；大批改动走 `export_plan` / `export_backup` → 客户端自行编辑 → `apply_file`；教学先 `get_education` 再 `education` 写工具。文件读写、网页搜索、定时等能力由客户端（DSH）自带工具完成，runtime 不重复暴露；旧清单的 `get_control_status` / `set_external_control` / `review_file` / `read_file` / `patch_file` 已随旧助手一起移除。
 
 ## 安全与边界
 

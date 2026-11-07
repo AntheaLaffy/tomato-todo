@@ -354,6 +354,54 @@ test("/mcp tools/call：get_context / complete_task / 错误工具 isError", asy
   assert.match(err.body.result.content[0].text, /任务不存在/);
 });
 
+test("/mcp 教学与读取工具：get_tasks / get_study_progress / get_education / education", async () => {
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${TOKEN}`,
+  };
+  const mcp = (name, args) =>
+    json("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 20,
+        method: "tools/call",
+        params: { name, arguments: args },
+      }),
+    });
+
+  const tasks = await mcp("get_tasks", { completed: false, limit: 5 });
+  assert.ok(!tasks.body.result.isError);
+  assert.ok(Array.isArray(tasks.body.result.structuredContent.tasks));
+
+  const sp = await mcp("get_study_progress", {});
+  assert.ok(!sp.body.result.isError);
+  assert.ok(Array.isArray(sp.body.result.structuredContent.projects));
+
+  const ed = await mcp("get_education", { collection: "progress", limit: 5 });
+  assert.ok(!ed.body.result.isError);
+  assert.equal(ed.body.result.structuredContent.collection, "progress");
+  assert.ok(Array.isArray(ed.body.result.structuredContent.records));
+
+  const bogus = await mcp("get_education", { collection: "nope" });
+  assert.equal(bogus.body.result.isError, true);
+  assert.match(bogus.body.result.content[0].text, /未知教学记录集合/);
+
+  // education 工具已接线：未知 op 被 parseCommand 拒绝（isError 而非 HTTP 错误）。
+  const edu = await mcp("education", { command: { op: "no_such_op" } });
+  assert.equal(edu.body.result.isError, true);
+  assert.match(edu.body.result.content[0].text, /教学命令/);
+
+  // apply_file：导出计划后按 fileHash 应用，往返应成功。
+  const exp = await mcp("export_plan", { name: "p-roundtrip.json" });
+  assert.ok(!exp.body.result.isError);
+  const { fileHash } = exp.body.result.structuredContent;
+  const app = await mcp("apply_file", { name: "p-roundtrip.json", fileHash });
+  assert.ok(!app.body.result.isError);
+  assert.equal(app.body.result.structuredContent.applied, true);
+});
+
 test("/mcp：非法 JSON → -32700；通知（无 id）→ 202 空响应；未知方法 → -32601", async () => {
   const headers = {
     "Content-Type": "application/json",

@@ -125,41 +125,56 @@ export function apply(ctx, config) {
     output: {
       schema: { type: "object", additionalProperties: true },
       render(args, value) {
-        return [{ type: "text", text: String(value) }];
+        if (value && typeof value === "string") {
+          return [{ type: "text", text: value }];
+        }
+        const v = value || {};
+        const tasks = Array.isArray(v.tasks) ? v.tasks : [];
+        const lines = [
+          `番茄 Todo 已连接（${v.serverTime ?? ""}）。`,
+          `今日待办 ${v.taskCount ?? 0} 件、逾期 ${v.overdueCount ?? 0} 件：`,
+          ...tasks.map(
+            (t) =>
+              `- ${t.title}${t.reminderTime ? `（${t.reminderTime}）` : ""}`,
+          ),
+          `今日投入 ${Math.round((v.todaySeconds ?? 0) / 60)} 分钟、` +
+            `完成番茄 ${v.todayPomodoros ?? 0} 个、完成 ${v.todayCompleted ?? 0} 件任务。`,
+        ];
+        if (Array.isArray(v.anomalies) && v.anomalies.length > 0) {
+          lines.push(
+            `本地诊断 ${v.anomalies.length} 条：${JSON.stringify(v.anomalies)}`,
+          );
+        }
+        return [{ type: "text", text: lines.join("\n") }];
       },
     },
     async execute() {
       const context = await callRuntimeTool(ctx, bin, "get_context", {});
       // get_context 允许两种返回：结构化对象或一段已组织好的文本。
-      if (typeof context === "string") return context;
+      if (typeof context === "string") return { summary: context };
       if (!context || typeof context !== "object") {
         fail("get_context 返回了无法识别的数据");
       }
-      const today = context.today;
-      const tasks = Array.isArray(context.recentTasks)
-        ? context.recentTasks.filter(
-            (t) => t.due_date === today && !t.completed,
-          )
+      const tasks = Array.isArray(context.todayTasks)
+        ? context.todayTasks.filter((t) => !t.completed)
         : [];
       const stats = context.stats || {};
-      const lines = [
-        `番茄 Todo 已连接（${context.asOf}）。`,
-        `任务总数 ${context.taskCount}；今日待办 ${tasks.length} 件：`,
-        ...tasks
-          .slice(0, 8)
-          .map(
-            (t) =>
-              `- ${t.title}${t.reminder_time ? `（${t.reminder_time}）` : ""}`,
-          ),
-        `今日投入 ${Math.round((stats.today_seconds || 0) / 60)} 分钟、` +
-          `完成番茄 ${stats.today_pomodoros || 0} 个、完成 ${stats.today_completed || 0} 件任务。`,
-      ];
-      if (Array.isArray(context.anomalies) && context.anomalies.length > 0) {
-        lines.push(
-          `本地诊断 ${context.anomalies.length} 条：${JSON.stringify(context.anomalies)}`,
-        );
-      }
-      return lines.join("\n");
+      return {
+        today: context.today,
+        serverTime: context.serverTime ?? null,
+        taskCount: tasks.length,
+        overdueCount: Array.isArray(context.overdueTasks)
+          ? context.overdueTasks.length
+          : 0,
+        tasks: tasks.slice(0, 8).map((t) => ({
+          title: t.title,
+          reminderTime: t.reminderTime ?? null,
+        })),
+        todaySeconds: stats.todaySeconds ?? 0,
+        todayPomodoros: stats.todayPomodoros ?? 0,
+        todayCompleted: stats.todayCompleted ?? 0,
+        anomalies: Array.isArray(context.anomalies) ? context.anomalies : [],
+      };
     },
   });
 
@@ -172,7 +187,22 @@ export function apply(ctx, config) {
     output: {
       schema: { type: "object", additionalProperties: true },
       render(args, value) {
-        return [{ type: "text", text: String(value) }];
+        const v = value || {};
+        const lines = ["番茄 Todo 专注保护（guard）："];
+        if (v.available) {
+          lines.push(
+            `- 可用：是${v.backend ? `（${v.backend}）` : ""}`,
+            `- 锁定：${v.locked ? "是" : "否"}`,
+            `- 白名单 ${Array.isArray(v.whitelist) ? v.whitelist.length : 0} 个` +
+              (Array.isArray(v.whitelist) && v.whitelist.length > 0
+                ? `：${v.whitelist.join("、")}`
+                : ""),
+            `- 进程 PID：${v.pid == null ? "未运行" : v.pid}`,
+          );
+        } else {
+          lines.push(`- 可用：否${v.message ? `（${v.message}）` : ""}`);
+        }
+        return [{ type: "text", text: lines.join("\n") }];
       },
     },
     async execute() {
@@ -194,21 +224,7 @@ export function apply(ctx, config) {
       const guard = reply.guard;
       if (!guard || typeof guard !== "object")
         fail("guard 状态响应缺少 guard 字段");
-      const lines = ["番茄 Todo 专注保护（guard）："];
-      if (guard.available) {
-        lines.push(
-          `- 可用：是${guard.backend ? `（${guard.backend}）` : ""}`,
-          `- 锁定：${guard.locked ? "是" : "否"}`,
-          `- 白名单 ${Array.isArray(guard.whitelist) ? guard.whitelist.length : 0} 个` +
-            (Array.isArray(guard.whitelist) && guard.whitelist.length > 0
-              ? `：${guard.whitelist.join("、")}`
-              : ""),
-          `- 进程 PID：${guard.pid == null ? "未运行" : guard.pid}`,
-        );
-      } else {
-        lines.push(`- 可用：否${guard.message ? `（${guard.message}）` : ""}`);
-      }
-      return lines.join("\n");
+      return guard;
     },
   });
 }

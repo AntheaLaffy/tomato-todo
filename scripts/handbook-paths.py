@@ -65,13 +65,19 @@ SYMBOL_PAT = re.compile(
 JS_FUNCTION_PAT = re.compile(r"^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_][A-Za-z0-9_]*)", re.M)
 STRUCT_PAT = re.compile(r"^(?:pub(?:\(crate\))?\s+)?(?:struct|enum|trait)\s+([A-Za-z_][A-Za-z0-9_]*)", re.M)
 EXPORT_PAT = re.compile(r"^export\s+(?:async\s+)?(?:function|const|class|type)\s+([A-Za-z_][A-Za-z0-9_]*)", re.M)
+# 插件层是 esbuild 打包的 IIFE 源码：没有 export，靠函数/常量/类的声明形态识别。
+JS_CONST_PAT = re.compile(r"^(?:const|let)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=", re.M)
+JS_CLASS_PAT = re.compile(r"^class\s+([A-Za-z_][A-Za-z0-9_]*)", re.M)
 
 def symbols(path: pathlib.Path, cap: int | None = None) -> list[str]:
     if not path.is_file():
         return []
     text = path.read_text(encoding="utf-8", errors="ignore")
     out: list[str] = []
-    patterns = (SYMBOL_PAT, JS_FUNCTION_PAT, EXPORT_PAT) if path.suffix in (".ts", ".mjs") else (SYMBOL_PAT,)
+    if path.suffix in (".ts", ".mjs", ".js"):
+        patterns = (JS_FUNCTION_PAT, EXPORT_PAT, JS_CONST_PAT, JS_CLASS_PAT)
+    else:
+        patterns = (SYMBOL_PAT,)
     for pat in patterns:
         for m in pat.finditer(text):
             if m.group(1) not in out:
@@ -86,7 +92,7 @@ def repo_index() -> dict[str, list[pathlib.Path]]:
     skip = {"node_modules", "target", "dist", "bundle", "gen", ".git", "artifacts", ".project-maintenance"}
     index: dict[str, list[pathlib.Path]] = {}
     for p in ROOT.rglob("*"):
-        if not p.is_file() or p.suffix not in (".rs", ".ts", ".mjs", ".py", ".css", ".json"):
+        if not p.is_file() or p.suffix not in (".rs", ".ts", ".mjs", ".js", ".py", ".css", ".json"):
             continue
         if any(part in skip for part in p.parts):
             continue
@@ -134,7 +140,7 @@ def nav_files() -> dict[str, list[str]]:
         m = re.match(r"^\| \[([^\]]+)\]\(([^)]+)\) \| (.+) \| (.+) \|$", line)
         if not m or not CHAPTER_RE.match(m.group(1)):
             continue
-        files = [p for p in re.findall(r"`([A-Za-z0-9_./-]+\.(?:rs|ts|mjs|py|md|json|css))`", m.group(4))]
+        files = [p for p in re.findall(r"`([A-Za-z0-9_./-]+\.(?:rs|ts|mjs|js|py|md|json|css))`", m.group(4))]
         out[m.group(1)] = files
     return out
 
@@ -148,7 +154,7 @@ def a_table_files(text: str) -> list[str]:
         if in_a and line.startswith("## "):
             break
         if in_a and line.startswith("|"):
-            for p in re.findall(r"`([A-Za-z0-9_./-]+\.(?:rs|ts|mjs|py|md|json|css))`", line):
+            for p in re.findall(r"`([A-Za-z0-9_./-]+\.(?:rs|ts|mjs|js|py|md|json|css))`", line):
                 if p not in files:
                     files.append(p)
     return files

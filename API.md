@@ -100,11 +100,13 @@ MCP 端点：`/mcp` streamable HTTP，Bearer token（数据目录 `agent/connect
 
 ## MCP 工具（--mcp 与 /mcp 同源）
 
-沿用旧版外部工具清单的语义（名称不变），实现全部在 `runtime/src/tools.mjs` 里重写为 @tomato/core 之上的调用：
-`get_context`、`get_control_status`、`set_external_control`、`create_task`、`update_task`、
-`move_tasks`、`complete_task`、`dispatch`、`export_plan`、`export_backup`、`review_file`、
-`apply_file`、`get_education` 及 education 写工具。初始化返回 serverInfo name=tomato-todo，
-instructions 简述接管入口（不再有 Pi 提示词与技能资源）。
+沿用旧版外部工具清单的语义（名称不变），实现全部在 `runtime/src/tools.mjs` 里重写为 @tomato/core 之上的调用。当前暴露 13 个：
+
+- 读取：`get_context`（今日/学情摘要/统计/诊断）、`get_tasks`（按项目/完成状态分页）、`get_study_progress`（按科目摘要 + 进度历史）、`get_education`（按 `collection/projectId/id` 分页读教学记录）。
+- 写入：`create_task` / `update_task` / `move_tasks` / `complete_task`（普通任务）、`dispatch`（番茄/设置/愿景/课表等单项 Action）、`education`（学期/课程/作业/考试/答卷/批改/订正/学情，`command.op`）、`apply_file`（应用导出的计划/备份，带哈希校验）。
+- 批量改动：`export_plan` / `export_backup` → 客户端自行编辑 → `apply_file`。
+
+初始化返回 `serverInfo.name = tomato-todo`，instructions 简述接管入口（不再有 Pi 提示词与技能资源）。旧清单里的 `get_control_status` / `set_external_control` / `review_file` / `read_file` / `patch_file` 等不再暴露：内置自动执行与外部接管已随旧助手一起移除，文件读写由客户端（DSH）自带工具完成。
 
 ## guard 命令协议（runtime → guard，127.0.0.1:43988，Bearer token）
 
