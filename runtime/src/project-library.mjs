@@ -12,9 +12,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
+import { readIndex, topLevelsForProject } from "./library-index.mjs";
 import {
   basename,
   dirname,
+  extname,
   isAbsolute,
   join,
   parse,
@@ -56,6 +58,31 @@ export function mimeTypeFor(ext) {
   return (
     MIME[String(ext ?? "").toLocaleLowerCase()] ?? "application/octet-stream"
   );
+}
+
+/** 扩展名 → core 的 ResourceKind；拿不准的一律 reference（可预览、可被引用）。 */
+function kindForExtension(ext) {
+  switch (String(ext ?? "").toLowerCase()) {
+    case "pdf":
+    case "epub":
+      return "book";
+    case "ppt":
+    case "pptx":
+      return "course";
+    case "png":
+    case "jpg":
+    case "jpeg":
+    case "webp":
+    case "gif":
+      return "attachment";
+    case "mp3":
+    case "wav":
+    case "mp4":
+    case "flv":
+      return "attachment";
+    default:
+      return "reference";
+  }
 }
 
 export class LibraryError extends Error {
@@ -704,6 +731,89 @@ export class ProjectLibrary {
     });
     return entry;
   }
+  /**
+   * 按索引把一个项目的资料整批登记成 resources。
+   *
+   * 为什么要有批量入口：4,821 个文件逐条 saveResource 会让 plan.json 被重写
+   * 4,821 次（每次都是整份原子写）；core 的 saveResources 让整批只落一次盘。
+   * 直接读索引而不是重新遍历目录：索引是刚扫过的快照，文件在不在由它负责。
+   *
+   * `paths` 省略时按「顶层目录 → 项目」的映射取该项目对应的目录；显式传 paths
+   * 时只登记这些路径（仍要求它们出现在索引里）。
+   */
+  importFromIndex(projectId, { paths = null, max = 5000 } = {}) {
+    this.project(projectId);
+    const root = this.mount(projectId);
+    const index = readIndex(this.dataDir);
+    if (!index || !Array.isArray(index.items))
+      fail(409, "资料库索引尚未建立，请先扫描");
+    if (index.root !== root) fail(409, "资料库索引属于另一个目录，请重新扫描");
+
+    let candidates = index.items;
+    if (Array.isArray(paths)) {
+      const wanted = new Set(
+        paths.filter((p) => typeof p === "string" && p !== ""),
+      );
+      if (wanted.size === 0) fail(400, "请选择要登记的资料");
+      candidates = candidates.filter((item) => wanted.has(item.path));
+      if (candidates.length !== wanted.size)
+        fail(404, "有资料不在索引中，请先重新扫描");
+    } else {
+      const tops = [
+        ...new Set(
+          index.items.map((item) => item.path.split("/")[0]).filter(Boolean),
+        ),
+      ];
+      const matched = topLevelsForProject(this.project(projectId), tops);
+      if (matched !== null) {
+        const allowed = new Set(matched);
+        candidates = candidates.filter((item) =>
+          allowed.has(item.path.split("/")[0]),
+        );
+      }
+    }
+
+    const existing = new Map(
+      this.engine.data.education.resources
+        .filter((r) => r.projectId === projectId)
+        .map((r) => [r.path, r]),
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const resources = [];
+    let skipped = 0;
+    for (const item of candidates) {
+      this.resolveFile(projectId, item.path); // 文件必须仍在授权目录内
+      const current = existing.get(item.path);
+      if (current !== undefined) {
+        skipped += 1;
+        continue;
+      }
+      if (resources.length >= max) fail(413, `一次最多登记 ${max} 条资料`);
+      resources.push({
+        id: randomUUID(),
+        projectId,
+        title: item.name.replace(/\.[^.]+$/, "") || item.name,
+        kind: kindForExtension(item.ext),
+        path: item.path,
+        source: "",
+        edition: "",
+        topics: [],
+      });
+    }
+    if (resources.length > 0) {
+      this.engine.applyAction(
+        { type: "education", command: { op: "saveResources", resources } },
+        now,
+      );
+    }
+    return {
+      projectId,
+      registered: resources.length,
+      skipped,
+      considered: candidates.length,
+    };
+  }
+
   repair(projectId, id, path) {
     const entry = this.resource(id);
     if (entry.projectId !== projectId) fail(404, "项目资源不存在");

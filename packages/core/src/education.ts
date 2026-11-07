@@ -61,6 +61,7 @@ import { overlapMinutes as overlapMinutesOfBlock } from "./blocks";
 export type Command =
   | { op: "saveProject"; project: ProjectStudy }
   | { op: "saveResource"; resource: Resource }
+  | { op: "saveResources"; resources: Resource[] }
   | { op: "removeResources"; ids: string[] }
   | { op: "saveSemester"; semester: Semester }
   | { op: "saveLesson"; lesson: Lesson }
@@ -85,6 +86,7 @@ export type Command =
 const COMMAND_KEYS: Record<string, string[]> = {
   saveProject: ["op", "project"],
   saveResource: ["op", "resource"],
+  saveResources: ["op", "resources"],
   removeResources: ["op", "ids"],
   saveSemester: ["op", "semester"],
   saveLesson: ["op", "lesson"],
@@ -130,6 +132,17 @@ export function parseCommand(raw: unknown): Command {
           requiredField(raw, "resource", "教学命令", (v) => v),
         ),
       };
+    case "saveResources": {
+      const list = asArray(
+        requiredField(raw, "resources", "教学命令", (v) => v),
+        "resources",
+      );
+      ensure(
+        list.length > 0 && list.length <= 5000,
+        "批量登记需要 1–5000 条资源",
+      );
+      return { op, resources: list.map((item) => parseResource(item)) };
+    }
     case "removeResources":
       return {
         op,
@@ -1381,6 +1394,14 @@ export class Education implements EducationData {
       }
       case "saveResource": {
         upsertBy(this.resources, command.resource, (x) => x.id);
+        break;
+      }
+      case "saveResources": {
+        // 批量登记只落一次盘：逐条 saveResource 会让 plan.json 被重写 N 次
+        // （资料库动辄上千条），这是「按项目整目录导入」必须走批量的原因。
+        for (const resource of command.resources) {
+          upsertBy(this.resources, resource, (x) => x.id);
+        }
         break;
       }
       case "removeResources": {

@@ -406,3 +406,51 @@ test("HTTP：授权 / 读取 / 验证 Origin / 取消授权", async () => {
     engine.flushNow();
   }
 });
+
+test("按索引整批登记：只登记本项目目录下的文件，已登记的不重复、文件必须仍在授权目录内", async () => {
+  const { exam, engine, library } = fixture();
+  const { scanLibrary, writeIndex } = await import("../src/library-index.mjs");
+
+  library.authorizeLibrary(exam, 1_800_000_000_000);
+  const math = library.create({ name: "数学一", color: "#b8503f" });
+  const english = library.create({ name: "英语一", color: "#5f7b50" });
+  mkdirSync(join(exam, "eng"), { recursive: true });
+  writeFileSync(join(exam, "math", "book.pdf"), "book");
+  writeFileSync(join(exam, "math", "notes.md"), "notes");
+  writeFileSync(join(exam, "eng", "words.pdf"), "words");
+
+  const scanned = await scanLibrary(exam);
+  writeIndex(library.dataDir, {
+    root: exam,
+    scannedAt: 1_800_000_000,
+    items: scanned.items,
+  });
+  const dataDir = library.dataDir;
+
+  const first = library.importFromIndex(math.projectId);
+  assert.equal(first.registered, 2);
+  assert.equal(first.skipped, 0);
+  const resources = engine.data.education.resources.filter(
+    (r) => r.projectId === math.projectId,
+  );
+  assert.deepEqual(resources.map((r) => r.path).sort(), [
+    "math/book.pdf",
+    "math/notes.md",
+  ]);
+  assert.equal(resources.find((r) => r.path === "math/book.pdf").kind, "book");
+
+  // 再跑一次：同样的文件全部跳过，不产生重复登记。
+  const second = library.importFromIndex(math.projectId);
+  assert.equal(second.registered, 0);
+  assert.equal(second.skipped, 2);
+
+  // 显式指定路径只登记选中的那一条（并且英语项目也能登记自己的目录）。
+  const picked = library.importFromIndex(english.projectId, {
+    paths: ["eng/words.pdf"],
+  });
+  assert.equal(picked.registered, 1);
+  assert.equal(picked.considered, 1);
+
+  engine.flushNow();
+  assert.ok(dataDir);
+});

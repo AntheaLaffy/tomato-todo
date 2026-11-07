@@ -705,7 +705,7 @@ async function handleApi(req, res, url, ctx) {
     return sendApi(res, 201, result);
   }
   let projectMatch =
-    /^\/api\/projects\/([^/]+)\/(authorize|rename|resources(?:\/cleanup)?|resources\/[^/]+\/repair)$/.exec(
+    /^\/api\/projects\/([^/]+)\/(authorize|rename|resources(?:\/(?:cleanup|import))?|resources\/[^/]+\/repair)$/.exec(
       path,
     );
   if (method === "POST" && projectMatch) {
@@ -720,6 +720,14 @@ async function handleApi(req, res, url, ctx) {
       return sendApi(res, 201, library.register(projectId, body.resource));
     if (op === "resources/cleanup")
       return sendApi(res, 200, library.cleanup(projectId, body.ids ?? null));
+    if (op === "resources/import")
+      return sendApi(
+        res,
+        200,
+        library.importFromIndex(projectId, {
+          paths: Array.isArray(body.paths) ? body.paths : null,
+        }),
+      );
     const resourceId = decodeId(
       op.slice("resources/".length, -"/repair".length),
     );

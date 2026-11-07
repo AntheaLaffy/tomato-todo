@@ -1179,3 +1179,77 @@ test("resource_cleanup_retains_archived_plan_references_and_is_atomic", () => {
   removed.resources = removed.resources.filter((r) => r.id !== "mock");
   expect(() => validateEducationTransition(data.education, removed)).toThrow();
 });
+
+test("saveResources：一次命令登记多条资源，重复 id 是覆盖不是追加", () => {
+  const data = fixture();
+  const projectId = data.education.projects[0]!.projectId;
+  const before = data.education.resources.length;
+  const base = {
+    projectId,
+    kind: "book",
+    source: "",
+    edition: "",
+    topics: [],
+  };
+  command(
+    data,
+    {
+      op: "saveResources",
+      resources: [
+        { ...base, id: "r1", title: "讲义一", path: "math/a.pdf" },
+        { ...base, id: "r2", title: "讲义二", path: "math/b.pdf" },
+      ],
+    },
+    at(1, 9, 0),
+  );
+  expect(data.education.resources.length).toBe(before + 2);
+
+  command(
+    data,
+    {
+      op: "saveResources",
+      resources: [
+        { ...base, id: "r1", title: "讲义一（修订）", path: "math/a.pdf" },
+      ],
+    },
+    at(1, 9, 5),
+  );
+  expect(data.education.resources.length).toBe(before + 2);
+  expect(data.education.resources.find((r) => r.id === "r1")?.title).toBe(
+    "讲义一（修订）",
+  );
+});
+
+test("saveResources：任何一条不合法时整批拒绝，不落半批", () => {
+  const data = fixture();
+  const before = data.education.resources.length;
+  const projectId = data.education.projects[0]!.projectId;
+  expect(() =>
+    parseCommand({
+      op: "saveResources",
+      resources: [
+        {
+          id: "ok",
+          projectId,
+          title: "正常",
+          kind: "book",
+          path: "a.pdf",
+          source: "",
+          edition: "",
+          topics: [],
+        },
+        {
+          id: "bad",
+          projectId,
+          title: "非法类别",
+          kind: "movie",
+          path: "b.pdf",
+          source: "",
+          edition: "",
+          topics: [],
+        },
+      ],
+    }),
+  ).toThrow(/资源 kind/);
+  expect(data.education.resources.length).toBe(before);
+});
