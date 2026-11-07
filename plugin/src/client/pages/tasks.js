@@ -278,8 +278,9 @@ function compareByTime(a, b) {
   );
 }
 
-/** 排序：time = 到期日升序 + 提醒时刻；priority = 优先级降序 + 到期日；created = 新→旧。 */
-function sortTasks(tasks, sort) {
+/** 排序：time = 到期日升序 + 提醒时刻；priority = 优先级降序 + 到期日；created = 新→旧。
+ *  导出给项目页复用，避免两处对同一批任务给出不同顺序。 */
+export function sortTasks(tasks, sort) {
   const items = tasks.slice();
   items.sort((a, b) => {
     if (sort === "priority") {

@@ -166,13 +166,18 @@ function intOf(raw, fallback = null) {
   return Number.isFinite(n) ? Math.round(n) : fallback;
 }
 
-/** 新建任务的空白草稿；initialTitle 用于「搜索无结果 → 用关键词新建」。 */
-export function blankTaskDraft(today, initialTitle = "") {
+/** 新建任务的空白草稿；initialTitle 用于「搜索无结果 → 用关键词新建」，
+ *  initialProjectId 用于从项目页新建（预选所属项目）。 */
+export function blankTaskDraft(
+  today,
+  initialTitle = "",
+  initialProjectId = "",
+) {
   return {
     id: null,
     title: initialTitle ?? "",
     notes: "",
-    projectId: "",
+    projectId: initialProjectId ?? "",
     dueDate: today ?? "",
     reminderTime: "",
     focusMinutes: "",
@@ -220,6 +225,7 @@ export function taskToDraft(task) {
  * - projects: data.projects
  * - settings: data.settings
  * - initialTitle: 新建时预填标题（搜索无结果时用关键词新建）
+ * - initialProjectId: 新建时预选项目（项目页的「新建任务」）
  */
 export function TaskDialog({
   open,
@@ -229,11 +235,14 @@ export function TaskDialog({
   projects = [],
   settings = {},
   initialTitle = "",
+  initialProjectId = "",
 }) {
   const editing = task !== null && task !== undefined;
   const taskId = editing ? task.id : null;
   const [draft, setDraft] = useState(() =>
-    editing ? taskToDraft(task) : blankTaskDraft(today, initialTitle),
+    editing
+      ? taskToDraft(task)
+      : blankTaskDraft(today, initialTitle, initialProjectId),
   );
   const [subInput, setSubInput] = useState("");
   const [error, setError] = useState(null);
@@ -244,13 +253,17 @@ export function TaskDialog({
   // 打开时按目标重置；用 taskId 而不是 task 作为依赖，避免轮询换新对象时清空输入。
   useEffect(() => {
     if (!open) return;
-    setDraft(editing ? taskToDraft(task) : blankTaskDraft(today, initialTitle));
+    setDraft(
+      editing
+        ? taskToDraft(task)
+        : blankTaskDraft(today, initialTitle, initialProjectId),
+    );
     setSubInput("");
     setError(null);
     setBusy(false);
     setConfirmDelete(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, taskId, today, initialTitle]);
+  }, [open, taskId, today, initialTitle, initialProjectId]);
 
   if (!open) return null;
 
