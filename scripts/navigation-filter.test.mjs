@@ -24,6 +24,21 @@ test("项目筛选：订阅者收到值，切页到 tasks，取走后清空", ()
   assert.equal(nav.takeTasksFilter(), null);
 });
 
+test("openPanelAt：切页并调用绑定的面板打开器", () => {
+  let opened = 0;
+  nav.bindPanelOpener(() => {
+    opened += 1;
+  });
+  nav.openPanelAt("focus");
+  assert.equal(opened, 1);
+  assert.equal(nav.getActivePageId(), "focus");
+
+  nav.bindPanelOpener(null);
+  nav.openPanelAt("stats");
+  assert.equal(opened, 1);
+  assert.equal(nav.getActivePageId(), "stats");
+});
+
 test("项目筛选：取消订阅后不再收到广播", () => {
   const seen = [];
   const off = nav.subscribeTasksFilter((value) => seen.push(value));

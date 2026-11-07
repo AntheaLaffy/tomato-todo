@@ -4764,6 +4764,12 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     if (mode === "longBreak") return t("hud.modeLong");
     return t("hud.modeFocus");
   }
+  function attentionSwitch(prev, next) {
+    if (!prev || !next) return null;
+    if (Number(next.serial) > Number(prev.serial)) return "complete";
+    if (Number(next.reminders) > Number(prev.reminders)) return "reminder";
+    return null;
+  }
   function Hud({ openPanel }) {
     const state = useSnapshot();
     const immersive = useImmersiveOpen();
@@ -4785,6 +4791,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const alive = view.running || view.paused;
     const focusMode = view.mode === "focus";
     const idleBreak = !alive && !focusMode;
+    const canGrabAttention = () => {
+      try {
+        return !document.querySelector('[role="dialog"]');
+      } catch {
+        return true;
+      }
+    };
     const prevRef = useRef(null);
     useEffect(() => {
       const next = {
@@ -4797,6 +4810,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       const prev = prevRef.current;
       prevRef.current = next;
       if (prev === null) return;
+      const grab = attentionSwitch(prev, next);
       if (next.serial > prev.serial) {
         sound.playCue("complete");
       } else if (!prev.running && next.running) {
@@ -4806,6 +4820,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       } else if (next.reminders > prev.reminders) {
         sound.playCue("reminder");
       }
+      if (grab && canGrabAttention()) openPanelAt("focus");
     }, [view.running, view.paused, view.mode, view.timer.completionSerial, data]);
     useEffect(() => {
       if (!expanded) return void 0;
