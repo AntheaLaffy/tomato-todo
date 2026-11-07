@@ -5,8 +5,8 @@ edition = "2021"
 license = "MIT"
 description = "番茄 Todo 专注保护守护进程：全屏锁定、应用白名单与系统通知，供 tomato-runtime 经 HTTP 指挥。无域无状态。"
 
-# 独立工作区：根 Cargo.toml 由 lead 在合并时加入 workspace members。
-# 合并时请删除本 [workspace] 段（或把 crates/guard 放入根 workspace exclude）。
+# 独立 Cargo 工作区：仓库根没有 Cargo.toml，构建/测试与锁文件都以本目录为准
+# （CI 用 `cargo build --locked --manifest-path crates/guard/Cargo.toml`）。
 [workspace]
 resolver = "2"
 

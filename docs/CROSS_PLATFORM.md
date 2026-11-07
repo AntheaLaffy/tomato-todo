@@ -3,7 +3,7 @@
 目标：主流 Linux 桌面、Windows 与 macOS 都能用上番茄 Todo 的专注保护（guard）。
 领域逻辑、UI 与助手都在 DSH 侧（TS/Node），不涉及平台差异；原生面只有
 `crates/guard` 一个二进制。guard 无域无状态、受 runtime 经 HTTP 指挥
-（协议见 [API.md](API.md) 的「guard 命令协议」）。
+（协议见 [API.md](../API.md) 的「guard 命令协议」）。
 
 ## 后端矩阵
 

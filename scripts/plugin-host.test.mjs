@@ -32,8 +32,8 @@ test("plugin Host tools cover the runtime contract without an MCP client", async
       },
     },
   };
-  // linkSkills: false —— 这个用例只验证 Host 工具契约，不该在真实 HOME 里
-  // 创建/替换 Agent 技能目录的符号链接（夹具里的 ctx 也没有 logger）。
+  // 测试不落盘：linkSkills 会真的往 ~/.agents/skills 建链接，这里关掉；
+  // 夹具里的 ctx 也没有 logger，走日志分支会直接抛错。
   apply(ctx, { tomatoBin: "/fake/tomato-runtime", linkSkills: false });
   for (const spec of TOOLS) {
     assert.ok(registered.has(`tomato_${spec.name}`), spec.name);
@@ -75,7 +75,7 @@ test("plugin Host can read the running Todo instance",
         },
       },
     };
-    apply(ctx, { tomatoBin: "/home/fuurin/.local/bin/tomato-runtime" });
+    apply(ctx, { tomatoBin: "/home/fuurin/.local/bin/tomato-runtime", linkSkills: false });
     const context = await registered.get("tomato_get_context").execute({});
     assert.equal(typeof context, "object");
     const education = await registered.get("tomato_get_education").execute({

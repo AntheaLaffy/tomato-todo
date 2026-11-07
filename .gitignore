@@ -2,12 +2,12 @@ target/
 /node_modules
 /dist
 /artifacts
-/agent/node_modules
-/agent/bundle
-/src-tauri/gen/*
-!/src-tauri/gen/android/
 *.sqlite3*
 .DS_Store
+
+# 并行代理的嵌套 worktree 与维护状态（本机临时产物，不入库）
+/.agents/worktrees/
+/.project-maintenance/
 
 # 外置 MCP（运行时安装，不入库；含 .env 凭据）
 /mcp/
