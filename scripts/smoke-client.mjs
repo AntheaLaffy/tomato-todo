@@ -566,7 +566,19 @@ let sampleState = {
 if (!process.env.SMOKE_LIVE) {
   const now = sampleState.serverTime;
   sampleState.data.education = {
-    projects: [{ projectId: "p1", target: "130+", examMode: true }],
+    projects: [
+      {
+        projectId: "p1",
+        directory: "/home/fuurin/exam/math",
+        examMode: false,
+        visionId: "v1",
+        target: "130+",
+        examDate: "2027-12-18",
+        syllabusId: null,
+        pastPaperIds: [],
+        mockPaperIds: [],
+      },
+    ],
     assessments: [
       {
         id: "homework-to-submit",
@@ -760,14 +772,81 @@ if (typeof nav?.openProject === "function") {
     renderedBy["page:project"] = markup;
     if (!markup || markup.length < 500) failures.push("项目页渲染为空");
     if (!process.env.SMOKE_LIVE) {
-      for (const marker of ["数学一", "未完成", "项目专属白名单", "项目资料"])
+      for (const marker of [
+        "数学一",
+        "未完成",
+        "项目专属白名单",
+        "项目资料",
+        "应试绑定",
+      ])
         if (!markup.includes(marker))
-          failures.push(`项目页缺少「${marker}」（侧栏项目点击可能又跳回全部任务）`);
+          failures.push(
+            `项目页缺少「${marker}」（侧栏项目点击可能又跳回全部任务）`,
+          );
     }
   } catch (e) {
     failures.push(
       `渲染项目页失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`,
     );
+  }
+  // SSR 不执行 useEffect，整页首屏会停在「读取授权状态」；资料区内部的索引、
+  // 导入、导出、应试绑定各自再渲染一次，确保这几块模板本身不炸。
+  const parts = context.window.__tomatoProjectParts;
+  if (!parts) {
+    failures.push("项目页没有暴露资料区测试钩子 __tomatoProjectParts");
+  } else {
+    const project = sampleState.data.projects.find((item) => item.id === "p1");
+    const profile = sampleState.data.education.projects.find(
+      (item) => item.projectId === "p1",
+    );
+    const renders = [
+      [
+        "project:materials",
+        "ProjectMaterialsSection",
+        { project, onChanged() {} },
+        ["资料目录", "授权目录", "使用共享库", "授权只是读取许可"],
+      ],
+      [
+        "project:index",
+        "ProjectIndexBrowser",
+        { project, reloadKey: 0, onImported() {} },
+        ["导入本目录全部", "导入选中", "索引 JSON", "索引 CSV"],
+      ],
+      [
+        "project:registered",
+        "ProjectRegisteredSection",
+        { project, reloadKey: 0 },
+        ["已登记资料", "检查状态", "清单 JSON", "清单 CSV"],
+      ],
+      [
+        "project:binding",
+        "ProjectEducationBinding",
+        { project, profile, reloadKey: 0 },
+        ["应试绑定", "考纲", "真题", "模拟题", "应试模式", "保存绑定"],
+      ],
+    ];
+    for (const [key, component, props, markers] of renders) {
+      const Component = parts[component];
+      if (typeof Component !== "function") {
+        failures.push(`资料区测试钩子缺少 ${component}`);
+        continue;
+      }
+      try {
+        const rendered = ReactDOMServer.renderToStaticMarkup(
+          React.createElement(Component, props),
+        );
+        renderedBy[key] = rendered;
+        if (!rendered || rendered.length < 100)
+          failures.push(`${component} 渲染为空`);
+        for (const marker of markers)
+          if (!rendered.includes(marker))
+            failures.push(`${component} 缺少「${marker}」`);
+      } catch (e) {
+        failures.push(
+          `渲染 ${component} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`,
+        );
+      }
+    }
   }
 } else {
   failures.push("没有暴露测试导航钩子 window.__tomatoDsh.openProject");
