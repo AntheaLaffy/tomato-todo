@@ -140,7 +140,8 @@ function registerRuntimeTools(ctx, bin) {
         const value = await callRuntimeTool(ctx, bin, spec.name, args);
         // DSH Host output requires an object; retain any MCP scalar or array.
         return value && typeof value === "object" && !Array.isArray(value)
-          ? value : { result: value };
+          ? value
+          : { result: value };
       },
     });
   }

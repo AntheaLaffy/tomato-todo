@@ -61,7 +61,8 @@ export function currentReminders(state) {
   const nowSecs = secondsOfNow();
   const due = [];
   for (const task of data.tasks || []) {
-    if (task.completed || !task.reminderPending || task.reminderExpired) continue;
+    if (task.completed || !task.reminderPending || task.reminderExpired)
+      continue;
     if (task.dueDate !== today || !task.reminderTime) continue;
     const start = parseHHMM(task.reminderTime);
     if (start === null) continue;
@@ -70,7 +71,10 @@ export function currentReminders(state) {
     if (nowSecs < start || nowSecs >= end) continue;
     due.push({ task, start });
   }
-  due.sort((a, b) => a.start - b.start || String(a.task.id).localeCompare(String(b.task.id)));
+  due.sort(
+    (a, b) =>
+      a.start - b.start || String(a.task.id).localeCompare(String(b.task.id)),
+  );
   const primary = due.length > 0 ? due[0].task : null;
   return { primary, extra: Math.max(0, due.length - 1) };
 }
@@ -97,7 +101,8 @@ export function ReminderStrip({ variant = "page", onOpen }) {
 
   const data = (state && state.data) || {};
   const settings = data.settings || {};
-  const project = (data.projects || []).find((p) => p.id === task.projectId) || null;
+  const project =
+    (data.projects || []).find((p) => p.id === task.projectId) || null;
   const minutes = Number(task.focusMinutes ?? settings.focusMinutes) || 0;
   const rounds = Number(task.estimate) || 1;
 
@@ -138,7 +143,8 @@ export function ReminderStrip({ variant = "page", onOpen }) {
             padding: "0 6px 0 9px",
             borderRadius: 9,
             border: "1px solid var(--tomato-line)",
-            background: "color-mix(in srgb, var(--tomato-brand-soft) 70%, var(--tomato-surface))",
+            background:
+              "color-mix(in srgb, var(--tomato-brand-soft) 70%, var(--tomato-surface))",
             maxWidth: 430,
             minWidth: 0,
             flex: "none",
@@ -152,12 +158,17 @@ export function ReminderStrip({ variant = "page", onOpen }) {
             marginBottom: compact ? 6 : 18,
             borderRadius: 12,
             border: "1px solid var(--tomato-line)",
-            background: "color-mix(in srgb, var(--tomato-brand-soft) 62%, var(--tomato-surface))",
+            background:
+              "color-mix(in srgb, var(--tomato-brand-soft) 62%, var(--tomato-surface))",
             flexWrap: "wrap",
             minWidth: 0,
           },
     },
-    h(Icon, { name: "bell", size: 14, style: { color: "var(--tomato-accent-fg)" } }),
+    h(Icon, {
+      name: "bell",
+      size: 14,
+      style: { color: "var(--tomato-accent-fg)" },
+    }),
     h(
       "span",
       {
@@ -170,7 +181,13 @@ export function ReminderStrip({ variant = "page", onOpen }) {
         },
       },
       t("reminder.prefix"),
-      task.reminderTime ? h("span", { className: "t-mono", style: { marginLeft: 5 } }, task.reminderTime) : null,
+      task.reminderTime
+        ? h(
+            "span",
+            { className: "t-mono", style: { marginLeft: 5 } },
+            task.reminderTime,
+          )
+        : null,
     ),
     project
       ? h(
@@ -219,26 +236,48 @@ export function ReminderStrip({ variant = "page", onOpen }) {
       ? extra > 0
         ? h(
             "span",
-            { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+            {
+              style: {
+                fontSize: 11,
+                color: "var(--tomato-ink-3)",
+                flex: "none",
+              },
+            },
             t("reminder.more", { n: extra }),
           )
         : null
       : h(
           "span",
-          { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+          {
+            style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" },
+          },
           t("reminder.minutes", { n: minutes, round: rounds }),
           extra > 0 ? ` · ${t("reminder.more", { n: extra })}` : "",
         ),
     error
       ? h(
           "span",
-          { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)", flex: "none" } },
+          {
+            style: {
+              fontSize: 11,
+              color: "var(--dsw-alias-state-error-primary, #b8503f)",
+              flex: "none",
+            },
+          },
           error,
         )
       : null,
     h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 6, flex: "none", marginLeft: "auto" } },
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          flex: "none",
+          marginLeft: "auto",
+        },
+      },
       h(
         Btn,
         {

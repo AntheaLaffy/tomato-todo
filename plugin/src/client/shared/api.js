@@ -22,13 +22,16 @@ async function request(path, { method = "GET", body, timeoutMs = 5000 } = {}) {
   try {
     res = await fetch(API_BASE + path, {
       method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      headers:
+        body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (e) {
     throw new ApiError(
-      e && e.name === "AbortError" ? "runtime 响应超时" : "无法连接番茄 runtime（127.0.0.1:43987）",
+      e && e.name === "AbortError"
+        ? "runtime 响应超时"
+        : "无法连接番茄 runtime（127.0.0.1:43987）",
       0,
     );
   } finally {
@@ -57,7 +60,11 @@ export function getState(opts) {
 
 /** 提交一个 @tomato/core Action（POST /api/dispatch）→ {changed, snapshot}。 */
 export function postDispatch(action, opts) {
-  return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
+  return request("/api/dispatch", {
+    ...opts,
+    method: "POST",
+    body: { action },
+  });
 }
 
 // 共享资料库：只在应试教育页给用户点选；不存在助手/MCP 入口（目录授权
@@ -81,10 +88,13 @@ export function revokeLibraryGrant(opts) {
 
 /** 检查一个项目资料是否仍在授权目录里（GET /api/projects/:id/resources/scan）。 */
 export function scanProjectLibrary(id, opts) {
-  return request("/api/projects/" + encodeURIComponent(id) + "/resources/scan", {
-    timeoutMs: 30000,
-    ...opts,
-  });
+  return request(
+    "/api/projects/" + encodeURIComponent(id) + "/resources/scan",
+    {
+      timeoutMs: 30000,
+      ...opts,
+    },
+  );
 }
 
 /**
@@ -106,7 +116,8 @@ export function getApps(opts) {
 
 let fullscreenQueue = Promise.resolve();
 export function setDesktopFullscreen(enabled) {
-  const run = () => request("/api/desktop/fullscreen", { method: "POST", body: { enabled } });
+  const run = () =>
+    request("/api/desktop/fullscreen", { method: "POST", body: { enabled } });
   fullscreenQueue = fullscreenQueue.then(run, run);
   return fullscreenQueue;
 }

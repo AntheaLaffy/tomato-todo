@@ -124,7 +124,9 @@ function ResultRow({ task, project, onPick }) {
     h(Icon, {
       name: task.completed ? "check" : "tasks",
       size: 17,
-      style: { color: task.completed ? "var(--tomato-leaf)" : "var(--tomato-ink-3)" },
+      style: {
+        color: task.completed ? "var(--tomato-leaf)" : "var(--tomato-ink-3)",
+      },
     }),
     h(
       "span",
@@ -146,11 +148,26 @@ function ResultRow({ task, project, onPick }) {
       ),
       h(
         "span",
-        { style: { display: "flex", alignItems: "center", gap: 7, marginTop: 3, fontSize: 11.5 } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            marginTop: 3,
+            fontSize: 11.5,
+          },
+        },
         project
           ? h(
               "span",
-              { style: { display: "inline-flex", alignItems: "center", gap: 4, color: "var(--tomato-ink-3)" } },
+              {
+                style: {
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  color: "var(--tomato-ink-3)",
+                },
+              },
               h("span", {
                 style: {
                   width: 6,
@@ -161,24 +178,42 @@ function ResultRow({ task, project, onPick }) {
               }),
               project.name,
             )
-          : h("span", { style: { color: "var(--tomato-ink-3)" } }, t("search.noProject")),
+          : h(
+              "span",
+              { style: { color: "var(--tomato-ink-3)" } },
+              t("search.noProject"),
+            ),
         task.dueDate
           ? h(
               "span",
-              { style: { color: overdue ? "var(--tomato-sun)" : "var(--tomato-ink-3)" } },
+              {
+                style: {
+                  color: overdue ? "var(--tomato-sun)" : "var(--tomato-ink-3)",
+                },
+              },
               task.dueDate === task.todayKey ? t("search.today") : task.dueDate,
             )
           : null,
         Array.isArray(task.tags) && task.tags.length > 0
           ? h(
               "span",
-              { style: { color: "var(--tomato-ink-3)", overflow: "hidden", textOverflow: "ellipsis" } },
+              {
+                style: {
+                  color: "var(--tomato-ink-3)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                },
+              },
               `#${task.tags.slice(0, 2).join(" #")}`,
             )
           : null,
       ),
     ),
-    h(Icon, { name: "arrowRight", size: 14, style: { color: "var(--tomato-ink-3)" } }),
+    h(Icon, {
+      name: "arrowRight",
+      size: 14,
+      style: { color: "var(--tomato-ink-3)" },
+    }),
   );
 }
 
@@ -222,14 +257,28 @@ export function SearchDialog({ open, onClose, onOpenTask, onCreate }) {
 
   const body = h(
     "div",
-    { style: { display: "flex", flexDirection: "column", gap: 10, minHeight: 220 } },
+    {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        minHeight: 220,
+      },
+    },
     h(
       "div",
-      { style: { position: "relative", display: "flex", alignItems: "center" } },
+      {
+        style: { position: "relative", display: "flex", alignItems: "center" },
+      },
       h(Icon, {
         name: "search",
         size: 16,
-        style: { position: "absolute", left: 12, color: "var(--tomato-ink-3)", pointerEvents: "none" },
+        style: {
+          position: "absolute",
+          left: 12,
+          color: "var(--tomato-ink-3)",
+          pointerEvents: "none",
+        },
       }),
       h(Input, {
         value: query,
@@ -261,10 +310,21 @@ export function SearchDialog({ open, onClose, onOpenTask, onCreate }) {
       { style: { display: "flex", alignItems: "center", gap: 8 } },
       h(
         "span",
-        { style: { fontSize: 11.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--tomato-ink-3)" } },
-        normalized === "" ? t("search.idleTitle") : t("search.count", { n: results.length }),
+        {
+          style: {
+            fontSize: 11.5,
+            letterSpacing: ".08em",
+            textTransform: "uppercase",
+            color: "var(--tomato-ink-3)",
+          },
+        },
+        normalized === ""
+          ? t("search.idleTitle")
+          : t("search.count", { n: results.length }),
       ),
-      h("span", { style: { flex: 1, height: 1, background: "var(--tomato-line)" } }),
+      h("span", {
+        style: { flex: 1, height: 1, background: "var(--tomato-line)" },
+      }),
     ),
     results.length > 0
       ? h(
@@ -291,9 +351,27 @@ export function SearchDialog({ open, onClose, onOpenTask, onCreate }) {
               textAlign: "center",
             },
           },
-          h(Icon, { name: "search", size: 22, style: { color: "var(--tomato-ink-3)" } }),
-          h("div", { style: { fontSize: 13.5, color: "var(--tomato-ink-2)" } }, t("search.empty")),
-          h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)", lineHeight: 1.6 } }, t("search.emptyHint")),
+          h(Icon, {
+            name: "search",
+            size: 22,
+            style: { color: "var(--tomato-ink-3)" },
+          }),
+          h(
+            "div",
+            { style: { fontSize: 13.5, color: "var(--tomato-ink-2)" } },
+            t("search.empty"),
+          ),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 12,
+                color: "var(--tomato-ink-3)",
+                lineHeight: 1.6,
+              },
+            },
+            t("search.emptyHint"),
+          ),
           onCreate && query.trim() !== ""
             ? h(
                 "button",
@@ -305,7 +383,11 @@ export function SearchDialog({ open, onClose, onOpenTask, onCreate }) {
                     onClose?.();
                     onCreate(title);
                   },
-                  style: { padding: "7px 14px", fontSize: 12.5, height: "auto" },
+                  style: {
+                    padding: "7px 14px",
+                    fontSize: 12.5,
+                    height: "auto",
+                  },
                 },
                 t("search.create", { q: query.trim() }),
               )
@@ -325,22 +407,46 @@ export function SearchDialog({ open, onClose, onOpenTask, onCreate }) {
           color: "var(--tomato-ink-3)",
         },
       },
-      h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "Ctrl K"), t("search.hotkeySearch")),
-      h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "N"), t("search.hotkeyNew")),
-      h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "Space"), t("search.hotkeySpace")),
-      h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "Esc"), t("search.hotkeyEsc")),
+      h(
+        "span",
+        { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+        h(Kbd, null, "Ctrl K"),
+        t("search.hotkeySearch"),
+      ),
+      h(
+        "span",
+        { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+        h(Kbd, null, "N"),
+        t("search.hotkeyNew"),
+      ),
+      h(
+        "span",
+        { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+        h(Kbd, null, "Space"),
+        t("search.hotkeySpace"),
+      ),
+      h(
+        "span",
+        { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+        h(Kbd, null, "Esc"),
+        t("search.hotkeyEsc"),
+      ),
       h("span", { style: { flex: 1 } }),
       h("span", { style: { color: "var(--tomato-ink-3)" } }, t("search.tip")),
     ),
   );
 
-  return h(Modal, {
-    open,
-    onClose,
-    icon: "search",
-    title: t("search.title"),
-    subtitle: t("search.subtitle"),
-    width: 560,
-    bodyStyle: { minHeight: 220 },
-  }, body);
+  return h(
+    Modal,
+    {
+      open,
+      onClose,
+      icon: "search",
+      title: t("search.title"),
+      subtitle: t("search.subtitle"),
+      width: 560,
+      bodyStyle: { minHeight: 220 },
+    },
+    body,
+  );
 }

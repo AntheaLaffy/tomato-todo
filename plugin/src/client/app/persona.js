@@ -33,10 +33,30 @@ registerCopy("persona", {
 });
 
 export const PERSONAS = [
-  { id: "atri", file: "atri.png", avatar: "default.webp", nameKey: "persona.atri" },
-  { id: "natsuki", file: "natsuki.png", avatar: "calm.webp", nameKey: "persona.natsuki" },
-  { id: "ryuji", file: "ryuji.png", avatar: "coach.webp", nameKey: "persona.ryuji" },
-  { id: "minamo", file: "minamo.png", avatar: "senpai.webp", nameKey: "persona.minamo" },
+  {
+    id: "atri",
+    file: "atri.png",
+    avatar: "default.webp",
+    nameKey: "persona.atri",
+  },
+  {
+    id: "natsuki",
+    file: "natsuki.png",
+    avatar: "calm.webp",
+    nameKey: "persona.natsuki",
+  },
+  {
+    id: "ryuji",
+    file: "ryuji.png",
+    avatar: "coach.webp",
+    nameKey: "persona.ryuji",
+  },
+  {
+    id: "minamo",
+    file: "minamo.png",
+    avatar: "senpai.webp",
+    nameKey: "persona.minamo",
+  },
 ];
 
 const KEY = "tomato-dsh.persona";
@@ -108,7 +128,11 @@ export function composerLift(anchor) {
 
 /** 当前可见会话的输入区（多会话保留在 DOM 里时，只有贴在底部的那个有高度）。 */
 function composerSeatRect() {
-  if (typeof document === "undefined" || typeof document.querySelectorAll !== "function") return null;
+  if (
+    typeof document === "undefined" ||
+    typeof document.querySelectorAll !== "function"
+  )
+    return null;
   let best = null;
   for (const node of document.querySelectorAll("[data-composer-seat]")) {
     const rect = node.getBoundingClientRect();
@@ -123,7 +147,12 @@ function hit(el, x, y, pad) {
   if (!el) return false;
   const r = el.getBoundingClientRect();
   if (!r.width || !r.height) return false;
-  return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+  return (
+    x >= r.left - pad &&
+    x <= r.right + pad &&
+    y >= r.top - pad &&
+    y <= r.bottom + pad
+  );
 }
 
 export function PersonaSwitch({ currentId, onPick, panelRef, lift = 0 }) {
@@ -230,7 +259,8 @@ export function PersonaBackdrop() {
     }
     const onMove = (e) => {
       if (e.pointerType === "touch") return;
-      const hot = hit(imgRef.current, e.clientX, e.clientY, 16) ||
+      const hot =
+        hit(imgRef.current, e.clientX, e.clientY, 16) ||
         hit(panelRef.current, e.clientX, e.clientY, 10);
       if (hot) {
         if (timer.current) {
@@ -266,8 +296,14 @@ export function PersonaBackdrop() {
     if (!open) return undefined;
     const measure = () => setLift(composerLift(imgRef.current));
     measure();
-    const seat = typeof document === "undefined" ? null : document.querySelector("[data-composer-seat]");
-    const observer = seat && typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+    const seat =
+      typeof document === "undefined"
+        ? null
+        : document.querySelector("[data-composer-seat]");
+    const observer =
+      seat && typeof ResizeObserver === "function"
+        ? new ResizeObserver(measure)
+        : null;
     if (observer) observer.observe(seat);
     window.addEventListener("resize", measure);
     return () => {

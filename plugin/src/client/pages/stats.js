@@ -68,7 +68,8 @@ registerCopy("stats", {
   },
   en: {
     eyebrow: "YOUR TIME, WELL SPENT",
-    subtitle: "No comparison — only your own quiet progress, one day at a time.",
+    subtitle:
+      "No comparison — only your own quiet progress, one day at a time.",
     refresh: "Refresh",
     labelTotalMinutes: "Total focus",
     unitMinutes: "min",
@@ -86,7 +87,8 @@ registerCopy("stats", {
     total: "Total {value}",
     where: "Where the time went",
     noProjects: "No project focus yet",
-    noProjectsHint: "Finish a focus session and its time will be grouped by project here.",
+    noProjectsHint:
+      "Finish a focus session and its time will be grouped by project here.",
     daily: "Daily log",
     dailyHint: "Last {n} days",
     colDate: "Date",
@@ -170,7 +172,10 @@ function WeekChart({ days, today }) {
     },
     days.map((day) => {
       const isToday = day.date === today;
-      const height = day.minutes > 0 ? Math.max(4, Math.round((day.minutes / scale) * barArea)) : 2;
+      const height =
+        day.minutes > 0
+          ? Math.max(4, Math.round((day.minutes / scale) * barArea))
+          : 2;
       const label = isToday
         ? t("common.today")
         : Array.isArray(weekLabels)
@@ -199,7 +204,9 @@ function WeekChart({ days, today }) {
               height: 12,
               fontSize: 10.5,
               lineHeight: "12px",
-              color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
+              color: isToday
+                ? "var(--tomato-brand-deep)"
+                : "var(--tomato-ink-3)",
             },
           },
           day.minutes > 0 ? String(day.minutes) : "",
@@ -210,7 +217,9 @@ function WeekChart({ days, today }) {
             maxWidth: 34,
             height,
             borderRadius: "8px 8px 2px 2px",
-            background: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-brand)",
+            background: isToday
+              ? "var(--tomato-brand-deep)"
+              : "var(--tomato-brand)",
           },
         }),
         h(
@@ -221,7 +230,9 @@ function WeekChart({ days, today }) {
               fontSize: 11,
               lineHeight: "14px",
               whiteSpace: "nowrap",
-              color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
+              color: isToday
+                ? "var(--tomato-brand-deep)"
+                : "var(--tomato-ink-3)",
               fontWeight: isToday ? 600 : 400,
             },
           },
@@ -248,7 +259,10 @@ function StatsPage({ state, refresh }) {
   const totalMinutes = Math.round((Number(stats.totalSeconds) || 0) / 60);
   const totalPomodoros = Number(stats.totalPomodoros) || 0;
   const streak = Number(stats.streak) || 0;
-  const missedTotal = days.reduce((sum, day) => sum + (Number(day && day.missed) || 0), 0);
+  const missedTotal = days.reduce(
+    (sum, day) => sum + (Number(day && day.missed) || 0),
+    0,
+  );
 
   const week = recentDays({ days }, 7, today);
   const weekTotal = week.reduce((sum, day) => sum + day.minutes, 0);
@@ -326,7 +340,9 @@ function StatsPage({ state, refresh }) {
       hint: t("stats.total", { value: fmtMinutes(weekTotal) }),
     }),
     h(WeekChart, { days: week, today }),
-    h("div", { style: { height: 1, background: "var(--tomato-line)", marginTop: 6 } }),
+    h("div", {
+      style: { height: 1, background: "var(--tomato-line)", marginTop: 6 },
+    }),
   );
 
   const projectCard = h(
@@ -347,7 +363,9 @@ function StatsPage({ state, refresh }) {
               "div",
               {
                 key: row.name,
-                style: { marginBottom: index === distribution.length - 1 ? 0 : 12 },
+                style: {
+                  marginBottom: index === distribution.length - 1 ? 0 : 12,
+                },
               },
               h(
                 "div",
@@ -362,8 +380,18 @@ function StatsPage({ state, refresh }) {
                 },
                 h(
                   "div",
-                  { style: { display: "flex", alignItems: "center", gap: 7, minWidth: 0 } },
-                  h(Dot, { color: row.color || "var(--tomato-brand)", size: 7 }),
+                  {
+                    style: {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      minWidth: 0,
+                    },
+                  },
+                  h(Dot, {
+                    color: row.color || "var(--tomato-brand)",
+                    size: 7,
+                  }),
                   h(
                     "div",
                     {
@@ -382,7 +410,11 @@ function StatsPage({ state, refresh }) {
                   "div",
                   {
                     className: "t-mono",
-                    style: { fontSize: 11.5, color: "var(--tomato-ink-3)", flex: "none" },
+                    style: {
+                      fontSize: 11.5,
+                      color: "var(--tomato-ink-3)",
+                      flex: "none",
+                    },
                   },
                   fmtMinutes(row.minutes),
                 ),
@@ -404,10 +436,15 @@ function StatsPage({ state, refresh }) {
     h(SectionTitle, {
       icon: "calendar",
       title: t("stats.daily"),
-      hint: dayRows.length > 0 ? t("stats.dailyHint", { n: dayRows.length }) : null,
+      hint:
+        dayRows.length > 0 ? t("stats.dailyHint", { n: dayRows.length }) : null,
     }),
     dayRows.length === 0
-      ? h(Empty, { icon: "stats", title: t("stats.noDays"), hint: t("stats.noDaysHint") })
+      ? h(Empty, {
+          icon: "stats",
+          title: t("stats.noDays"),
+          hint: t("stats.noDaysHint"),
+        })
       : h(
           "div",
           null,
@@ -433,14 +470,17 @@ function StatsPage({ state, refresh }) {
             const day = rawDay || {};
             const date = typeof day.date === "string" ? day.date : "";
             const isToday = date !== "" && date === today;
-            const dateLabel = date.length >= 10 ? date.slice(5).replace("-", "/") : date;
+            const dateLabel =
+              date.length >= 10 ? date.slice(5).replace("-", "/") : date;
             return h(
               "div",
               {
                 key: date || `row-${index}`,
                 style: {
                   ...rowGridStyle,
-                  background: isToday ? "var(--tomato-surface-2)" : "transparent",
+                  background: isToday
+                    ? "var(--tomato-surface-2)"
+                    : "transparent",
                   borderRadius: 8,
                 },
               },
@@ -450,7 +490,9 @@ function StatsPage({ state, refresh }) {
                   className: "t-mono",
                   style: {
                     fontSize: 12.5,
-                    color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-2)",
+                    color: isToday
+                      ? "var(--tomato-brand-deep)"
+                      : "var(--tomato-ink-2)",
                   },
                 },
                 dateLabel,
@@ -472,7 +514,11 @@ function StatsPage({ state, refresh }) {
       hint: t("stats.trailCount", { n: trail.length }),
     }),
     trail.length === 0
-      ? h(Empty, { icon: "clock", title: t("stats.noTrail"), hint: t("stats.noTrailHint") })
+      ? h(Empty, {
+          icon: "clock",
+          title: t("stats.noTrail"),
+          hint: t("stats.noTrailHint"),
+        })
       : h(
           "div",
           null,
@@ -488,7 +534,9 @@ function StatsPage({ state, refresh }) {
                   gap: 10,
                   padding: "10px 0",
                   borderBottom:
-                    index === trail.length - 1 ? "1px solid transparent" : "1px solid var(--tomato-line)",
+                    index === trail.length - 1
+                      ? "1px solid transparent"
+                      : "1px solid var(--tomato-line)",
                 },
               },
               h(
@@ -510,7 +558,13 @@ function StatsPage({ state, refresh }) {
                 session.projectName
                   ? h(
                       "div",
-                      { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 2 } },
+                      {
+                        style: {
+                          fontSize: 11.5,
+                          color: "var(--tomato-ink-3)",
+                          marginTop: 2,
+                        },
+                      },
                       session.projectName,
                     )
                   : null,
@@ -519,7 +573,11 @@ function StatsPage({ state, refresh }) {
                 "div",
                 {
                   className: "t-mono",
-                  style: { fontSize: 11.5, color: "var(--tomato-ink-3)", flex: "none" },
+                  style: {
+                    fontSize: 11.5,
+                    color: "var(--tomato-ink-3)",
+                    flex: "none",
+                  },
                 },
                 fmtSessionTime(session.endedAt),
               ),

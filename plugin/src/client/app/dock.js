@@ -46,7 +46,9 @@ export function DockCard({ openPanel }) {
   const start = async (event) => {
     event?.stopPropagation?.();
     setBusy(true);
-    const res = await tryDispatch({ type: view.running ? "pauseTimer" : "startTimer" });
+    const res = await tryDispatch({
+      type: view.running ? "pauseTimer" : "startTimer",
+    });
     setBusy(false);
     if (!res.ok) {
       notify(res.error || t("common.writeFailed"), "danger");
@@ -70,24 +72,44 @@ export function DockCard({ openPanel }) {
         cursor: "pointer",
         borderRadius: 14,
         border: "1px solid var(--tomato-line)",
-        background: "color-mix(in srgb, var(--tomato-surface) 72%, transparent)",
+        background:
+          "color-mix(in srgb, var(--tomato-surface) 72%, transparent)",
         backdropFilter: "blur(8px)",
         fontSize: 12.5,
         color: "var(--tomato-ink-2)",
         flexWrap: "wrap",
       },
     },
-    h(Icon, { name: "tomato", size: 15, style: { color: "var(--tomato-brand)", flex: "none" } }),
+    h(Icon, {
+      name: "tomato",
+      size: 15,
+      style: { color: "var(--tomato-brand)", flex: "none" },
+    }),
     h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, flexWrap: "wrap" } },
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flex: 1,
+          minWidth: 0,
+          flexWrap: "wrap",
+        },
+      },
       h(
         "span",
         { style: { color: "var(--tomato-ink)", fontWeight: 550 } },
-        view.running ? t("dock.running", { time: fmtClock(view.remainingSecs) }) : t("dock.idle"),
+        view.running
+          ? t("dock.running", { time: fmtClock(view.remainingSecs) })
+          : t("dock.idle"),
       ),
       h(Chip, { icon: "tasks" }, t("dock.due", { n: due })),
-      h(Chip, { icon: "clock", tone: "brand" }, t("dock.minutes", { n: focusMinutes })),
+      h(
+        Chip,
+        { icon: "clock", tone: "brand" },
+        t("dock.minutes", { n: focusMinutes }),
+      ),
     ),
     h(
       "button",
@@ -117,7 +139,13 @@ export function DockCard({ openPanel }) {
           e.stopPropagation();
           openPanel?.();
         },
-        style: { height: 27, padding: "0 10px", borderRadius: 9, fontFamily: "inherit", fontSize: 12 },
+        style: {
+          height: 27,
+          padding: "0 10px",
+          borderRadius: 9,
+          fontFamily: "inherit",
+          fontSize: 12,
+        },
       },
       t("dock.view"),
       h(Icon, { name: "chevronRight", size: 13 }),

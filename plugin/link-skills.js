@@ -15,7 +15,16 @@
  * replaced only when `force` is set; the plugin uses `force` so that a link
  * left by an older install path heals on the next mount.
  */
-import { lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, statSync, symlinkSync, unlinkSync } from "node:fs";
+import {
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readlinkSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+  unlinkSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,7 +92,12 @@ export function linkSkills(options) {
   for (const dir of dirs) {
     if (!isDirectory(dir)) {
       if (options.create !== true) {
-        entries.push({ dir, name: undefined, action: "skip", message: "directory does not exist" });
+        entries.push({
+          dir,
+          name: undefined,
+          action: "skip",
+          message: "directory does not exist",
+        });
         continue;
       }
       if (!dryRun) mkdirSync(dir, { recursive: true });
@@ -96,7 +110,10 @@ export function linkSkills(options) {
     }
   }
 
-  return { entries, failures: entries.filter((entry) => entry.action === "skip").length };
+  return {
+    entries,
+    failures: entries.filter((entry) => entry.action === "skip").length,
+  };
 }
 
 function listSkills() {
@@ -110,9 +127,17 @@ function listSkills() {
   for (const entry of entries) {
     if (entry.isDirectory()) {
       const file = join(SKILLS_DIR, entry.name, "SKILL.md");
-      if (exists(file)) skills.push({ name: entry.name, path: join(SKILLS_DIR, entry.name) });
-    } else if (entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md") {
-      skills.push({ name: basename(entry.name, ".md"), path: join(SKILLS_DIR, entry.name) });
+      if (exists(file))
+        skills.push({ name: entry.name, path: join(SKILLS_DIR, entry.name) });
+    } else if (
+      entry.isFile() &&
+      entry.name.endsWith(".md") &&
+      entry.name !== "README.md"
+    ) {
+      skills.push({
+        name: basename(entry.name, ".md"),
+        path: join(SKILLS_DIR, entry.name),
+      });
     }
   }
   return skills.sort((left, right) => left.name.localeCompare(right.name));
@@ -122,11 +147,14 @@ function applyTo(dir, skill, options) {
   const linkPath = join(dir, skill.name);
   const existing = lstatOrUndefined(linkPath);
   const dryRun = options.dryRun === true;
-  const target = options.relative === true ? relative(dir, skill.path) : skill.path;
+  const target =
+    options.relative === true ? relative(dir, skill.path) : skill.path;
 
   if (options.remove === true) {
-    if (existing?.isSymbolicLink() !== true) return { name: skill.name, action: "none", linkPath };
-    if (pointsAt(linkPath) !== resolve(skill.path)) return { name: skill.name, action: "none", linkPath };
+    if (existing?.isSymbolicLink() !== true)
+      return { name: skill.name, action: "none", linkPath };
+    if (pointsAt(linkPath) !== resolve(skill.path))
+      return { name: skill.name, action: "none", linkPath };
     if (!dryRun) unlinkSync(linkPath);
     return { name: skill.name, action: "unlink", linkPath };
   }
@@ -136,13 +164,23 @@ function applyTo(dir, skill, options) {
     return { name: skill.name, action: "link", linkPath, target };
   }
   if (existing.isSymbolicLink() !== true) {
-    return { name: skill.name, action: "skip", linkPath, message: "a real file or directory is in the way" };
+    return {
+      name: skill.name,
+      action: "skip",
+      linkPath,
+      message: "a real file or directory is in the way",
+    };
   }
   if (pointsAt(linkPath) === resolve(skill.path)) {
     return { name: skill.name, action: "ok", linkPath };
   }
   if (options.force !== true) {
-    return { name: skill.name, action: "skip", linkPath, message: `points elsewhere (${pointsAt(linkPath)})` };
+    return {
+      name: skill.name,
+      action: "skip",
+      linkPath,
+      message: `points elsewhere (${pointsAt(linkPath)})`,
+    };
   }
   if (!dryRun) {
     unlinkSync(linkPath);
@@ -171,7 +209,9 @@ export function installSkillLinks(ctx, setting, label = "skills") {
     ? setting.map((dir) => expandHome(dir))
     : autoLinkDirs();
   if (dirs.length === 0) {
-    ctx.logger.info(`${label}: no other agent skill directory yet; run node link-skills.mjs when one exists`);
+    ctx.logger.info(
+      `${label}: no other agent skill directory yet; run node link-skills.mjs when one exists`,
+    );
     return;
   }
 
@@ -183,13 +223,20 @@ export function installSkillLinks(ctx, setting, label = "skills") {
     return;
   }
 
-  const linked = result.entries.filter((entry) => entry.action === "link" || entry.action === "replace");
+  const linked = result.entries.filter(
+    (entry) => entry.action === "link" || entry.action === "replace",
+  );
   if (linked.length > 0) {
     const roots = [...new Set(linked.map((entry) => entry.dir))].join(", ");
-    ctx.logger.info(`${label}: linked ${linked.map((entry) => entry.name).join(", ")} into ${roots}`);
+    ctx.logger.info(
+      `${label}: linked ${linked.map((entry) => entry.name).join(", ")} into ${roots}`,
+    );
   }
   for (const entry of result.entries) {
-    if (entry.action === "skip") ctx.logger.warn(`${label}: left ${entry.linkPath ?? entry.dir} alone (${entry.message})`);
+    if (entry.action === "skip")
+      ctx.logger.warn(
+        `${label}: left ${entry.linkPath ?? entry.dir} alone (${entry.message})`,
+      );
   }
 }
 

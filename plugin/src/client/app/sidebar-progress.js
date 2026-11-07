@@ -13,6 +13,8 @@ export function SidebarTomatoIcon({ size = 18, active = false }) {
     name: "tomato",
     size,
     stroke: 1.5,
-    style: { color: active ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" },
+    style: {
+      color: active ? "var(--tomato-brand-deep)" : "var(--tomato-brand)",
+    },
   });
 }

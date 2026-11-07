@@ -297,7 +297,8 @@ registerCopy("education", {
     libraryRevoke: "Revoke",
     libraryScanning: "Checking resources…",
     libraryScanNone: "No study projects to scan yet.",
-    libraryScanDone: "Checked {n} resources: {a} available, {m} missing, {u} unavailable",
+    libraryScanDone:
+      "Checked {n} resources: {a} available, {m} missing, {u} unavailable",
     libraryDialogTitle: "Authorize shared library",
     libraryDialogSubtitle:
       "Enter an absolute path on this machine, e.g. /home/fuurin/exam. One authorization covers every study project; per-project grants can only narrow to a subfolder.",
@@ -314,7 +315,8 @@ registerCopy("education", {
     libraryRevokeWarning:
       "Projects without their own grant immediately lose resource access; per-project grants stay and keep mounting their own folders.",
     libraryLoading: "Reading library authorization…",
-    libraryUnavailable: "Could not read the library state; runtime may be offline.",
+    libraryUnavailable:
+      "Could not read the library state; runtime may be offline.",
     libraryRetry: "Retry",
     syllabusLabel: "Syllabus",
     pastPapersCount: "{n} past papers",
@@ -982,12 +984,22 @@ function AssessmentRow({ assessment, index, at, onAssistant }) {
   const grade = submission ? index.gradeOf.get(submission.id) || null : null;
   const total = assessmentTotal(assessment);
   const score = grade !== null ? gradeScore(grade) : null;
-  const action = status === "submitted" ? "grade"
-    : status === "correctionDue" ? "correct"
-    : status === "needsReview" ? "review"
-    : ["awaitingSubmission", "overdue", "missed"].includes(status) ? "submit" : null;
-  const actionKey = { submit: "submitAction", grade: "gradeAction",
-    correct: "correctAction", review: "reviewAction" };
+  const action =
+    status === "submitted"
+      ? "grade"
+      : status === "correctionDue"
+        ? "correct"
+        : status === "needsReview"
+          ? "review"
+          : ["awaitingSubmission", "overdue", "missed"].includes(status)
+            ? "submit"
+            : null;
+  const actionKey = {
+    submit: "submitAction",
+    grade: "gradeAction",
+    correct: "correctAction",
+    review: "reviewAction",
+  };
   return h(
     "div",
     { style: ROW },
@@ -1032,10 +1044,23 @@ function AssessmentRow({ assessment, index, at, onAssistant }) {
         )
       : null,
     h(Chip, { tone: statusTone(status) }, statusLabel(status)),
-    action && onAssistant ? h(Btn, { variant: "ghost", size: "sm",
-      onClick: () => onAssistant(action, { projectId: assessment.projectId,
-        assessmentId: assessment.id, submissionId: submission?.id, gradeId: grade?.id }),
-    }, t(`education.${actionKey[action]}`)) : null,
+    action && onAssistant
+      ? h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            onClick: () =>
+              onAssistant(action, {
+                projectId: assessment.projectId,
+                assessmentId: assessment.id,
+                submissionId: submission?.id,
+                gradeId: grade?.id,
+              }),
+          },
+          t(`education.${actionKey[action]}`),
+        )
+      : null,
   );
 }
 
@@ -1104,8 +1129,10 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
   const [scan, setScan] = useState("");
 
   const loading = library === null || library === undefined;
-  const authorized = library !== null && library !== undefined && library.authorized === true;
-  const unavailable = library !== null && library !== undefined && library.unavailable === true;
+  const authorized =
+    library !== null && library !== undefined && library.authorized === true;
+  const unavailable =
+    library !== null && library !== undefined && library.unavailable === true;
   const path = strOr(library?.directory);
 
   const openAuthorize = () => {
@@ -1172,7 +1199,8 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
       const items = results.flatMap((result) =>
         result && Array.isArray(result.resources) ? result.resources : [],
       );
-      const count = (state) => items.filter((item) => item.state === state).length;
+      const count = (state) =>
+        items.filter((item) => item.state === state).length;
       const available = count("available");
       const missing = count("missing");
       setScan(
@@ -1213,7 +1241,10 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
     },
     loading
       ? t("education.libraryLoading")
-      : path || (unavailable ? t("education.libraryUnavailable") : t("education.directoryEmpty")),
+      : path ||
+          (unavailable
+            ? t("education.libraryUnavailable")
+            : t("education.directoryEmpty")),
   );
 
   const card = h(
@@ -1222,22 +1253,54 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
     h(SectionTitle, {
       icon: "folder",
       title: t("education.libraryTitle"),
-      hint: authorized ? t("education.libraryProjects", { n: library.projects ?? 0 }) : null,
+      hint: authorized
+        ? t("education.libraryProjects", { n: library.projects ?? 0 })
+        : null,
       action: statusChip,
     }),
     pathBox,
     h(
       "div",
-      { style: { fontSize: 12, color: "var(--tomato-ink-3)", lineHeight: 1.6, marginTop: 9 } },
-      authorized ? t("education.librarySharedHint") : t("education.libraryMissingHint"),
+      {
+        style: {
+          fontSize: 12,
+          color: "var(--tomato-ink-3)",
+          lineHeight: 1.6,
+          marginTop: 9,
+        },
+      },
+      authorized
+        ? t("education.librarySharedHint")
+        : t("education.libraryMissingHint"),
     ),
     unavailable
       ? h(
           "div",
-          { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 9 } },
-          h("span", { style: { fontSize: 12, color: "#b8503f" } }, strOr(library.reason) || t("education.libraryUnavailable")),
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+              marginTop: 9,
+            },
+          },
+          h(
+            "span",
+            { style: { fontSize: 12, color: "#b8503f" } },
+            strOr(library.reason) || t("education.libraryUnavailable"),
+          ),
           onReload
-            ? h(Btn, { variant: "ghost", size: "sm", icon: "refresh", onClick: onReload }, t("education.libraryRetry"))
+            ? h(
+                Btn,
+                {
+                  variant: "ghost",
+                  size: "sm",
+                  icon: "refresh",
+                  onClick: onReload,
+                },
+                t("education.libraryRetry"),
+              )
             : null,
         )
       : null,
@@ -1248,19 +1311,80 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
         ? null
         : authorized
           ? [
-              h(Btn, { key: "change", variant: "soft", size: "sm", icon: "folder", onClick: openAuthorize }, t("education.libraryChange")),
-              h(Btn, { key: "scan", variant: "ghost", size: "sm", icon: "refresh", onClick: scanAll, disabled: busy }, t("education.libraryScan")),
-              h(Btn, { key: "revoke", variant: "ghost", size: "sm", icon: "trash", onClick: openRevoke }, t("education.libraryRevoke")),
+              h(
+                Btn,
+                {
+                  key: "change",
+                  variant: "soft",
+                  size: "sm",
+                  icon: "folder",
+                  onClick: openAuthorize,
+                },
+                t("education.libraryChange"),
+              ),
+              h(
+                Btn,
+                {
+                  key: "scan",
+                  variant: "ghost",
+                  size: "sm",
+                  icon: "refresh",
+                  onClick: scanAll,
+                  disabled: busy,
+                },
+                t("education.libraryScan"),
+              ),
+              h(
+                Btn,
+                {
+                  key: "revoke",
+                  variant: "ghost",
+                  size: "sm",
+                  icon: "trash",
+                  onClick: openRevoke,
+                },
+                t("education.libraryRevoke"),
+              ),
             ]
-          : h(Btn, { variant: "primary", size: "sm", icon: "folder", onClick: openAuthorize }, t("education.libraryAuthorize")),
+          : h(
+              Btn,
+              {
+                variant: "primary",
+                size: "sm",
+                icon: "folder",
+                onClick: openAuthorize,
+              },
+              t("education.libraryAuthorize"),
+            ),
     ),
     scan
-      ? h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 9 } }, scan)
+      ? h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              marginTop: 9,
+            },
+          },
+          scan,
+        )
       : null,
   );
 
   const errorLine = error
-    ? h("div", { style: { fontSize: 12, color: "#b8503f", lineHeight: 1.55, marginTop: 10 } }, error)
+    ? h(
+        "div",
+        {
+          style: {
+            fontSize: 12,
+            color: "#b8503f",
+            lineHeight: 1.55,
+            marginTop: 10,
+          },
+        },
+        error,
+      )
     : null;
 
   const authorizeDialog = h(
@@ -1274,8 +1398,16 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
       footer: h(
         "div",
         { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
-        h(Btn, { variant: "ghost", onClick: closeDialog, disabled: busy }, t("common.cancel")),
-        h(Btn, { variant: "primary", onClick: submit, disabled: busy }, busy ? t("education.librarySaving") : t("education.libraryAuthorize")),
+        h(
+          Btn,
+          { variant: "ghost", onClick: closeDialog, disabled: busy },
+          t("common.cancel"),
+        ),
+        h(
+          Btn,
+          { variant: "primary", onClick: submit, disabled: busy },
+          busy ? t("education.librarySaving") : t("education.libraryAuthorize"),
+        ),
       ),
     },
     h(
@@ -1283,7 +1415,10 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
       { style: { display: "flex", flexDirection: "column", gap: 10 } },
       h(
         Field,
-        { label: t("education.libraryDialogLabel"), hint: t("education.libraryDialogHint") },
+        {
+          label: t("education.libraryDialogLabel"),
+          hint: t("education.libraryDialogHint"),
+        },
         h(Input, {
           value: directory,
           onChange: (value) => {
@@ -1313,14 +1448,28 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
       footer: h(
         "div",
         { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
-        h(Btn, { variant: "ghost", onClick: closeDialog, disabled: busy }, t("common.cancel")),
-        h(Btn, { variant: "danger", onClick: revoke, disabled: busy }, busy ? t("education.libraryRevoking") : t("education.libraryRevoke")),
+        h(
+          Btn,
+          { variant: "ghost", onClick: closeDialog, disabled: busy },
+          t("common.cancel"),
+        ),
+        h(
+          Btn,
+          { variant: "danger", onClick: revoke, disabled: busy },
+          busy ? t("education.libraryRevoking") : t("education.libraryRevoke"),
+        ),
       ),
     },
     errorLine ? h("div", null, errorLine) : null,
   );
 
-  return h("div", { style: { marginBottom: 16 } }, card, authorizeDialog, revokeDialog);
+  return h(
+    "div",
+    { style: { marginBottom: 16 } },
+    card,
+    authorizeDialog,
+    revokeDialog,
+  );
 }
 
 // ---------------------------------------------------------------- 项目详情
@@ -1347,7 +1496,9 @@ export function ProjectDetail({
     library && library.authorized === true ? strOr(library.directory) : "";
   const projectDirectory = strOr(study.directory);
   const sharedIds =
-    library && Array.isArray(library.sharedProjects) ? library.sharedProjects : null;
+    library && Array.isArray(library.sharedProjects)
+      ? library.sharedProjects
+      : null;
   const usesSharedLibrary =
     sharedLibrary !== "" &&
     (sharedIds !== null
@@ -1609,7 +1760,11 @@ export function ProjectDetail({
         ? h(Chip, { tone: "brand" }, t("education.examMode"))
         : null,
       usesSharedLibrary
-        ? h(Chip, { tone: "neutral", icon: "folder" }, t("education.directorySharedLabel"))
+        ? h(
+            Chip,
+            { tone: "neutral", icon: "folder" },
+            t("education.directorySharedLabel"),
+          )
         : null,
       study.syllabusId
         ? h(
@@ -1750,15 +1905,13 @@ export function ProjectDetail({
     }),
     progress.length === 0
       ? mutedText(t("education.noProgress"))
-      : progress
-          .slice(0, 10)
-          .map((record, recordIndex) =>
-            h(ProgressRow, {
-              key: record.id || `progress-${recordIndex}`,
-              record,
-              onConfirm,
-            }),
-          ),
+      : progress.slice(0, 10).map((record, recordIndex) =>
+          h(ProgressRow, {
+            key: record.id || `progress-${recordIndex}`,
+            record,
+            onConfirm,
+          }),
+        ),
   );
 
   const completedCard = h(
@@ -1968,9 +2121,17 @@ export function ProjectDetail({
       icon: "tasks",
       title: t("education.assessmentsTitle"),
       hint: t("education.attentionHint", { n: assessments.length }),
-      action: onAssistant ? h(Btn, { variant: "soft", size: "sm",
-        onClick: () => onAssistant("assign", { projectId }),
-      }, t("education.assignAction")) : null,
+      action: onAssistant
+        ? h(
+            Btn,
+            {
+              variant: "soft",
+              size: "sm",
+              onClick: () => onAssistant("assign", { projectId }),
+            },
+            t("education.assignAction"),
+          )
+        : null,
     }),
     assessments.length === 0
       ? mutedText(t("education.assessmentsEmpty"))
@@ -2312,7 +2473,8 @@ export function EducationPage({ onAssistant } = {}) {
           projects: 0,
           sharedProjects: [],
           unavailable: true,
-          reason: error && error.userMessage ? error.userMessage : String(error),
+          reason:
+            error && error.userMessage ? error.userMessage : String(error),
         }),
       );
   };
@@ -2590,12 +2752,31 @@ export function EducationPage({ onAssistant } = {}) {
                 t("education.noProgress"),
               ),
         ),
-        h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-          h(Btn, { variant: "soft", size: "sm", iconRight: "arrowRight",
-            onClick: () => setDetailId(study.projectId) }, t("education.viewDetail")),
-          onAssistant ? h(Btn, { variant: "ghost", size: "sm",
-            onClick: () => onAssistant("assign", { projectId: study.projectId }),
-          }, t("education.assignAction")) : null,
+        h(
+          "div",
+          { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+          h(
+            Btn,
+            {
+              variant: "soft",
+              size: "sm",
+              iconRight: "arrowRight",
+              onClick: () => setDetailId(study.projectId),
+            },
+            t("education.viewDetail"),
+          ),
+          onAssistant
+            ? h(
+                Btn,
+                {
+                  variant: "ghost",
+                  size: "sm",
+                  onClick: () =>
+                    onAssistant("assign", { projectId: study.projectId }),
+                },
+                t("education.assignAction"),
+              )
+            : null,
         ),
       ),
     );
@@ -2603,7 +2784,9 @@ export function EducationPage({ onAssistant } = {}) {
 
   const librarySection = h(LibraryCard, {
     library,
-    projectIds: edu.projects.map((item) => strOr(item.projectId)).filter(Boolean),
+    projectIds: edu.projects
+      .map((item) => strOr(item.projectId))
+      .filter(Boolean),
     onChange: (next) => setLibrary(next),
     onReload: loadLibrary,
   });
@@ -2707,10 +2890,21 @@ export function EducationPage({ onAssistant } = {}) {
         pendingCorrection.push({ assessment, grade, error });
       }
     }
-    if (submission !== null && grade === null) pendingGrade.push({ assessment, submission });
+    if (submission !== null && grade === null)
+      pendingGrade.push({ assessment, submission });
   }
 
-  const attentionRow = (key, color, title, kind, timeText, note, status, action, onAction) =>
+  const attentionRow = (
+    key,
+    color,
+    title,
+    kind,
+    timeText,
+    note,
+    status,
+    action,
+    onAction,
+  ) =>
     h(
       "div",
       { key, style: ROW },
@@ -2744,11 +2938,16 @@ export function EducationPage({ onAssistant } = {}) {
       status
         ? h(Chip, { tone: statusTone(status) }, statusLabel(status))
         : null,
-      onAction ? h(Btn, { variant: "ghost", size: "sm", onClick: onAction }, action) : null,
+      onAction
+        ? h(Btn, { variant: "ghost", size: "sm", onClick: onAction }, action)
+        : null,
     );
 
   const attentionTotal =
-    pendingSubmit.length + pendingGrade.length + pendingCorrection.length + pendingReview.length;
+    pendingSubmit.length +
+    pendingGrade.length +
+    pendingCorrection.length +
+    pendingReview.length;
   const attentionCard = h(
     Card,
     { pad: 22 },
@@ -2779,14 +2978,21 @@ export function EducationPage({ onAssistant } = {}) {
                     "",
                     status,
                     t("education.submitAction"),
-                    onAssistant ? () => onAssistant("submit", { projectId: assessment.projectId,
-                      assessmentId: assessment.id }) : null,
+                    onAssistant
+                      ? () =>
+                          onAssistant("submit", {
+                            projectId: assessment.projectId,
+                            assessmentId: assessment.id,
+                          })
+                      : null,
                   ),
                 ),
               )
             : null,
           pendingGrade.length > 0
-            ? h("div", null,
+            ? h(
+                "div",
+                null,
                 subHeading(t("education.pendingGrade"), pendingGrade.length),
                 pendingGrade.map(({ assessment, submission }, gradeIndex) =>
                   attentionRow(
@@ -2798,8 +3004,14 @@ export function EducationPage({ onAssistant } = {}) {
                     "",
                     "submitted",
                     t("education.gradeAction"),
-                    onAssistant ? () => onAssistant("grade", { projectId: assessment.projectId,
-                      assessmentId: assessment.id, submissionId: submission.id }) : null,
+                    onAssistant
+                      ? () =>
+                          onAssistant("grade", {
+                            projectId: assessment.projectId,
+                            assessmentId: assessment.id,
+                            submissionId: submission.id,
+                          })
+                      : null,
                   ),
                 ),
               )
@@ -2833,9 +3045,16 @@ export function EducationPage({ onAssistant } = {}) {
                       note,
                       "correctionDue",
                       t("education.correctAction"),
-                      onAssistant ? () => onAssistant("correct", { projectId: assessment.projectId,
-                        assessmentId: assessment.id, submissionId: grade.submissionId,
-                        gradeId: grade.id, questionId: error.questionId }) : null,
+                      onAssistant
+                        ? () =>
+                            onAssistant("correct", {
+                              projectId: assessment.projectId,
+                              assessmentId: assessment.id,
+                              submissionId: grade.submissionId,
+                              gradeId: grade.id,
+                              questionId: error.questionId,
+                            })
+                        : null,
                     );
                   },
                 ),
@@ -2856,9 +3075,15 @@ export function EducationPage({ onAssistant } = {}) {
                     "",
                     "needsReview",
                     t("education.reviewAction"),
-                    onAssistant ? () => onAssistant("review", { projectId: assessment.projectId,
-                      assessmentId: assessment.id, submissionId: grade.submissionId,
-                      gradeId: grade.id }) : null,
+                    onAssistant
+                      ? () =>
+                          onAssistant("review", {
+                            projectId: assessment.projectId,
+                            assessmentId: assessment.id,
+                            submissionId: grade.submissionId,
+                            gradeId: grade.id,
+                          })
+                      : null,
                   ),
                 ),
               )

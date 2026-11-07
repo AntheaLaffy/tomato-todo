@@ -38,5 +38,8 @@ const result = await build({
 });
 
 const inputs = Object.keys(result.metafile.inputs).length;
-const bytes = result.metafile.outputs[Object.keys(result.metafile.outputs)[0]].bytes;
-console.log(`client.js built from ${inputs} modules (${(bytes / 1024).toFixed(1)} KiB)`);
+const bytes =
+  result.metafile.outputs[Object.keys(result.metafile.outputs)[0]].bytes;
+console.log(
+  `client.js built from ${inputs} modules (${(bytes / 1024).toFixed(1)} KiB)`,
+);

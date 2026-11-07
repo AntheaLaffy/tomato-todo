@@ -28,7 +28,12 @@ test("没有 react-dom 时对话框退回内联渲染，不抛错", () => {
   const html = renderToStaticMarkup(
     React.createElement(
       Modal,
-      { open: true, title: "直接创建实例", subtitle: "写下想完成的一件事", onClose() {} },
+      {
+        open: true,
+        title: "直接创建实例",
+        subtitle: "写下想完成的一件事",
+        onClose() {},
+      },
       React.createElement("div", null, "表单内容"),
     ),
   );
@@ -39,6 +44,8 @@ test("没有 react-dom 时对话框退回内联渲染，不抛错", () => {
 });
 
 test("open 为 false 时不渲染任何东西", () => {
-  const html = renderToStaticMarkup(React.createElement(Modal, { open: false, title: "x" }, "y"));
+  const html = renderToStaticMarkup(
+    React.createElement(Modal, { open: false, title: "x" }, "y"),
+  );
   assert.equal(html, "");
 });

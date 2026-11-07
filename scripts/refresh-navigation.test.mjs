@@ -79,7 +79,10 @@ test("提醒（reminder）：不切面板、不切页，只留 HUD 与提示音"
   assert.deepEqual(calls, []);
   assert.equal(nav.getActivePageId(), "calendar");
   assert.equal(nav.isPanelVisible(), true);
-  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), { panel: "tomato", page: "calendar" });
+  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), {
+    panel: "tomato",
+    page: "calendar",
+  });
 });
 
 // ---- navigate：一轮结束才抢 ----
@@ -90,7 +93,10 @@ test("navigate(complete)：切到番茄面板的今日专注页，并记住面�
   assert.deepEqual(calls, ["tomato"]);
   assert.equal(nav.getActivePageId(), "focus");
   assert.equal(nav.isPanelVisible(), true);
-  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), { panel: "tomato", page: "focus" });
+  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), {
+    panel: "tomato",
+    page: "focus",
+  });
 });
 
 test("navigate(complete)：同一个 completionSerial 只切一次", () => {
@@ -106,7 +112,9 @@ test("navigate(complete)：同一个 completionSerial 只切一次", () => {
 
 test("navigate(complete)：有对话框打开时让位，关掉后也不补跳", () => {
   const calls = opener();
-  globalThis.document = { querySelector: (selector) => (selector === '[role="dialog"]' ? {} : null) };
+  globalThis.document = {
+    querySelector: (selector) => (selector === '[role="dialog"]' ? {} : null),
+  };
   assert.equal(nav.navigate({ reason: "complete", serial: 6 }), false);
   assert.deepEqual(calls, []);
 
@@ -160,7 +168,10 @@ test("持久化 {panel, page}：切页保留面板，打开面板保留页", () 
   nav.setActivePageId("calendar");
   nav.setPanelVisible(true);
   nav.setActivePageId("stats");
-  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), { panel: "tomato", page: "stats" });
+  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), {
+    panel: "tomato",
+    page: "stats",
+  });
   // 旧 key 继续写：旧版本 / 外部脚本仍按 tomato-dsh.page 读页。
   assert.equal(local.getItem(LEGACY_PAGE_KEY), "stats");
 });
@@ -169,7 +180,10 @@ test("迁移：只有旧版 tomato-dsh.page 时读回页，但不擅自打开面
   local.setItem(LEGACY_PAGE_KEY, "stats");
   assert.equal(nav.getActivePageId(), "stats");
   assert.equal(nav.isPanelVisible(), false);
-  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), { panel: "conversation", page: "stats" });
+  assert.deepEqual(JSON.parse(session.getItem(NAV_KEY)), {
+    panel: "conversation",
+    page: "stats",
+  });
 
   // 刷新后按对话处理：不切面板、不切页。
   assert.equal(nav.isColdStart(), true);

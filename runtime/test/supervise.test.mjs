@@ -58,7 +58,11 @@ test("guard 不可达时拉起，退出后重启", async () => {
     token: "t",
     logger,
     backoffMs: 100,
-    client: new GuardClient({ baseUrl: `http://127.0.0.1:${PORT}`, token: "t", timeoutMs: 500 }),
+    client: new GuardClient({
+      baseUrl: `http://127.0.0.1:${PORT}`,
+      token: "t",
+      timeoutMs: 500,
+    }),
   });
   process.env.TOMATO_GUARD_BIN = bin;
   try {
@@ -69,10 +73,14 @@ test("guard 不可达时拉起，退出后重启", async () => {
     // 杀掉当前 guard 进程，监督器应重启一个。
     const pidBefore = status.pid;
     process.kill(pidBefore, "SIGKILL");
-    await waitFor(async () => {
-      const s = await sup.status();
-      return s !== null && s.pid !== pidBefore;
-    }, 8000, "退出后重启");
+    await waitFor(
+      async () => {
+        const s = await sup.status();
+        return s !== null && s.pid !== pidBefore;
+      },
+      8000,
+      "退出后重启",
+    );
     status = await sup.status();
     assert.notEqual(status.pid, pidBefore);
   } finally {
@@ -91,7 +99,11 @@ test("候选二进制都拉不起来也不影响 runtime（持续退避重试）
     token: "t",
     logger,
     backoffMs: 50,
-    client: new GuardClient({ baseUrl: `http://127.0.0.1:${PORT}`, token: "t", timeoutMs: 500 }),
+    client: new GuardClient({
+      baseUrl: `http://127.0.0.1:${PORT}`,
+      token: "t",
+      timeoutMs: 500,
+    }),
   });
   try {
     await sleep(400);
@@ -115,7 +127,11 @@ test("已有 guard 在跑时只旁观，不抢端口", async () => {
     token: "t",
     logger: { error: () => {} },
     backoffMs: 100,
-    client: new GuardClient({ baseUrl: `http://127.0.0.1:${PORT}`, token: "t", timeoutMs: 500 }),
+    client: new GuardClient({
+      baseUrl: `http://127.0.0.1:${PORT}`,
+      token: "t",
+      timeoutMs: 500,
+    }),
   });
   try {
     await waitFor(async () => (await sup.status()) !== null, 3000, "旁观确认");

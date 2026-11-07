@@ -24,7 +24,15 @@ import {
   TextArea,
   notify,
 } from "../shared/ui.js";
-import { addDays, fmtHHMM, parseHHMM, projectById, todayKey, weekStart, weekdayIndex } from "../shared/derive.js";
+import {
+  addDays,
+  fmtHHMM,
+  parseHHMM,
+  projectById,
+  todayKey,
+  weekStart,
+  weekdayIndex,
+} from "../shared/derive.js";
 import { tryDispatch } from "../shared/store.js";
 import { registerPage } from "../app/registry.js";
 import { TaskDialog } from "./task-dialog.js";
@@ -102,7 +110,8 @@ registerCopy("calendar", {
   },
   en: {
     eyebrow: "WEEK AT A GLANCE",
-    subtitle: "Weekdays across, time down: solid blocks are tasks, hatched bands are fixed time.",
+    subtitle:
+      "Weekdays across, time down: solid blocks are tasks, hatched bands are fixed time.",
     prev: "Previous week",
     next: "Next week",
     thisWeek: "This week",
@@ -145,19 +154,24 @@ registerCopy("calendar", {
     savedToast: "Slot saved",
     deletedToast: "Slot deleted",
     deleteConfirmTitle: "Delete this slot?",
-    deleteConfirmBody: "“{name}” will be removed from the weekly calendar; printed tasks are untouched.",
+    deleteConfirmBody:
+      "“{name}” will be removed from the weekly calendar; printed tasks are untouched.",
     deleteBlock: "Delete slot",
     blocksTitle: "Weekly fixed slots",
     blocksHint: "{n}",
     blocksEmptyTitle: "No fixed slots yet",
-    blocksEmptyHint: "Add recurring classes so the calendar knows which hours are taken.",
+    blocksEmptyHint:
+      "Add recurring classes so the calendar knows which hours are taken.",
     conflictsTitle: "Conflicts & parallel time",
     conflictCount: "{n}",
     noConflict: "No time conflicts found",
     conflictDay: "{day} {date}",
-    conflictBlockBlock: "Two focus-required slots overlap: {a} and {b} ({minutes} min)",
-    conflictTeachingBlock: "“{a}” falls inside focus-required “{b}” ({minutes} min)",
-    conflictTeachingTeaching: "Overlapping schedule: “{a}” and “{b}” ({minutes} min)",
+    conflictBlockBlock:
+      "Two focus-required slots overlap: {a} and {b} ({minutes} min)",
+    conflictTeachingBlock:
+      "“{a}” falls inside focus-required “{b}” ({minutes} min)",
+    conflictTeachingTeaching:
+      "Overlapping schedule: “{a}” and “{b}” ({minutes} min)",
     conflictRest: "Rest “{a}” overlaps “{b}” ({minutes} min)",
     parallel: "Light class “{a}” overlaps “{b}”; working in parallel is fine.",
     lesson: "Lesson",
@@ -208,7 +222,8 @@ function overlapOf(a, b) {
 
 function fmtBand(start, end) {
   const range = bandRange(start, end);
-  if (range && range.end > 1440) return `${start} – ${t("calendar.nextDay")} ${end}`;
+  if (range && range.end > 1440)
+    return `${start} – ${t("calendar.nextDay")} ${end}`;
   return `${start} – ${end}`;
 }
 
@@ -232,10 +247,14 @@ function buildWeek(state, offset) {
   const base = weekStart(today);
   const monday = addDays(base, offset * 7);
   const blocks = Array.isArray(data.blocks) ? data.blocks : [];
-  const schedules = (data.lock && Array.isArray(data.lock.schedules) && data.lock.schedules) || [];
+  const schedules =
+    (data.lock && Array.isArray(data.lock.schedules) && data.lock.schedules) ||
+    [];
   const education = data.education || {};
   const lessons = Array.isArray(education.lessons) ? education.lessons : [];
-  const assessments = Array.isArray(education.assessments) ? education.assessments : [];
+  const assessments = Array.isArray(education.assessments)
+    ? education.assessments
+    : [];
   const allTasks = Array.isArray(data.tasks) ? data.tasks : [];
   const settings = data.settings || {};
   const focusMinutes = Math.max(1, Number(settings.focusMinutes) || 45);
@@ -257,7 +276,10 @@ function buildWeek(state, offset) {
     for (const lesson of lessons) {
       if (!lesson || typeof lesson.startsAt !== "number") continue;
       if (lesson.startsAt < dayStart || lesson.startsAt >= dayEnd) continue;
-      const endsAt = Number(lesson.endsAt) > 0 ? Number(lesson.endsAt) : lesson.startsAt + 3600;
+      const endsAt =
+        Number(lesson.endsAt) > 0
+          ? Number(lesson.endsAt)
+          : lesson.startsAt + 3600;
       teaching.push({
         kind: "lesson",
         raw: lesson,
@@ -268,9 +290,15 @@ function buildWeek(state, offset) {
       });
     }
     for (const exam of assessments) {
-      if (!exam || exam.kind === "homework" || typeof exam.startsAt !== "number") continue;
+      if (
+        !exam ||
+        exam.kind === "homework" ||
+        typeof exam.startsAt !== "number"
+      )
+        continue;
       if (exam.startsAt < dayStart || exam.startsAt >= dayEnd) continue;
-      const endsAt = Number(exam.endsAt) > 0 ? Number(exam.endsAt) : exam.startsAt + 3600;
+      const endsAt =
+        Number(exam.endsAt) > 0 ? Number(exam.endsAt) : exam.startsAt + 3600;
       teaching.push({
         kind: "exam",
         raw: exam,
@@ -283,8 +311,14 @@ function buildWeek(state, offset) {
     teaching.sort((a, b) => a.startMin - b.startMin);
 
     const dayBlocks = blocks
-      .filter((block) => block && Array.isArray(block.days) && block.days.includes(weekday))
-      .map((block) => ({ ...block, attention: block.attention === "light" ? "light" : "required" }));
+      .filter(
+        (block) =>
+          block && Array.isArray(block.days) && block.days.includes(weekday),
+      )
+      .map((block) => ({
+        ...block,
+        attention: block.attention === "light" ? "light" : "required",
+      }));
 
     const dayRests = schedules.filter(
       (schedule) =>
@@ -303,13 +337,18 @@ function buildWeek(state, offset) {
           task.reminderTime &&
           !lessonTaskIds.has(task.id),
       )
-      .sort((a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime)))
+      .sort((a, b) =>
+        String(a.reminderTime).localeCompare(String(b.reminderTime)),
+      )
       .map((task) => {
         const startSecs = parseHHMM(task.reminderTime);
         if (startSecs === null) return null;
         const estimate = Math.max(1, Number(task.estimate) || 1);
         const focus = Math.max(1, Number(task.focusMinutes) || focusMinutes);
-        const minutes = Math.max(30, estimate * focus + (estimate - 1) * breakMinutes);
+        const minutes = Math.max(
+          30,
+          estimate * focus + (estimate - 1) * breakMinutes,
+        );
         return {
           raw: task,
           title: task.title || t("calendar.untitled"),
@@ -321,7 +360,14 @@ function buildWeek(state, offset) {
       })
       .filter(Boolean);
 
-    return { date, weekday, teaching, blocks: dayBlocks, rests: dayRests, tasks: dayTasks };
+    return {
+      date,
+      weekday,
+      teaching,
+      blocks: dayBlocks,
+      rests: dayRests,
+      tasks: dayTasks,
+    };
   });
 
   return { today, monday, days, data };
@@ -335,10 +381,13 @@ function teachingLabel(item) {
 /** 冲突（红点）与并行提示（绿叶）：展示层判定，不改变 core 数据。 */
 function findConflicts(days) {
   const out = [];
-  const add = (dayIndex, tone, message, key) => out.push({ key, dayIndex, tone, message });
+  const add = (dayIndex, tone, message, key) =>
+    out.push({ key, dayIndex, tone, message });
 
   days.forEach((day, dayIndex) => {
-    const required = day.blocks.filter((block) => block.attention === "required");
+    const required = day.blocks.filter(
+      (block) => block.attention === "required",
+    );
     const light = day.blocks.filter((block) => block.attention === "light");
     const rangeOfBlock = (block) => bandRange(block.start, block.end);
     const rangeOfRest = (rest) => bandRange(rest.start, rest.end);
@@ -348,7 +397,10 @@ function findConflicts(days) {
       const currentRange = { start: current.startMin, end: current.endMin };
       for (let j = i + 1; j < day.teaching.length; j += 1) {
         const next = day.teaching[j];
-        const minutes = overlapOf(currentRange, { start: next.startMin, end: next.endMin });
+        const minutes = overlapOf(currentRange, {
+          start: next.startMin,
+          end: next.endMin,
+        });
         if (minutes > 0) {
           add(
             dayIndex,
@@ -410,7 +462,10 @@ function findConflicts(days) {
 
     for (let i = 0; i < required.length; i += 1) {
       for (let j = i + 1; j < required.length; j += 1) {
-        const minutes = overlapOf(rangeOfBlock(required[i]), rangeOfBlock(required[j]));
+        const minutes = overlapOf(
+          rangeOfBlock(required[i]),
+          rangeOfBlock(required[j]),
+        );
         if (minutes > 0) {
           add(
             dayIndex,
@@ -556,7 +611,9 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
   for (let hour = 7; hour <= 24; hour += 1) hourLabels.push(hour);
 
   const conflictDays = new Set(
-    conflicts.filter((item) => item.tone === "danger").map((item) => item.dayIndex),
+    conflicts
+      .filter((item) => item.tone === "danger")
+      .map((item) => item.dayIndex),
   );
 
   return h(
@@ -629,7 +686,9 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 1,
-                background: isToday ? "var(--tomato-brand-soft)" : "transparent",
+                background: isToday
+                  ? "var(--tomato-brand-soft)"
+                  : "transparent",
                 borderRadius: isToday ? "10px 10px 0 0" : undefined,
                 position: "relative",
               },
@@ -640,7 +699,9 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
                 style: {
                   fontSize: 12.5,
                   fontWeight: isToday ? 650 : 550,
-                  color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink)",
+                  color: isToday
+                    ? "var(--tomato-brand-deep)"
+                    : "var(--tomato-ink)",
                 },
               },
               weekdayLabel(index),
@@ -649,7 +710,12 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
               "div",
               {
                 className: "t-mono",
-                style: { fontSize: 10.5, color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)" },
+                style: {
+                  fontSize: 10.5,
+                  color: isToday
+                    ? "var(--tomato-brand-deep)"
+                    : "var(--tomato-ink-3)",
+                },
               },
               day.date.slice(5).replace("-", "/"),
             ),
@@ -677,7 +743,10 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
                   right: 0,
                   top: `${((hour - 7) / 17) * 100}%`,
                   height: 1,
-                  background: hour === 24 ? "var(--tomato-line-strong)" : "var(--tomato-line)",
+                  background:
+                    hour === 24
+                      ? "var(--tomato-line-strong)"
+                      : "var(--tomato-line)",
                   pointerEvents: "none",
                 },
               }),
@@ -749,7 +818,9 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
                   band: true,
                   title: block.title || t("calendar.untitled"),
                   meta: `${fmtBand(block.start, block.end)}${light ? ` · ${t("calendar.legendLight")}` : ""}`,
-                  color: light ? "var(--tomato-ink-2)" : "var(--tomato-brand-deep)",
+                  color: light
+                    ? "var(--tomato-ink-2)"
+                    : "var(--tomato-brand-deep)",
                 }),
               );
             }),
@@ -783,8 +854,12 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
             ...day.teaching.map((item) => {
               const position = gridPosition(item.startMin, item.endMin);
               const project = projectById(week.data, item.projectId);
-              const color = (project && project.color) || "var(--tomato-accent)";
-              const kindLabel = item.kind === "exam" ? t("calendar.exam") : t("calendar.lesson");
+              const color =
+                (project && project.color) || "var(--tomato-accent)";
+              const kindLabel =
+                item.kind === "exam"
+                  ? t("calendar.exam")
+                  : t("calendar.lesson");
               const timeLabel = `${fmtHHMM(item.startMin * 60)}–${fmtHHMM(item.endMin * 60)}`;
               return h(
                 GridBand,
@@ -816,19 +891,51 @@ function Legend() {
   const item = (key, style, label) =>
     h(
       "span",
-      { key, style: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+      {
+        key,
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 11.5,
+          color: "var(--tomato-ink-3)",
+        },
+      },
       h("span", {
-        style: { width: 12, height: 12, borderRadius: 3, borderLeft: "3px solid", ...style },
+        style: {
+          width: 12,
+          height: 12,
+          borderRadius: 3,
+          borderLeft: "3px solid",
+          ...style,
+        },
       }),
       label,
     );
   return h(
     "div",
-    { style: { display: "flex", gap: 16, flexWrap: "wrap", padding: "0 18px 12px" } },
-    item("teaching", { background: "var(--tomato-surface-2)", borderLeftColor: "var(--tomato-accent)" }, t("calendar.legendTeaching")),
+    {
+      style: {
+        display: "flex",
+        gap: 16,
+        flexWrap: "wrap",
+        padding: "0 18px 12px",
+      },
+    },
+    item(
+      "teaching",
+      {
+        background: "var(--tomato-surface-2)",
+        borderLeftColor: "var(--tomato-accent)",
+      },
+      t("calendar.legendTeaching"),
+    ),
     item(
       "task",
-      { background: "var(--tomato-surface)", borderLeftColor: "var(--tomato-ink-3)" },
+      {
+        background: "var(--tomato-surface)",
+        borderLeftColor: "var(--tomato-ink-3)",
+      },
       t("calendar.legendTask"),
     ),
     item(
@@ -840,7 +947,15 @@ function Legend() {
       },
       t("calendar.legendRequired"),
     ),
-    item("light", { background: "var(--tomato-surface-2)", borderLeftColor: "var(--tomato-leaf)", borderLeftStyle: "dashed" }, t("calendar.legendLight")),
+    item(
+      "light",
+      {
+        background: "var(--tomato-surface-2)",
+        borderLeftColor: "var(--tomato-leaf)",
+        borderLeftStyle: "dashed",
+      },
+      t("calendar.legendLight"),
+    ),
     item(
       "rest",
       {
@@ -859,15 +974,31 @@ function DetailRow({ label, value }) {
   return h(
     "div",
     { style: { display: "flex", gap: 12, padding: "6px 0", fontSize: 13 } },
-    h("span", { style: { width: 64, flex: "none", color: "var(--tomato-ink-3)" } }, label),
-    h("span", { style: { color: "var(--tomato-ink)", minWidth: 0, overflowWrap: "anywhere" } }, value),
+    h(
+      "span",
+      { style: { width: 64, flex: "none", color: "var(--tomato-ink-3)" } },
+      label,
+    ),
+    h(
+      "span",
+      {
+        style: {
+          color: "var(--tomato-ink)",
+          minWidth: 0,
+          overflowWrap: "anywhere",
+        },
+      },
+      value,
+    ),
   );
 }
 
 function BlockEditor({ editor, onChange, onClose, onSave, onDelete, saving }) {
   if (!editor) return null;
   const week = t("common.weekFull");
-  const weekdays = Array.isArray(week) ? week : ["1", "2", "3", "4", "5", "6", "7"];
+  const weekdays = Array.isArray(week)
+    ? week
+    : ["1", "2", "3", "4", "5", "6", "7"];
   const toggleDay = (day) => {
     const days = editor.days.includes(day)
       ? editor.days.filter((value) => value !== day)
@@ -880,43 +1011,86 @@ function BlockEditor({ editor, onChange, onClose, onSave, onDelete, saving }) {
       open: true,
       onClose,
       icon: "calendar",
-      title: editor.id ? t("calendar.editBlockTitle") : t("calendar.newBlockTitle"),
+      title: editor.id
+        ? t("calendar.editBlockTitle")
+        : t("calendar.newBlockTitle"),
       subtitle: t("calendar.clickHint"),
       width: 520,
       footer: h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 10, width: "100%" } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            width: "100%",
+          },
+        },
         editor.id
-          ? h(Btn, { variant: "danger", size: "sm", icon: "trash", onClick: onDelete }, t("calendar.deleteBlock"))
+          ? h(
+              Btn,
+              {
+                variant: "danger",
+                size: "sm",
+                icon: "trash",
+                onClick: onDelete,
+              },
+              t("calendar.deleteBlock"),
+            )
           : null,
         h("span", { style: { flex: 1 } }),
-        h(Btn, { variant: "ghost", size: "md", onClick: onClose }, t("common.cancel")),
-        h(Btn, { variant: "primary", size: "md", onClick: onSave, disabled: saving }, t("common.save")),
+        h(
+          Btn,
+          { variant: "ghost", size: "md", onClick: onClose },
+          t("common.cancel"),
+        ),
+        h(
+          Btn,
+          { variant: "primary", size: "md", onClick: onSave, disabled: saving },
+          t("common.save"),
+        ),
       ),
     },
     h(
       "div",
       { style: { display: "flex", flexDirection: "column", gap: 14 } },
-      h(Field, { label: t("calendar.nameLabel") }, h(Input, {
-        value: editor.title,
-        autoFocus: true,
-        maxLength: 40,
-        placeholder: t("calendar.namePlaceholder"),
-        onChange: (value) => onChange({ ...editor, title: value, error: "" }),
-      })),
+      h(
+        Field,
+        { label: t("calendar.nameLabel") },
+        h(Input, {
+          value: editor.title,
+          autoFocus: true,
+          maxLength: 40,
+          placeholder: t("calendar.namePlaceholder"),
+          onChange: (value) => onChange({ ...editor, title: value, error: "" }),
+        }),
+      ),
       h(
         "div",
         { style: { display: "flex", gap: 12 } },
-        h(Field, { label: t("calendar.startLabel"), style: { flex: 1 } }, h(Input, {
-          type: "time",
-          value: editor.start,
-          onChange: (value) => onChange({ ...editor, start: value, error: "" }),
-        })),
-        h(Field, { label: t("calendar.endLabel"), hint: t("calendar.endHint"), style: { flex: 1 } }, h(Input, {
-          type: "time",
-          value: editor.end,
-          onChange: (value) => onChange({ ...editor, end: value, error: "" }),
-        })),
+        h(
+          Field,
+          { label: t("calendar.startLabel"), style: { flex: 1 } },
+          h(Input, {
+            type: "time",
+            value: editor.start,
+            onChange: (value) =>
+              onChange({ ...editor, start: value, error: "" }),
+          }),
+        ),
+        h(
+          Field,
+          {
+            label: t("calendar.endLabel"),
+            hint: t("calendar.endHint"),
+            style: { flex: 1 },
+          },
+          h(Input, {
+            type: "time",
+            value: editor.end,
+            onChange: (value) => onChange({ ...editor, end: value, error: "" }),
+          }),
+        ),
       ),
       h(
         Field,
@@ -954,20 +1128,28 @@ function BlockEditor({ editor, onChange, onClose, onSave, onDelete, saving }) {
           ),
         ),
       ),
-      h(Field, { label: t("calendar.attentionLabel") }, h(Select, {
-        value: editor.attention,
-        options: [
-          { value: "required", label: t("calendar.attentionRequired") },
-          { value: "light", label: t("calendar.attentionLight") },
-        ],
-        onChange: (value) => onChange({ ...editor, attention: value }),
-      })),
-      h(Field, { label: t("calendar.notesLabel") }, h(TextArea, {
-        value: editor.notes,
-        rows: 2,
-        placeholder: t("calendar.notesPlaceholder"),
-        onChange: (value) => onChange({ ...editor, notes: value }),
-      })),
+      h(
+        Field,
+        { label: t("calendar.attentionLabel") },
+        h(Select, {
+          value: editor.attention,
+          options: [
+            { value: "required", label: t("calendar.attentionRequired") },
+            { value: "light", label: t("calendar.attentionLight") },
+          ],
+          onChange: (value) => onChange({ ...editor, attention: value }),
+        }),
+      ),
+      h(
+        Field,
+        { label: t("calendar.notesLabel") },
+        h(TextArea, {
+          value: editor.notes,
+          rows: 2,
+          placeholder: t("calendar.notesPlaceholder"),
+          onChange: (value) => onChange({ ...editor, notes: value }),
+        }),
+      ),
       editor.error
         ? h(
             "div",
@@ -975,8 +1157,10 @@ function BlockEditor({ editor, onChange, onClose, onSave, onDelete, saving }) {
               style: {
                 fontSize: 12.5,
                 color: "var(--dsw-alias-state-error-primary)",
-                background: "color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 22%, transparent)",
+                background:
+                  "color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 22%, transparent)",
                 borderRadius: 10,
                 padding: "8px 11px",
                 lineHeight: 1.5,
@@ -1005,14 +1189,19 @@ function CalendarPage({ state }) {
   const conflicts = findConflicts(week.days);
   const allBlocks = Array.isArray(data.blocks) ? data.blocks : [];
   const allTasks = Array.isArray(data.tasks) ? data.tasks : [];
-  const taskEditing = taskId ? allTasks.find((task) => task.id === taskId) || null : null;
+  const taskEditing = taskId
+    ? allTasks.find((task) => task.id === taskId) || null
+    : null;
 
-  const itemCount =
-    week.days.reduce(
-      (total, day) => total + day.blocks.length + day.rests.length + day.teaching.length,
-      0,
-    );
-  const teachingCount = week.days.reduce((total, day) => total + day.teaching.length, 0);
+  const itemCount = week.days.reduce(
+    (total, day) =>
+      total + day.blocks.length + day.rests.length + day.teaching.length,
+    0,
+  );
+  const teachingCount = week.days.reduce(
+    (total, day) => total + day.teaching.length,
+    0,
+  );
   const summary = t("calendar.summary", {
     range: `${week.days[0].date.slice(5).replace("-", "/")} – ${week.days[6].date.slice(5).replace("-", "/")}`,
     items: itemCount,
@@ -1023,7 +1212,10 @@ function CalendarPage({ state }) {
     setEditor({
       id: null,
       title: seed.title || "",
-      days: Array.isArray(seed.days) && seed.days.length ? [...seed.days] : [weekdayIndex(week.today) + 1],
+      days:
+        Array.isArray(seed.days) && seed.days.length
+          ? [...seed.days]
+          : [weekdayIndex(week.today) + 1],
       start: seed.start || "09:00",
       end: seed.end || "10:00",
       attention: seed.attention || "required",
@@ -1076,7 +1268,10 @@ function CalendarPage({ state }) {
     });
     setSaving(false);
     if (!result.ok) {
-      setEditor({ ...editor, error: t("calendar.saveFailed", { error: result.error }) });
+      setEditor({
+        ...editor,
+        error: t("calendar.saveFailed", { error: result.error }),
+      });
       return;
     }
     setEditor(null);
@@ -1122,12 +1317,16 @@ function CalendarPage({ state }) {
       title: t("nav.calendar"),
       subtitle: t("calendar.subtitle"),
       actions: [
-        h(Btn, {
-          key: "add",
-          variant: "primary",
-          icon: "plus",
-          onClick: () => openNewBlock({}),
-        }, t("calendar.addBlock")),
+        h(
+          Btn,
+          {
+            key: "add",
+            variant: "primary",
+            icon: "plus",
+            onClick: () => openNewBlock({}),
+          },
+          t("calendar.addBlock"),
+        ),
       ],
     }),
 
@@ -1156,17 +1355,38 @@ function CalendarPage({ state }) {
           { style: { flex: 1, minWidth: 220 } },
           h(
             "div",
-            { className: "t-mono", style: { fontSize: 13.5, fontWeight: 600, color: "var(--tomato-ink)" } },
+            {
+              className: "t-mono",
+              style: {
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "var(--tomato-ink)",
+              },
+            },
             summary,
           ),
-          h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 2 } }, t("calendar.clickHint")),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 11.5,
+                color: "var(--tomato-ink-3)",
+                marginTop: 2,
+              },
+            },
+            t("calendar.clickHint"),
+          ),
         ),
         weekOffset !== 0
-          ? h(Btn, {
-              variant: "soft",
-              size: "sm",
-              onClick: () => setWeekOffset(0),
-            }, t("calendar.thisWeek"))
+          ? h(
+              Btn,
+              {
+                variant: "soft",
+                size: "sm",
+                onClick: () => setWeekOffset(0),
+              },
+              t("calendar.thisWeek"),
+            )
           : null,
         h(IconBtn, {
           name: "chevronRight",
@@ -1175,7 +1395,7 @@ function CalendarPage({ state }) {
         }),
       ),
       h(Legend, null),
-          h(WeekGrid, {
+      h(WeekGrid, {
         week,
         conflicts,
         onSelect: selectItem,
@@ -1191,7 +1411,9 @@ function CalendarPage({ state }) {
       h(SectionTitle, {
         icon: "bell",
         title: t("calendar.conflictsTitle"),
-        hint: conflicts.length ? t("calendar.conflictCount", { n: conflicts.length }) : null,
+        hint: conflicts.length
+          ? t("calendar.conflictCount", { n: conflicts.length })
+          : null,
       }),
       conflicts.length === 0
         ? h(
@@ -1235,10 +1457,18 @@ function CalendarPage({ state }) {
                 { style: { minWidth: 0 } },
                 h(
                   "div",
-                  { style: { fontSize: 10.5, color: "var(--tomato-ink-3)", marginBottom: 2 } },
+                  {
+                    style: {
+                      fontSize: 10.5,
+                      color: "var(--tomato-ink-3)",
+                      marginBottom: 2,
+                    },
+                  },
                   t("calendar.conflictDay", {
                     day: weekdayLabel(item.dayIndex),
-                    date: week.days[item.dayIndex].date.slice(5).replace("-", "/"),
+                    date: week.days[item.dayIndex].date
+                      .slice(5)
+                      .replace("-", "/"),
                   }),
                 ),
                 h(
@@ -1268,19 +1498,31 @@ function CalendarPage({ state }) {
         icon: "grip",
         title: t("calendar.blocksTitle"),
         hint: t("calendar.blocksHint", { n: allBlocks.length }),
-        action: h(Btn, {
-          variant: "ghost",
-          size: "sm",
-          icon: "plus",
-          onClick: () => openNewBlock({}),
-        }, t("calendar.addBlock")),
+        action: h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "plus",
+            onClick: () => openNewBlock({}),
+          },
+          t("calendar.addBlock"),
+        ),
       }),
       allBlocks.length === 0
         ? h(Empty, {
             icon: "calendar",
             title: t("calendar.blocksEmptyTitle"),
             hint: t("calendar.blocksEmptyHint"),
-            action: h(Btn, { variant: "soft", icon: "plus", onClick: () => openNewBlock({}) }, t("calendar.gridEmptyAction")),
+            action: h(
+              Btn,
+              {
+                variant: "soft",
+                icon: "plus",
+                onClick: () => openNewBlock({}),
+              },
+              t("calendar.gridEmptyAction"),
+            ),
           })
         : allBlocks
             .slice()
@@ -1318,13 +1560,42 @@ function CalendarPage({ state }) {
                   { style: { flex: 1, minWidth: 0 } },
                   h(
                     "div",
-                    { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-                    h("span", { style: { fontSize: 13.5, fontWeight: 600, color: "var(--tomato-ink)" } }, block.title || t("calendar.untitled")),
-                    h(Chip, { tone: light ? "leaf" : "brand" }, light ? t("calendar.legendLight") : t("calendar.legendRequired")),
+                    {
+                      style: {
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      },
+                    },
+                    h(
+                      "span",
+                      {
+                        style: {
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          color: "var(--tomato-ink)",
+                        },
+                      },
+                      block.title || t("calendar.untitled"),
+                    ),
+                    h(
+                      Chip,
+                      { tone: light ? "leaf" : "brand" },
+                      light
+                        ? t("calendar.legendLight")
+                        : t("calendar.legendRequired"),
+                    ),
                   ),
                   h(
                     "div",
-                    { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 3 } },
+                    {
+                      style: {
+                        fontSize: 11.5,
+                        color: "var(--tomato-ink-3)",
+                        marginTop: 3,
+                      },
+                    },
                     `${dayText} · ${fmtBand(block.start, block.end)}${block.notes ? ` · ${block.notes}` : ""}`,
                   ),
                 ),
@@ -1396,27 +1667,50 @@ function CalendarPage({ state }) {
             width: 480,
             footer: h(
               "div",
-              { style: { display: "flex", gap: 10, justifyContent: "flex-end", width: "100%" } },
+              {
+                style: {
+                  display: "flex",
+                  gap: 10,
+                  justifyContent: "flex-end",
+                  width: "100%",
+                },
+              },
               detail.kind === "block"
-                ? h(Btn, {
-                    variant: "danger",
-                    size: "sm",
-                    icon: "trash",
-                    onClick: () => {
-                      setPendingDelete(detail.item);
-                      setDetail(null);
+                ? h(
+                    Btn,
+                    {
+                      variant: "danger",
+                      size: "sm",
+                      icon: "trash",
+                      onClick: () => {
+                        setPendingDelete(detail.item);
+                        setDetail(null);
+                      },
                     },
-                  }, t("calendar.deleteBlock"))
+                    t("calendar.deleteBlock"),
+                  )
                 : null,
               detail.kind === "block"
-                ? h(Btn, {
-                    variant: "primary",
-                    size: "md",
-                    icon: "edit",
-                    onClick: () => openEditBlock(detail.item),
-                  }, t("common.edit"))
+                ? h(
+                    Btn,
+                    {
+                      variant: "primary",
+                      size: "md",
+                      icon: "edit",
+                      onClick: () => openEditBlock(detail.item),
+                    },
+                    t("common.edit"),
+                  )
                 : null,
-              h(Btn, { variant: "ghost", size: "md", onClick: () => setDetail(null) }, t("calendar.close")),
+              h(
+                Btn,
+                {
+                  variant: "ghost",
+                  size: "md",
+                  onClick: () => setDetail(null),
+                },
+                t("calendar.close"),
+              ),
             ),
           },
           detail.kind === "teaching"
@@ -1424,20 +1718,31 @@ function CalendarPage({ state }) {
                 h(DetailRow, {
                   key: "kind",
                   label: t("calendar.detailAttention"),
-                  value: detail.item.kind === "exam" ? t("calendar.exam") : t("calendar.lesson"),
+                  value:
+                    detail.item.kind === "exam"
+                      ? t("calendar.exam")
+                      : t("calendar.lesson"),
                 }),
                 h(DetailRow, {
                   key: "project",
                   label: t("calendar.detailProject"),
                   value:
-                    (projectById(data, detail.item.projectId) || {}).name || t("calendar.unknownProject"),
+                    (projectById(data, detail.item.projectId) || {}).name ||
+                    t("calendar.unknownProject"),
                 }),
                 h(DetailRow, {
                   key: "date",
                   label: t("calendar.detailTime"),
-                  value: `${week.days.find((day) =>
-                    day.teaching.some((entry) => entry.raw.id === detail.item.raw.id),
-                  )?.date.slice(5).replace("-", "/") || ""} ${fmtHHMM(detail.item.startMin * 60)}–${fmtHHMM(detail.item.endMin * 60)}`,
+                  value: `${
+                    week.days
+                      .find((day) =>
+                        day.teaching.some(
+                          (entry) => entry.raw.id === detail.item.raw.id,
+                        ),
+                      )
+                      ?.date.slice(5)
+                      .replace("-", "/") || ""
+                  } ${fmtHHMM(detail.item.startMin * 60)}–${fmtHHMM(detail.item.endMin * 60)}`,
                 }),
                 h(DetailRow, {
                   key: "state",
@@ -1458,18 +1763,30 @@ function CalendarPage({ state }) {
                   h(DetailRow, {
                     key: "days",
                     label: t("calendar.detailDays"),
-                    value: (Array.isArray(detail.item.days) ? detail.item.days : [])
+                    value: (Array.isArray(detail.item.days)
+                      ? detail.item.days
+                      : []
+                    )
                       .map((day) => weekdayLabel(day - 1))
                       .join(" · "),
                   }),
                   h(DetailRow, {
                     key: "strict",
                     label: t("calendar.detailStrict"),
-                    value: detail.item.strict ? t("calendar.strict") : t("calendar.relaxed"),
+                    value: detail.item.strict
+                      ? t("calendar.strict")
+                      : t("calendar.relaxed"),
                   }),
                   h(
                     "div",
-                    { style: { fontSize: 12, color: "var(--tomato-ink-3)", marginTop: 8, lineHeight: 1.6 } },
+                    {
+                      style: {
+                        fontSize: 12,
+                        color: "var(--tomato-ink-3)",
+                        marginTop: 8,
+                        lineHeight: 1.6,
+                      },
+                    },
                     t("calendar.detailRestHint"),
                   ),
                 ]
@@ -1482,7 +1799,10 @@ function CalendarPage({ state }) {
                   h(DetailRow, {
                     key: "days",
                     label: t("calendar.detailDays"),
-                    value: (Array.isArray(detail.item.days) ? detail.item.days : [])
+                    value: (Array.isArray(detail.item.days)
+                      ? detail.item.days
+                      : []
+                    )
                       .map((day) => weekdayLabel(day - 1))
                       .join(" · "),
                   }),
@@ -1518,19 +1838,52 @@ function CalendarPage({ state }) {
             width: 440,
             footer: h(
               "div",
-              { style: { display: "flex", gap: 10, justifyContent: "flex-end", width: "100%" } },
-              h(Btn, { variant: "ghost", size: "md", onClick: () => setPendingDelete(null) }, t("common.cancel")),
-              h(Btn, { variant: "danger", size: "md", icon: "trash", onClick: () => deleteBlock(pendingDelete) }, t("common.delete")),
+              {
+                style: {
+                  display: "flex",
+                  gap: 10,
+                  justifyContent: "flex-end",
+                  width: "100%",
+                },
+              },
+              h(
+                Btn,
+                {
+                  variant: "ghost",
+                  size: "md",
+                  onClick: () => setPendingDelete(null),
+                },
+                t("common.cancel"),
+              ),
+              h(
+                Btn,
+                {
+                  variant: "danger",
+                  size: "md",
+                  icon: "trash",
+                  onClick: () => deleteBlock(pendingDelete),
+                },
+                t("common.delete"),
+              ),
             ),
           },
           h(
             "div",
-            { style: { fontSize: 12.5, color: "var(--tomato-ink-2)", lineHeight: 1.7 } },
-            `${fmtBand(pendingDelete.start, pendingDelete.end)} · ${
-              (Array.isArray(pendingDelete.days) ? pendingDelete.days : [])
-                .map((day) => weekdayLabel(day - 1))
-                .join(" · ")
-            }`,
+            {
+              style: {
+                fontSize: 12.5,
+                color: "var(--tomato-ink-2)",
+                lineHeight: 1.7,
+              },
+            },
+            `${fmtBand(pendingDelete.start, pendingDelete.end)} · ${(Array.isArray(
+              pendingDelete.days,
+            )
+              ? pendingDelete.days
+              : []
+            )
+              .map((day) => weekdayLabel(day - 1))
+              .join(" · ")}`,
           ),
         )
       : null,

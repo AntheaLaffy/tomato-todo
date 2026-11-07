@@ -23,7 +23,8 @@ export function attentionCue(prev, next) {
   if (!prev || !next) return null;
   if (!prev.hydrated || !next.hydrated) return null;
   if (Number(next.serial) > Number(prev.serial)) return "complete";
-  if (!prev.running && next.running) return next.mode === "focus" ? "start" : "resume";
+  if (!prev.running && next.running)
+    return next.mode === "focus" ? "start" : "resume";
   if (prev.running && !next.running && next.paused) return "pause";
   if (Number(next.reminders) > Number(prev.reminders)) return "reminder";
   return null;

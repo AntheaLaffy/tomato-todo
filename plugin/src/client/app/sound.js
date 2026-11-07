@@ -48,7 +48,11 @@ function warnOnce(err) {
   if (warned) return;
   warned = true;
   try {
-    if (typeof console !== "undefined" && console && typeof console.warn === "function") {
+    if (
+      typeof console !== "undefined" &&
+      console &&
+      typeof console.warn === "function"
+    ) {
       console.warn("[tomato] sound:", err && err.message ? err.message : err);
     }
   } catch {
@@ -98,12 +102,17 @@ function syncFromSnapshot() {
     const volume = normalizeVolume(settings.soundVolume);
     if (volume !== null) {
       // 快照追上了本地乐观值 → 释放 override；否则保留用户刚拖到的音量。
-      if (pendingVolume !== null && Math.abs(volume - pendingVolume) < 0.005) pendingVolume = null;
+      if (pendingVolume !== null && Math.abs(volume - pendingVolume) < 0.005)
+        pendingVolume = null;
       settingsVolume = pendingVolume !== null ? pendingVolume : volume;
     }
   }
   const timer = data.timer;
-  timerFocusRunning = !!(timer && timer.running === true && timer.mode === "focus");
+  timerFocusRunning = !!(
+    timer &&
+    timer.running === true &&
+    timer.mode === "focus"
+  );
 }
 
 // ---------- 音量（立即生效 + 防抖持久化） ----------
@@ -185,7 +194,11 @@ function readAmbience() {
   if (ambienceKind !== null) return ambienceKind;
   let stored = null;
   try {
-    if (typeof localStorage !== "undefined" && localStorage && typeof localStorage.getItem === "function") {
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage &&
+      typeof localStorage.getItem === "function"
+    ) {
       stored = localStorage.getItem(STORAGE_KEY);
     }
   } catch (e) {
@@ -198,7 +211,11 @@ function readAmbience() {
 
 function persistAmbience(kind) {
   try {
-    if (typeof localStorage !== "undefined" && localStorage && typeof localStorage.setItem === "function") {
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage &&
+      typeof localStorage.setItem === "function"
+    ) {
       localStorage.setItem(STORAGE_KEY, kind);
     }
   } catch (e) {
@@ -314,7 +331,8 @@ export function ensureAudio() {
       }
     };
     const pending = ctx.resume();
-    if (pending && typeof pending.then === "function") pending.then(afterResume, () => {});
+    if (pending && typeof pending.then === "function")
+      pending.then(afterResume, () => {});
     else afterResume();
   } catch (e) {
     warnOnce(e);
@@ -331,10 +349,13 @@ function rampTo(param, value, seconds) {
   if (!ctx || !param) return;
   const now = typeof ctx.currentTime === "number" ? ctx.currentTime : 0;
   try {
-    if (typeof param.cancelAndHoldAtTime === "function") param.cancelAndHoldAtTime(now);
+    if (typeof param.cancelAndHoldAtTime === "function")
+      param.cancelAndHoldAtTime(now);
     else {
-      if (typeof param.cancelScheduledValues === "function") param.cancelScheduledValues(now);
-      if (typeof param.setValueAtTime === "function") param.setValueAtTime(param.value, now);
+      if (typeof param.cancelScheduledValues === "function")
+        param.cancelScheduledValues(now);
+      if (typeof param.setValueAtTime === "function")
+        param.setValueAtTime(param.value, now);
     }
     param.linearRampToValueAtTime(value, now + seconds);
   } catch {
@@ -369,7 +390,10 @@ function normalizePeak(out, target) {
  * 循环点两侧样本在原始序列里相邻，因此接缝处不会有振幅跳变（棕噪音尤其明显）。
  */
 function makeNoiseBuffer(ctx, brown) {
-  const rate = typeof ctx.sampleRate === "number" && ctx.sampleRate > 0 ? ctx.sampleRate : 44100;
+  const rate =
+    typeof ctx.sampleRate === "number" && ctx.sampleRate > 0
+      ? ctx.sampleRate
+      : 44100;
   const seconds = brown ? 4 : 3;
   const length = Math.max(256, Math.floor(rate * seconds));
   const fade = Math.min(length >> 2, Math.max(64, Math.floor(rate * 0.25)));
@@ -441,7 +465,16 @@ function buildRain(ctx) {
   return {
     output: trem,
     startables: [src, filterLfo, gainLfo],
-    nodes: [src, highpass, lowpass, trem, filterLfo, filterDepth, gainLfo, gainDepth],
+    nodes: [
+      src,
+      highpass,
+      lowpass,
+      trem,
+      filterLfo,
+      filterDepth,
+      gainLfo,
+      gainDepth,
+    ],
   };
 }
 
@@ -524,7 +557,10 @@ function fadeOutAndStop(entry) {
   entry.stopped = true;
   rampTo(entry.gain.gain, 0, FADE_SECS);
   try {
-    entry.timer = setTimeout(() => stopEntry(entry), Math.round(FADE_SECS * 1000) + 120);
+    entry.timer = setTimeout(
+      () => stopEntry(entry),
+      Math.round(FADE_SECS * 1000) + 120,
+    );
   } catch {
     stopEntry(entry);
   }
@@ -534,7 +570,12 @@ function startAmbient(kind) {
   const ctx = audioCtx;
   if (!ctx || !master) return;
   if (active && active.kind === kind) return;
-  const graph = kind === "rain" ? buildRain(ctx) : kind === "brown" ? buildBrown(ctx) : null;
+  const graph =
+    kind === "rain"
+      ? buildRain(ctx)
+      : kind === "brown"
+        ? buildBrown(ctx)
+        : null;
   if (!graph) return;
 
   const gain = ctx.createGain();
@@ -565,7 +606,13 @@ function stopAmbient() {
 
 /** 唯一判定入口：声音开关 + 专注运行 + 非静音 + 已解锁。 */
 function shouldPlayAmbience() {
-  return !!(settingsSound && timerFocusRunning && isKind(getAmbience()) && getAmbience() !== "silent" && isReady());
+  return !!(
+    settingsSound &&
+    timerFocusRunning &&
+    isKind(getAmbience()) &&
+    getAmbience() !== "silent" &&
+    isReady()
+  );
 }
 
 /** 根据模块级状态与快照，把引擎推进到正确状态（幂等，可频繁调用）。 */
@@ -686,7 +733,9 @@ export function playCue(name) {
     if (!notes || notes.length === 0) return;
     const bus = ensureCueBus(audioCtx);
     if (!bus) return;
-    const base = (typeof audioCtx.currentTime === "number" ? audioCtx.currentTime : 0) + 0.01;
+    const base =
+      (typeof audioCtx.currentTime === "number" ? audioCtx.currentTime : 0) +
+      0.01;
     for (const note of notes) playTone(audioCtx, bus, base + note.at, note);
   } catch (e) {
     warnOnce(e);
@@ -696,7 +745,11 @@ export function playCue(name) {
 // ---------- React 接入 ----------
 function getDocument() {
   try {
-    if (typeof document !== "undefined" && document && typeof document.addEventListener === "function") {
+    if (
+      typeof document !== "undefined" &&
+      document &&
+      typeof document.addEventListener === "function"
+    ) {
       return document;
     }
   } catch {
@@ -729,8 +782,14 @@ function installUnlockListeners() {
     ensureAudio();
   }
   try {
-    doc.addEventListener("pointerdown", onGesture, { capture: true, passive: true });
-    doc.addEventListener("keydown", onGesture, { capture: true, passive: true });
+    doc.addEventListener("pointerdown", onGesture, {
+      capture: true,
+      passive: true,
+    });
+    doc.addEventListener("keydown", onGesture, {
+      capture: true,
+      passive: true,
+    });
   } catch (e) {
     // 老实现不接受 options 对象时退回布尔 capture。
     try {
@@ -764,7 +823,12 @@ function settingsView(state) {
   return {
     enabled: settings ? settings.sound === true : false,
     volume: readVolume(settings),
-    focusRunning: !!(data && data.timer && data.timer.running === true && data.timer.mode === "focus"),
+    focusRunning: !!(
+      data &&
+      data.timer &&
+      data.timer.running === true &&
+      data.timer.mode === "focus"
+    ),
   };
 }
 

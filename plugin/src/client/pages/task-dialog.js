@@ -30,7 +30,8 @@ registerCopy("task", {
     newTitle: "直接创建实例",
     editTitle: "编辑实例",
     newSubtitle: "写下想完成的一件事，日期和专注时段可以慢慢补。",
-    editSubtitle: "日期、完成状态和专注记录属于这一次执行；改模板请去模板编辑。",
+    editSubtitle:
+      "日期、完成状态和专注记录属于这一次执行；改模板请去模板编辑。",
     title: "任务名称",
     titlePlaceholder: "想完成什么？",
     project: "所属项目",
@@ -75,7 +76,8 @@ registerCopy("task", {
     newTitle: "Create task",
     editTitle: "Edit task",
     newSubtitle: "One thing at a time. Dates and focus blocks can come later.",
-    editSubtitle: "Date, completion and sessions belong to this instance; edit the template to change the pattern.",
+    editSubtitle:
+      "Date, completion and sessions belong to this instance; edit the template to change the pattern.",
     title: "Title",
     titlePlaceholder: "What do you want to finish?",
     project: "Project",
@@ -118,7 +120,12 @@ registerCopy("task", {
   },
 });
 
-const PRIORITY_KEYS = ["priorityNone", "priorityLow", "priorityMedium", "priorityHigh"];
+const PRIORITY_KEYS = [
+  "priorityNone",
+  "priorityLow",
+  "priorityMedium",
+  "priorityHigh",
+];
 
 registerCopy("task", {
   zh: {
@@ -138,7 +145,10 @@ registerCopy("task", {
 /** 新建子任务 id：crypto 不可用时退回时间戳 + 随机串。 */
 function newId() {
   try {
-    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    if (
+      globalThis.crypto &&
+      typeof globalThis.crypto.randomUUID === "function"
+    ) {
       return globalThis.crypto.randomUUID();
     }
   } catch {
@@ -184,13 +194,19 @@ export function taskToDraft(task) {
     dueDate: task.dueDate ?? "",
     reminderTime: task.reminderTime ?? "",
     focusMinutes:
-      task.focusMinutes === null || task.focusMinutes === undefined ? "" : String(task.focusMinutes),
+      task.focusMinutes === null || task.focusMinutes === undefined
+        ? ""
+        : String(task.focusMinutes),
     scrapMinutes: String(task.scrapMinutes ?? 0),
     priority: Number(task.priority) || 0,
     estimate: String(Math.max(1, Number(task.estimate) || 1)),
     tagsText: Array.isArray(task.tags) ? task.tags.join(", ") : "",
     subtasks: Array.isArray(task.subtasks)
-      ? task.subtasks.map((sub) => ({ id: sub.id, title: sub.title, done: !!sub.done }))
+      ? task.subtasks.map((sub) => ({
+          id: sub.id,
+          title: sub.title,
+          done: !!sub.done,
+        }))
       : [],
   };
 }
@@ -256,7 +272,9 @@ export function TaskDialog({
   const addSubtask = () => {
     const title = subInput.trim();
     if (title === "") return;
-    patch({ subtasks: [...draft.subtasks, { id: newId(), title, done: false }] });
+    patch({
+      subtasks: [...draft.subtasks, { id: newId(), title, done: false }],
+    });
     setSubInput("");
   };
 
@@ -372,23 +390,35 @@ export function TaskDialog({
         ),
         h(
           "div",
-          { style: { fontSize: 13.5, color: "var(--tomato-ink)", fontWeight: 550 } },
+          {
+            style: {
+              fontSize: 13.5,
+              color: "var(--tomato-ink)",
+              fontWeight: 550,
+            },
+          },
           draft.title || t("task.untouched"),
         ),
       )
     : h(
         "div",
         { style: { display: "flex", flexDirection: "column", gap: 16 } },
-        h(Field, { label: t("task.title") }, h(Input, {
-          value: draft.title,
-          onChange: (value) => patch({ title: value }),
-          placeholder: t("task.titlePlaceholder"),
-          maxLength: 200,
-          autoFocus: true,
-        })),
+        h(
+          Field,
+          { label: t("task.title") },
+          h(Input, {
+            value: draft.title,
+            onChange: (value) => patch({ title: value }),
+            placeholder: t("task.titlePlaceholder"),
+            maxLength: 200,
+            autoFocus: true,
+          }),
+        ),
         h(
           "div",
-          { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 } },
+          {
+            style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
+          },
           h(
             Field,
             { label: t("task.project") },
@@ -396,7 +426,10 @@ export function TaskDialog({
               value: draft.projectId,
               options: [
                 { value: "", label: t("task.noProject") },
-                ...projects.map((project) => ({ value: project.id, label: project.name })),
+                ...projects.map((project) => ({
+                  value: project.id,
+                  label: project.name,
+                })),
               ],
               onChange: (value) => patch({ projectId: value }),
               width: "100%",
@@ -474,25 +507,41 @@ export function TaskDialog({
         h(
           "div",
           {
-            style: { fontSize: 12, color: "var(--tomato-ink-3)", display: "flex", alignItems: "center", gap: 6 },
+            style: {
+              fontSize: 12,
+              color: "var(--tomato-ink-3)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            },
           },
           h(Icon, { name: "timer", size: 14 }),
           t("task.focusPreview", { n: workMinutes, m: blockMinutes }),
         ),
-        h(Field, { label: t("task.notes") }, h(TextArea, {
-          value: draft.notes,
-          onChange: (value) => patch({ notes: value }),
-          placeholder: t("task.notesPlaceholder"),
-          rows: 3,
-          style: { maxHeight: 160 },
-        })),
+        h(
+          Field,
+          { label: t("task.notes") },
+          h(TextArea, {
+            value: draft.notes,
+            onChange: (value) => patch({ notes: value }),
+            placeholder: t("task.notesPlaceholder"),
+            rows: 3,
+            style: { maxHeight: 160 },
+          }),
+        ),
         h(Divider, null),
         h(
           "div",
           { style: { display: "flex", flexDirection: "column", gap: 8 } },
           h(
             "div",
-            { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+            {
+              style: {
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink-2)",
+              },
+            },
             t("task.subtasks"),
           ),
           draft.subtasks.length > 0
@@ -530,7 +579,9 @@ export function TaskDialog({
                           flex: 1,
                           minWidth: 0,
                           fontSize: 13,
-                          color: sub.done ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+                          color: sub.done
+                            ? "var(--tomato-ink-3)"
+                            : "var(--tomato-ink)",
                           textDecoration: sub.done ? "line-through" : "none",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -545,7 +596,11 @@ export function TaskDialog({
                       box: 28,
                       title: t("task.removeSubtask"),
                       onClick: () =>
-                        patch({ subtasks: draft.subtasks.filter((_, i) => i !== index) }),
+                        patch({
+                          subtasks: draft.subtasks.filter(
+                            (_, i) => i !== index,
+                          ),
+                        }),
                     }),
                   ),
                 ),
@@ -602,52 +657,91 @@ export function TaskDialog({
     ? h(
         "div",
         { style: { display: "flex", gap: 9, marginLeft: "auto" } },
-        h(Btn, {
-          variant: "ghost",
-          size: "sm",
-          onClick: () => setConfirmDelete(false),
-          disabled: busy,
-        }, t("common.cancel")),
-        h(Btn, {
-          variant: "danger",
-          size: "sm",
-          icon: "trash",
-          onClick: remove,
-          disabled: busy,
-        }, t("task.deleteConfirm")),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            onClick: () => setConfirmDelete(false),
+            disabled: busy,
+          },
+          t("common.cancel"),
+        ),
+        h(
+          Btn,
+          {
+            variant: "danger",
+            size: "sm",
+            icon: "trash",
+            onClick: remove,
+            disabled: busy,
+          },
+          t("task.deleteConfirm"),
+        ),
       )
     : h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 9, width: "100%" } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+            width: "100%",
+          },
+        },
         editing
-          ? h(Btn, {
-              variant: "danger",
-              size: "sm",
-              icon: "trash",
-              onClick: () => setConfirmDelete(true),
-              disabled: busy,
-            }, t("common.delete"))
+          ? h(
+              Btn,
+              {
+                variant: "danger",
+                size: "sm",
+                icon: "trash",
+                onClick: () => setConfirmDelete(true),
+                disabled: busy,
+              },
+              t("common.delete"),
+            )
           : null,
         h("div", { style: { flex: 1 } }),
-        h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
-        h(Btn, {
-          variant: "primary",
-          size: "sm",
-          icon: "check",
-          onClick: submit,
-          disabled: busy,
-        }, editing ? t("common.save") : t("common.add")),
+        h(
+          Btn,
+          { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+          t("common.cancel"),
+        ),
+        h(
+          Btn,
+          {
+            variant: "primary",
+            size: "sm",
+            icon: "check",
+            onClick: submit,
+            disabled: busy,
+          },
+          editing ? t("common.save") : t("common.add"),
+        ),
       );
 
-  return h(Modal, {
-    open,
-    onClose: () => {
-      if (!busy) onClose?.();
+  return h(
+    Modal,
+    {
+      open,
+      onClose: () => {
+        if (!busy) onClose?.();
+      },
+      icon: confirmDelete ? "trash" : editing ? "edit" : "plus",
+      title: confirmDelete
+        ? t("task.deleteTitle")
+        : editing
+          ? t("task.editTitle")
+          : t("task.newTitle"),
+      subtitle: confirmDelete
+        ? undefined
+        : editing
+          ? t("task.editSubtitle")
+          : t("task.newSubtitle"),
+      width: 620,
+      footer,
     },
-    icon: confirmDelete ? "trash" : editing ? "edit" : "plus",
-    title: confirmDelete ? t("task.deleteTitle") : editing ? t("task.editTitle") : t("task.newTitle"),
-    subtitle: confirmDelete ? undefined : editing ? t("task.editSubtitle") : t("task.newSubtitle"),
-    width: 620,
-    footer,
-  }, body);
+    body,
+  );
 }

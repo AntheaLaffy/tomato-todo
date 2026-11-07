@@ -165,7 +165,8 @@ registerCopy("prefs", {
     importReadFailed: "Couldn't read the file: {error}",
     sectionExperience: "Experience & reminders",
     language: "Language",
-    languageHint: "Synced with DSH settings; first launch follows your browser or system language.",
+    languageHint:
+      "Synced with DSH settings; first launch follows your browser or system language.",
     appearance: "Appearance",
     appearanceNote:
       "Appearance follows DSH Settings → Appearance; the tomato skin layers the paper palette on top.",
@@ -802,7 +803,9 @@ function PreferencesPage(props) {
     Card,
     { pad: 22 },
     h(SectionTitle, { icon: "bell", title: t("prefs.sectionExperience") }),
-    h(SettingRow, { label: t("prefs.language"), hint: t("prefs.languageHint") },
+    h(
+      SettingRow,
+      { label: t("prefs.language"), hint: t("prefs.languageHint") },
       h(Select, {
         value: language,
         width: 142,

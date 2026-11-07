@@ -7,12 +7,26 @@ import { t, registerCopy } from "../shared/copy.js";
 import { PageHeader, Empty } from "../shared/ui.js";
 
 /** 生成一个占位页面定义。 */
-export function makeStub({ id, order, icon, titleKey, hintKey, ns, zhTitle, enTitle }) {
+export function makeStub({
+  id,
+  order,
+  icon,
+  titleKey,
+  hintKey,
+  ns,
+  zhTitle,
+  enTitle,
+}) {
   registerCopy(ns ?? id, {
-    zh: { title: zhTitle, placeholder: "这个页面正在按旧版功能清单补全，稍后就绪。", hint: "功能面见 docs/LEGACY_FEATURES.md" },
+    zh: {
+      title: zhTitle,
+      placeholder: "这个页面正在按旧版功能清单补全，稍后就绪。",
+      hint: "功能面见 docs/LEGACY_FEATURES.md",
+    },
     en: {
       title: enTitle,
-      placeholder: "This page is being completed against the legacy feature inventory.",
+      placeholder:
+        "This page is being completed against the legacy feature inventory.",
       hint: "See docs/LEGACY_FEATURES.md",
     },
   });
@@ -36,5 +50,11 @@ export function makeStub({ id, order, icon, titleKey, hintKey, ns, zhTitle, enTi
       ),
     );
   }
-  return { id, order, icon, titleKey: titleKey ?? id + ".title", Component: Stub };
+  return {
+    id,
+    order,
+    icon,
+    titleKey: titleKey ?? id + ".title",
+    Component: Stub,
+  };
 }

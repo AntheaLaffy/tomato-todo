@@ -20,7 +20,14 @@ const snap = (serial, reminders, extra = {}) => ({
   ...extra,
 });
 // 刷新后的首帧：store 还没有数据。completionSerial / reminderPending 都还是 0。
-const empty = { hydrated: false, serial: 0, reminders: 0, running: false, paused: false, mode: "focus" };
+const empty = {
+  hydrated: false,
+  serial: 0,
+  reminders: 0,
+  running: false,
+  paused: false,
+  mode: "focus",
+};
 
 test("首次快照不补播历史音效", () => {
   assert.equal(attentionCue(null, snap(3, 2)), null);
@@ -42,9 +49,18 @@ test("没有跃迁时不触发（轮询重复渲染）", () => {
 });
 
 test("开始、暂停和休息的音效仍按原有优先级播放", () => {
-  assert.equal(attentionCue(snap(3, 2), snap(3, 2, { running: true })), "start");
-  assert.equal(attentionCue(snap(3, 2), snap(3, 2, { running: true, mode: "shortBreak" })), "resume");
-  assert.equal(attentionCue(snap(3, 2, { running: true }), snap(3, 2, { paused: true })), "pause");
+  assert.equal(
+    attentionCue(snap(3, 2), snap(3, 2, { running: true })),
+    "start",
+  );
+  assert.equal(
+    attentionCue(snap(3, 2), snap(3, 2, { running: true, mode: "shortBreak" })),
+    "resume",
+  );
+  assert.equal(
+    attentionCue(snap(3, 2, { running: true }), snap(3, 2, { paused: true })),
+    "pause",
+  );
 });
 
 // ---- 刷新 vs 运行中跃迁：旧版「刷新自动回到番茄页」的回归测试 ----

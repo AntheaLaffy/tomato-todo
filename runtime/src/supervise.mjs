@@ -30,7 +30,13 @@ function candidateBins(env) {
  * 启动 guard 监督循环。返回 { status: () => Promise<object|null>, stop: () => void }。
  * status() 返回最近一次成功的 /guard/status 数据，不可达时为 null。
  */
-export function startGuardSupervisor({ dataDir, token, logger = console, backoffMs = DEFAULT_BACKOFF_MS, client = null }) {
+export function startGuardSupervisor({
+  dataDir,
+  token,
+  logger = console,
+  backoffMs = DEFAULT_BACKOFF_MS,
+  client = null,
+}) {
   const guard = client ?? GuardClient.fromDataDir(dataDir);
   let child = null;
   let stopped = false;
@@ -69,7 +75,9 @@ export function startGuardSupervisor({ dataDir, token, logger = console, backoff
       candidate.once("exit", (code) => {
         if (child === candidate) child = null;
         if (!stopped && spawned) {
-          logger.error(`tomato-guard 退出（code ${code}），${currentBackoff}ms 后重启`);
+          logger.error(
+            `tomato-guard 退出（code ${code}），${currentBackoff}ms 后重启`,
+          );
           schedule(currentBackoff);
         }
       });

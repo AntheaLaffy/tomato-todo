@@ -8,12 +8,15 @@ const pad = (n) => String(n).padStart(2, "0");
 
 /** Unix 秒或 Date → 本地日期键。 */
 export function dayKey(ts) {
-  const d = ts instanceof Date ? ts : new Date((ts ?? Date.now() / 1000) * 1000);
+  const d =
+    ts instanceof Date ? ts : new Date((ts ?? Date.now() / 1000) * 1000);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function todayKey(serverTime) {
-  return typeof serverTime === "number" ? dayKey(serverTime) : dayKey(Date.now() / 1000);
+  return typeof serverTime === "number"
+    ? dayKey(serverTime)
+    : dayKey(Date.now() / 1000);
 }
 
 /** `YYYY-MM-DD` 加减天数。 */
@@ -92,7 +95,10 @@ export function timerView(state) {
   const data = (state && state.data) || {};
   const timer = data.timer || {};
   const settings = data.settings || {};
-  const totalSecs = Number(timer.durationSecs) > 0 ? timer.durationSecs : (settings.focusMinutes || 45) * 60;
+  const totalSecs =
+    Number(timer.durationSecs) > 0
+      ? timer.durationSecs
+      : (settings.focusMinutes || 45) * 60;
   // 运行中优先用 deadline 本地插值：store 心跳每秒 emit，界面数字不依赖网络轮询。
   const remainingFromDeadline =
     timer.running && typeof timer.deadline === "number"
@@ -110,7 +116,10 @@ export function timerView(state) {
     timer,
     mode,
     running,
-    paused: !running && Number(timer.remainingSecs) > 0 && timer.remainingSecs < totalSecs,
+    paused:
+      !running &&
+      Number(timer.remainingSecs) > 0 &&
+      timer.remainingSecs < totalSecs,
     remainingSecs: remaining,
     totalSecs,
     progress: totalSecs > 0 ? 1 - remaining / totalSecs : 0,
@@ -120,7 +129,8 @@ export function timerView(state) {
 }
 
 export function taskById(data, id) {
-  if (!data || !Array.isArray(data.tasks) || id === null || id === undefined) return null;
+  if (!data || !Array.isArray(data.tasks) || id === null || id === undefined)
+    return null;
   return data.tasks.find((task) => task.id === id) || null;
 }
 
@@ -170,7 +180,9 @@ export function overdueTasks(data, today) {
 
 export function isOverdue(task, today) {
   if (!task || task.completed) return false;
-  return task.dueDate !== null && task.dueDate !== undefined && task.dueDate < today;
+  return (
+    task.dueDate !== null && task.dueDate !== undefined && task.dueDate < today
+  );
 }
 
 /** 今日待办：到期日 ≤ 今天、未完成；逾期排前面。 */
@@ -189,14 +201,16 @@ export function dueTasks(data, today) {
 /** 今日完成数（按完成时间落在今天判断，回退到 dueDate===today 且 completed）。 */
 export function completedToday(data, today) {
   const tasks = (data && data.tasks) || [];
-  return tasks.filter((task) => task.completed && task.dueDate === today).length;
+  return tasks.filter((task) => task.completed && task.dueDate === today)
+    .length;
 }
 
 export function habitMissedToday(data, today) {
   const habits = (data && data.habits) || [];
   let missed = 0;
   for (const habit of habits) {
-    if (Array.isArray(habit.missedDates) && habit.missedDates.includes(today)) missed += 1;
+    if (Array.isArray(habit.missedDates) && habit.missedDates.includes(today))
+      missed += 1;
   }
   return missed;
 }
@@ -209,7 +223,11 @@ export function recentDays(stats, n = 7, today) {
   for (let i = n - 1; i >= 0; i -= 1) {
     const date = addDays(today, -i);
     const day = byDate.get(date);
-    out.push({ date, minutes: toMinutes(day ? day.seconds : 0), pomodoros: day ? day.pomodoros || 0 : 0 });
+    out.push({
+      date,
+      minutes: toMinutes(day ? day.seconds : 0),
+      pomodoros: day ? day.pomodoros || 0 : 0,
+    });
   }
   return out;
 }
@@ -220,7 +238,10 @@ export function projectTimeDistribution(data) {
   const totals = new Map();
   for (const session of sessions) {
     const name = session.projectName || "—";
-    totals.set(name, (totals.get(name) || 0) + (Number(session.durationSecs) || 0));
+    totals.set(
+      name,
+      (totals.get(name) || 0) + (Number(session.durationSecs) || 0),
+    );
   }
   const projects = (data && data.projects) || [];
   const colorOf = new Map(projects.map((p) => [p.name, p.color]));
@@ -252,14 +273,22 @@ export function focusTrail(data, n = 12) {
 export function protectionView(state) {
   const data = (state && state.data) || {};
   const settings = data.settings || {};
-  const protection = settings.protection || { mode: "off", whitelist: [], strict: false };
+  const protection = settings.protection || {
+    mode: "off",
+    whitelist: [],
+    strict: false,
+  };
   const timer = timerView(state);
   const guard = (state && state.guard) || { available: false };
   const focusing = timer.running && timer.mode === "focus";
   const active = focusing && protection.mode !== "off";
   const task = taskById(data, timer.taskId);
-  const project = task && task.projectId ? projectById(data, task.projectId) : null;
-  const projectList = project && Array.isArray(project.appWhitelist) ? project.appWhitelist : null;
+  const project =
+    task && task.projectId ? projectById(data, task.projectId) : null;
+  const projectList =
+    project && Array.isArray(project.appWhitelist)
+      ? project.appWhitelist
+      : null;
   return {
     mode: protection.mode || "off",
     strict: !!protection.strict,
@@ -286,13 +315,17 @@ export function protectionView(state) {
  * 客户端只用于显示「待补窗口」，写入与作废判定仍以 core 为唯一权威。
  */
 export function windowMinutes(task, settings) {
-  const focus = task && task.focusMinutes != null ? task.focusMinutes : (settings && settings.focusMinutes) || 45;
+  const focus =
+    task && task.focusMinutes != null
+      ? task.focusMinutes
+      : (settings && settings.focusMinutes) || 45;
   const sessions = Math.max(1, Number(task && task.estimate) || 1);
   const every = Math.max(1, Number(settings && settings.longBreakEvery) || 4);
   const shortBreak = Number(settings && settings.shortBreakMinutes) || 5;
   const longBreak = Number(settings && settings.longBreakMinutes) || 15;
   let breaks = 0;
-  for (let i = 1; i < sessions; i += 1) breaks += i % every === 0 ? longBreak : shortBreak;
+  for (let i = 1; i < sessions; i += 1)
+    breaks += i % every === 0 ? longBreak : shortBreak;
   return sessions * focus + breaks;
 }
 
@@ -304,7 +337,8 @@ export function windowMinutes(task, settings) {
 export function isCatchUp(input, task, today) {
   // 页面既可能传 data 也可能传整个 state；taskKinds 在 state 顶层。
   const data = input && input.data ? input.data : input;
-  const taskKinds = (input && input.data ? input.taskKinds : input && input.taskKinds) || {};
+  const taskKinds =
+    (input && input.data ? input.taskKinds : input && input.taskKinds) || {};
   if (!data || !task) return false;
   const nowKey = dayKey(Date.now() / 1000);
   if (nowKey !== today) return false;
@@ -316,7 +350,10 @@ export function isCatchUp(input, task, today) {
   if (start === null) return false;
   if (task.scrapMinutes <= 0) return false;
   const elapsed = new Date();
-  const nowSecs = elapsed.getHours() * 3600 + elapsed.getMinutes() * 60 + elapsed.getSeconds();
+  const nowSecs =
+    elapsed.getHours() * 3600 +
+    elapsed.getMinutes() * 60 +
+    elapsed.getSeconds();
   const end = start + windowMinutes(task, data.settings) * 60;
   return nowSecs > end && nowSecs < end + task.scrapMinutes * 60;
 }
@@ -327,7 +364,9 @@ export function catchUpTasks(input, today) {
   const tasks = (data && data.tasks) || [];
   return tasks
     .filter((task) => isCatchUp(input, task, today))
-    .sort((a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime)));
+    .sort((a, b) =>
+      String(a.reminderTime).localeCompare(String(b.reminderTime)),
+    );
 }
 
 /** 今天完成的任务（completedAt 落在今天；旧数据无 completedAt 时回退到期日）。 */
@@ -345,7 +384,10 @@ export function taskRounds(data, taskId) {
   const sessions = (data && data.sessions) || [];
   if (!taskId) return 0;
   return sessions.filter(
-    (session) => session.source === "timer" && session.completed && session.taskId === taskId,
+    (session) =>
+      session.source === "timer" &&
+      session.completed &&
+      session.taskId === taskId,
   ).length;
 }
 
@@ -369,9 +411,13 @@ export function dayLabel(date, today) {
  */
 export function educationGrading(data) {
   const education = (data && data.education) || {};
-  const submissions = Array.isArray(education.submissions) ? education.submissions : [];
+  const submissions = Array.isArray(education.submissions)
+    ? education.submissions
+    : [];
   const grades = Array.isArray(education.grades) ? education.grades : [];
-  const assessments = Array.isArray(education.assessments) ? education.assessments : [];
+  const assessments = Array.isArray(education.assessments)
+    ? education.assessments
+    : [];
   const projects = Array.isArray(data && data.projects) ? data.projects : [];
   const assessmentOf = new Map(assessments.map((item) => [item.id, item]));
   const graded = new Set(grades.map((grade) => grade.submissionId));
@@ -397,23 +443,36 @@ export function educationGrading(data) {
     if (!graded.has(submission.id)) {
       const item = bucket(assessment && assessment.projectId);
       item.grading += 1;
-      item.records.push({ projectId: assessment?.projectId, assessmentId: assessment?.id,
-        submissionId: submission.id });
+      item.records.push({
+        projectId: assessment?.projectId,
+        assessmentId: assessment?.id,
+        submissionId: submission.id,
+      });
     }
   }
   for (const grade of grades) {
     if (grade.needsReview !== true) continue;
-    const submission = submissions.find((item) => item.id === grade.submissionId) || null;
-    const assessment = submission ? assessmentOf.get(submission.assessmentId) : null;
+    const submission =
+      submissions.find((item) => item.id === grade.submissionId) || null;
+    const assessment = submission
+      ? assessmentOf.get(submission.assessmentId)
+      : null;
     const item = bucket(assessment && assessment.projectId);
     item.review += 1;
-    item.records.push({ projectId: assessment?.projectId, assessmentId: assessment?.id,
-      submissionId: grade.submissionId, gradeId: grade.id });
+    item.records.push({
+      projectId: assessment?.projectId,
+      assessmentId: assessment?.id,
+      submissionId: grade.submissionId,
+      gradeId: grade.id,
+    });
   }
 
   const items = [...buckets.values()]
     .filter((item) => item.grading > 0 || item.review > 0)
     .sort((a, b) => b.grading + b.review - (a.grading + a.review));
-  const total = items.reduce((sum, item) => sum + item.grading + item.review, 0);
+  const total = items.reduce(
+    (sum, item) => sum + item.grading + item.review,
+    0,
+  );
   return { total, items };
 }

@@ -34,9 +34,16 @@ import "../pages/index.js";
 
 function localeId(locale) {
   try {
-    const snapshot = locale && typeof locale.getLocale === "function" ? locale.getLocale() : null;
+    const snapshot =
+      locale && typeof locale.getLocale === "function"
+        ? locale.getLocale()
+        : null;
     const active = snapshot && (snapshot.active || snapshot.locale);
-    return typeof active === "string" && active !== "" ? active : (typeof navigator !== "undefined" ? navigator.language : "en");
+    return typeof active === "string" && active !== ""
+      ? active
+      : typeof navigator !== "undefined"
+        ? navigator.language
+        : "en";
   } catch {
     return typeof navigator !== "undefined" ? navigator.language : "en";
   }
@@ -70,18 +77,24 @@ function TopReminder({ openPanel }) {
 
 export function registerApp(ctx) {
   const locale = ctx.get ? ctx.get("locale") : null;
-  const hasJapanese = locale && typeof locale.getLocale === "function" &&
+  const hasJapanese =
+    locale &&
+    typeof locale.getLocale === "function" &&
     locale.getLocale().locales?.some((item) => item.id === "ja");
-  const removeJapanese = !hasJapanese && typeof locale?.addLanguage === "function"
-    ? locale.addLanguage({ id: "ja", label: "日本語", fallback: "en" })
-    : null;
+  const removeJapanese =
+    !hasJapanese && typeof locale?.addLanguage === "function"
+      ? locale.addLanguage({ id: "ja", label: "日本語", fallback: "en" })
+      : null;
   let removeJapaneseSettings = null;
   if (typeof locale?.register === "function") {
     try {
-      removeJapaneseSettings = locale.register("settings.locale", "ja", { "language.title": "言語" });
+      removeJapaneseSettings = locale.register("settings.locale", "ja", {
+        "language.title": "言語",
+      });
     } catch (error) {
       // DSH 的独立日语包可能已占有该字典；重复贡献不能阻断整个插件启动。
-      if (!String(error?.message || error).includes('already has locale')) throw error;
+      if (!String(error?.message || error).includes("already has locale"))
+        throw error;
     }
   }
   setLocale(localeId(locale));
@@ -132,7 +145,8 @@ export function registerApp(ctx) {
 
   const leaveToConversation = () => {
     try {
-      if (layout && typeof layout.selectPanel === "function") layout.selectPanel(null);
+      if (layout && typeof layout.selectPanel === "function")
+        layout.selectPanel(null);
     } catch {
       /* DSH 版本差异时忽略 */
     }
@@ -144,12 +158,14 @@ export function registerApp(ctx) {
     try {
       const sessions = ctx.get?.("sessions") ?? ctx.sessions;
       const conversation = ctx.get?.("conversation") ?? ctx.conversation;
-      const current = Object.values(sessions?.list?.getSnapshot?.()?.byId ?? {})
-        .find((row) => (row.retainedBy?.mainView ?? 0) > 0)?.id;
+      const current = Object.values(
+        sessions?.list?.getSnapshot?.()?.byId ?? {},
+      ).find((row) => (row.retainedBy?.mainView ?? 0) > 0)?.id;
       const binding = current ? sessions?.binding?.(current) : null;
       if (binding && conversation?.input?.requestDraftInitialization) {
         const result = conversation.input.requestDraftInitialization(binding, {
-          prompt, whenDraftExists: "append",
+          prompt,
+          whenDraftExists: "append",
         });
         if (result === "blocked") throw new Error("conversation draft busy");
         leaveToConversation();
@@ -160,7 +176,10 @@ export function registerApp(ctx) {
       const workspace = ctx.get?.("uiWorkspace") ?? ctx.uiWorkspace;
       if (typeof workspace?.startSession === "function") {
         leaveToConversation();
-        workspace.startSession(undefined, { prompt, whenDraftExists: "append" });
+        workspace.startSession(undefined, {
+          prompt,
+          whenDraftExists: "append",
+        });
         return true;
       }
     } catch (error) {
@@ -173,7 +192,10 @@ export function registerApp(ctx) {
   // 进入番茄页时收起 DSH 侧栏（若本来就收起则不重复切换）；离开时还原。
   const collapseSidebar = () => {
     try {
-      if (typeof document !== "undefined" && document.querySelector("[data-sidebar-collapsed]")) {
+      if (
+        typeof document !== "undefined" &&
+        document.querySelector("[data-sidebar-collapsed]")
+      ) {
         return false;
       }
       if (layout && typeof layout.toggleSidebar === "function") {
@@ -187,7 +209,8 @@ export function registerApp(ctx) {
   };
   const restoreSidebar = () => {
     try {
-      if (layout && typeof layout.toggleSidebar === "function") layout.toggleSidebar();
+      if (layout && typeof layout.toggleSidebar === "function")
+        layout.toggleSidebar();
     } catch {
       /* ignore */
     }
@@ -212,21 +235,33 @@ export function registerApp(ctx) {
     try {
       ctx.slots.inject(key, () => ctx.slots.register(options, Component));
     } catch (e) {
-      console.warn(`[tomato] slot ${key} 注册失败：`, e && e.message ? e.message : e);
+      console.warn(
+        `[tomato] slot ${key} 注册失败：`,
+        e && e.message ? e.message : e,
+      );
     }
   };
 
-  safeInject("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
+  safeInject("main", { name: "main", key: "tomato" }, () =>
+    h(AppShell, pageProps),
+  );
 
   // 与主面板共用 tomato ID，侧栏负责导航和选中态。
   safeInject(
     "sidebar.panellist",
-    { name: "sidebar.panellist", id: "tomato", order: 10, label: () => t("side.label") },
+    {
+      name: "sidebar.panellist",
+      id: "tomato",
+      order: 10,
+      label: () => t("side.label"),
+    },
     SidebarTomatoIcon,
   );
 
-  safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-overlay", order: 900 }, () =>
-    h(AppOverlay, { openPanel }),
+  safeInject(
+    "shell.overlay",
+    { name: "shell.overlay", id: "tomato-overlay", order: 900 },
+    () => h(AppOverlay, { openPanel }),
   );
 
   safeInject(
@@ -236,11 +271,16 @@ export function registerApp(ctx) {
   );
 
   // 看板娘：DSH 的每个界面右下角都显示（沉浸层 z70 会盖住它）。
-  safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-persona", order: -990 }, PersonaBackdrop);
-
-  // 顶栏正中：到点提醒（整条可点，进入番茄面板）。
-  safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-top-reminder", order: 850 }, () =>
-    h(TopReminder, { openPanel }),
+  safeInject(
+    "shell.overlay",
+    { name: "shell.overlay", id: "tomato-persona", order: -990 },
+    PersonaBackdrop,
   );
 
+  // 顶栏正中：到点提醒（整条可点，进入番茄面板）。
+  safeInject(
+    "shell.overlay",
+    { name: "shell.overlay", id: "tomato-top-reminder", order: 850 },
+    () => h(TopReminder, { openPanel }),
+  );
 }

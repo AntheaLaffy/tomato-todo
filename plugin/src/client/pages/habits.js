@@ -91,7 +91,8 @@ registerCopy("habits", {
     deleted: "已删除",
     deleteHabit: "删除习惯",
     deleteHabitTitle: "删除这个习惯？",
-    deleteHabitBody: "「{name}」的每周计划会一并移除；已经发生的记录会保留在历史里。",
+    deleteHabitBody:
+      "「{name}」的每周计划会一并移除；已经发生的记录会保留在历史里。",
     newVisionTitle: "新建愿景",
     editVisionTitle: "编辑愿景",
     visionDialogSubtitle: "愿景只有方向，没有完成态。",
@@ -112,16 +113,19 @@ registerCopy("habits", {
     subtitle: "Habits are repeated small acts; visions are the far direction.",
     tabHabits: "Habits",
     tabVisions: "Visions",
-    habitsHint: "Dots cover the last 7 days: filled done, outlined missed, grey nothing scheduled.",
+    habitsHint:
+      "Dots cover the last 7 days: filled done, outlined missed, grey nothing scheduled.",
     visionsHint: "Pure direction markers: no completion state, no pressure.",
     newHabit: "New habit",
     newVision: "New vision",
     firstHabit: "Create your first habit",
     firstVision: "Write your first vision",
     emptyHabitsTitle: "No habits yet",
-    emptyHabitsHint: "Start with something so small it can't fail; a few days in a row becomes a rhythm.",
+    emptyHabitsHint:
+      "Start with something so small it can't fail; a few days in a row becomes a rhythm.",
     emptyVisionsTitle: "No visions yet",
-    emptyVisionsHint: "Write down where you're headed. It only needs to be seen, not completed.",
+    emptyVisionsHint:
+      "Write down where you're headed. It only needs to be seen, not completed.",
     everyDay: "Every day",
     weekly: "Weekly",
     daySeparator: ", ",
@@ -136,7 +140,8 @@ registerCopy("habits", {
     dotTitle: "{date} · {status}",
     newHabitTitle: "New habit",
     editHabitTitle: "Edit habit",
-    habitDialogSubtitle: "The schedule decides how often it appears; leave focus length empty for the default.",
+    habitDialogSubtitle:
+      "The schedule decides how often it appears; leave focus length empty for the default.",
     habitName: "Habit name",
     habitNamePlaceholder: "e.g. Morning reading, 20 minutes",
     habitProject: "Group",
@@ -158,7 +163,8 @@ registerCopy("habits", {
     deleted: "Deleted",
     deleteHabit: "Delete habit",
     deleteHabitTitle: "Delete this habit?",
-    deleteHabitBody: "The weekly schedule for \"{name}\" is removed too; history already recorded stays.",
+    deleteHabitBody:
+      'The weekly schedule for "{name}" is removed too; history already recorded stays.',
     newVisionTitle: "New vision",
     editVisionTitle: "Edit vision",
     visionDialogSubtitle: "A vision is a direction, not a task to complete.",
@@ -171,7 +177,8 @@ registerCopy("habits", {
     visionSaved: "Vision saved",
     deleteVision: "Delete vision",
     deleteVisionTitle: "Delete this vision?",
-    deleteVisionBody: "\"{name}\" will be removed; tasks and records are untouched.",
+    deleteVisionBody:
+      '"{name}" will be removed; tasks and records are untouched.',
     untitled: "Untitled",
   },
 });
@@ -219,13 +226,20 @@ const BADGE_STYLE = {
 /** 习惯的调度模板：core 用 shape.habitId 关联，不依赖 id 前缀。 */
 function habitTemplate(templates, habitId) {
   if (!habitId) return null;
-  return templates.find((item) => item && item.shape && item.shape.habitId === habitId) || null;
+  return (
+    templates.find(
+      (item) => item && item.shape && item.shape.habitId === habitId,
+    ) || null
+  );
 }
 
 /** 模板里的每周时段；非 weekly 或字段缺失时返回空数组。 */
 function slotsOfTemplate(template) {
-  if (!template || !template.printing || template.printing.kind !== "weekly") return [];
-  const slots = Array.isArray(template.printing.slots) ? template.printing.slots : [];
+  if (!template || !template.printing || template.printing.kind !== "weekly")
+    return [];
+  const slots = Array.isArray(template.printing.slots)
+    ? template.printing.slots
+    : [];
   return slots.filter(
     (slot) =>
       slot &&
@@ -238,7 +252,11 @@ function slotsOfTemplate(template) {
 
 function instancesOf(tasks, habitId) {
   return tasks.filter(
-    (task) => task && task.habitId === habitId && typeof task.dueDate === "string" && task.dueDate.length > 0,
+    (task) =>
+      task &&
+      task.habitId === habitId &&
+      typeof task.dueDate === "string" &&
+      task.dueDate.length > 0,
   );
 }
 
@@ -292,7 +310,14 @@ function streakOf(grouped, slots, hasTemplate, today, firstDate) {
   let streak = 0;
   let cursor = today;
   for (let i = 0; i < STREAK_LOOKBACK; i += 1) {
-    const status = statusOfDay(cursor, grouped, slots, hasTemplate, today, firstDate);
+    const status = statusOfDay(
+      cursor,
+      grouped,
+      slots,
+      hasTemplate,
+      today,
+      firstDate,
+    );
     if (status === "done") streak += 1;
     else if (status === "missed") break;
     cursor = addDays(cursor, -1);
@@ -318,7 +343,9 @@ function recentDates(today, count) {
 
 /** 只保留对象项：旧快照里可能有 null 占位，页面不为此崩。 */
 function objectList(value) {
-  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
+  return Array.isArray(value)
+    ? value.filter((item) => item && typeof item === "object")
+    : [];
 }
 
 function weekFullLabels() {
@@ -333,13 +360,17 @@ function weekShortLabels() {
 
 /** 把模板 slot 写成「每天 07:00」/「周一、周三、周五 07:00」。 */
 function slotText(slot) {
-  const days = Array.from(new Set(slot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b);
+  const days = Array.from(
+    new Set(slot.days.filter((day) => day >= 1 && day <= 7)),
+  ).sort((a, b) => a - b);
   if (days.length === 0) return "";
   const labels = weekFullLabels();
   const everyDay = days.length === 7;
   const dayText = everyDay
     ? t("habits.everyDay")
-    : days.map((day) => labels[day - 1] || String(day)).join(t("habits.daySeparator"));
+    : days
+        .map((day) => labels[day - 1] || String(day))
+        .join(t("habits.daySeparator"));
   return t("habits.slotText", { days: dayText, time: slot.time });
 }
 
@@ -393,7 +424,8 @@ function HabitCard({ habit, data, templates, tasks, today, onEdit, onDelete }) {
   const firstDate = firstInstanceDate(instanceList);
   const project = shape.projectId ? projectById(data, shape.projectId) : null;
   const settingsFocus = Number((data.settings || {}).focusMinutes) || 0;
-  const focus = Number(shape.focusMinutes) > 0 ? Number(shape.focusMinutes) : settingsFocus;
+  const focus =
+    Number(shape.focusMinutes) > 0 ? Number(shape.focusMinutes) : settingsFocus;
   const dates = recentDates(today, 7);
   const streak = streakOf(grouped, slots, template !== null, today, firstDate);
   const missed = missedOf(instanceList, today);
@@ -412,18 +444,34 @@ function HabitCard({ habit, data, templates, tasks, today, onEdit, onDelete }) {
   }
   if (focus > 0) {
     meta.push(
-      h(Chip, { key: "focus", tone: "neutral", icon: "timer" }, t("habits.focusPerSession", { n: fmtMinutes(focus) })),
+      h(
+        Chip,
+        { key: "focus", tone: "neutral", icon: "timer" },
+        t("habits.focusPerSession", { n: fmtMinutes(focus) }),
+      ),
     );
   }
   slots.forEach((slot, index) => {
-    meta.push(h(Chip, { key: `slot-${index}`, tone: "neutral", icon: "clock" }, slotText(slot)));
+    meta.push(
+      h(
+        Chip,
+        { key: `slot-${index}`, tone: "neutral", icon: "clock" },
+        slotText(slot),
+      ),
+    );
   });
 
   return h(
     Card,
     {
       pad: 18,
-      style: { flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 13 },
+      style: {
+        flex: "1 1 300px",
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: 13,
+      },
     },
     h(
       "div",
@@ -442,7 +490,11 @@ function HabitCard({ habit, data, templates, tasks, today, onEdit, onDelete }) {
       h(
         "div",
         { style: { flex: 1, minWidth: 0 } },
-        h("div", { style: NAME_STYLE, title: habit.name || t("habits.untitled") }, habit.name || t("habits.untitled")),
+        h(
+          "div",
+          { style: NAME_STYLE, title: habit.name || t("habits.untitled") },
+          habit.name || t("habits.untitled"),
+        ),
       ),
       h(IconBtn, {
         name: "edit",
@@ -459,12 +511,32 @@ function HabitCard({ habit, data, templates, tasks, today, onEdit, onDelete }) {
         onClick: () => onDelete(habit),
       }),
     ),
-    meta.length > 0 ? h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" } }, meta) : null,
+    meta.length > 0
+      ? h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              alignItems: "center",
+            },
+          },
+          meta,
+        )
+      : null,
     h(
       "div",
       { style: { display: "flex", gap: 4, marginTop: "auto" } },
       dates.map((date) => {
-        const status = statusOfDay(date, grouped, slots, template !== null, today, firstDate);
+        const status = statusOfDay(
+          date,
+          grouped,
+          slots,
+          template !== null,
+          today,
+          firstDate,
+        );
         const isToday = date === today;
         const title = t("habits.dotTitle", {
           date: dayLabel(date, today),
@@ -486,11 +558,21 @@ function HabitCard({ habit, data, templates, tasks, today, onEdit, onDelete }) {
           },
           h(
             "span",
-            { style: { width: 13, height: 13, display: "grid", placeItems: "center", flex: "none" } },
+            {
+              style: {
+                width: 13,
+                height: 13,
+                display: "grid",
+                placeItems: "center",
+                flex: "none",
+              },
+            },
             h(
               "span",
               { style: dotStyle(status) },
-              status === "done" ? h(Icon, { name: "check", size: 9, stroke: 2.6 }) : null,
+              status === "done"
+                ? h(Icon, { name: "check", size: 9, stroke: 2.6 })
+                : null,
             ),
           ),
           h(
@@ -500,7 +582,9 @@ function HabitCard({ habit, data, templates, tasks, today, onEdit, onDelete }) {
                 fontSize: 10,
                 lineHeight: 1.2,
                 whiteSpace: "nowrap",
-                color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
+                color: isToday
+                  ? "var(--tomato-brand-deep)"
+                  : "var(--tomato-ink-3)",
                 fontWeight: isToday ? 600 : 400,
               },
             },
@@ -511,9 +595,24 @@ function HabitCard({ habit, data, templates, tasks, today, onEdit, onDelete }) {
     ),
     h(
       "div",
-      { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" } },
-      h(Chip, { tone: "sun", icon: "flame" }, t("habits.streakDays", { n: streak })),
-      h(Chip, { tone: "danger", icon: "moon" }, t("habits.missedCount", { n: missed })),
+      {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          alignItems: "center",
+        },
+      },
+      h(
+        Chip,
+        { tone: "sun", icon: "flame" },
+        t("habits.streakDays", { n: streak }),
+      ),
+      h(
+        Chip,
+        { tone: "danger", icon: "moon" },
+        t("habits.missedCount", { n: missed }),
+      ),
     ),
   );
 }
@@ -527,7 +626,13 @@ function VisionCard({ vision, data, onEdit, onDelete }) {
     Card,
     {
       pad: 18,
-      style: { flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 12 },
+      style: {
+        flex: "1 1 300px",
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      },
     },
     h(
       "div",
@@ -543,7 +648,11 @@ function VisionCard({ vision, data, onEdit, onDelete }) {
         },
         h(Icon, { name: "sparkle", size: 17 }),
       ),
-      h("div", { style: { flex: 1, minWidth: 0 } }, h("div", { style: NAME_STYLE, title: name }, name)),
+      h(
+        "div",
+        { style: { flex: 1, minWidth: 0 } },
+        h("div", { style: NAME_STYLE, title: name }, name),
+      ),
       h(IconBtn, {
         name: "edit",
         size: 15,
@@ -562,13 +671,28 @@ function VisionCard({ vision, data, onEdit, onDelete }) {
     notes
       ? h(
           "div",
-          { style: { fontSize: 12.5, lineHeight: 1.65, color: "var(--tomato-ink-2)", whiteSpace: "pre-wrap" } },
+          {
+            style: {
+              fontSize: 12.5,
+              lineHeight: 1.65,
+              color: "var(--tomato-ink-2)",
+              whiteSpace: "pre-wrap",
+            },
+          },
           notes,
         )
       : null,
     h(
       "div",
-      { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: "auto" } },
+      {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          alignItems: "center",
+          marginTop: "auto",
+        },
+      },
       project
         ? h(
             Chip,
@@ -576,7 +700,11 @@ function VisionCard({ vision, data, onEdit, onDelete }) {
             h(Dot, { color: projectColor(data, project.id), size: 6 }),
             project.name,
           )
-        : h(Chip, { tone: "brand", icon: "arrowRight" }, t("habits.totalVision")),
+        : h(
+            Chip,
+            { tone: "brand", icon: "arrowRight" },
+            t("habits.totalVision"),
+          ),
     ),
   );
 }
@@ -607,7 +735,9 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
   const habits = Array.isArray(data.habits) ? data.habits : [];
   const templates = Array.isArray(data.templates) ? data.templates : [];
   const projects = Array.isArray(data.projects) ? data.projects : [];
-  const habit = editing ? habits.find((item) => item && item.id === habitId) || null : null;
+  const habit = editing
+    ? habits.find((item) => item && item.id === habitId) || null
+    : null;
   const template = habitTemplate(templates, habitId);
   const shape = (template && template.shape) || {};
   // 时段是「一天出现几次」的唯一描述：同一个习惯可以「周三 08:00」加「周日 20:00」，
@@ -618,22 +748,30 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
       ? initialSlots.map((slot) => ({
           days:
             Array.isArray(slot.days) && slot.days.length > 0
-              ? Array.from(new Set(slot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b)
+              ? Array.from(
+                  new Set(slot.days.filter((day) => day >= 1 && day <= 7)),
+                ).sort((a, b) => a - b)
               : [...ALL_DAYS],
           time: normalizeTime(slot.time),
         }))
       : [{ days: [...ALL_DAYS], time: normalizeTime(null) }];
   const defaultFocus = Number((data.settings || {}).focusMinutes) || 45;
 
-  const [name, setName] = useState(habit && typeof habit.name === "string" ? habit.name : "");
+  const [name, setName] = useState(
+    habit && typeof habit.name === "string" ? habit.name : "",
+  );
   const [projectId, setProjectId] = useState(shape.projectId || "");
   const [slots, setSlots] = useState(slotsFromTemplate);
-  const [focus, setFocus] = useState(Number(shape.focusMinutes) >= 1 ? String(shape.focusMinutes) : "");
+  const [focus, setFocus] = useState(
+    Number(shape.focusMinutes) >= 1 ? String(shape.focusMinutes) : "",
+  );
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const patchSlot = (index, patch) => {
-    setSlots((previous) => previous.map((slot, at) => (at === index ? { ...slot, ...patch } : slot)));
+    setSlots((previous) =>
+      previous.map((slot, at) => (at === index ? { ...slot, ...patch } : slot)),
+    );
   };
 
   const toggleSlotDay = (index, day) => {
@@ -696,7 +834,12 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
     }
     const focusRaw = focus.trim();
     const focusMinutes = focusRaw === "" ? null : Number(focusRaw);
-    if (focusRaw !== "" && (!Number.isInteger(focusMinutes) || focusMinutes < 1 || focusMinutes > 180)) {
+    if (
+      focusRaw !== "" &&
+      (!Number.isInteger(focusMinutes) ||
+        focusMinutes < 1 ||
+        focusMinutes > 180)
+    ) {
       setError(t("habits.focusError"));
       return;
     }
@@ -725,7 +868,10 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
 
   const projectOptions = [
     { value: "", label: t("habits.noGroup") },
-    ...projects.map((project) => ({ value: project.id, label: project.name || project.id })),
+    ...projects.map((project) => ({
+      value: project.id,
+      label: project.name || project.id,
+    })),
   ];
   const weekFull = weekFullLabels();
 
@@ -746,17 +892,35 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
     h(
       Field,
       { label: t("habits.habitProject") },
-      h(Select, { value: projectId, options: projectOptions, onChange: setProjectId, width: "100%" }),
+      h(Select, {
+        value: projectId,
+        options: projectOptions,
+        onChange: setProjectId,
+        width: "100%",
+      }),
     ),
     h(
       "div",
-      { style: { display: "flex", flexDirection: "column", gap: 8, minWidth: 0 } },
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          minWidth: 0,
+        },
+      },
       h(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 8 } },
         h(
           "span",
-          { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+          {
+            style: {
+              fontSize: 12,
+              fontWeight: 550,
+              color: "var(--tomato-ink-2)",
+            },
+          },
           t("habits.schedule"),
         ),
         h("div", { style: { flex: 1 } }),
@@ -827,8 +991,19 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
           ),
           h(
             "div",
-            { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" } },
-            h("span", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, t("habits.time")),
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 9,
+                flexWrap: "wrap",
+              },
+            },
+            h(
+              "span",
+              { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+              t("habits.time"),
+            ),
             h(Input, {
               type: "time",
               value: slot.time,
@@ -841,7 +1016,10 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
     ),
     h(
       Field,
-      { label: t("habits.focusMinutes"), hint: t("habits.focusMinutesHint", { n: fmtMinutes(defaultFocus) }) },
+      {
+        label: t("habits.focusMinutes"),
+        hint: t("habits.focusMinutesHint", { n: fmtMinutes(defaultFocus) }),
+      },
       h(Input, {
         type: "number",
         value: focus,
@@ -874,8 +1052,22 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
         )
       : null,
     h("div", { style: { flex: 1 } }),
-    h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
-    h(Btn, { variant: "primary", size: "sm", icon: "check", onClick: submit, disabled: busy }, t("common.save")),
+    h(
+      Btn,
+      { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+      t("common.cancel"),
+    ),
+    h(
+      Btn,
+      {
+        variant: "primary",
+        size: "sm",
+        icon: "check",
+        onClick: submit,
+        disabled: busy,
+      },
+      t("common.save"),
+    ),
   );
 
   return h(
@@ -899,11 +1091,19 @@ function VisionDialog({ mode, visionId, data, onClose, onRequestDelete }) {
   const editing = mode === "edit";
   const visions = Array.isArray(data.visions) ? data.visions : [];
   const projects = Array.isArray(data.projects) ? data.projects : [];
-  const vision = editing ? visions.find((item) => item && item.id === visionId) || null : null;
+  const vision = editing
+    ? visions.find((item) => item && item.id === visionId) || null
+    : null;
 
-  const [name, setName] = useState(vision && typeof vision.name === "string" ? vision.name : "");
-  const [projectId, setProjectId] = useState(vision && vision.projectId ? vision.projectId : "");
-  const [notes, setNotes] = useState(vision && typeof vision.notes === "string" ? vision.notes : "");
+  const [name, setName] = useState(
+    vision && typeof vision.name === "string" ? vision.name : "",
+  );
+  const [projectId, setProjectId] = useState(
+    vision && vision.projectId ? vision.projectId : "",
+  );
+  const [notes, setNotes] = useState(
+    vision && typeof vision.notes === "string" ? vision.notes : "",
+  );
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -935,7 +1135,10 @@ function VisionDialog({ mode, visionId, data, onClose, onRequestDelete }) {
 
   const projectOptions = [
     { value: "", label: t("habits.totalVision") },
-    ...projects.map((project) => ({ value: project.id, label: project.name || project.id })),
+    ...projects.map((project) => ({
+      value: project.id,
+      label: project.name || project.id,
+    })),
   ];
 
   const body = h(
@@ -955,7 +1158,12 @@ function VisionDialog({ mode, visionId, data, onClose, onRequestDelete }) {
     h(
       Field,
       { label: t("habits.visionProject") },
-      h(Select, { value: projectId, options: projectOptions, onChange: setProjectId, width: "100%" }),
+      h(Select, {
+        value: projectId,
+        options: projectOptions,
+        onChange: setProjectId,
+        width: "100%",
+      }),
     ),
     h(
       Field,
@@ -991,8 +1199,22 @@ function VisionDialog({ mode, visionId, data, onClose, onRequestDelete }) {
         )
       : null,
     h("div", { style: { flex: 1 } }),
-    h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
-    h(Btn, { variant: "primary", size: "sm", icon: "check", onClick: submit, disabled: busy }, t("common.save")),
+    h(
+      Btn,
+      { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+      t("common.cancel"),
+    ),
+    h(
+      Btn,
+      {
+        variant: "primary",
+        size: "sm",
+        icon: "check",
+        onClick: submit,
+        disabled: busy,
+      },
+      t("common.save"),
+    ),
   );
 
   return h(
@@ -1092,10 +1314,26 @@ function HabitsPage({ state }) {
 
   const toolbar = h(
     "div",
-    { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" } },
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 16,
+        flexWrap: "wrap",
+      },
+    },
     h(
       "div",
-      { style: { flex: 1, minWidth: 220, fontSize: 12.5, lineHeight: 1.6, color: "var(--tomato-ink-3)" } },
+      {
+        style: {
+          flex: 1,
+          minWidth: 220,
+          fontSize: 12.5,
+          lineHeight: 1.6,
+          color: "var(--tomato-ink-3)",
+        },
+      },
       tab === "habits" ? t("habits.habitsHint") : t("habits.visionsHint"),
     ),
     h(
@@ -1104,7 +1342,10 @@ function HabitsPage({ state }) {
         variant: "primary",
         size: "md",
         icon: "plus",
-        onClick: () => (tab === "habits" ? openHabit({ mode: "new" }) : openVision({ mode: "new" })),
+        onClick: () =>
+          tab === "habits"
+            ? openHabit({ mode: "new" })
+            : openVision({ mode: "new" }),
       },
       tab === "habits" ? t("habits.newHabit") : t("habits.newVision"),
     ),
@@ -1121,14 +1362,26 @@ function HabitsPage({ state }) {
             hint: t("habits.emptyHabitsHint"),
             action: h(
               Btn,
-              { variant: "soft", size: "sm", icon: "plus", onClick: () => openHabit({ mode: "new" }) },
+              {
+                variant: "soft",
+                size: "sm",
+                icon: "plus",
+                onClick: () => openHabit({ mode: "new" }),
+              },
               t("habits.firstHabit"),
             ),
           }),
         )
       : h(
           "div",
-          { style: { display: "flex", flexWrap: "wrap", gap: 14, alignItems: "stretch" } },
+          {
+            style: {
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 14,
+              alignItems: "stretch",
+            },
+          },
           habits.map((habit, index) =>
             h(HabitCard, {
               key: habit.id || `habit-${index}`,
@@ -1138,7 +1391,12 @@ function HabitsPage({ state }) {
               tasks,
               today,
               onEdit: (id) => openHabit({ mode: "edit", habitId: id }),
-              onDelete: (item) => setDeleteConfirm({ kind: "habit", id: item.id, name: item.name || t("habits.untitled") }),
+              onDelete: (item) =>
+                setDeleteConfirm({
+                  kind: "habit",
+                  id: item.id,
+                  name: item.name || t("habits.untitled"),
+                }),
             }),
           ),
         );
@@ -1154,21 +1412,38 @@ function HabitsPage({ state }) {
             hint: t("habits.emptyVisionsHint"),
             action: h(
               Btn,
-              { variant: "soft", size: "sm", icon: "plus", onClick: () => openVision({ mode: "new" }) },
+              {
+                variant: "soft",
+                size: "sm",
+                icon: "plus",
+                onClick: () => openVision({ mode: "new" }),
+              },
               t("habits.firstVision"),
             ),
           }),
         )
       : h(
           "div",
-          { style: { display: "flex", flexWrap: "wrap", gap: 14, alignItems: "stretch" } },
+          {
+            style: {
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 14,
+              alignItems: "stretch",
+            },
+          },
           visions.map((vision, index) =>
             h(VisionCard, {
               key: vision.id || `vision-${index}`,
               vision,
               data,
               onEdit: (id) => openVision({ mode: "edit", visionId: id }),
-              onDelete: (item) => setDeleteConfirm({ kind: "vision", id: item.id, name: item.name || t("habits.untitled") }),
+              onDelete: (item) =>
+                setDeleteConfirm({
+                  kind: "vision",
+                  id: item.id,
+                  name: item.name || t("habits.untitled"),
+                }),
             }),
           ),
         );
@@ -1188,7 +1463,11 @@ function HabitsPage({ state }) {
           onClose: () => setHabitDialog(null),
           onRequestDelete: (target) => {
             setHabitDialog(null);
-            setDeleteConfirm({ kind: "habit", id: target.id, name: target.name });
+            setDeleteConfirm({
+              kind: "habit",
+              id: target.id,
+              name: target.name,
+            });
           },
         })
       : null,
@@ -1201,7 +1480,11 @@ function HabitsPage({ state }) {
           onClose: () => setVisionDialog(null),
           onRequestDelete: (target) => {
             setVisionDialog(null);
-            setDeleteConfirm({ kind: "vision", id: target.id, name: target.name });
+            setDeleteConfirm({
+              kind: "vision",
+              id: target.id,
+              name: target.name,
+            });
           },
         })
       : null,
@@ -1214,28 +1497,51 @@ function HabitsPage({ state }) {
               if (!deleting) setDeleteConfirm(null);
             },
             icon: "trash",
-            title: t(deleteConfirm.kind === "habit" ? "habits.deleteHabitTitle" : "habits.deleteVisionTitle"),
+            title: t(
+              deleteConfirm.kind === "habit"
+                ? "habits.deleteHabitTitle"
+                : "habits.deleteVisionTitle",
+            ),
             width: 420,
             footer: h(
               "div",
               { style: { display: "flex", gap: 9, marginLeft: "auto" } },
               h(
                 Btn,
-                { variant: "ghost", size: "sm", onClick: () => setDeleteConfirm(null), disabled: deleting },
+                {
+                  variant: "ghost",
+                  size: "sm",
+                  onClick: () => setDeleteConfirm(null),
+                  disabled: deleting,
+                },
                 t("common.cancel"),
               ),
               h(
                 Btn,
-                { variant: "danger", size: "sm", icon: "trash", onClick: confirmDelete, disabled: deleting },
+                {
+                  variant: "danger",
+                  size: "sm",
+                  icon: "trash",
+                  onClick: confirmDelete,
+                  disabled: deleting,
+                },
                 t("common.delete"),
               ),
             ),
           },
           h(
             "div",
-            { style: { fontSize: 13, lineHeight: 1.65, color: "var(--tomato-ink-2)" } },
+            {
+              style: {
+                fontSize: 13,
+                lineHeight: 1.65,
+                color: "var(--tomato-ink-2)",
+              },
+            },
             t(
-              deleteConfirm.kind === "habit" ? "habits.deleteHabitBody" : "habits.deleteVisionBody",
+              deleteConfirm.kind === "habit"
+                ? "habits.deleteHabitBody"
+                : "habits.deleteVisionBody",
               { name: deleteConfirm.name },
             ),
           ),

@@ -68,7 +68,8 @@ registerCopy("guard", {
     refreshFound: "找到 {n} 个正在运行的应用。",
     refreshEmpty: "没有找到可添加的运行中应用。",
     refreshFailed: "读不到应用列表：{error}",
-    appsHint: "只建议当前已启动且有窗口的应用，最多显示 8 个；其他应用可手动输入 id。",
+    appsHint:
+      "只建议当前已启动且有窗口的应用，最多显示 8 个；其他应用可手动输入 id。",
     noSuggestions: "当前没有可添加的运行中应用。",
     semanticsTitle: "白名单如何工作",
     semantics: [
@@ -378,7 +379,9 @@ export function GuardPage({ refresh }) {
   // 建议只取当前有窗口的 app_id，不从历史配置或安装目录推断。
   const [apps, setApps] = useState(null);
   const [appsBusy, setAppsBusy] = useState(false);
-  useEffect(() => { void refreshApps(); }, []);
+  useEffect(() => {
+    void refreshApps();
+  }, []);
   if (state === null) return h(GuardSkeleton, null);
 
   const data = state.data || {};
@@ -392,7 +395,9 @@ export function GuardPage({ refresh }) {
   const active = !!view.active;
   const whitelist = protection.whitelist;
   const editable = protection.mode === "whitelist";
-  const suggestions = (apps || []).filter((app) => !whitelist.includes(app.id)).slice(0, 8);
+  const suggestions = (apps || [])
+    .filter((app) => !whitelist.includes(app.id))
+    .slice(0, 8);
   const semantics = t("guard.semantics");
   const semanticItems = Array.isArray(semantics) ? semantics : [];
   const pid =
@@ -470,13 +475,19 @@ export function GuardPage({ refresh }) {
           id: String(app.id ?? ""),
           name: String(app.name ?? app.id ?? ""),
         }))
-        .filter((app) => app.id !== "" && app.id !== "dsh-desktop" && app.id !== "studio.dsh.desktop")
+        .filter(
+          (app) =>
+            app.id !== "" &&
+            app.id !== "dsh-desktop" &&
+            app.id !== "studio.dsh.desktop",
+        )
         .sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
       setApps(ranked);
       if (ranked.length === 0) notify(t("guard.refreshEmpty"), "neutral");
       else notify(t("guard.refreshFound", { n: ranked.length }), "brand");
     } catch (error) {
-      const message = (error && (error.userMessage || error.message)) || "未知错误";
+      const message =
+        (error && (error.userMessage || error.message)) || "未知错误";
       notify(t("guard.refreshFailed", { error: message }), "danger");
     } finally {
       setAppsBusy(false);

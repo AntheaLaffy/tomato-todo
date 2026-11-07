@@ -7,7 +7,11 @@ import { startServer, DEFAULT_PORT } from "./server.mjs";
 import { runMcpStdio } from "./mcp-stdio.mjs";
 import { ensureGuardToken, runGuardStatus } from "./guard-client.ts";
 import { startGuardSupervisor } from "./supervise.mjs";
-import { ensureConnection, loadOrCreateConnection, writeConnection } from "./connection.mjs";
+import {
+  ensureConnection,
+  loadOrCreateConnection,
+  writeConnection,
+} from "./connection.mjs";
 import { VERSION } from "./version.mjs";
 
 const USAGE = `番茄 Todo runtime ${VERSION}（随 DSH 插件分发）
@@ -126,7 +130,8 @@ export async function main(argv) {
       lastConnectionError = null;
     } catch (error) {
       const message = error?.message ?? String(error);
-      if (message !== lastConnectionError) console.error(`MCP 连接文件恢复失败：${message}`);
+      if (message !== lastConnectionError)
+        console.error(`MCP 连接文件恢复失败：${message}`);
       lastConnectionError = message;
     }
   }, 15000);
@@ -139,7 +144,9 @@ export async function main(argv) {
     if (!engine.data.settings.notifications) return;
     void guard.notify({ title, body }).then((result) => {
       if (!result.ok) {
-        console.error(`guard notify 失败：${result.error ?? `HTTP ${result.status}`}`);
+        console.error(
+          `guard notify 失败：${result.error ?? `HTTP ${result.status}`}`,
+        );
       }
     });
   };
@@ -148,7 +155,9 @@ export async function main(argv) {
     return afterIds.filter((id) => !before.has(id));
   };
   const reminderIds = () =>
-    engine.data.tasks.filter((task) => task && task.reminderPending).map((task) => task.id);
+    engine.data.tasks
+      .filter((task) => task && task.reminderPending)
+      .map((task) => task.id);
   let prev = {
     serial: Number(engine.data.timer.completionSerial) || 0,
     reminderIds: reminderIds(),
@@ -172,7 +181,10 @@ export async function main(argv) {
       }
       for (const id of fresh) {
         const task = engine.data.tasks.find((item) => item.id === id);
-        notifyDesktop("番茄 Todo", task ? `到点了：${task.title}` : "有一项任务到点了。");
+        notifyDesktop(
+          "番茄 Todo",
+          task ? `到点了：${task.title}` : "有一项任务到点了。",
+        );
       }
     }
     prev = next;

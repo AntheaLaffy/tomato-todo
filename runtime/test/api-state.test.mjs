@@ -30,7 +30,10 @@ function fakeGuard() {
     async runningApps() {
       return this.runningAppsError
         ? { ok: false, error: this.runningAppsError }
-        : { ok: true, data: { apps: ["kitty", "code", "kitty", "dsh-desktop"] } };
+        : {
+            ok: true,
+            data: { apps: ["kitty", "code", "kitty", "dsh-desktop"] },
+          };
     },
     async fullscreen(enabled) {
       calls.push({ command: "fullscreen", enabled });
@@ -98,14 +101,22 @@ const dispatch = (action) =>
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("原生全屏端点校验输入与 Origin，并向 UI 透传失败", async () => {
-  const post = (body, origin = UI_ORIGIN) => json("/api/desktop/fullscreen", {
-    method: "POST", headers: { "Content-Type": "application/json", Origin: origin },
-    body: JSON.stringify(body),
-  });
+  const post = (body, origin = UI_ORIGIN) =>
+    json("/api/desktop/fullscreen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify(body),
+    });
   assert.equal((await post({ enabled: true })).status, 200);
-  assert.deepEqual(guard.calls.at(-1), { command: "fullscreen", enabled: true });
+  assert.deepEqual(guard.calls.at(-1), {
+    command: "fullscreen",
+    enabled: true,
+  });
   assert.equal((await post({ enabled: "true" })).status, 400);
-  assert.equal((await post({ enabled: true }, "https://example.com")).status, 403);
+  assert.equal(
+    (await post({ enabled: true }, "https://example.com")).status,
+    403,
+  );
   guard.fullscreenError = "未找到 DSH 窗口";
   try {
     const result = await post({ enabled: false });
@@ -604,7 +615,9 @@ test("guard 同步会在守卫重启或锁定状态丢失后重新发送锁机�
       locked = true;
       return { ok: true };
     },
-    async status() { return { ok: true, data: { locked, whitelist: [] } }; },
+    async status() {
+      return { ok: true, data: { locked, whitelist: [] } };
+    },
   };
   const sync = createGuardSync(engine, guard);
   await sync();
@@ -621,7 +634,10 @@ test("GET /api/apps：只返回 guard 看到的运行中应用", async () => {
   const body = await res.json();
   assert.ok(Array.isArray(body.apps));
   assert.equal(body.count, body.apps.length);
-  assert.deepEqual(body.apps.map((app) => app.id), ["kitty", "code", "dsh-desktop"]);
+  assert.deepEqual(
+    body.apps.map((app) => app.id),
+    ["kitty", "code", "dsh-desktop"],
+  );
   for (const app of body.apps) {
     assert.equal(typeof app.id, "string");
     // id 是桌面入口文件名去后缀；像 com.ccswitch.desktop.desktop 这种带点的
@@ -644,7 +660,8 @@ test("GET /api/apps：guard 不可达时不退回全部已安装应用", async (
 });
 
 test("parseDesktopEntry：跳过 NoDisplay/Hidden/非 Application，优先中文名", () => {
-  const base = "[Desktop Entry]\nType=Application\nName=Files\nExec=nautilus %U\n";
+  const base =
+    "[Desktop Entry]\nType=Application\nName=Files\nExec=nautilus %U\n";
   assert.deepEqual(parseDesktopEntry(base), {
     exec: "nautilus",
     icon: "",
@@ -686,7 +703,10 @@ test("POST /api/dispatch：习惯可带多个时段，撞在同一 (day|time) �
   assert.ok(habit);
   const template = data.templates.find((tpl) => tpl.shape.habitId === habit.id);
   assert.equal(template.printing.slots.length, 2);
-  assert.deepEqual(template.printing.slots.map((s) => s.time), ["08:00", "20:30"]);
+  assert.deepEqual(
+    template.printing.slots.map((s) => s.time),
+    ["08:00", "20:30"],
+  );
 
   const clash = await post({
     type: "saveHabit",

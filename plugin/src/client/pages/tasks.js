@@ -123,7 +123,8 @@ registerCopy("tasks", {
     templateEstimate: "预计 {n} 个番茄",
     templateFocus: "每次 {minutes}",
     templateDefaultFocus: "每次 {minutes}（默认）",
-    templatesHint: "模板保留形状与印刷规则；印刷生成的实例之后与模板互不覆盖，需要时手动同步。",
+    templatesHint:
+      "模板保留形状与印刷规则；印刷生成的实例之后与模板互不覆盖，需要时手动同步。",
     templatesTitle: "模板与印刷",
     newTemplate: "新建模板",
     editTemplate: "编辑模板",
@@ -174,12 +175,14 @@ registerCopy("tasks", {
     batchDelete: "Delete",
     batchCancel: "Cancel",
     batchDeleteTitle: "Delete selected tasks?",
-    batchDeleteBody: "The {n} selected tasks will be removed; focus history stays in stats.",
+    batchDeleteBody:
+      "The {n} selected tasks will be removed; focus history stays in stats.",
     batchDeleted: "Deleted {n} tasks",
     batchCompleted: "Completed {n} tasks",
     batchMoved: "Moved {n} tasks",
     moveTitle: "Move to which day?",
-    moveHint: "Selected tasks keep their title, project, reminder and focus settings; only the planned date changes.",
+    moveHint:
+      "Selected tasks keep their title, project, reminder and focus settings; only the planned date changes.",
     moveDate: "New planned date",
     moveConfirm: "Move",
     moveFailed: "Couldn't move: {error}",
@@ -217,7 +220,8 @@ registerCopy("tasks", {
     templateEstimate: "{n} pomodoros planned",
     templateFocus: "{minutes} per session",
     templateDefaultFocus: "{minutes} per session (default)",
-    templatesHint: "Templates keep the shape and the printing rule; printed instances stay decoupled, sync them when needed.",
+    templatesHint:
+      "Templates keep the shape and the printing rule; printed instances stay decoupled, sync them when needed.",
     templatesTitle: "Templates & printing",
     newTemplate: "New template",
     editTemplate: "Edit template",
@@ -238,7 +242,12 @@ registerCopy("tasks", {
   },
 });
 
-const PRIORITY_KEYS = ["priorityNone", "priorityLow", "priorityMedium", "priorityHigh"];
+const PRIORITY_KEYS = [
+  "priorityNone",
+  "priorityLow",
+  "priorityMedium",
+  "priorityHigh",
+];
 
 /** 优先级容错：旧数据可能缺字段或给字符串。 */
 function priorityOf(task) {
@@ -250,7 +259,8 @@ function priorityOf(task) {
 function matchesQuery(task, query) {
   if (query === "") return true;
   const tags = Array.isArray(task.tags) ? task.tags.join(" ") : "";
-  const haystack = `${task.title ?? ""} ${task.notes ?? ""} ${tags}`.toLowerCase();
+  const haystack =
+    `${task.title ?? ""} ${task.notes ?? ""} ${tags}`.toLowerCase();
   return haystack.includes(query);
 }
 
@@ -261,7 +271,9 @@ const NO_TIME = "99:99";
 function compareByTime(a, b) {
   return (
     String(a.dueDate || NO_DATE).localeCompare(String(b.dueDate || NO_DATE)) ||
-    String(a.reminderTime || NO_TIME).localeCompare(String(b.reminderTime || NO_TIME)) ||
+    String(a.reminderTime || NO_TIME).localeCompare(
+      String(b.reminderTime || NO_TIME),
+    ) ||
     (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0)
   );
 }
@@ -290,18 +302,28 @@ function printingSummary(template, today) {
   if (rule.kind === "once") {
     const date = rule.date ? dayLabel(rule.date, today) : "";
     const time = rule.time ? ` ${rule.time}` : "";
-    return t("tasks.printingOnce", { date: date || t("tasks.printingNoDate"), time });
+    return t("tasks.printingOnce", {
+      date: date || t("tasks.printingNoDate"),
+      time,
+    });
   }
   if (rule.kind === "calendar") {
     const slots = Array.isArray(rule.slots) ? rule.slots : [];
-    const n = slots.reduce((sum, slot) => sum + (Array.isArray(slot.dates) ? slot.dates.length : 0), 0);
+    const n = slots.reduce(
+      (sum, slot) => sum + (Array.isArray(slot.dates) ? slot.dates.length : 0),
+      0,
+    );
     return t("tasks.printingCalendar", { n });
   }
   if (rule.kind === "weekly") {
     const slots = Array.isArray(rule.slots) ? rule.slots : [];
-    const times = Array.from(new Set(slots.map((slot) => slot.time).filter(Boolean)));
+    const times = Array.from(
+      new Set(slots.map((slot) => slot.time).filter(Boolean)),
+    );
     const summary = t("tasks.printingWeekly", { n: slots.length });
-    return times.length > 0 ? `${summary}${t("tasks.printingTimes", { times: times.join(" / ") })}` : summary;
+    return times.length > 0
+      ? `${summary}${t("tasks.printingTimes", { times: times.join(" / ") })}`
+      : summary;
   }
   return t("tasks.printingNone");
 }
@@ -321,7 +343,11 @@ function taskDraft(task, patch) {
     estimate: Math.max(1, Number(task.estimate) || 1),
     tags: Array.isArray(task.tags) ? task.tags.slice() : [],
     subtasks: Array.isArray(task.subtasks)
-      ? task.subtasks.map((sub) => ({ id: sub.id, title: sub.title, done: !!sub.done }))
+      ? task.subtasks.map((sub) => ({
+          id: sub.id,
+          title: sub.title,
+          done: !!sub.done,
+        }))
       : [],
     ...patch,
     repeat: "none",
@@ -332,10 +358,34 @@ function taskDraft(task, patch) {
 
 function SummaryStrip({ counts }) {
   const items = [
-    { key: "all", icon: "tasks", label: t("tasks.tabAll"), n: counts.all, tone: "neutral" },
-    { key: "active", icon: "clock", label: t("tasks.tabActive"), n: counts.active, tone: "brand" },
-    { key: "completed", icon: "check", label: t("tasks.tabCompleted"), n: counts.completed, tone: "leaf" },
-    { key: "templates", icon: "sparkle", label: t("tasks.tabTemplates"), n: counts.templates, tone: "neutral" },
+    {
+      key: "all",
+      icon: "tasks",
+      label: t("tasks.tabAll"),
+      n: counts.all,
+      tone: "neutral",
+    },
+    {
+      key: "active",
+      icon: "clock",
+      label: t("tasks.tabActive"),
+      n: counts.active,
+      tone: "brand",
+    },
+    {
+      key: "completed",
+      icon: "check",
+      label: t("tasks.tabCompleted"),
+      n: counts.completed,
+      tone: "leaf",
+    },
+    {
+      key: "templates",
+      icon: "sparkle",
+      label: t("tasks.tabTemplates"),
+      n: counts.templates,
+      tone: "neutral",
+    },
   ];
   return h(
     "div",
@@ -383,9 +433,15 @@ function Toolbar({
 }) {
   const tabItems = [
     { value: "active", label: `${t("tasks.tabActive")} ${counts.active}` },
-    { value: "completed", label: `${t("tasks.tabCompleted")} ${counts.completed}` },
+    {
+      value: "completed",
+      label: `${t("tasks.tabCompleted")} ${counts.completed}`,
+    },
     { value: "all", label: `${t("tasks.tabAll")} ${counts.all}` },
-    { value: "templates", label: `${t("tasks.tabTemplates")} ${counts.templates}` },
+    {
+      value: "templates",
+      label: `${t("tasks.tabTemplates")} ${counts.templates}`,
+    },
   ];
   const projectOptions = [
     { value: "all", label: t("tasks.allProjects") },
@@ -394,10 +450,12 @@ function Toolbar({
   ];
   const priorityOptions = [
     { value: "all", label: t("tasks.allPriorities") },
-    ...["priorityHigh", "priorityMedium", "priorityLow", "priorityNone"].map((key, index) => ({
-      value: String(3 - index),
-      label: t(`tasks.${key}`),
-    })),
+    ...["priorityHigh", "priorityMedium", "priorityLow", "priorityNone"].map(
+      (key, index) => ({
+        value: String(3 - index),
+        label: t(`tasks.${key}`),
+      }),
+    ),
   ];
   const sortOptions = [
     { value: "time", label: t("tasks.sortTime") },
@@ -446,7 +504,12 @@ function Toolbar({
           h(Icon, {
             name: "search",
             size: 15,
-            style: { position: "absolute", left: 11, color: "var(--tomato-ink-3)", pointerEvents: "none" },
+            style: {
+              position: "absolute",
+              left: 11,
+              color: "var(--tomato-ink-3)",
+              pointerEvents: "none",
+            },
           }),
           h(Input, {
             value: query,
@@ -520,7 +583,13 @@ function BatchBar({ count, busy, onComplete, onMove, onDelete, onCancel }) {
     },
     h(
       "span",
-      { style: { fontSize: 12.5, fontWeight: 620, color: "var(--tomato-brand-deep)" } },
+      {
+        style: {
+          fontSize: 12.5,
+          fontWeight: 620,
+          color: "var(--tomato-brand-deep)",
+        },
+      },
       t("tasks.batchSelected", { n: count }),
     ),
     h("span", { style: { flex: 1 } }),
@@ -557,7 +626,11 @@ function BatchBar({ count, busy, onComplete, onMove, onDelete, onCancel }) {
       },
       t("tasks.batchDelete"),
     ),
-    h(Btn, { variant: "plain", size: "sm", onClick: onCancel, disabled: busy }, t("tasks.batchCancel")),
+    h(
+      Btn,
+      { variant: "plain", size: "sm", onClick: onCancel, disabled: busy },
+      t("tasks.batchCancel"),
+    ),
   );
 }
 
@@ -596,10 +669,22 @@ function TaskRow({
   const subtaskDone = subtasks.filter((sub) => sub.done).length;
 
   const menuItems = [
-    { id: "edit", label: t("common.edit"), icon: "edit", onClick: () => onEdit(task) },
+    {
+      id: "edit",
+      label: t("common.edit"),
+      icon: "edit",
+      onClick: () => onEdit(task),
+    },
     ...(completed
       ? []
-      : [{ id: "focus", label: t("tasks.startFocus"), icon: "focus", onClick: () => onPlay(task) }]),
+      : [
+          {
+            id: "focus",
+            label: t("tasks.startFocus"),
+            icon: "focus",
+            onClick: () => onPlay(task),
+          },
+        ]),
     { divider: true },
     {
       id: "delete",
@@ -625,13 +710,26 @@ function TaskRow({
       },
     },
     isHabit
-      ? h(Chip, { tone: "leaf", icon: "habit", style: { height: 19, fontSize: 11 } }, t("tasks.habitKind"))
+      ? h(
+          Chip,
+          { tone: "leaf", icon: "habit", style: { height: 19, fontSize: 11 } },
+          t("tasks.habitKind"),
+        )
       : null,
     task.reminderTime
-      ? h("span", { style: META_ITEM }, h(Icon, { name: "clock", size: 12 }), task.reminderTime)
+      ? h(
+          "span",
+          { style: META_ITEM },
+          h(Icon, { name: "clock", size: 12 }),
+          task.reminderTime,
+        )
       : null,
     task.focusMinutes != null
-      ? h("span", { style: META_ITEM }, t("tasks.perSession", { n: task.focusMinutes }))
+      ? h(
+          "span",
+          { style: META_ITEM },
+          t("tasks.perSession", { n: task.focusMinutes }),
+        )
       : null,
     project
       ? h(
@@ -642,7 +740,12 @@ function TaskRow({
         )
       : null,
     task.dueDate
-      ? h("span", { style: META_ITEM }, h(Icon, { name: "calendar", size: 12 }), dayLabel(task.dueDate, today))
+      ? h(
+          "span",
+          { style: META_ITEM },
+          h(Icon, { name: "calendar", size: 12 }),
+          dayLabel(task.dueDate, today),
+        )
       : null,
     overdue ? h(Chip, { tone: "danger" }, t("tasks.overdue")) : null,
     catchUp ? h(Chip, { tone: "sun" }, t("tasks.catchUp")) : null,
@@ -657,7 +760,11 @@ function TaskRow({
     tags.map((tag, index) =>
       h(
         Chip,
-        { key: `tag-${index}`, tone: "neutral", style: { height: 19, fontSize: 11, maxWidth: 140 } },
+        {
+          key: `tag-${index}`,
+          tone: "neutral",
+          style: { height: 19, fontSize: 11, maxWidth: 140 },
+        },
         `#${tag}`,
       ),
     ),
@@ -821,15 +928,33 @@ function TemplateList({
         flexWrap: "wrap",
       },
     },
-    h(Icon, { name: "sparkle", size: 16, style: { color: "var(--tomato-brand-deep)" } }),
+    h(Icon, {
+      name: "sparkle",
+      size: 16,
+      style: { color: "var(--tomato-brand-deep)" },
+    }),
     h(
       "div",
-      { style: { fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)", flex: 1, minWidth: 0 } },
+      {
+        style: {
+          fontSize: 13,
+          fontWeight: 620,
+          color: "var(--tomato-ink)",
+          flex: 1,
+          minWidth: 0,
+        },
+      },
       t("tasks.templatesTitle"),
     ),
     h(
       Btn,
-      { variant: "soft", size: "sm", icon: "plus", onClick: onNew, disabled: !onNew },
+      {
+        variant: "soft",
+        size: "sm",
+        icon: "plus",
+        onClick: onNew,
+        disabled: !onNew,
+      },
       t("tasks.newTemplate"),
     ),
   );
@@ -837,21 +962,18 @@ function TemplateList({
     return h(
       "div",
       null,
-      h(
-        Empty,
-        {
-          icon: "calendar",
-          title: t("tasks.emptyTemplates"),
-          hint: t("tasks.emptyTemplatesHint"),
-          action: onNew
-            ? h(
-                Btn,
-                { variant: "primary", size: "sm", icon: "plus", onClick: onNew },
-                t("tasks.newTemplate"),
-              )
-            : null,
-        },
-      ),
+      h(Empty, {
+        icon: "calendar",
+        title: t("tasks.emptyTemplates"),
+        hint: t("tasks.emptyTemplatesHint"),
+        action: onNew
+          ? h(
+              Btn,
+              { variant: "primary", size: "sm", icon: "plus", onClick: onNew },
+              t("tasks.newTemplate"),
+            )
+          : null,
+      }),
       hint,
     );
   }
@@ -867,7 +989,8 @@ function TemplateList({
         const shape = template.shape || {};
         const project = projectById(data, shape.projectId);
         const estimate = Math.max(1, Number(shape.estimate) || 1);
-        const focus = shape.focusMinutes != null ? Number(shape.focusMinutes) : null;
+        const focus =
+          shape.focusMinutes != null ? Number(shape.focusMinutes) : null;
         const tags = Array.isArray(shape.tags) ? shape.tags.slice(0, 4) : [];
         const ahead = Number(template.printAheadDays);
         return h(
@@ -881,12 +1004,22 @@ function TemplateList({
               gap: 6,
               padding: "12px 10px",
               borderRadius: 12,
-              borderBottom: index === templates.length - 1 ? "none" : "1px solid var(--tomato-line)",
+              borderBottom:
+                index === templates.length - 1
+                  ? "none"
+                  : "1px solid var(--tomato-line)",
             },
           },
           h(
             "div",
-            { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 } },
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 8,
+              },
+            },
             h(
               "span",
               {
@@ -908,7 +1041,9 @@ function TemplateList({
                 tone: template.automatic ? "brand" : "neutral",
                 icon: template.automatic ? "refresh" : "edit",
               },
-              template.automatic ? t("tasks.autoPrint") : t("tasks.manualPrint"),
+              template.automatic
+                ? t("tasks.autoPrint")
+                : t("tasks.manualPrint"),
             ),
             h("div", { style: { flex: 1 } }),
             h(
@@ -932,7 +1067,10 @@ function TemplateList({
                 name: "refresh",
                 size: 16,
                 box: 30,
-                title: syncingId === template.id ? t("tasks.syncingTemplate") : t("tasks.syncTemplate"),
+                title:
+                  syncingId === template.id
+                    ? t("tasks.syncingTemplate")
+                    : t("tasks.syncTemplate"),
                 disabled: syncingId !== null,
                 onClick: () => onSync?.(template),
               }),
@@ -971,20 +1109,34 @@ function TemplateList({
               printingSummary(template, today),
             ),
             Number.isFinite(ahead) && ahead >= 0
-              ? h("span", { style: META_ITEM }, t("tasks.printAhead", { n: ahead }))
+              ? h(
+                  "span",
+                  { style: META_ITEM },
+                  t("tasks.printAhead", { n: ahead }),
+                )
               : null,
-            h("span", { style: META_ITEM }, t("tasks.templateEstimate", { n: estimate })),
+            h(
+              "span",
+              { style: META_ITEM },
+              t("tasks.templateEstimate", { n: estimate }),
+            ),
             h(
               "span",
               { style: META_ITEM },
               focus != null && focus > 0
                 ? t("tasks.templateFocus", { minutes: fmtMinutes(focus) })
-                : t("tasks.templateDefaultFocus", { minutes: fmtMinutes(defaultFocus) }),
+                : t("tasks.templateDefaultFocus", {
+                    minutes: fmtMinutes(defaultFocus),
+                  }),
             ),
             tags.map((tag, tagIndex) =>
               h(
                 Chip,
-                { key: `tag-${tagIndex}`, tone: "neutral", style: { height: 19, fontSize: 11 } },
+                {
+                  key: `tag-${tagIndex}`,
+                  tone: "neutral",
+                  style: { height: 19, fontSize: 11 },
+                },
                 `#${tag}`,
               ),
             ),
@@ -1012,7 +1164,11 @@ function AddBar({ value, onChange, onAdd, onFullEdit, busy }) {
         flexWrap: "wrap",
       },
     },
-    h(Icon, { name: "plus", size: 17, style: { color: "var(--tomato-brand)" } }),
+    h(Icon, {
+      name: "plus",
+      size: 17,
+      style: { color: "var(--tomato-brand)" },
+    }),
     h(Input, {
       value,
       onChange,
@@ -1037,7 +1193,11 @@ function AddBar({ value, onChange, onAdd, onFullEdit, busy }) {
       },
       t("tasks.addSubmit"),
     ),
-    h(Btn, { variant: "plain", size: "sm", icon: "edit", onClick: onFullEdit }, t("tasks.fullEdit")),
+    h(
+      Btn,
+      { variant: "plain", size: "sm", icon: "edit", onClick: onFullEdit },
+      t("tasks.fullEdit"),
+    ),
   );
 }
 
@@ -1107,7 +1267,8 @@ function TasksPage() {
       } else if (projectId !== "all" && task.projectId !== projectId) {
         return false;
       }
-      if (priority !== "all" && priorityOf(task) !== Number(priority)) return false;
+      if (priority !== "all" && priorityOf(task) !== Number(priority))
+        return false;
       return matchesQuery(task, normalizedQuery);
     }),
     sort,
@@ -1116,12 +1277,16 @@ function TasksPage() {
   const dialogOpen = !!editor && (!editor.id || !!editingTask);
   const editingTemplate =
     templateEditor && templateEditor.id
-      ? templates.find((template) => template && template.id === templateEditor.id) || null
+      ? templates.find(
+          (template) => template && template.id === templateEditor.id,
+        ) || null
       : null;
-  const templateDialogOpen = !!templateEditor && (!templateEditor.id || !!editingTemplate);
+  const templateDialogOpen =
+    !!templateEditor && (!templateEditor.id || !!editingTemplate);
   const prints = Array.isArray(data.prints) ? data.prints : [];
 
-  const showToastError = (error) => notify(error || t("common.writeFailed"), "danger");
+  const showToastError = (error) =>
+    notify(error || t("common.writeFailed"), "danger");
 
   const changeTab = (next) => {
     setTab(next);
@@ -1142,7 +1307,9 @@ function TasksPage() {
 
   const pickTask = (task) => {
     setPicked((current) =>
-      current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id],
+      current.includes(task.id)
+        ? current.filter((id) => id !== task.id)
+        : [...current, task.id],
     );
   };
 
@@ -1186,7 +1353,9 @@ function TasksPage() {
 
   const runBatchComplete = async () => {
     if (batchBusy) return;
-    const targets = tasks.filter((task) => picked.includes(task.id) && !task.completed);
+    const targets = tasks.filter(
+      (task) => picked.includes(task.id) && !task.completed,
+    );
     if (targets.length === 0) {
       clearSelection();
       return;
@@ -1274,7 +1443,10 @@ function TasksPage() {
     }
     setBatchBusy(false);
     if (failure) {
-      notify(t("tasks.moveFailed", { error: failure || t("common.writeFailed") }), "danger");
+      notify(
+        t("tasks.moveFailed", { error: failure || t("common.writeFailed") }),
+        "danger",
+      );
       return;
     }
     setMoveOpen(false);
@@ -1318,7 +1490,9 @@ function TasksPage() {
   };
 
   const openPrint = (template) => {
-    setPrintDialog({ templateId: template && template.id ? template.id : null });
+    setPrintDialog({
+      templateId: template && template.id ? template.id : null,
+    });
   };
 
   const runSyncTemplate = async (template) => {
@@ -1336,13 +1510,19 @@ function TasksPage() {
   const header = h(PageHeader, {
     eyebrow: t("tasks.eyebrow"),
     title: t("tasks.headline"),
-    subtitle: state ? t("tasks.countLine", { n: counts.active }) : t("common.loading"),
+    subtitle: state
+      ? t("tasks.countLine", { n: counts.active })
+      : t("common.loading"),
     actions: h(
       Fragment,
       null,
       h(
         Btn,
-        { variant: "ghost", icon: "search", onClick: () => setSearchOpen(true) },
+        {
+          variant: "ghost",
+          icon: "search",
+          onClick: () => setSearchOpen(true),
+        },
         t("common.search"),
       ),
       h(
@@ -1384,11 +1564,23 @@ function TasksPage() {
   }
 
   const emptyProps = normalizedQuery
-    ? { icon: "search", title: t("tasks.emptySearch"), hint: t("tasks.emptySearchHint") }
+    ? {
+        icon: "search",
+        title: t("tasks.emptySearch"),
+        hint: t("tasks.emptySearchHint"),
+      }
     : tab === "completed"
-      ? { icon: "check", title: t("tasks.emptyCompleted"), hint: t("tasks.emptyCompletedHint") }
+      ? {
+          icon: "check",
+          title: t("tasks.emptyCompleted"),
+          hint: t("tasks.emptyCompletedHint"),
+        }
       : tab === "all"
-        ? { icon: "tasks", title: t("tasks.emptyAll"), hint: t("tasks.emptyAllHint") }
+        ? {
+            icon: "tasks",
+            title: t("tasks.emptyAll"),
+            hint: t("tasks.emptyAllHint"),
+          }
         : {
             icon: "leaf",
             title: t("tasks.emptyActive"),
@@ -1469,7 +1661,12 @@ function TasksPage() {
                 "div",
                 null,
                 visible.map((task, index) =>
-                  h(TaskRow, { key: task.id, task, last: index === visible.length - 1, ...rowProps }),
+                  h(TaskRow, {
+                    key: task.id,
+                    task,
+                    last: index === visible.length - 1,
+                    ...rowProps,
+                  }),
                 ),
               ),
         ),
@@ -1526,7 +1723,13 @@ function TasksPage() {
       width: 460,
       children: h(
         "div",
-        { style: { fontSize: 13, color: "var(--tomato-ink-2)", lineHeight: 1.7 } },
+        {
+          style: {
+            fontSize: 13,
+            color: "var(--tomato-ink-2)",
+            lineHeight: 1.7,
+          },
+        },
         pendingDelete && pendingDelete.batch
           ? t("tasks.batchDeleteBody", { n: pendingDelete.ids.length })
           : t("tasks.deleteBody"),
@@ -1536,12 +1739,21 @@ function TasksPage() {
         { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
         h(
           Btn,
-          { variant: "ghost", onClick: () => setPendingDelete(null), disabled: batchBusy },
+          {
+            variant: "ghost",
+            onClick: () => setPendingDelete(null),
+            disabled: batchBusy,
+          },
           t("common.cancel"),
         ),
         h(
           Btn,
-          { variant: "danger", icon: "trash", onClick: confirmDelete, disabled: batchBusy },
+          {
+            variant: "danger",
+            icon: "trash",
+            onClick: confirmDelete,
+            disabled: batchBusy,
+          },
           t("tasks.deleteConfirm"),
         ),
       ),
@@ -1560,7 +1772,13 @@ function TasksPage() {
         { style: { display: "flex", flexDirection: "column", gap: 8 } },
         h(
           "div",
-          { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+          {
+            style: {
+              fontSize: 12,
+              fontWeight: 550,
+              color: "var(--tomato-ink-2)",
+            },
+          },
           t("tasks.moveDate"),
         ),
         h(Input, { type: "date", value: moveDate, onChange: setMoveDate }),
@@ -1570,7 +1788,11 @@ function TasksPage() {
         { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
         h(
           Btn,
-          { variant: "ghost", onClick: () => setMoveOpen(false), disabled: batchBusy },
+          {
+            variant: "ghost",
+            onClick: () => setMoveOpen(false),
+            disabled: batchBusy,
+          },
           t("common.cancel"),
         ),
         h(

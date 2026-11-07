@@ -72,7 +72,10 @@ function readNavState() {
       if (parsed && typeof parsed === "object") {
         return {
           panel: parsed.panel === "tomato" ? "tomato" : "conversation",
-          page: typeof parsed.page === "string" && parsed.page !== "" ? parsed.page : null,
+          page:
+            typeof parsed.page === "string" && parsed.page !== ""
+              ? parsed.page
+              : null,
         };
       }
     } catch {
@@ -128,7 +131,10 @@ export function isPanelVisible() {
 /** 有对话框开着时不抢页面：切页会把未保存的草稿丢掉（页面内 Modal 都带 role=dialog）。 */
 export function dialogOpen() {
   try {
-    return typeof document !== "undefined" && !!(document && document.querySelector?.('[role="dialog"]'));
+    return (
+      typeof document !== "undefined" &&
+      !!(document && document.querySelector?.('[role="dialog"]'))
+    );
   } catch {
     return false;
   }
@@ -247,7 +253,10 @@ export function navigate({ page = null, reason = "user", serial = null } = {}) {
   } catch {
     /* DSH 版本差异时忽略 */
   }
-  writeNavState({ panel: "tomato", page: target || (state && state.page) || null });
+  writeNavState({
+    panel: "tomato",
+    page: target || (state && state.page) || null,
+  });
   return true;
 }
 

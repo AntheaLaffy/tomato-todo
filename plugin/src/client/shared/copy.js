@@ -26,9 +26,12 @@ export function registerCopy(ns, dicts) {
 
 /** DSH locale id → 本插件语言。 */
 export function setLocale(id) {
-  const next = typeof id === "string" && /^zh/i.test(id)
-    ? ZH
-    : typeof id === "string" && /^ja/i.test(id) ? JA : EN;
+  const next =
+    typeof id === "string" && /^zh/i.test(id)
+      ? ZH
+      : typeof id === "string" && /^ja/i.test(id)
+        ? JA
+        : EN;
   if (next === current) return;
   current = next;
   for (const fn of Array.from(listeners)) fn(current);
@@ -63,8 +66,10 @@ export function t(key, vars) {
   let text = dict && dict[name] !== undefined ? dict[name] : undefined;
   if (text === undefined) {
     const fallback = entry ? entry[EN] : undefined;
-    text = fallback && fallback[name] !== undefined ? fallback[name] : undefined;
-    if (text === undefined) text = entry && entry[ZH][name] !== undefined ? entry[ZH][name] : key;
+    text =
+      fallback && fallback[name] !== undefined ? fallback[name] : undefined;
+    if (text === undefined)
+      text = entry && entry[ZH][name] !== undefined ? entry[ZH][name] : key;
   }
   if (vars) {
     for (const k of Object.keys(vars)) {

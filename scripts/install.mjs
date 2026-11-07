@@ -392,7 +392,8 @@ async function install() {
   // package.json 的 "type":"module" 一并带上，避免 Node 的模块类型探测告警。
   const sourceSrc = join(dirname(dirname(runtimeSource)), "src");
   const sourcePkg = join(dirname(dirname(runtimeSource)), "package.json");
-  const srcExists = (await stat(sourceSrc).catch(() => null))?.isDirectory() === true;
+  const srcExists =
+    (await stat(sourceSrc).catch(() => null))?.isDirectory() === true;
   let srcFiles = [];
   if (srcExists) {
     for (const file of await walkFiles(sourceSrc)) {

@@ -3,7 +3,14 @@
 // 约定：布局用 inline style（页面可以按需覆盖），状态样式（hover/focus/选中/
 // 动画）走 ui.css.js 的 `t-` 类；颜色只用 var(--tomato-*) 与 var(--dsw-alias-*)。
 // 组件不写死中文，文案通过 props 或 copy 传入。
-import { h, useState, useEffect, useRef, Fragment, createPortal } from "../runtime.js";
+import {
+  h,
+  useState,
+  useEffect,
+  useRef,
+  Fragment,
+  createPortal,
+} from "../runtime.js";
 import { t } from "./copy.js";
 import { Icon } from "./icons.js";
 
@@ -14,7 +21,15 @@ const SIZES = {
 };
 
 /** 卡片：纸面 + 细线 + 轻阴影。 */
-export function Card({ children, pad = 20, style, flat = false, onClick, className = "", ...rest }) {
+export function Card({
+  children,
+  pad = 20,
+  style,
+  flat = false,
+  onClick,
+  className = "",
+  ...rest
+}) {
   return h(
     "div",
     {
@@ -40,14 +55,43 @@ export function SectionTitle({ icon, title, hint, action, style }) {
         ...style,
       },
     },
-    icon ? h(Icon, { name: icon, size: 17, style: { color: "var(--tomato-ink-3)" } }) : null,
+    icon
+      ? h(Icon, {
+          name: icon,
+          size: 17,
+          style: { color: "var(--tomato-ink-3)" },
+        })
+      : null,
     h(
       "div",
-      { style: { fontSize: 14, fontWeight: 620, color: "var(--tomato-ink)", flex: "0 1 auto", minWidth: 0, marginRight: "auto" } },
+      {
+        style: {
+          fontSize: 14,
+          fontWeight: 620,
+          color: "var(--tomato-ink)",
+          flex: "0 1 auto",
+          minWidth: 0,
+          marginRight: "auto",
+        },
+      },
       title,
     ),
     hint
-      ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)", flex: "1 1 220px", minWidth: 0, textAlign: "right", lineHeight: 1.5, overflowWrap: "anywhere" } }, hint)
+      ? h(
+          "div",
+          {
+            style: {
+              fontSize: 12,
+              color: "var(--tomato-ink-3)",
+              flex: "1 1 220px",
+              minWidth: 0,
+              textAlign: "right",
+              lineHeight: 1.5,
+              overflowWrap: "anywhere",
+            },
+          },
+          hint,
+        )
       : null,
     action ?? null,
   );
@@ -126,19 +170,38 @@ export function IconBtn({
 }
 
 const CHIP_TONES = {
-  neutral: { bg: "var(--tomato-surface-2)", fg: "var(--tomato-ink-2)", bd: "transparent" },
-  brand: { bg: "var(--tomato-brand-soft)", fg: "var(--tomato-brand-deep)", bd: "transparent" },
+  neutral: {
+    bg: "var(--tomato-surface-2)",
+    fg: "var(--tomato-ink-2)",
+    bd: "transparent",
+  },
+  brand: {
+    bg: "var(--tomato-brand-soft)",
+    fg: "var(--tomato-brand-deep)",
+    bd: "transparent",
+  },
   leaf: { bg: "#7e9a6e20", fg: "#5f7b50", bd: "transparent" },
   sun: { bg: "#d5a55326", fg: "#a87b2d", bd: "transparent" },
   danger: { bg: "#b8503f18", fg: "#b8503f", bd: "transparent" },
 };
 
-export function Chip({ children, tone = "neutral", color, icon, style, onClick, active = false, title }) {
+export function Chip({
+  children,
+  tone = "neutral",
+  color,
+  icon,
+  style,
+  onClick,
+  active = false,
+  title,
+}) {
   const palette = CHIP_TONES[tone] || CHIP_TONES.neutral;
   return h(
     onClick ? "button" : "span",
     {
-      ...(onClick ? { type: "button", onClick, className: "t-chip t-btn", title } : { title }),
+      ...(onClick
+        ? { type: "button", onClick, className: "t-chip t-btn", title }
+        : { title }),
       style: {
         display: "inline-flex",
         alignItems: "center",
@@ -244,7 +307,14 @@ export function Ring({
         viewBox: `0 0 ${size} ${size}`,
         style: { position: "absolute", inset: 0, transform: "rotate(-90deg)" },
       },
-      h("circle", { cx: size / 2, cy: size / 2, r, fill: "none", stroke: track, strokeWidth: stroke }),
+      h("circle", {
+        cx: size / 2,
+        cy: size / 2,
+        r,
+        fill: "none",
+        stroke: track,
+        strokeWidth: stroke,
+      }),
       h("circle", {
         className: "t-ring-progress",
         cx: size / 2,
@@ -259,12 +329,26 @@ export function Ring({
       }),
     ),
     children
-      ? h("div", { className: pulse ? "t-pulse" : undefined, style: { position: "relative", zIndex: 1 } }, children)
+      ? h(
+          "div",
+          {
+            className: pulse ? "t-pulse" : undefined,
+            style: { position: "relative", zIndex: 1 },
+          },
+          children,
+        )
       : null,
   );
 }
 
-export function Bar({ value = 0, max = 1, color = "var(--tomato-brand)", height = 8, style, radius = 8 }) {
+export function Bar({
+  value = 0,
+  max = 1,
+  color = "var(--tomato-brand)",
+  height = 8,
+  style,
+  radius = 8,
+}) {
   const pct = max > 0 ? Math.max(0, Math.min(1, Number(value) / max)) * 100 : 0;
   return h(
     "div",
@@ -304,7 +388,13 @@ export function Segmented({ items, value, onChange, size = "md", style }) {
           className: "t-tab",
           "data-active": item.value === value,
           onClick: () => onChange?.(item.value),
-          style: { height: s.height - 6, fontSize: s.font, display: "flex", alignItems: "center", gap: 5 },
+          style: {
+            height: s.height - 6,
+            fontSize: s.font,
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+          },
         },
         item.icon ? h(Icon, { name: item.icon, size: 14 }) : null,
         item.label,
@@ -384,7 +474,13 @@ export function Field({ label, hint, children, style, inline = false }) {
         )
       : null,
     children,
-    hint ? h("span", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } }, hint) : null,
+    hint
+      ? h(
+          "span",
+          { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          hint,
+        )
+      : null,
   );
 }
 
@@ -396,9 +492,23 @@ export function Toggle({ checked, onChange, label, hint, style }) {
       ? h(
           "div",
           { style: { flex: 1, minWidth: 0 } },
-          h("div", { style: { fontSize: 13.5, color: "var(--tomato-ink)" } }, label),
+          h(
+            "div",
+            { style: { fontSize: 13.5, color: "var(--tomato-ink)" } },
+            label,
+          ),
           hint
-            ? h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 2 } }, hint)
+            ? h(
+                "div",
+                {
+                  style: {
+                    fontSize: 11.5,
+                    color: "var(--tomato-ink-3)",
+                    marginTop: 2,
+                  },
+                },
+                hint,
+              )
             : null,
         )
       : null,
@@ -417,7 +527,9 @@ export function Toggle({ checked, onChange, label, hint, style }) {
           cursor: "pointer",
           padding: 2,
           flex: "none",
-          background: checked ? "var(--tomato-brand)" : "var(--tomato-surface-3)",
+          background: checked
+            ? "var(--tomato-brand)"
+            : "var(--tomato-surface-3)",
           transition: "background .2s ease",
           display: "flex",
           justifyContent: checked ? "flex-end" : "flex-start",
@@ -518,28 +630,65 @@ export function Modal({
         h(
           "div",
           { style: { flex: 1, minWidth: 0 } },
-          h("div", { style: { fontSize: 16.5, fontWeight: 650, color: "var(--tomato-ink)" } }, title),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 16.5,
+                fontWeight: 650,
+                color: "var(--tomato-ink)",
+              },
+            },
+            title,
+          ),
           subtitle
             ? h(
                 "div",
-                { style: { fontSize: 12.5, color: "var(--tomato-ink-3)", marginTop: 4, lineHeight: 1.5 } },
+                {
+                  style: {
+                    fontSize: 12.5,
+                    color: "var(--tomato-ink-3)",
+                    marginTop: 4,
+                    lineHeight: 1.5,
+                  },
+                },
                 subtitle,
               )
             : null,
         ),
-        onClose ? h(IconBtn, { name: "x", onClick: onClose, title: t("common.close") }) : null,
+        onClose
+          ? h(IconBtn, {
+              name: "x",
+              onClick: onClose,
+              title: t("common.close"),
+            })
+          : null,
       ),
-      h("div", { className: "t-modal-body t-scroll", style: bodyStyle }, children),
+      h(
+        "div",
+        { className: "t-modal-body t-scroll", style: bodyStyle },
+        children,
+      ),
       footer ? h("div", { className: "t-modal-foot" }, footer) : null,
     ),
   );
   // 挂到 body：页面在可滚动容器里，祖先的 transform/animation 会把 position:fixed
   // 的包含块变成内容列，导致对话框偏下、遮罩只盖住内容区（见 runtime.createPortal）。
-  return createPortal(mask, typeof document !== "undefined" ? document.body : null);
+  return createPortal(
+    mask,
+    typeof document !== "undefined" ? document.body : null,
+  );
 }
 
 /** 下拉菜单：放在 position:relative 的父容器里，向右/左展开。 */
-export function Dropdown({ open, items, onClose, align = "right", width = 200, style }) {
+export function Dropdown({
+  open,
+  items,
+  onClose,
+  align = "right",
+  width = 200,
+  style,
+}) {
   const ref = useRef(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -579,7 +728,14 @@ export function Dropdown({ open, items, onClose, align = "right", width = 200, s
     },
     items.map((item, i) =>
       item.divider
-        ? h("div", { key: `d${i}`, style: { height: 1, background: "var(--tomato-line)", margin: "5px 0" } })
+        ? h("div", {
+            key: `d${i}`,
+            style: {
+              height: 1,
+              background: "var(--tomato-line)",
+              margin: "5px 0",
+            },
+          })
         : h(
             "button",
             {
@@ -590,7 +746,11 @@ export function Dropdown({ open, items, onClose, align = "right", width = 200, s
                 onClose?.();
                 item.onClick?.();
               },
-              style: { fontSize: 13, color: item.danger ? "#b8503f" : undefined, padding: "7px 10px" },
+              style: {
+                fontSize: 13,
+                color: item.danger ? "#b8503f" : undefined,
+                padding: "7px 10px",
+              },
             },
             item.icon ? h(Icon, { name: item.icon, size: 15 }) : null,
             item.label,
@@ -631,8 +791,26 @@ export function Empty({ icon = "sparkle", title, hint, action, style }) {
       },
       h(Icon, { name: icon, size: 22 }),
     ),
-    title ? h("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--tomato-ink-2)" } }, title) : null,
-    hint ? h("div", { style: { fontSize: 12.5, lineHeight: 1.6, maxWidth: 320 } }, hint) : null,
+    title
+      ? h(
+          "div",
+          {
+            style: {
+              fontSize: 14,
+              fontWeight: 600,
+              color: "var(--tomato-ink-2)",
+            },
+          },
+          title,
+        )
+      : null,
+    hint
+      ? h(
+          "div",
+          { style: { fontSize: 12.5, lineHeight: 1.6, maxWidth: 320 } },
+          hint,
+        )
+      : null,
     action ?? null,
   );
 }
@@ -643,7 +821,8 @@ export function Skeleton({ w = 120, h: hh = 14, r = 7, style }) {
       width: w,
       height: hh,
       borderRadius: r,
-      background: "linear-gradient(90deg, var(--tomato-surface-2), var(--tomato-surface-3), var(--tomato-surface-2))",
+      background:
+        "linear-gradient(90deg, var(--tomato-surface-2), var(--tomato-surface-3), var(--tomato-surface-2))",
       backgroundSize: "200% 100%",
       animation: "t-shimmer 1.6s linear infinite",
       ...style,
@@ -652,7 +831,15 @@ export function Skeleton({ w = 120, h: hh = 14, r = 7, style }) {
 }
 
 /** 数字卡：图标 + 标签 + 大数字 + 单位/补充。 */
-export function Stat({ icon, label, value, unit, hint, tone = "brand", style }) {
+export function Stat({
+  icon,
+  label,
+  value,
+  unit,
+  hint,
+  tone = "brand",
+  style,
+}) {
   const tones = {
     brand: { bg: "var(--tomato-brand-soft)", fg: "var(--tomato-brand-deep)" },
     leaf: { bg: "#7e9a6e1f", fg: "#5f7b50" },
@@ -693,7 +880,17 @@ export function Stat({ icon, label, value, unit, hint, tone = "brand", style }) 
     h(
       "div",
       { style: { minWidth: 0, flex: 1 } },
-      h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginBottom: 3 } }, label),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            marginBottom: 3,
+          },
+        },
+        label,
+      ),
       h(
         "div",
         { style: { display: "flex", alignItems: "baseline", gap: 4 } },
@@ -701,15 +898,36 @@ export function Stat({ icon, label, value, unit, hint, tone = "brand", style }) 
           "div",
           {
             className: "t-mono",
-            style: { fontSize: 24, fontWeight: 620, color: "var(--tomato-ink)", lineHeight: 1.15 },
+            style: {
+              fontSize: 24,
+              fontWeight: 620,
+              color: "var(--tomato-ink)",
+              lineHeight: 1.15,
+            },
           },
           value,
         ),
         unit
-          ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, unit)
+          ? h(
+              "div",
+              { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+              unit,
+            )
           : null,
       ),
-      hint ? h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 3 } }, hint) : null,
+      hint
+        ? h(
+            "div",
+            {
+              style: {
+                fontSize: 11.5,
+                color: "var(--tomato-ink-3)",
+                marginTop: 3,
+              },
+            },
+            hint,
+          )
+        : null,
     ),
   );
 }
@@ -765,17 +983,32 @@ export function PageHeader({ eyebrow, title, subtitle, actions, style }) {
       subtitle
         ? h(
             "div",
-            { style: { marginTop: 8, fontSize: 13, color: "var(--tomato-ink-2)", lineHeight: 1.6 } },
+            {
+              style: {
+                marginTop: 8,
+                fontSize: 13,
+                color: "var(--tomato-ink-2)",
+                lineHeight: 1.6,
+              },
+            },
             subtitle,
           )
         : null,
     ),
-    actions ? h("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, actions) : null,
+    actions
+      ? h(
+          "div",
+          { style: { display: "flex", gap: 8, alignItems: "center" } },
+          actions,
+        )
+      : null,
   );
 }
 
 export function Divider({ style }) {
-  return h("div", { style: { height: 1, background: "var(--tomato-line)", ...style } });
+  return h("div", {
+    style: { height: 1, background: "var(--tomato-line)", ...style },
+  });
 }
 
 /** 圆角方形勾选：任务完成（旧版样式）。 */
@@ -805,7 +1038,13 @@ export function Kbd({ children }) {
 }
 
 /** 番茄轮次点阵：完成 N 个实心，当前空心。 */
-export function ProgressDots({ total = 4, done = 0, color = "var(--tomato-brand)", size = 8, style }) {
+export function ProgressDots({
+  total = 4,
+  done = 0,
+  color = "var(--tomato-brand)",
+  size = 8,
+  style,
+}) {
   return h(
     "div",
     { style: { display: "flex", gap: 5, alignItems: "center", ...style } },

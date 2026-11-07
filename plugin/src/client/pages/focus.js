@@ -188,7 +188,8 @@ registerCopy("focus", {
     roundOf: "Pomodoro {n} of {m}",
     freeFocus: "Free focus · pick a task",
     pickTaskTitle: "Pick a focus task",
-    pickTaskSubtitle: "You can't switch tasks mid-round; end the current round first.",
+    pickTaskSubtitle:
+      "You can't switch tasks mid-round; end the current round first.",
     pickTaskSearch: "Search open tasks…",
     freeFocusOption: "Free focus (no task)",
     noPickTasks: "No matching open tasks",
@@ -207,7 +208,8 @@ registerCopy("focus", {
     locked: "Screen locked",
     lockReady: "Screen lock on · applies during focus",
     protectOff: "Give yourself an undisturbed stretch",
-    guardUnavailable: "Focus guard unavailable (background guard isn't running)",
+    guardUnavailable:
+      "Focus guard unavailable (background guard isn't running)",
     soundChoose: "Choose ambience",
     soundTitle: "Ambient sound",
     soundSubtitle: "Pick a sound to give your attention somewhere to land.",
@@ -227,7 +229,8 @@ registerCopy("focus", {
     catchUpWhenText:
       "If a plan block ends and the task is unfinished but still inside its repair window, it moves into the catch-up queue and shows up here again.",
     catchUpHabitHeading: "Missed habits count as absences",
-    catchUpHabitText: "Once a habit expires it leaves today's list and records an absence.",
+    catchUpHabitText:
+      "Once a habit expires it leaves today's list and records an absence.",
     catchUpExpireHeading: "Past the window, it's void",
     catchUpExpireText:
       "Beyond the repair window the instance is voided and stops reminding. It never carries to another day.",
@@ -348,15 +351,23 @@ function ProtectionLine({ state, view, protection }) {
     parts.push(
       h(
         "span",
-        { key: "wlReady", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+        {
+          key: "wlReady",
+          style: { fontSize: 11.5, color: "var(--tomato-ink-3)" },
+        },
         t("focus.whitelistReady", {
-          n: protection.effectiveWhitelist.length || protection.whitelist.length,
+          n:
+            protection.effectiveWhitelist.length || protection.whitelist.length,
         }),
       ),
     );
   } else if (view.mode === "focus" && protection.mode === "off") {
     parts.push(
-      h("span", { key: "off", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } }, t("focus.protectOff")),
+      h(
+        "span",
+        { key: "off", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+        t("focus.protectOff"),
+      ),
     );
   }
   const guard = state && state.guard;
@@ -364,7 +375,10 @@ function ProtectionLine({ state, view, protection }) {
     parts.push(
       h(
         "span",
-        { key: "guard", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+        {
+          key: "guard",
+          style: { fontSize: 11.5, color: "var(--tomato-ink-3)" },
+        },
         t("focus.guardUnavailable"),
       ),
     );
@@ -444,14 +458,39 @@ function TimerCard({
     // 标题行（与旧版一致：卡片名 + 沉浸入口）
     h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 8, padding: "16px 22px 0" } },
-      h(Icon, { name: "clock", size: 15, style: { color: "var(--tomato-ink-3)" } }),
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px 22px 0",
+        },
+      },
+      h(Icon, {
+        name: "clock",
+        size: 15,
+        style: { color: "var(--tomato-ink-3)" },
+      }),
       h(
         "div",
-        { style: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)" } },
+        {
+          style: {
+            flex: 1,
+            minWidth: 0,
+            fontSize: 13,
+            fontWeight: 620,
+            color: "var(--tomato-ink)",
+          },
+        },
         t("focus.timerTitle"),
       ),
-      h(IconBtn, { name: "expand", size: 15, box: 28, title: t("focus.expand"), onClick: onExpand }),
+      h(IconBtn, {
+        name: "expand",
+        size: 15,
+        box: 28,
+        title: t("focus.expand"),
+        onClick: onExpand,
+      }),
     ),
     // 模式切换：占满卡片宽度，三段等分
     h(
@@ -467,7 +506,13 @@ function TimerCard({
     ),
     h(
       "div",
-      { style: { display: "flex", justifyContent: "center", padding: "12px 22px 0" } },
+      {
+        style: {
+          display: "flex",
+          justifyContent: "center",
+          padding: "12px 22px 0",
+        },
+      },
       h(
         Ring,
         {
@@ -490,7 +535,11 @@ function TimerCard({
           },
           // 旧版只在计时进行/暂停/休息时显示状态，空闲时不占一行。
           view.running || view.paused || resting
-            ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, status)
+            ? h(
+                "div",
+                { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+                status,
+              )
             : null,
           h(
             "div",
@@ -561,13 +610,25 @@ function TimerCard({
           },
           selected ? selected.title : t("focus.freeFocus"),
         ),
-        h(Icon, { name: "chevronDown", size: 15, style: { color: "var(--tomato-ink-3)" } }),
+        h(Icon, {
+          name: "chevronDown",
+          size: 15,
+          style: { color: "var(--tomato-ink-3)" },
+        }),
       ),
     ),
     // 旧版的按钮组是居中的一小簇：重置 / 开始 / 跳过，不拉满整行。
     h(
       "div",
-      { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "16px 22px 0" } },
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          padding: "16px 22px 0",
+        },
+      },
       h(IconBtn, {
         name: "refresh",
         size: 17,
@@ -597,7 +658,11 @@ function TimerCard({
         disabled: busy,
       }),
     ),
-    h("div", { style: { padding: "0 22px" } }, h(ProtectionLine, { state, view, protection })),
+    h(
+      "div",
+      { style: { padding: "0 22px" } },
+      h(ProtectionLine, { state, view, protection }),
+    ),
     h(
       "div",
       {
@@ -661,17 +726,34 @@ function TimerCard({
             padding: "13px 22px",
             border: "none",
             borderTop: "1px solid var(--tomato-line)",
-            background: "color-mix(in srgb, var(--tomato-surface-2) 45%, transparent)",
+            background:
+              "color-mix(in srgb, var(--tomato-surface-2) 45%, transparent)",
             cursor: "pointer",
             fontFamily: "inherit",
             fontSize: 12.5,
             color: "var(--tomato-ink-2)",
           },
         },
-        h(Icon, { name: "sound", size: 16, style: { color: "var(--tomato-ink-3)" } }),
-        h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.soundChoose")),
-        h("span", { style: { color: "var(--tomato-ink-3)" } }, t(`sound.${soundKind}`)),
-        h(Icon, { name: "chevronRight", size: 14, style: { color: "var(--tomato-ink-3)" } }),
+        h(Icon, {
+          name: "sound",
+          size: 16,
+          style: { color: "var(--tomato-ink-3)" },
+        }),
+        h(
+          "span",
+          { style: { flex: 1, textAlign: "left" } },
+          t("focus.soundChoose"),
+        ),
+        h(
+          "span",
+          { style: { color: "var(--tomato-ink-3)" } },
+          t(`sound.${soundKind}`),
+        ),
+        h(Icon, {
+          name: "chevronRight",
+          size: 14,
+          style: { color: "var(--tomato-ink-3)" },
+        }),
       ),
     ),
   );
@@ -679,7 +761,15 @@ function TimerCard({
 
 // ---------------------------------------------------------------- 任务行
 
-function TaskMeta({ task, project, color, today, catchUpFlag, overdue, settings }) {
+function TaskMeta({
+  task,
+  project,
+  color,
+  today,
+  catchUpFlag,
+  overdue,
+  settings,
+}) {
   const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
   const doneSubtasks = subtasks.filter((sub) => sub && sub.done).length;
   const tags = Array.isArray(task.tags) ? task.tags : [];
@@ -691,7 +781,10 @@ function TaskMeta({ task, project, color, today, catchUpFlag, overdue, settings 
     items.push(
       h(
         "span",
-        { key: "reminder", style: { display: "inline-flex", alignItems: "center", gap: 4 } },
+        {
+          key: "reminder",
+          style: { display: "inline-flex", alignItems: "center", gap: 4 },
+        },
         h(Icon, { name: "clock", size: 11.5 }),
         h("span", { className: "t-mono" }, task.reminderTime),
       ),
@@ -699,14 +792,21 @@ function TaskMeta({ task, project, color, today, catchUpFlag, overdue, settings 
   }
   if (focusMinutes > 0) {
     items.push(
-      h("span", { key: "focus" }, t("focus.minutesPerSession", { n: focusMinutes })),
+      h(
+        "span",
+        { key: "focus" },
+        t("focus.minutesPerSession", { n: focusMinutes }),
+      ),
     );
   }
   if (project) {
     items.push(
       h(
         "span",
-        { key: "project", style: { display: "inline-flex", alignItems: "center", gap: 4 } },
+        {
+          key: "project",
+          style: { display: "inline-flex", alignItems: "center", gap: 4 },
+        },
         h("span", {
           style: {
             width: 6,
@@ -722,18 +822,44 @@ function TaskMeta({ task, project, color, today, catchUpFlag, overdue, settings 
   }
   if (overdue) {
     items.push(
-      h(Chip, { key: "due", tone: "danger", style: { height: 18, fontSize: 10.5, padding: "0 6px" } }, t("focus.overdue")),
+      h(
+        Chip,
+        {
+          key: "due",
+          tone: "danger",
+          style: { height: 18, fontSize: 10.5, padding: "0 6px" },
+        },
+        t("focus.overdue"),
+      ),
     );
   } else if (catchUpFlag) {
     items.push(
-      h(Chip, { key: "due", tone: "sun", style: { height: 18, fontSize: 10.5, padding: "0 6px" } }, t("focus.catchUpBadge")),
+      h(
+        Chip,
+        {
+          key: "due",
+          tone: "sun",
+          style: { height: 18, fontSize: 10.5, padding: "0 6px" },
+        },
+        t("focus.catchUpBadge"),
+      ),
     );
   } else if (task.dueDate) {
     items.push(
       h(
         "span",
-        { key: "due", style: { color: task.dueDate === today ? "var(--tomato-ink-2)" : "var(--tomato-ink-3)" } },
-        task.dueDate === today ? t("common.today") : dayLabel(task.dueDate, today),
+        {
+          key: "due",
+          style: {
+            color:
+              task.dueDate === today
+                ? "var(--tomato-ink-2)"
+                : "var(--tomato-ink-3)",
+          },
+        },
+        task.dueDate === today
+          ? t("common.today")
+          : dayLabel(task.dueDate, today),
       ),
     );
   }
@@ -741,7 +867,10 @@ function TaskMeta({ task, project, color, today, catchUpFlag, overdue, settings 
     items.push(
       h(
         "span",
-        { key: "subs", style: { display: "inline-flex", alignItems: "center", gap: 3 } },
+        {
+          key: "subs",
+          style: { display: "inline-flex", alignItems: "center", gap: 3 },
+        },
         h(Icon, { name: "tasks", size: 11.5 }),
         `${doneSubtasks}/${subtasks.length}`,
       ),
@@ -819,7 +948,10 @@ function TaskRow({ task, data, today, view, busy, actions }) {
           catchUpFlag && !done
             ? "color-mix(in srgb, var(--tomato-brand-soft) 62%, transparent)"
             : undefined,
-        boxShadow: catchUpFlag && !done ? "inset 3px 0 0 var(--tomato-brand)" : undefined,
+        boxShadow:
+          catchUpFlag && !done
+            ? "inset 3px 0 0 var(--tomato-brand)"
+            : undefined,
       },
     },
     h(Check, {
@@ -874,7 +1006,15 @@ function TaskRow({ task, data, today, view, busy, actions }) {
     ),
     h(
       "div",
-      { style: { position: "relative", display: "flex", alignItems: "center", gap: 2, flex: "none" } },
+      {
+        style: {
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          flex: "none",
+        },
+      },
       h("span", {
         style: {
           width: 5,
@@ -907,15 +1047,21 @@ function TaskRow({ task, data, today, view, busy, actions }) {
             box: 30,
             disabled: busy,
             title: activeTimer
-              ? t("focus.taskPause", { title: task.title || t("focus.untitled") })
-              : t("focus.taskPlay", { title: task.title || t("focus.untitled") }),
+              ? t("focus.taskPause", {
+                  title: task.title || t("focus.untitled"),
+                })
+              : t("focus.taskPlay", {
+                  title: task.title || t("focus.untitled"),
+                }),
             onClick: () => actions.play(task),
           }),
       h(IconBtn, {
         name: "more",
         size: 16,
         box: 28,
-        title: t("focus.taskMore", { title: task.title || t("focus.untitled") }),
+        title: t("focus.taskMore", {
+          title: task.title || t("focus.untitled"),
+        }),
         onClick: () => setMenuOpen((open) => !open),
       }),
       h(Dropdown, {
@@ -924,7 +1070,12 @@ function TaskRow({ task, data, today, view, busy, actions }) {
         width: 188,
         onClose: () => setMenuOpen(false),
         items: [
-          { id: "edit", label: t("common.edit"), icon: "edit", onClick: () => actions.edit(task) },
+          {
+            id: "edit",
+            label: t("common.edit"),
+            icon: "edit",
+            onClick: () => actions.edit(task),
+          },
           ...(done
             ? []
             : [
@@ -967,10 +1118,23 @@ function TaskGroup({ title, tasks, data, today, view, busy, actions, onHelp }) {
           marginBottom: 2,
         },
       },
-      h("span", { style: { fontSize: 12.5, fontWeight: 550, color: "var(--tomato-ink-2)" } }, title),
       h(
         "span",
-        { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+        {
+          style: {
+            fontSize: 12.5,
+            fontWeight: 550,
+            color: "var(--tomato-ink-2)",
+          },
+        },
+        title,
+      ),
+      h(
+        "span",
+        {
+          className: "t-mono",
+          style: { fontSize: 11, color: "var(--tomato-ink-3)" },
+        },
         tasks.length,
       ),
       onHelp
@@ -1009,7 +1173,10 @@ function TaskGroup({ title, tasks, data, today, view, busy, actions, onHelp }) {
           "div",
           {
             key: task.id,
-            style: index === 0 ? undefined : { borderTop: "1px solid var(--tomato-line)" },
+            style:
+              index === 0
+                ? undefined
+                : { borderTop: "1px solid var(--tomato-line)" },
           },
           h(TaskRow, { task, data, today, view, busy, actions }),
         ),
@@ -1068,14 +1235,27 @@ function GradingBanner({ items, total, onAssistant }) {
   );
 }
 
-function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp }) {
+function TodayCard({
+  data,
+  today,
+  tab,
+  onTab,
+  view,
+  busy,
+  actions,
+  onCatchUpHelp,
+}) {
   // 今日专注只呈现「今天计划」的任务；逾期任务在全部任务里单独处理。
   const pending = todayTasks(data, today);
   const overdue = overdueTasks(data, today);
   const catchUps = catchUpTasks(data, today);
   const catchIds = new Set(catchUps.map((task) => task.id));
-  const timed = pending.filter((task) => task.reminderTime && !catchIds.has(task.id));
-  const untimed = pending.filter((task) => !task.reminderTime && !catchIds.has(task.id));
+  const timed = pending.filter(
+    (task) => task.reminderTime && !catchIds.has(task.id),
+  );
+  const untimed = pending.filter(
+    (task) => !task.reminderTime && !catchIds.has(task.id),
+  );
   const completed = completedOn(data, today);
 
   const tabs = [
@@ -1095,7 +1275,10 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
                 "div",
                 {
                   key: task.id,
-                  style: index === 0 ? undefined : { borderTop: "1px solid var(--tomato-line)" },
+                  style:
+                    index === 0
+                      ? undefined
+                      : { borderTop: "1px solid var(--tomato-line)" },
                 },
                 h(TaskRow, { task, data, today, view, busy, actions }),
               ),
@@ -1184,7 +1367,10 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
         { style: { display: "flex", alignItems: "center", gap: 10 } },
         h(
           Chip,
-          { tone: "neutral", style: { height: 20, fontSize: 10.5, padding: "0 7px" } },
+          {
+            tone: "neutral",
+            style: { height: 20, fontSize: 10.5, padding: "0 7px" },
+          },
           String(pending.length),
         ),
         h(
@@ -1216,7 +1402,10 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
           item.label,
           h(
             "span",
-            { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+            {
+              className: "t-mono",
+              style: { fontSize: 11, color: "var(--tomato-ink-3)" },
+            },
             item.count,
           ),
         ),
@@ -1305,7 +1494,9 @@ function WeekCard({ stats, today }) {
               style: {
                 textAlign: "center",
                 fontSize: 10,
-                color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
+                color: isToday
+                  ? "var(--tomato-brand-deep)"
+                  : "var(--tomato-ink-3)",
               },
             },
             minutes,
@@ -1363,20 +1554,33 @@ function WeekCard({ stats, today }) {
           days.map((day) => {
             const minutes = Math.max(0, Number(day.minutes) || 0);
             const isToday = day.date === today;
-            const height = minutes > 0 ? Math.max(3, Math.round((minutes / max) * CHART)) : 2;
+            const height =
+              minutes > 0
+                ? Math.max(3, Math.round((minutes / max) * CHART))
+                : 2;
             return h(
               "div",
               {
                 key: day.date,
-                title: t("focus.weekBarTitle", { date: dayLabel(day.date, today), n: minutes }),
-                style: { display: "flex", justifyContent: "center", alignItems: "flex-end", height: "100%" },
+                title: t("focus.weekBarTitle", {
+                  date: dayLabel(day.date, today),
+                  n: minutes,
+                }),
+                style: {
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "flex-end",
+                  height: "100%",
+                },
               },
               h("div", {
                 style: {
                   width: 22,
                   height,
                   borderRadius: "4px 4px 2px 2px",
-                  background: isToday ? "var(--tomato-brand)" : "var(--tomato-leaf)",
+                  background: isToday
+                    ? "var(--tomato-brand)"
+                    : "var(--tomato-leaf)",
                   opacity: isToday ? 1 : 0.5,
                   transition: "height .5s cubic-bezier(.3,.7,.3,1)",
                 },
@@ -1408,7 +1612,9 @@ function WeekCard({ stats, today }) {
               style: {
                 textAlign: "center",
                 fontSize: 11,
-                color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
+                color: isToday
+                  ? "var(--tomato-brand-deep)"
+                  : "var(--tomato-ink-3)",
                 fontWeight: isToday ? 600 : 400,
               },
             },
@@ -1462,7 +1668,13 @@ function TaskPicker({ open, data, today, selectedId, onPick, onClose }) {
       "div",
       {
         className: "t-scroll",
-        style: { display: "flex", flexDirection: "column", gap: 2, maxHeight: 330, paddingRight: 2 },
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          maxHeight: 330,
+          paddingRight: 2,
+        },
       },
       h(
         "button",
@@ -1474,7 +1686,11 @@ function TaskPicker({ open, data, today, selectedId, onPick, onClose }) {
           style: { padding: "8px 10px" },
         },
         h(Icon, { name: "sparkle", size: 16 }),
-        h("span", { style: { flex: 1, minWidth: 0 } }, t("focus.freeFocusOption")),
+        h(
+          "span",
+          { style: { flex: 1, minWidth: 0 } },
+          t("focus.freeFocusOption"),
+        ),
       ),
       tasks.length > 0
         ? tasks.map((task) =>
@@ -1505,7 +1721,10 @@ function TaskPicker({ open, data, today, selectedId, onPick, onClose }) {
               task.reminderTime
                 ? h(
                     "span",
-                    { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+                    {
+                      className: "t-mono",
+                      style: { fontSize: 11, color: "var(--tomato-ink-3)" },
+                    },
                     task.reminderTime,
                   )
                 : null,
@@ -1513,7 +1732,14 @@ function TaskPicker({ open, data, today, selectedId, onPick, onClose }) {
           )
         : h(
             "div",
-            { style: { padding: "22px 12px", fontSize: 12.5, color: "var(--tomato-ink-3)", textAlign: "center" } },
+            {
+              style: {
+                padding: "22px 12px",
+                fontSize: 12.5,
+                color: "var(--tomato-ink-3)",
+                textAlign: "center",
+              },
+            },
             t("focus.noPickTasks"),
           ),
     ),
@@ -1531,7 +1757,11 @@ function TaskPicker({ open, data, today, selectedId, onPick, onClose }) {
       footer: h(
         "div",
         { style: { marginLeft: "auto" } },
-        h(Btn, { variant: "plain", size: "sm", onClick: onClose }, t("common.cancel")),
+        h(
+          Btn,
+          { variant: "plain", size: "sm", onClick: onClose },
+          t("common.cancel"),
+        ),
       ),
     },
     body,
@@ -1542,10 +1772,22 @@ function TaskPicker({ open, data, today, selectedId, onPick, onClose }) {
 
 function CatchUpDialog({ open, onClose }) {
   const sections = [
-    { heading: t("focus.catchUpDesignHeading"), text: t("focus.catchUpDesignText") },
-    { heading: t("focus.catchUpWhenHeading"), text: t("focus.catchUpWhenText") },
-    { heading: t("focus.catchUpHabitHeading"), text: t("focus.catchUpHabitText") },
-    { heading: t("focus.catchUpExpireHeading"), text: t("focus.catchUpExpireText") },
+    {
+      heading: t("focus.catchUpDesignHeading"),
+      text: t("focus.catchUpDesignText"),
+    },
+    {
+      heading: t("focus.catchUpWhenHeading"),
+      text: t("focus.catchUpWhenText"),
+    },
+    {
+      heading: t("focus.catchUpHabitHeading"),
+      text: t("focus.catchUpHabitText"),
+    },
+    {
+      heading: t("focus.catchUpExpireHeading"),
+      text: t("focus.catchUpExpireText"),
+    },
   ];
   return h(
     Modal,
@@ -1558,7 +1800,11 @@ function CatchUpDialog({ open, onClose }) {
       footer: h(
         "div",
         { style: { marginLeft: "auto" } },
-        h(Btn, { variant: "primary", size: "sm", onClick: onClose }, t("common.close")),
+        h(
+          Btn,
+          { variant: "primary", size: "sm", onClick: onClose },
+          t("common.close"),
+        ),
       ),
     },
     h(
@@ -1570,7 +1816,13 @@ function CatchUpDialog({ open, onClose }) {
           { key: section.heading },
           h(
             "div",
-            { style: { fontSize: 12.5, fontWeight: 600, color: "var(--tomato-ink)" } },
+            {
+              style: {
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: "var(--tomato-ink)",
+              },
+            },
             section.heading,
           ),
           h(
@@ -1594,7 +1846,9 @@ function CatchUpDialog({ open, onClose }) {
 function SoundDialog({ open, onClose, amb }) {
   const kind = (amb && amb.kind) || "silent";
   const volume = Number(amb && amb.volume);
-  const safeVolume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
+  const safeVolume = Number.isFinite(volume)
+    ? Math.max(0, Math.min(1, volume))
+    : 0;
   const percent = Math.round(safeVolume * 100);
 
   return h(
@@ -1609,7 +1863,11 @@ function SoundDialog({ open, onClose, amb }) {
       footer: h(
         "div",
         { style: { marginLeft: "auto" } },
-        h(Btn, { variant: "primary", size: "sm", onClick: onClose }, t("common.close")),
+        h(
+          Btn,
+          { variant: "primary", size: "sm", onClick: onClose },
+          t("common.close"),
+        ),
       ),
     },
     h(
@@ -1639,7 +1897,13 @@ function SoundDialog({ open, onClose, amb }) {
         { style: { display: "flex", flexDirection: "column", gap: 8 } },
         h(
           "div",
-          { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+          {
+            style: {
+              fontSize: 12,
+              fontWeight: 550,
+              color: "var(--tomato-ink-2)",
+            },
+          },
           t("sound.volume"),
         ),
         h(
@@ -1654,7 +1918,8 @@ function SoundDialog({ open, onClose, amb }) {
             "aria-label": t("sound.volume"),
             onChange: (event) => {
               const next = Number(event.target.value);
-              if (amb && typeof amb.setVolume === "function") amb.setVolume(next);
+              if (amb && typeof amb.setVolume === "function")
+                amb.setVolume(next);
             },
             style: { flex: 1, accentColor: "var(--tomato-brand)" },
           }),
@@ -1662,7 +1927,12 @@ function SoundDialog({ open, onClose, amb }) {
             "span",
             {
               className: "t-mono",
-              style: { fontSize: 12, color: "var(--tomato-ink-2)", minWidth: 38, textAlign: "right" },
+              style: {
+                fontSize: 12,
+                color: "var(--tomato-ink-2)",
+                minWidth: 38,
+                textAlign: "right",
+              },
             },
             `${percent}%`,
           ),
@@ -1671,7 +1941,13 @@ function SoundDialog({ open, onClose, amb }) {
       amb && amb.enabled === false
         ? h(
             "div",
-            { style: { fontSize: 11.5, lineHeight: 1.6, color: "var(--tomato-ink-3)" } },
+            {
+              style: {
+                fontSize: 11.5,
+                lineHeight: 1.6,
+                color: "var(--tomato-ink-3)",
+              },
+            },
             t("sound.mutedHint"),
           )
         : null,
@@ -1691,22 +1967,46 @@ function DeleteTaskDialog({ open, task, busy, onClose, onConfirm }) {
       footer: h(
         "div",
         { style: { display: "flex", gap: 9, marginLeft: "auto" } },
-        h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
         h(
           Btn,
-          { variant: "danger", size: "sm", icon: "trash", onClick: onConfirm, disabled: busy },
+          { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+          t("common.cancel"),
+        ),
+        h(
+          Btn,
+          {
+            variant: "danger",
+            size: "sm",
+            icon: "trash",
+            onClick: onConfirm,
+            disabled: busy,
+          },
           t("focus.deleteConfirm"),
         ),
       ),
     },
     h(
       "div",
-      { style: { fontSize: 13.5, fontWeight: 550, color: "var(--tomato-ink)", lineHeight: 1.6 } },
+      {
+        style: {
+          fontSize: 13.5,
+          fontWeight: 550,
+          color: "var(--tomato-ink)",
+          lineHeight: 1.6,
+        },
+      },
       task ? task.title || t("focus.untitled") : "",
     ),
     h(
       "div",
-      { style: { fontSize: 12, lineHeight: 1.7, color: "var(--tomato-ink-3)", marginTop: 6 } },
+      {
+        style: {
+          fontSize: 12,
+          lineHeight: 1.7,
+          color: "var(--tomato-ink-3)",
+          marginTop: 6,
+        },
+      },
       t("focus.deleteBody"),
     ),
   );
@@ -1735,8 +2035,22 @@ export function FocusPage(props = {}) {
       if (e.key !== "n" && e.key !== "N") return;
       const el = e.target;
       const tag = (el && el.tagName) || "";
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (el && el.isContentEditable)) return;
-      if (editor || searchOpen || pickerOpen || soundOpen || catchUpOpen || deleteTarget) return;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        (el && el.isContentEditable)
+      )
+        return;
+      if (
+        editor ||
+        searchOpen ||
+        pickerOpen ||
+        soundOpen ||
+        catchUpOpen ||
+        deleteTarget
+      )
+        return;
       e.preventDefault();
       setEditor({ title: "" });
     };
@@ -1901,12 +2215,26 @@ export function FocusPage(props = {}) {
     header,
     h(StatRow, { stats, pendingCount: pending.length }),
     grading.total > 0
-      ? h(GradingBanner, { items: grading.items, total: grading.total,
-          onAssistant: () => props.onAssistant?.("triage", grading.items.flatMap((item) => item.records)) })
+      ? h(GradingBanner, {
+          items: grading.items,
+          total: grading.total,
+          onAssistant: () =>
+            props.onAssistant?.(
+              "triage",
+              grading.items.flatMap((item) => item.records),
+            ),
+        })
       : null,
     h(
       "div",
-      { style: { display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" } },
+      {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 20,
+          alignItems: "flex-start",
+        },
+      },
       h(
         "div",
         { style: { flex: "1 1 420px", maxWidth: 500, minWidth: 0 } },
@@ -1973,8 +2301,15 @@ export function FocusPage(props = {}) {
       onPick: chooseTask,
       onClose: () => setPickerOpen(false),
     }),
-    h(SoundDialog, { open: soundOpen, onClose: () => setSoundOpen(false), amb }),
-    h(CatchUpDialog, { open: catchUpOpen, onClose: () => setCatchUpOpen(false) }),
+    h(SoundDialog, {
+      open: soundOpen,
+      onClose: () => setSoundOpen(false),
+      amb,
+    }),
+    h(CatchUpDialog, {
+      open: catchUpOpen,
+      onClose: () => setCatchUpOpen(false),
+    }),
     h(DeleteTaskDialog, {
       open: !!deleteTarget,
       task: deleteTarget,

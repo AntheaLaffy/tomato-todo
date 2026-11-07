@@ -47,7 +47,8 @@ registerCopy("skinprefs", {
     night: "Night reading",
     backdrop: "Backdrop character",
     persona: "Character",
-    personaHint: "The standing character at the lower right (hidden while focusing)",
+    personaHint:
+      "The standing character at the lower right (hidden while focusing)",
     backdropOff: "Illustration hidden; window light remains",
     backdropUnavailable: "Runtime offline — illustration can't be changed now",
     saveFailed: "Couldn't save: {error}",
@@ -97,7 +98,13 @@ function Row({ label, hint, children, dim = false }) {
           )
         : null,
     ),
-    h("div", { style: { display: "flex", alignItems: "center", gap: 10, flex: "none" } }, children),
+    h(
+      "div",
+      {
+        style: { display: "flex", alignItems: "center", gap: 10, flex: "none" },
+      },
+      children,
+    ),
   );
 }
 
@@ -119,14 +126,20 @@ export function TomatoSkinSettingsRow() {
     if (!settings) return;
     setSaving(true);
     setError(null);
-    const res = await tryDispatch({ type: "saveSettings", settings: { ...settings, personaBackdrop: next } });
+    const res = await tryDispatch({
+      type: "saveSettings",
+      settings: { ...settings, personaBackdrop: next },
+    });
     setSaving(false);
     if (!res.ok) setError(res.error);
   };
 
   return h(
     "div",
-    { className: "t-root", style: { display: "flex", flexDirection: "column", gap: 2 } },
+    {
+      className: "t-root",
+      style: { display: "flex", flexDirection: "column", gap: 2 },
+    },
     h(
       "div",
       {
@@ -181,7 +194,11 @@ export function TomatoSkinSettingsRow() {
     ),
     h(
       Row,
-      { label: t("skinprefs.persona"), hint: t("skinprefs.personaHint"), dim: !settings },
+      {
+        label: t("skinprefs.persona"),
+        hint: t("skinprefs.personaHint"),
+        dim: !settings,
+      },
       h(Select, {
         value: persona,
         width: 140,
@@ -193,7 +210,11 @@ export function TomatoSkinSettingsRow() {
       Row,
       {
         label: t("skinprefs.backdrop"),
-        hint: settings ? (backdrop ? undefined : t("skinprefs.backdropOff")) : t("skinprefs.backdropUnavailable"),
+        hint: settings
+          ? backdrop
+            ? undefined
+            : t("skinprefs.backdropOff")
+          : t("skinprefs.backdropUnavailable"),
         dim: !settings || saving,
       },
       h(Toggle, {

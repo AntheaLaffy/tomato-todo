@@ -45,7 +45,10 @@ test("lock/unlock/notify/status/apps 按 API.md 协议发请求", async (t) => {
   const notified = await client.notify({ title: "休息一下", body: "5 分钟" });
   assert.equal(notified.ok, true);
   assert.equal((await client.fullscreen(true)).ok, true);
-  assert.deepEqual(received.at(-1).body, { command: "fullscreen", enabled: true });
+  assert.deepEqual(received.at(-1).body, {
+    command: "fullscreen",
+    enabled: true,
+  });
   const status = await client.status();
   assert.equal(status.ok, true);
   assert.deepEqual(status.data, { locked: false, whitelist: [], pid: 42 });

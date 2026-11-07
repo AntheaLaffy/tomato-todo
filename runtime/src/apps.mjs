@@ -19,7 +19,8 @@ let cache = { at: 0, apps: [] };
 const LOCALIZED_NAME = /^Name\[([A-Za-z_@.]+)\]$/;
 
 function isZh() {
-  const locale = process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || "";
+  const locale =
+    process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || "";
   return /^zh/i.test(locale);
 }
 
@@ -60,7 +61,9 @@ export function parseDesktopEntry(text) {
   }
   const name = fields.get("Name") ?? "";
   if (name === "") return null;
-  const localized = isZh() ? fields.get("Name[zh_CN]") ?? fields.get("Name[zh]") : null;
+  const localized = isZh()
+    ? (fields.get("Name[zh_CN]") ?? fields.get("Name[zh]"))
+    : null;
   const exec = fields.get("Exec") ?? "";
   return {
     // Exec 的第一段是二进制名，白名单偶尔要按它填（例如 `jetbrains-idea`）。

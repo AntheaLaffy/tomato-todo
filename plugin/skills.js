@@ -61,7 +61,9 @@ function createProvider(ctx) {
       return {
         name: skill.name,
         description: skill.description,
-        ...(skill.whenToUse === undefined ? {} : { whenToUse: skill.whenToUse }),
+        ...(skill.whenToUse === undefined
+          ? {}
+          : { whenToUse: skill.whenToUse }),
         invocation: skill.invocation,
         provider: PROVIDER_NAME,
         source: SOURCE,
@@ -83,7 +85,9 @@ async function discover(ctx) {
   }
 
   const candidates = [];
-  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+  for (const entry of entries.sort((left, right) =>
+    left.name.localeCompare(right.name),
+  )) {
     // A skill is `<name>/SKILL.md` or a flat `<name>.md`, matching the
     // filesystem provider's layout; nested files are resources, not skills.
     const file = entry.isDirectory()
@@ -121,18 +125,24 @@ async function readSkill(ctx, file) {
 
   const parsed = parseSkillFile(raw);
   if (parsed === undefined) {
-    ctx.logger.warn(`bundled skill ${file} ignored: missing or invalid YAML frontmatter`);
+    ctx.logger.warn(
+      `bundled skill ${file} ignored: missing or invalid YAML frontmatter`,
+    );
     return undefined;
   }
 
   const name = parsed.data.name;
   if (typeof name !== "string" || !KEBAB_CASE.test(name)) {
-    ctx.logger.warn(`bundled skill ${file} ignored: frontmatter needs a kebab-case name`);
+    ctx.logger.warn(
+      `bundled skill ${file} ignored: frontmatter needs a kebab-case name`,
+    );
     return undefined;
   }
   const description = parsed.data.description;
   if (typeof description !== "string" || description.trim() === "") {
-    ctx.logger.warn(`bundled skill ${file} ignored: frontmatter needs a description`);
+    ctx.logger.warn(
+      `bundled skill ${file} ignored: frontmatter needs a description`,
+    );
     return undefined;
   }
 
@@ -144,7 +154,8 @@ async function readSkill(ctx, file) {
       ? { whenToUse: whenToUse.trim() }
       : {}),
     invocation: {
-      modelInvocable: boolField(parsed.data, "disable-model-invocation") !== true,
+      modelInvocable:
+        boolField(parsed.data, "disable-model-invocation") !== true,
       userInvocable: boolField(parsed.data, "user-invocable") !== false,
     },
     resourceBase: { kind: "directory", path: dirname(file) },
@@ -159,14 +170,21 @@ function parseSkillFile(raw) {
   if (lines[0].trim() !== "---") return undefined;
 
   let end = 1;
-  while (end < lines.length && lines[end].trim() !== "---" && lines[end].trim() !== "...") {
+  while (
+    end < lines.length &&
+    lines[end].trim() !== "---" &&
+    lines[end].trim() !== "..."
+  ) {
     end += 1;
   }
   if (end === lines.length) return undefined;
 
   return {
     data: parseFields(lines.slice(1, end)),
-    body: lines.slice(end + 1).join("\n").trim(),
+    body: lines
+      .slice(end + 1)
+      .join("\n")
+      .trim(),
   };
 }
 
@@ -226,7 +244,8 @@ function parseFields(lines) {
       continuation.push(next.trim());
       index += 1;
     }
-    if (continuation.length > 0) data[key] = `${data[key]} ${continuation.join(" ")}`.trim();
+    if (continuation.length > 0)
+      data[key] = `${data[key]} ${continuation.join(" ")}`.trim();
   }
 
   return data;

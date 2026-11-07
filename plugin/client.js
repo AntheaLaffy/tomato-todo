@@ -52,7 +52,14 @@
   var L = (x1, y1, x2, y2) => ["line", { x1, y1, x2, y2 }];
   var R = (x, y, w, hh, rx) => ["rect", { x, y, width: w, height: hh, rx }];
   var ICONS = {
-    focus: [C(12, 12, 8.5), C(12, 12, 4.5), ["circle", { cx: 12, cy: 12, r: 1.2, fill: "currentColor", stroke: "none" }]],
+    focus: [
+      C(12, 12, 8.5),
+      C(12, 12, 4.5),
+      [
+        "circle",
+        { cx: 12, cy: 12, r: 1.2, fill: "currentColor", stroke: "none" }
+      ]
+    ],
     tasks: [
       ["path", { d: "M4 6.5h3.2M4 12h3.2M4 17.5h3.2" }],
       P("M10.5 6.5h9.5M10.5 12h9.5M10.5 17.5h6.5"),
@@ -65,21 +72,40 @@
       P("M8.4 20h7.2")
     ],
     stats: [P("M4 20V10.5M9.4 20V5M14.8 20v-6.6M20.2 20V8.4")],
-    calendar: [R(3.4, 5, 17.2, 15.6, 3), L(3.4, 10, 20.6, 10), L(8, 3.4, 8, 6.6), L(16, 3.4, 16, 6.6)],
+    calendar: [
+      R(3.4, 5, 17.2, 15.6, 3),
+      L(3.4, 10, 20.6, 10),
+      L(8, 3.4, 8, 6.6),
+      L(16, 3.4, 16, 6.6)
+    ],
     education: [
-      P("M12 6.4C10.2 4.7 7.7 4 4.6 4v13.4C7.7 17.4 10.2 18.1 12 19.8c1.8-1.7 4.3-2.4 7.4-2.4V4C16.3 4 13.8 4.7 12 6.4Z"),
+      P(
+        "M12 6.4C10.2 4.7 7.7 4 4.6 4v13.4C7.7 17.4 10.2 18.1 12 19.8c1.8-1.7 4.3-2.4 7.4-2.4V4C16.3 4 13.8 4.7 12 6.4Z"
+      ),
       L(12, 6.4, 12, 19.8)
     ],
-    shield: [P("M12 3.6l7 2.8v5.9c0 4.1-2.7 7-7 8.1-4.3-1.1-7-4-7-8.1V6.4l7-2.8Z"), P("M8.9 12.1l2.1 2.1 4.1-4.3")],
+    shield: [
+      P("M12 3.6l7 2.8v5.9c0 4.1-2.7 7-7 8.1-4.3-1.1-7-4-7-8.1V6.4l7-2.8Z"),
+      P("M8.9 12.1l2.1 2.1 4.1-4.3")
+    ],
     moon: [P("M19.4 14.4A8.1 8.1 0 0 1 9.6 4.6a8.1 8.1 0 1 0 9.8 9.8Z")],
-    settings: [C(12, 12, 3.2), P("M12 3.2v2.1M12 18.7v2.1M3.2 12h2.1M18.7 12h2.1M5.9 5.9l1.5 1.5M16.6 16.6l1.5 1.5M18.1 5.9l-1.5 1.5M7.4 16.6l-1.5 1.5")],
+    settings: [
+      C(12, 12, 3.2),
+      P(
+        "M12 3.2v2.1M12 18.7v2.1M3.2 12h2.1M18.7 12h2.1M5.9 5.9l1.5 1.5M16.6 16.6l1.5 1.5M18.1 5.9l-1.5 1.5M7.4 16.6l-1.5 1.5"
+      )
+    ],
     play: [["path", { d: "M8.4 5.6l10 6.4-10 6.4V5.6Z" }]],
     pause: [P("M9 5.4v13.2M15 5.4v13.2")],
     stop: [R(6.6, 6.6, 10.8, 10.8, 2.6)],
     plus: [P("M12 5.4v13.2M5.4 12h13.2")],
     search: [C(10.8, 10.8, 6.2), L(15.4, 15.4, 20.2, 20.2)],
     filter: [P("M4 6.6h16M7.2 12h9.6M10.4 17.4h3.2")],
-    sort: [P("M7 4.8v14.4M7 19.2l-2.6-2.7M7 19.2l2.6-2.7M17 19.2V4.8M17 4.8l-2.6 2.7M17 4.8l2.6 2.7")],
+    sort: [
+      P(
+        "M7 4.8v14.4M7 19.2l-2.6-2.7M7 19.2l2.6-2.7M17 19.2V4.8M17 4.8l-2.6 2.7M17 4.8l2.6 2.7"
+      )
+    ],
     more: [C(6, 12, 1.3), C(12, 12, 1.3), C(18, 12, 1.3)],
     check: [P("M5.4 12.4l4.2 4.2 9-9.4")],
     x: [P("M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8")],
@@ -88,11 +114,21 @@
     chevronLeft: [P("M14.6 6.4L9.2 12l5.4 5.6")],
     chevronRight: [P("M9.4 6.4l5.4 5.6-5.4 5.6")],
     clock: [C(12, 12, 8.4), P("M12 7.4V12l3.2 2")],
-    flame: [P("M12 20.4c3.6 0 6-2.4 6-5.6 0-4.6-4.6-6.3-4.1-11.2-2.9.9-4.6 3.4-4.9 6-1.1-.9-1.7-1.9-1.9-3.1C6 8.7 6 10.6 6 12c0 4.6 2.4 8.4 6 8.4Z")],
+    flame: [
+      P(
+        "M12 20.4c3.6 0 6-2.4 6-5.6 0-4.6-4.6-6.3-4.1-11.2-2.9.9-4.6 3.4-4.9 6-1.1-.9-1.7-1.9-1.9-3.1C6 8.7 6 10.6 6 12c0 4.6 2.4 8.4 6 8.4Z"
+      )
+    ],
     lock: [R(5, 10.6, 14, 9.6, 2.6), P("M8.2 10.6V8a3.8 3.8 0 0 1 7.6 0v2.6")],
     unlock: [R(5, 10.6, 14, 9.6, 2.6), P("M8.2 10.6V8a3.8 3.8 0 0 1 7.2-1.6")],
-    sound: [P("M4.4 9.6h3.4l4.2-3.8v12.4L7.8 14.4H4.4V9.6Z"), P("M15.4 9.2a4 4 0 0 1 0 5.6M17.8 6.8a7.4 7.4 0 0 1 0 10.4")],
-    mute: [P("M4.4 9.6h3.4l4.2-3.8v12.4L7.8 14.4H4.4V9.6Z"), P("M15.6 9.8l4.2 4.4M19.8 9.8l-4.2 4.4")],
+    sound: [
+      P("M4.4 9.6h3.4l4.2-3.8v12.4L7.8 14.4H4.4V9.6Z"),
+      P("M15.4 9.2a4 4 0 0 1 0 5.6M17.8 6.8a7.4 7.4 0 0 1 0 10.4")
+    ],
+    mute: [
+      P("M4.4 9.6h3.4l4.2-3.8v12.4L7.8 14.4H4.4V9.6Z"),
+      P("M15.6 9.8l4.2 4.4M19.8 9.8l-4.2 4.4")
+    ],
     minimize: [P("M6 6.6h12M8 6.6v7.2h8V6.6")],
     expand: [
       P("M9.2 4.8H4.8v4.4"),
@@ -100,31 +136,89 @@
       P("M14.8 19.2h4.4v-4.4"),
       P("M9.2 19.2H4.8v-4.4")
     ],
-    sparkle: [P("M12 3.8l1.9 5.3 5.3 1.9-5.3 1.9L12 18.2l-1.9-5.3L4.8 11l5.3-1.9L12 3.8Z")],
-    edit: [P("M4.6 19.4l.8-4 9.4-9.4 3.2 3.2-9.4 9.4-4 .8Z"), P("M13.2 7.4l3.2 3.2")],
+    sparkle: [
+      P(
+        "M12 3.8l1.9 5.3 5.3 1.9-5.3 1.9L12 18.2l-1.9-5.3L4.8 11l5.3-1.9L12 3.8Z"
+      )
+    ],
+    edit: [
+      P("M4.6 19.4l.8-4 9.4-9.4 3.2 3.2-9.4 9.4-4 .8Z"),
+      P("M13.2 7.4l3.2 3.2")
+    ],
     trash: [P("M4.8 7.2h14.4M9.4 7.2V4.8h5.2v2.4M6.6 7.2l.9 12h9l.9-12")],
     tag: [P("M12.6 4.6H20v7.4l-8.2 8.2-7.4-7.4 8.2-8.2Z"), C(16.4, 8.2, 1.2)],
-    folder: [P("M3.6 7.4h6l2 2.2h8.8v9.2a1.8 1.8 0 0 1-1.8 1.8H5.4A1.8 1.8 0 0 1 3.6 18.8V7.4Z")],
-    bell: [P("M6.4 10.4a5.6 5.6 0 0 1 11.2 0c0 3.4 1.2 5 1.2 5H5.2s1.2-1.6 1.2-5Z"), P("M10.2 18.6a2 2 0 0 0 3.6 0")],
+    folder: [
+      P(
+        "M3.6 7.4h6l2 2.2h8.8v9.2a1.8 1.8 0 0 1-1.8 1.8H5.4A1.8 1.8 0 0 1 3.6 18.8V7.4Z"
+      )
+    ],
+    bell: [
+      P("M6.4 10.4a5.6 5.6 0 0 1 11.2 0c0 3.4 1.2 5 1.2 5H5.2s1.2-1.6 1.2-5Z"),
+      P("M10.2 18.6a2 2 0 0 0 3.6 0")
+    ],
     arrowRight: [P("M4.8 12h14.4M13.6 6.4L19.2 12l-5.6 5.6")],
     arrowLeft: [P("M19.2 12H4.8M10.4 6.4L4.8 12l5.6 5.6")],
     refresh: [P("M19.2 12a7.2 7.2 0 1 1-2.1-5.1"), P("M19.6 4.4v4.2h-4.2")],
     download: [P("M12 4.6v10.2M7.6 10.8L12 15.2l4.4-4.4"), P("M5 19.4h14")],
     upload: [P("M12 15.4V5.2M7.6 9.4L12 5l4.4 4.4"), P("M5 19.4h14")],
-    eye: [P("M2.8 12S6.4 5.6 12 5.6 21.2 12 21.2 12 17.6 18.4 12 18.4 2.8 12 2.8 12Z"), C(12, 12, 3)],
-    coffee: [P("M5 8.6h11v5.6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8.6Z"), P("M16 10.2h1.6a2.4 2.4 0 0 1 0 4.8H16"), P("M5 21h11")],
+    eye: [
+      P(
+        "M2.8 12S6.4 5.6 12 5.6 21.2 12 21.2 12 17.6 18.4 12 18.4 2.8 12 2.8 12Z"
+      ),
+      C(12, 12, 3)
+    ],
+    coffee: [
+      P("M5 8.6h11v5.6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8.6Z"),
+      P("M16 10.2h1.6a2.4 2.4 0 0 1 0 4.8H16"),
+      P("M5 21h11")
+    ],
     timer: [C(12, 13, 7.4), P("M12 13V9.4M9.4 3.4h5.2")],
-    calendarClock: [P("M3.6 8.6h16.8"), P("M6.4 4.6v2.6M17.6 4.6v2.6"), R(3.6, 5.4, 16.8, 14.2, 2.8), P("M12 11.4v3l2 1.4")],
-    sun: [C(12, 12, 4.2), P("M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M5.9 5.9l1.6 1.6M16.5 16.5l1.6 1.6M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6")],
-    leaf: [P("M4.6 19.4c0-8 5-13.2 14.8-14.8C17.2 14 12.6 19.4 4.6 19.4Z"), P("M4.6 19.4l9-8.6")],
+    calendarClock: [
+      P("M3.6 8.6h16.8"),
+      P("M6.4 4.6v2.6M17.6 4.6v2.6"),
+      R(3.6, 5.4, 16.8, 14.2, 2.8),
+      P("M12 11.4v3l2 1.4")
+    ],
+    sun: [
+      C(12, 12, 4.2),
+      P(
+        "M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M5.9 5.9l1.6 1.6M16.5 16.5l1.6 1.6M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6"
+      )
+    ],
+    leaf: [
+      P("M4.6 19.4c0-8 5-13.2 14.8-14.8C17.2 14 12.6 19.4 4.6 19.4Z"),
+      P("M4.6 19.4l9-8.6")
+    ],
     chat: [
-      ["path", { d: "M4.4 6.6c0-1.2 1-2.2 2.2-2.2h10.8c1.2 0 2.2 1 2.2 2.2v7.2c0 1.2-1 2.2-2.2 2.2H9.6l-4 3.4v-3.4h-.2c-.6 0-1-.4-1-1V6.6Z" }],
+      [
+        "path",
+        {
+          d: "M4.4 6.6c0-1.2 1-2.2 2.2-2.2h10.8c1.2 0 2.2 1 2.2 2.2v7.2c0 1.2-1 2.2-2.2 2.2H9.6l-4 3.4v-3.4h-.2c-.6 0-1-.4-1-1V6.6Z"
+        }
+      ],
       P("M8.4 9.4h7.2M8.4 12.6h4.4")
     ],
-    grip: [C(9, 6.4, 1.1), C(15, 6.4, 1.1), C(9, 12, 1.1), C(15, 12, 1.1), C(9, 17.6, 1.1), C(15, 17.6, 1.1)],
+    grip: [
+      C(9, 6.4, 1.1),
+      C(15, 6.4, 1.1),
+      C(9, 12, 1.1),
+      C(15, 12, 1.1),
+      C(9, 17.6, 1.1),
+      C(15, 17.6, 1.1)
+    ],
     tomato: [
-      ["path", { d: "M12 7.2c-3.6 0-6.2 2.7-6.2 6.2 0 3.7 2.8 6.1 6.2 6.1s6.2-2.4 6.2-6.1c0-3.5-2.6-6.2-6.2-6.2Z" }],
-      ["path", { d: "M12 7.4c-.2-2 .9-3.3 2.8-3.6-.2 1.4-.9 2.3-2 2.8M12 7.4c-1.5-.6-2.3-1.7-2.4-3.2 1.7.1 2.6 1.1 2.4 3.2" }]
+      [
+        "path",
+        {
+          d: "M12 7.2c-3.6 0-6.2 2.7-6.2 6.2 0 3.7 2.8 6.1 6.2 6.1s6.2-2.4 6.2-6.1c0-3.5-2.6-6.2-6.2-6.2Z"
+        }
+      ],
+      [
+        "path",
+        {
+          d: "M12 7.4c-.2-2 .9-3.3 2.8-3.6-.2 1.4-.9 2.3-2 2.8M12 7.4c-1.5-.6-2.3-1.7-2.4-3.2 1.7.1 2.6 1.1 2.4 3.2"
+        }
+      ]
     ]
   };
   var ICON_NAMES = Object.keys(ICONS);
@@ -988,1097 +1082,1073 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
 
   // plugin/src/client/shared/ja.js
   var japaneseCopy = {
-    "common": {
-      "cancel": "キャンセル",
-      "close": "閉じる",
-      "save": "保存",
-      "saved": "保存済み",
-      "delete": "削除",
-      "edit": "編集",
-      "confirm": "確認",
-      "add": "追加",
-      "retry": "再試行",
-      "loading": "読み込み中...",
-      "loadFailed": "読み込めませんでした。自動再試行",
-      "writeFailed": "書き込みに失敗しました。ランタイムがオンラインであることを確認してください",
-      "empty": "ここにはまだ何もありません",
-      "today": "今日",
-      "yesterday": "昨日",
-      "tomorrow": "明日",
-      "minutes": "{n}分",
-      "hours": "{n}時間",
-      "pomodoros": "{n}ポモドーロ",
-      "tasksCount": "{n}タスク",
-      "itemsCount": "{n}アイテム",
-      "offline": "オフラインのランタイム",
-      "savedLocal": "このデバイスに保存されたすべての変更",
-      "more": "その他",
-      "search": "検索",
-      "all": "すべて",
-      "none": "なし",
-      "week": [
-        "M",
-        "T",
-        "W",
-        "T",
-        "F",
-        "S",
-        "S"
-      ],
-      "weekFull": [
-        "月",
-        "火",
-        "水",
-        "木",
-        "金",
-        "土",
-        "日"
-      ],
-      "monthDay": "{m}/{d}",
-      "daypartMorning": "おはようございます",
-      "daypartNoon": "おはようございます",
-      "daypartAfternoon": "こんにちは",
-      "daypartEvening": "こんばんは",
-      "daypartNight": "深夜"
+    common: {
+      cancel: "キャンセル",
+      close: "閉じる",
+      save: "保存",
+      saved: "保存済み",
+      delete: "削除",
+      edit: "編集",
+      confirm: "確認",
+      add: "追加",
+      retry: "再試行",
+      loading: "読み込み中...",
+      loadFailed: "読み込めませんでした。自動再試行",
+      writeFailed: "書き込みに失敗しました。ランタイムがオンラインであることを確認してください",
+      empty: "ここにはまだ何もありません",
+      today: "今日",
+      yesterday: "昨日",
+      tomorrow: "明日",
+      minutes: "{n}分",
+      hours: "{n}時間",
+      pomodoros: "{n}ポモドーロ",
+      tasksCount: "{n}タスク",
+      itemsCount: "{n}アイテム",
+      offline: "オフラインのランタイム",
+      savedLocal: "このデバイスに保存されたすべての変更",
+      more: "その他",
+      search: "検索",
+      all: "すべて",
+      none: "なし",
+      week: ["M", "T", "W", "T", "F", "S", "S"],
+      weekFull: ["月", "火", "水", "木", "金", "土", "日"],
+      monthDay: "{m}/{d}",
+      daypartMorning: "おはようございます",
+      daypartNoon: "おはようございます",
+      daypartAfternoon: "こんにちは",
+      daypartEvening: "こんばんは",
+      daypartNight: "深夜"
     },
-    "dock": {
-      "due": "本日期限{n}",
-      "minutes": "{n}分間集中",
-      "start": "今すぐ集中",
-      "view": "本日オープン",
-      "running": "{time}に集中中",
-      "idle": "- いいか？",
-      "pomodoro": "{done} / {goal} ポモドーロ"
+    dock: {
+      due: "本日期限{n}",
+      minutes: "{n}分間集中",
+      start: "今すぐ集中",
+      view: "本日オープン",
+      running: "{time}に集中中",
+      idle: "- いいか？",
+      pomodoro: "{done} / {goal} ポモドーロ"
     },
-    "hud": {
-      "focusing": "ピント合わせ",
-      "paused": "一時停止",
-      "pomodoro": "ポモドーロ",
-      "hint": "本日のフォーカス",
-      "progress": "今日の進行状況",
-      "noTask": "今日の最初のラウンドの準備",
-      "protected": "保護中",
-      "start": "フォーカス開始",
-      "pause": "一時停止",
-      "resume": "再開",
-      "endRound": "ラウンド終了",
-      "openImmersive": "フォーカスモードに戻る",
-      "openApp": "トマトTODOを開く",
-      "modeFocus": "集中",
-      "modeShort": "休憩",
-      "modeLong": "長い休憩",
-      "resting": "休止",
-      "startRest": "休憩を開始",
-      "restNext": "次：{mode}",
-      "notifyPaused": "一時停止—息を吸う",
-      "notifyResumed": "フォーカスに戻る",
-      "notifyEnded": "ラウンド終了"
+    hud: {
+      focusing: "ピント合わせ",
+      paused: "一時停止",
+      pomodoro: "ポモドーロ",
+      hint: "本日のフォーカス",
+      progress: "今日の進行状況",
+      noTask: "今日の最初のラウンドの準備",
+      protected: "保護中",
+      start: "フォーカス開始",
+      pause: "一時停止",
+      resume: "再開",
+      endRound: "ラウンド終了",
+      openImmersive: "フォーカスモードに戻る",
+      openApp: "トマトTODOを開く",
+      modeFocus: "集中",
+      modeShort: "休憩",
+      modeLong: "長い休憩",
+      resting: "休止",
+      startRest: "休憩を開始",
+      restNext: "次：{mode}",
+      notifyPaused: "一時停止—息を吸う",
+      notifyResumed: "フォーカスに戻る",
+      notifyEnded: "ラウンド終了"
     },
-    "imm": {
-      "title": "このフォーカスラウンドを終了しますか？",
-      "detail": "ラウンドが完了したら、ポモドーロを早めに完了し、休憩を取ります。フォーカス時間は実際に費やした時間として記録されます。タスクはまだ手動で確認する必要があります。一時的に中断する場合は、「終了してロックを解除」を選択します。ラウンドは完全なポモドーロとしてカウントされません。",
-      "typeHint": "「フォーカス終了」と入力して、中断",
-      "confirmPhrase": "フォーカス終了",
-      "back": "続行",
-      "earlyComplete": "早めに完了",
-      "interrupt": "終了してロック解除",
-      "noTimeHint": "フォーカス時間はまだありません。もう少し長くすれば、早めに完了できます。",
-      "strictWarning": "厳格モードがオンになっています：タイマーが終了するまで早めに終了または退出することはできません。",
-      "badgeWhitelist": "アプリのホワイトリストが有効です",
-      "badgeLock": "画面ロック中",
-      "badgeBreakLock": "ロック解除アクティブ",
-      "badgeFree": "フリーフォーカス",
-      "badgeRest": "休憩をとる",
-      "onlyThis": "たったひとつ、今すぐに。",
-      "allowHint": "{n}個のアプリが許可されています。他のアプリは切り替えられています",
-      "cycle": "ポモドーロ{n}/{total}",
-      "schedule": "今日のスケジュール",
-      "sound": "アンビエントサウンド",
-      "endEarly": "緊急—早めに終了",
-      "exit": "フォーカスモードを終了",
-      "pause": "一時停止",
-      "paused": "一時停止",
-      "resume": "フォーカスを再開",
-      "resumeRest": "休憩を再開",
-      "skipRest": "休憩を終了",
-      "restHint": "立ち上がり、ストレッチし、呼吸します。",
-      "restMinutes": "{n}分間休憩",
-      "focusLabel": "集中",
-      "notifyCompleted": "ポモドーロコンプリート—一息つく",
-      "notifyInterrupted": "ラウンドが中断されました。実際の時間が記録されました",
-      "notifyRestEnded": "ブレイクオーバー—いつでも準備完了"
+    imm: {
+      title: "このフォーカスラウンドを終了しますか？",
+      detail: "ラウンドが完了したら、ポモドーロを早めに完了し、休憩を取ります。フォーカス時間は実際に費やした時間として記録されます。タスクはまだ手動で確認する必要があります。一時的に中断する場合は、「終了してロックを解除」を選択します。ラウンドは完全なポモドーロとしてカウントされません。",
+      typeHint: "「フォーカス終了」と入力して、中断",
+      confirmPhrase: "フォーカス終了",
+      back: "続行",
+      earlyComplete: "早めに完了",
+      interrupt: "終了してロック解除",
+      noTimeHint: "フォーカス時間はまだありません。もう少し長くすれば、早めに完了できます。",
+      strictWarning: "厳格モードがオンになっています：タイマーが終了するまで早めに終了または退出することはできません。",
+      badgeWhitelist: "アプリのホワイトリストが有効です",
+      badgeLock: "画面ロック中",
+      badgeBreakLock: "ロック解除アクティブ",
+      badgeFree: "フリーフォーカス",
+      badgeRest: "休憩をとる",
+      onlyThis: "たったひとつ、今すぐに。",
+      allowHint: "{n}個のアプリが許可されています。他のアプリは切り替えられています",
+      cycle: "ポモドーロ{n}/{total}",
+      schedule: "今日のスケジュール",
+      sound: "アンビエントサウンド",
+      endEarly: "緊急—早めに終了",
+      exit: "フォーカスモードを終了",
+      pause: "一時停止",
+      paused: "一時停止",
+      resume: "フォーカスを再開",
+      resumeRest: "休憩を再開",
+      skipRest: "休憩を終了",
+      restHint: "立ち上がり、ストレッチし、呼吸します。",
+      restMinutes: "{n}分間休憩",
+      focusLabel: "集中",
+      notifyCompleted: "ポモドーロコンプリート—一息つく",
+      notifyInterrupted: "ラウンドが中断されました。実際の時間が記録されました",
+      notifyRestEnded: "ブレイクオーバー—いつでも準備完了"
     },
-    "nav": {
-      "focus": "今日",
-      "tasks": "すべてのタスク",
-      "habits": "習慣とビジョン",
-      "stats": "統計データ",
-      "calendar": "今週",
-      "education": "学習プロジェクト",
-      "guard": "フォーカスガード",
-      "schedule": "予定されたロック",
-      "preferences": "設定",
-      "assistant": "学習アシスタント",
-      "assistantHint": "DSH会話に戻る（トマトビューは折りたたまれます）",
-      "space": "マイスペース",
-      "personal": "パーソナル",
-      "projects": "マイプロジェクト",
-      "goalTitle": "今日のポモドーロ目標",
-      "goalHint": "タスク{n}件完了 · ポモドーロは完了した回数で集計",
-      "storage": "ローカルストレージ・落ち着いたフォーカス"
+    nav: {
+      focus: "今日",
+      tasks: "すべてのタスク",
+      habits: "習慣とビジョン",
+      stats: "統計データ",
+      calendar: "今週",
+      education: "学習プロジェクト",
+      guard: "フォーカスガード",
+      schedule: "予定されたロック",
+      preferences: "設定",
+      assistant: "学習アシスタント",
+      assistantHint: "DSH会話に戻る（トマトビューは折りたたまれます）",
+      space: "マイスペース",
+      personal: "パーソナル",
+      projects: "マイプロジェクト",
+      goalTitle: "今日のポモドーロ目標",
+      goalHint: "タスク{n}件完了 · ポモドーロは完了した回数で集計",
+      storage: "ローカルストレージ・落ち着いたフォーカス"
     },
-    "persona": {
-      "atri": "リトルファンガー",
-      "natsuki": "落ち着いた勉強仲間",
-      "ryuji": "厳格なコーチ",
-      "minamo": "優しい先輩",
-      "label": "背景キャラクター",
-      "switch": "スイッチ",
-      "hint": "勉強中に右下に立っているキャラクター"
+    persona: {
+      atri: "リトルファンガー",
+      natsuki: "落ち着いた勉強仲間",
+      ryuji: "厳格なコーチ",
+      minamo: "優しい先輩",
+      label: "背景キャラクター",
+      switch: "スイッチ",
+      hint: "勉強中に右下に立っているキャラクター"
     },
-    "reminder": {
-      "prefix": "今すぐ",
-      "start": "フォーカス開始",
-      "more": "ほかに{n}件、予定時刻になりました",
-      "minutes": "{n}分・{round}ラウンド",
-      "title": "そろそろこの時間だ"
+    reminder: {
+      prefix: "今すぐ",
+      start: "フォーカス開始",
+      more: "ほかに{n}件、予定時刻になりました",
+      minutes: "{n}分・{round}ラウンド",
+      title: "そろそろこの時間だ"
     },
-    "side": {
-      "label": "トマト Todo",
-      "open": "トマト Todo を開く"
+    side: {
+      label: "トマト Todo",
+      open: "トマト Todo を開く"
     },
-    "sound": {
-      "title": "アンビエントサウンド",
-      "playing": "再生中",
-      "rain": "雨",
-      "brown": "ブラウンノイズ",
-      "silent": "サイレント",
-      "volume": "ボリューム",
-      "mutedHint": "サウンドキューがオフになっています"
+    sound: {
+      title: "アンビエントサウンド",
+      playing: "再生中",
+      rain: "雨",
+      brown: "ブラウンノイズ",
+      silent: "サイレント",
+      volume: "ボリューム",
+      mutedHint: "サウンドキューがオフになっています"
     },
-    "skinprefs": {
-      "title": "トマトの雰囲気",
-      "desc": "DSHを開くと、窓の明かり、漂うモート、ラインアートデスクなど、ゆっくりとした学習ムードになります。試験データは変更されていません。",
-      "ambience": "アンビエンスレイヤー",
-      "daypart": "時間帯",
-      "auto": "時計に従う",
-      "morning": "朝",
-      "day": "昼間",
-      "dusk": "夕暮れ",
-      "night": "ナイトリーディング",
-      "backdrop": "背景キャラクター",
-      "persona": "Character（特性）",
-      "personaHint": "右下の立っているキャラクター（ピントを合わせている間は隠されています）",
-      "backdropOff": "イラストは非表示になっています。ウィンドウライトは残ります",
-      "backdropUnavailable": "オフラインの実行時—イラストは今は変更できません",
-      "saveFailed": "保存できませんでした: {error}"
+    skinprefs: {
+      title: "トマトの雰囲気",
+      desc: "DSHを開くと、窓の明かり、漂うモート、ラインアートデスクなど、ゆっくりとした学習ムードになります。試験データは変更されていません。",
+      ambience: "アンビエンスレイヤー",
+      daypart: "時間帯",
+      auto: "時計に従う",
+      morning: "朝",
+      day: "昼間",
+      dusk: "夕暮れ",
+      night: "ナイトリーディング",
+      backdrop: "背景キャラクター",
+      persona: "Character（特性）",
+      personaHint: "右下の立っているキャラクター（ピントを合わせている間は隠されています）",
+      backdropOff: "イラストは非表示になっています。ウィンドウライトは残ります",
+      backdropUnavailable: "オフラインの実行時—イラストは今は変更できません",
+      saveFailed: "保存できませんでした: {error}"
     },
-    "calendar": {
-      "eyebrow": "概要",
-      "subtitle": "横軸に曜日、縦軸に時刻を表示。塗りつぶしはタスク、斜線は固定予定です。",
-      "prev": "前週",
-      "next": "来週",
-      "thisWeek": "今週",
-      "summary": "{range}・{items}スロット・{teaching}レッスン/試験",
-      "addBlock": "スロットを追加",
-      "legendTeaching": "レッスン/試験",
-      "legendTask": "タスク",
-      "legendRequired": "フォーカスが必要",
-      "legendLight": "軽いクラス（平行OK ）",
-      "legendRest": "スケジュールされたREST",
-      "clickHint": "空のスペースをクリックしてその時点でスロットを追加",
-      "gridEmptyAction": "最初のスロットを追加",
-      "details": "スロットの詳細",
-      "detailTime": "時間",
-      "detailDays": "日",
-      "detailProject": "プロジェクト",
-      "detailNotes": "メモ",
-      "detailAttention": "ステータス",
-      "detailState": "進行状況",
-      "detailStrict": "厳格モード",
-      "detailRestHint": "残りのスケジュールは、スケジュールされたロックページで管理されます。",
-      "detailEmptyNotes": "メモなし",
-      "newBlockTitle": "固定スロットを追加",
-      "editBlockTitle": "固定スロットを編集",
-      "nameLabel": "名前",
-      "namePlaceholder": "例：大学英語I",
-      "startLabel": "開始",
-      "endLabel": "終了",
-      "endHint": "開始よりも早い終了は、午前0時を過ぎることを意味します",
-      "daysLabel": "日",
-      "attentionLabel": "注意",
-      "attentionRequired": "集中する必要があります（ここでスケジュールされたタスクが競合している）",
-      "attentionLight": "軽いクラス（並行して動作することができます）",
-      "notesLabel": "メモ（オプション）",
-      "notesPlaceholder": "例：5号館402教室・出席確認済み",
-      "validationName": "名前は必須です（ 1〜40文字）",
-      "validationDays": "少なくとも1日を選択してください",
-      "validationTime": "開始と終了は有効なHH: MMであり、異なる必要があります",
-      "saveFailed": "保存に失敗しました：{error}",
-      "savedToast": "スロットが保存されました",
-      "deletedToast": "スロットが削除されました",
-      "deleteConfirmTitle": "このスロットを削除しますか？",
-      "deleteConfirmBody": "「{name}」を週間予定から削除します。印刷済みのタスクは残ります。",
-      "deleteBlock": "スロットを削除",
-      "blocksTitle": "ウィークリー固定スロット",
-      "blocksHint": "{n}",
-      "blocksEmptyTitle": "固定スロットはまだありません",
-      "blocksEmptyHint": "定期的なクラスを追加して、どの時間が取られているかがカレンダーにわかるようにします。",
-      "conflictsTitle": "競合とパラレルタイム",
-      "conflictCount": "{n}",
-      "noConflict": "時間の競合は見つかりませんでした",
-      "conflictDay": "{day} {date}",
-      "conflictBlockBlock": "集中が必要な予定「{a}」と「{b}」が{minutes}分重複しています。",
-      "conflictTeachingBlock": "「{a}」が集中必須の予定「{b}」と{minutes}分重複しています。",
-      "conflictTeachingTeaching": "予定「{a}」と「{b}」が{minutes}分重複しています。",
-      "conflictRest": "休憩「{a}」と「{b}」が{minutes}分重複しています。",
-      "parallel": "軽い授業「{a}」と「{b}」が重なっています。並行しても問題ありません。",
-      "lesson": "レッスン",
-      "exam": "試験",
-      "rest": "休憩",
-      "untitled": "無題のスロット",
-      "nextDay": "翌日",
-      "strict": "厳格",
-      "relaxed": "通常",
-      "unknownProject": "プロジェクトなし",
-      "close": "閉じる"
+    calendar: {
+      eyebrow: "概要",
+      subtitle: "横軸に曜日、縦軸に時刻を表示。塗りつぶしはタスク、斜線は固定予定です。",
+      prev: "前週",
+      next: "来週",
+      thisWeek: "今週",
+      summary: "{range}・{items}スロット・{teaching}レッスン/試験",
+      addBlock: "スロットを追加",
+      legendTeaching: "レッスン/試験",
+      legendTask: "タスク",
+      legendRequired: "フォーカスが必要",
+      legendLight: "軽いクラス（平行OK ）",
+      legendRest: "スケジュールされたREST",
+      clickHint: "空のスペースをクリックしてその時点でスロットを追加",
+      gridEmptyAction: "最初のスロットを追加",
+      details: "スロットの詳細",
+      detailTime: "時間",
+      detailDays: "日",
+      detailProject: "プロジェクト",
+      detailNotes: "メモ",
+      detailAttention: "ステータス",
+      detailState: "進行状況",
+      detailStrict: "厳格モード",
+      detailRestHint: "残りのスケジュールは、スケジュールされたロックページで管理されます。",
+      detailEmptyNotes: "メモなし",
+      newBlockTitle: "固定スロットを追加",
+      editBlockTitle: "固定スロットを編集",
+      nameLabel: "名前",
+      namePlaceholder: "例：大学英語I",
+      startLabel: "開始",
+      endLabel: "終了",
+      endHint: "開始よりも早い終了は、午前0時を過ぎることを意味します",
+      daysLabel: "日",
+      attentionLabel: "注意",
+      attentionRequired: "集中する必要があります（ここでスケジュールされたタスクが競合している）",
+      attentionLight: "軽いクラス（並行して動作することができます）",
+      notesLabel: "メモ（オプション）",
+      notesPlaceholder: "例：5号館402教室・出席確認済み",
+      validationName: "名前は必須です（ 1〜40文字）",
+      validationDays: "少なくとも1日を選択してください",
+      validationTime: "開始と終了は有効なHH: MMであり、異なる必要があります",
+      saveFailed: "保存に失敗しました：{error}",
+      savedToast: "スロットが保存されました",
+      deletedToast: "スロットが削除されました",
+      deleteConfirmTitle: "このスロットを削除しますか？",
+      deleteConfirmBody: "「{name}」を週間予定から削除します。印刷済みのタスクは残ります。",
+      deleteBlock: "スロットを削除",
+      blocksTitle: "ウィークリー固定スロット",
+      blocksHint: "{n}",
+      blocksEmptyTitle: "固定スロットはまだありません",
+      blocksEmptyHint: "定期的なクラスを追加して、どの時間が取られているかがカレンダーにわかるようにします。",
+      conflictsTitle: "競合とパラレルタイム",
+      conflictCount: "{n}",
+      noConflict: "時間の競合は見つかりませんでした",
+      conflictDay: "{day} {date}",
+      conflictBlockBlock: "集中が必要な予定「{a}」と「{b}」が{minutes}分重複しています。",
+      conflictTeachingBlock: "「{a}」が集中必須の予定「{b}」と{minutes}分重複しています。",
+      conflictTeachingTeaching: "予定「{a}」と「{b}」が{minutes}分重複しています。",
+      conflictRest: "休憩「{a}」と「{b}」が{minutes}分重複しています。",
+      parallel: "軽い授業「{a}」と「{b}」が重なっています。並行しても問題ありません。",
+      lesson: "レッスン",
+      exam: "試験",
+      rest: "休憩",
+      untitled: "無題のスロット",
+      nextDay: "翌日",
+      strict: "厳格",
+      relaxed: "通常",
+      unknownProject: "プロジェクトなし",
+      close: "閉じる"
     },
-    "education": {
-      "eyebrow": "トマト Todo",
-      "title": "学習プロジェクト",
-      "subtitle": "目標130点以上、2028年入学。初試験は2027年12月18日予定。",
-      "refreshTitle": "更新",
-      "loading": "研究計画を読み込んでいます...",
-      "projectsTitle": "学習プロジェクト",
-      "projectsHint": "{n}",
-      "emptyProjectsTitle": "学習プロジェクトはまだありません",
-      "emptyProjectsHint": "研究アシスタントはプロジェクトを作成し、会話中にフォルダをバインドします。このページにはそれらが表示され、実行されます。",
-      "targetLabel": "目標",
-      "examMode": "試験モード",
-      "examDateLabel": "試験日",
-      "countdownLabel": "試験カウントダウン",
-      "countdownNone": "試験日なし",
-      "countdownToday": "今日",
-      "daysUnit": "日",
-      "daysPast": "{n}日前",
-      "unnamedProject": "無題のプロジェクト",
-      "resourcesCount": "{n}リソース",
-      "latestProgressLabel": "最新の進捗状況",
-      "noProgress": "まだ進捗状況はありません",
-      "viewDetail": "詳細を表示",
-      "todayTasks": "今日の学習タスク",
-      "todayTasksHint": "{n}",
-      "startFocus": "フォーカス開始",
-      "focusStarted": "フォーカスが開始されました",
-      "noTodayTasks": "今日スケジュールされた研究タスクはありません。",
-      "lessonKind": "レッスン",
-      "homeworkKind": "宿題",
-      "studyTaskKind": "勉強",
-      "reminderLabel": "リマインド{time}",
-      "focusMinutesLabel": "{n}分",
-      "estimateLabel": "{n}計画されたポモドーロ",
-      "needsAttention": "注意が必要",
-      "attentionHint": "{n}",
-      "pendingSubmit": "提出する",
-      "pendingCorrection": "修正するには",
-      "pendingReview": "確認する必要があります",
-      "nothingPending": "今すぐ送信、修正、または確認する必要はありません。",
-      "causeLabel": "原因",
-      "retestLabel": "再テスト{date}",
-      "deadlineLabel": "期限{date}",
-      "timeUnknown": "時間未定",
-      "nextWeek": "今後7日間",
-      "weekLessons": "レッスン",
-      "weekResources": "関連リソース",
-      "weekAssessments": "コースと試験",
-      "nextWeekEmpty": "今週はレッスン、リソース、または試験はありません。",
-      "topicsCount": "{n}トピック",
-      "recentProgress": "最近勉強した",
-      "confirm": "確認",
-      "confirmed": "確認済み",
-      "sourceUser": "本人が記録",
-      "sourceAssistant": "アシスタント",
-      "stateStudied": "勉強済み",
-      "statePracticing": "練習中",
-      "stateNeedsReview": "レビュー",
-      "unnamedTopic": "無題のトピック",
-      "back": "戻る",
-      "projectMissing": "この学習プロジェクトは存在しません。",
-      "directory": "リソースフォルダ",
-      "directoryEmpty": "フォルダがバインドされていません",
-      "syllabusLabel": "シラバス",
-      "pastPapersCount": "過去問{n}件",
-      "mockPapersCount": "模擬試験の問題{n}件",
-      "resourceGroups": "種類別",
-      "resourceList": "リソース",
-      "resourceEmpty": "資料はまだありません。学習アシスタントが資料を取り込みます。",
-      "progressHistory": "進行状況レコード",
-      "completedTasksTitle": "最近完了した研究課題",
-      "completedTasksEmpty": "完了した研究課題はまだありません。",
-      "statResources": "リソース",
-      "statLessons": "参加したレッスン",
-      "statAssessments": "アセスメント",
-      "statProgress": "進行状況レコード",
-      "semesterTitle": "学期の進捗",
-      "semesterEmpty": "まだ学期計画はありません。",
-      "revisionLabel": "v {n}",
-      "weekLabel": "週{n}",
-      "milestoneLessons": "{n}レッスン",
-      "weeksProgress": "{m}週間中{n}週間",
-      "assessmentsTitle": "課題と試験",
-      "assessmentsEmpty": "課題や試験はありません。",
-      "reviewsTitle": "日次レビュー",
-      "reviewsEmpty": "日次レビューはまだありません。",
-      "findingsLabel": "調査結果",
-      "actionsLabel": "アクション",
-      "eventsTitle": "ティーチングイベント",
-      "eventsEmpty": "ティーチングイベントはありません。",
-      "retryEvent": "再試行",
-      "eventPending": "保留",
-      "eventRunning": "実行中",
-      "eventDone": "完了",
-      "eventState": "状態：{state}",
-      "whitelistTitle": "アプリのホワイトリスト",
-      "whitelistGeneric": "一般的なホワイトリストを使用する",
-      "whitelistEmpty": "ホワイトリストは空です。",
-      "visionTitle": "ビジョン",
-      "visionEmpty": "リンクされたビジョンはまだありません。",
-      "projectTasksTitle": "プロジェクトのタスク",
-      "projectTasksEmpty": "このプロジェクトにはまだタスクがありません。",
-      "openTasks": "未完了",
-      "doneTasks": "完了",
-      "statusUpcoming": "次回の",
-      "statusMissed": "未実施",
-      "statusInProgress": "着手済み",
-      "statusAwaiting": "提出待ち",
-      "statusOverdue": "期限切れ",
-      "statusSubmitted": "提出済み",
-      "statusCorrectionDue": "訂正待ち",
-      "statusNeedsReview": "要確認",
-      "statusGraded": "採点済み",
-      "kindWeeklyExam": "週テスト",
-      "kindMockExam": "模擬試験",
-      "kindRetest": "再試験",
-      "resourceKindSyllabus": "シラバス",
-      "resourceKindCourse": "コース",
-      "resourceKindBook": "教材",
-      "resourceKindPastPaper": "過去問",
-      "resourceKindMockPaper": "模擬問題",
-      "resourceKindReference": "参照",
-      "resourceKindAttachment": "添付資料",
-      "resourceKindAnswerSheet": "答案"
+    education: {
+      eyebrow: "トマト Todo",
+      title: "学習プロジェクト",
+      subtitle: "目標130点以上、2028年入学。初試験は2027年12月18日予定。",
+      refreshTitle: "更新",
+      loading: "研究計画を読み込んでいます...",
+      projectsTitle: "学習プロジェクト",
+      projectsHint: "{n}",
+      emptyProjectsTitle: "学習プロジェクトはまだありません",
+      emptyProjectsHint: "研究アシスタントはプロジェクトを作成し、会話中にフォルダをバインドします。このページにはそれらが表示され、実行されます。",
+      targetLabel: "目標",
+      examMode: "試験モード",
+      examDateLabel: "試験日",
+      countdownLabel: "試験カウントダウン",
+      countdownNone: "試験日なし",
+      countdownToday: "今日",
+      daysUnit: "日",
+      daysPast: "{n}日前",
+      unnamedProject: "無題のプロジェクト",
+      resourcesCount: "{n}リソース",
+      latestProgressLabel: "最新の進捗状況",
+      noProgress: "まだ進捗状況はありません",
+      viewDetail: "詳細を表示",
+      todayTasks: "今日の学習タスク",
+      todayTasksHint: "{n}",
+      startFocus: "フォーカス開始",
+      focusStarted: "フォーカスが開始されました",
+      noTodayTasks: "今日スケジュールされた研究タスクはありません。",
+      lessonKind: "レッスン",
+      homeworkKind: "宿題",
+      studyTaskKind: "勉強",
+      reminderLabel: "リマインド{time}",
+      focusMinutesLabel: "{n}分",
+      estimateLabel: "{n}計画されたポモドーロ",
+      needsAttention: "注意が必要",
+      attentionHint: "{n}",
+      pendingSubmit: "提出する",
+      pendingCorrection: "修正するには",
+      pendingReview: "確認する必要があります",
+      nothingPending: "今すぐ送信、修正、または確認する必要はありません。",
+      causeLabel: "原因",
+      retestLabel: "再テスト{date}",
+      deadlineLabel: "期限{date}",
+      timeUnknown: "時間未定",
+      nextWeek: "今後7日間",
+      weekLessons: "レッスン",
+      weekResources: "関連リソース",
+      weekAssessments: "コースと試験",
+      nextWeekEmpty: "今週はレッスン、リソース、または試験はありません。",
+      topicsCount: "{n}トピック",
+      recentProgress: "最近勉強した",
+      confirm: "確認",
+      confirmed: "確認済み",
+      sourceUser: "本人が記録",
+      sourceAssistant: "アシスタント",
+      stateStudied: "勉強済み",
+      statePracticing: "練習中",
+      stateNeedsReview: "レビュー",
+      unnamedTopic: "無題のトピック",
+      back: "戻る",
+      projectMissing: "この学習プロジェクトは存在しません。",
+      directory: "リソースフォルダ",
+      directoryEmpty: "フォルダがバインドされていません",
+      syllabusLabel: "シラバス",
+      pastPapersCount: "過去問{n}件",
+      mockPapersCount: "模擬試験の問題{n}件",
+      resourceGroups: "種類別",
+      resourceList: "リソース",
+      resourceEmpty: "資料はまだありません。学習アシスタントが資料を取り込みます。",
+      progressHistory: "進行状況レコード",
+      completedTasksTitle: "最近完了した研究課題",
+      completedTasksEmpty: "完了した研究課題はまだありません。",
+      statResources: "リソース",
+      statLessons: "参加したレッスン",
+      statAssessments: "アセスメント",
+      statProgress: "進行状況レコード",
+      semesterTitle: "学期の進捗",
+      semesterEmpty: "まだ学期計画はありません。",
+      revisionLabel: "v {n}",
+      weekLabel: "週{n}",
+      milestoneLessons: "{n}レッスン",
+      weeksProgress: "{m}週間中{n}週間",
+      assessmentsTitle: "課題と試験",
+      assessmentsEmpty: "課題や試験はありません。",
+      reviewsTitle: "日次レビュー",
+      reviewsEmpty: "日次レビューはまだありません。",
+      findingsLabel: "調査結果",
+      actionsLabel: "アクション",
+      eventsTitle: "ティーチングイベント",
+      eventsEmpty: "ティーチングイベントはありません。",
+      retryEvent: "再試行",
+      eventPending: "保留",
+      eventRunning: "実行中",
+      eventDone: "完了",
+      eventState: "状態：{state}",
+      whitelistTitle: "アプリのホワイトリスト",
+      whitelistGeneric: "一般的なホワイトリストを使用する",
+      whitelistEmpty: "ホワイトリストは空です。",
+      visionTitle: "ビジョン",
+      visionEmpty: "リンクされたビジョンはまだありません。",
+      projectTasksTitle: "プロジェクトのタスク",
+      projectTasksEmpty: "このプロジェクトにはまだタスクがありません。",
+      openTasks: "未完了",
+      doneTasks: "完了",
+      statusUpcoming: "次回の",
+      statusMissed: "未実施",
+      statusInProgress: "着手済み",
+      statusAwaiting: "提出待ち",
+      statusOverdue: "期限切れ",
+      statusSubmitted: "提出済み",
+      statusCorrectionDue: "訂正待ち",
+      statusNeedsReview: "要確認",
+      statusGraded: "採点済み",
+      kindWeeklyExam: "週テスト",
+      kindMockExam: "模擬試験",
+      kindRetest: "再試験",
+      resourceKindSyllabus: "シラバス",
+      resourceKindCourse: "コース",
+      resourceKindBook: "教材",
+      resourceKindPastPaper: "過去問",
+      resourceKindMockPaper: "模擬問題",
+      resourceKindReference: "参照",
+      resourceKindAttachment: "添付資料",
+      resourceKindAnswerSheet: "答案"
     },
-    "focus": {
-      "headline": "今日は、ゆっくりと進みましょう。",
-      "gradingBanner": "{name}：提出済みの課題 {n} 件が採点または訂正待ちです",
-      "gradingBannerAll": "提出済みの課題 {n} 件が採点または訂正待ちです",
-      "gradingBannerAction": "学習アシスタントを開く",
-      "sub": "この瞬間にとどまり、小さな一歩一歩をエコーしましょう。",
-      "newTask": "新しいタスク",
-      "statFocus": "今日のフォーカス",
-      "statFocusHint": "重要なことに少し時間を残す",
-      "unitMinutes": "分",
-      "statDone": "完了したタスク",
-      "statDoneHint": "未完了のタスクが{n}件",
-      "statStreak": "連続フォーカス",
-      "statStreakHint": "少しずつ",
-      "unitDays": "日",
-      "timerTitle": "私のポモドーロ",
-      "expand": "没入モード",
-      "allTasks": "すべてのタスク",
-      "weekdays": [
-        "日",
-        "月",
-        "火",
-        "水",
-        "木",
-        "金",
-        "土"
-      ],
-      "modeFocus": "集中",
-      "modeShort": "休憩",
-      "modeLong": "長い休憩",
-      "stateFocusing": "集中中",
-      "statePaused": "一時停止—いつでも再開",
-      "stateIdle": "いつでも始められます",
-      "stateBreak": "休息も重要",
-      "roundOf": "{m}のポモドーロ{n}",
-      "freeFocus": "フリーフォーカス·タスクを選択",
-      "pickTaskTitle": "フォーカスタスクを選択",
-      "pickTaskSubtitle": "ミッドラウンドでタスクを切り替えることはできません。最初に現在のラウンドを終了してください。",
-      "pickTaskSearch": "未完了のタスクを検索…",
-      "freeFocusOption": "フリーフォーカス（タスクなし）",
-      "noPickTasks": "該当する未完了タスクはありません",
-      "selected": "「{title}」を選択しました。準備ができたら開始してください。",
-      "freeSelected": "フリーフォーカス、タスクの添付なし",
-      "reset": "タイマーをリセット",
-      "skip": "このフェーズをスキップ",
-      "startFocus": "フォーカス開始",
-      "startBreak": "休憩を開始",
-      "resumeTimer": "再開",
-      "pauseFocus": "フォーカスを一時停止",
-      "loop": "繰り返し",
-      "loopHint": "このラウンドが終了すると、自動的に次のラウンドを開始します",
-      "whitelistOn": "有効なホワイトリスト・{n}個のアプリが許可されています",
-      "whitelistReady": "ホワイトリスト設定済み · {n}個のアプリを許可",
-      "locked": "画面ロック中",
-      "lockReady": "画面ロックオン·フォーカス中に適用",
-      "protectOff": "邪魔されずにストレッチしてください",
-      "guardUnavailable": "フォーカスガードは使用できません（バックグラウンドガードが実行されていません）",
-      "soundChoose": "雰囲気を選択してください",
-      "soundTitle": "アンビエントサウンド",
-      "soundSubtitle": "着地する場所に注意を向けるためにサウンドを選択してください。",
-      "timerBusy": "新しいフォーカスラウンドを開始する前に現在のタイマーを終了する",
-      "todayTasks": "今日のタスク",
-      "tabActive": "To Do",
-      "tabDone": "完了",
-      "groupCatchUp": "キャッチアップ",
-      "groupTimed": "本日予定",
-      "groupUntimed": "予定外",
-      "catchUpHelp": "キャッチアップキューについて",
-      "catchUpTitle": "キャッチアップキュー",
-      "catchUpDesignHeading": "それが存在する理由",
-      "catchUpDesignText": "キャッチアップは借金リストではなく、「まだやりたい」の余地があります。補うかどうかを決め、失敗しないようにします。",
-      "catchUpWhenHeading": "タスクがここに着陸したとき",
-      "catchUpWhenText": "計画ブロックが終了し、タスクが未完了でも修復ウィンドウ内にある場合、キャッチアップキューに移動し、再びここに表示されます。",
-      "catchUpHabitHeading": "見逃した習慣は欠勤としてカウントされます",
-      "catchUpHabitText": "習慣が切れると、今日のリストから外れ、欠勤が記録されます。",
-      "catchUpExpireHeading": "ウィンドウを過ぎると無効になります",
-      "catchUpExpireText": "修復ウィンドウを超えると、インスタンスは無効になり、リマインダーが停止します。それは別の日に運ぶことはありません。",
-      "emptyActiveTitle": "今日のタスクはありません",
-      "emptyActiveHint": "1つのことを書き留めて、最初のステップを今のところ維持してください。",
-      "emptyDoneTitle": "完了したタスクはまだありません",
-      "emptyDoneHint": "完了したタスクはここに表示されます。",
-      "quickAdd": "完了したいことを1つ追加",
-      "minutesPerSession": "{n}分/セッション",
-      "overdue": "期限切れ",
-      "catchUpBadge": "追いつく",
-      "overdueHint": "さらに{n}件の期限超過タスク",
-      "goTasks": "すべてのタスクに移動",
-      "untitled": "(無題)",
-      "taskCheck": "「{title}」を完了にする",
-      "taskUncheck": "「{title}」を未完了に戻す",
-      "taskPlay": "「{title}」に集中する",
-      "taskPause": "「{title}」を一時停止する",
-      "taskMore": "その他のアクション: {title}",
-      "rounds": "ラウンド {n}/{m}",
-      "menuFocus": "フォーカス開始",
-      "deleteTitle": "このタスクを削除しますか？",
-      "deleteBody": "集中履歴は統計に残ります。この操作は元に戻せません。",
-      "deleteConfirm": "削除",
-      "deleted": "タスクを削除しました",
-      "weekTitle": "今週の集中リズム",
-      "viewStats": "統計を見る",
-      "weekTotal": "今週は {time}",
-      "weekBarTitle": "{date} · {n}分",
-      "loadingTitle": "今日のプランを読み込み中…",
-      "loadingHint": "自動で再試行します。更新は不要です。",
-      "unitItems": "件"
+    focus: {
+      headline: "今日は、ゆっくりと進みましょう。",
+      gradingBanner: "{name}：提出済みの課題 {n} 件が採点または訂正待ちです",
+      gradingBannerAll: "提出済みの課題 {n} 件が採点または訂正待ちです",
+      gradingBannerAction: "学習アシスタントを開く",
+      sub: "この瞬間にとどまり、小さな一歩一歩をエコーしましょう。",
+      newTask: "新しいタスク",
+      statFocus: "今日のフォーカス",
+      statFocusHint: "重要なことに少し時間を残す",
+      unitMinutes: "分",
+      statDone: "完了したタスク",
+      statDoneHint: "未完了のタスクが{n}件",
+      statStreak: "連続フォーカス",
+      statStreakHint: "少しずつ",
+      unitDays: "日",
+      timerTitle: "私のポモドーロ",
+      expand: "没入モード",
+      allTasks: "すべてのタスク",
+      weekdays: ["日", "月", "火", "水", "木", "金", "土"],
+      modeFocus: "集中",
+      modeShort: "休憩",
+      modeLong: "長い休憩",
+      stateFocusing: "集中中",
+      statePaused: "一時停止—いつでも再開",
+      stateIdle: "いつでも始められます",
+      stateBreak: "休息も重要",
+      roundOf: "{m}のポモドーロ{n}",
+      freeFocus: "フリーフォーカス·タスクを選択",
+      pickTaskTitle: "フォーカスタスクを選択",
+      pickTaskSubtitle: "ミッドラウンドでタスクを切り替えることはできません。最初に現在のラウンドを終了してください。",
+      pickTaskSearch: "未完了のタスクを検索…",
+      freeFocusOption: "フリーフォーカス（タスクなし）",
+      noPickTasks: "該当する未完了タスクはありません",
+      selected: "「{title}」を選択しました。準備ができたら開始してください。",
+      freeSelected: "フリーフォーカス、タスクの添付なし",
+      reset: "タイマーをリセット",
+      skip: "このフェーズをスキップ",
+      startFocus: "フォーカス開始",
+      startBreak: "休憩を開始",
+      resumeTimer: "再開",
+      pauseFocus: "フォーカスを一時停止",
+      loop: "繰り返し",
+      loopHint: "このラウンドが終了すると、自動的に次のラウンドを開始します",
+      whitelistOn: "有効なホワイトリスト・{n}個のアプリが許可されています",
+      whitelistReady: "ホワイトリスト設定済み · {n}個のアプリを許可",
+      locked: "画面ロック中",
+      lockReady: "画面ロックオン·フォーカス中に適用",
+      protectOff: "邪魔されずにストレッチしてください",
+      guardUnavailable: "フォーカスガードは使用できません（バックグラウンドガードが実行されていません）",
+      soundChoose: "雰囲気を選択してください",
+      soundTitle: "アンビエントサウンド",
+      soundSubtitle: "着地する場所に注意を向けるためにサウンドを選択してください。",
+      timerBusy: "新しいフォーカスラウンドを開始する前に現在のタイマーを終了する",
+      todayTasks: "今日のタスク",
+      tabActive: "To Do",
+      tabDone: "完了",
+      groupCatchUp: "キャッチアップ",
+      groupTimed: "本日予定",
+      groupUntimed: "予定外",
+      catchUpHelp: "キャッチアップキューについて",
+      catchUpTitle: "キャッチアップキュー",
+      catchUpDesignHeading: "それが存在する理由",
+      catchUpDesignText: "キャッチアップは借金リストではなく、「まだやりたい」の余地があります。補うかどうかを決め、失敗しないようにします。",
+      catchUpWhenHeading: "タスクがここに着陸したとき",
+      catchUpWhenText: "計画ブロックが終了し、タスクが未完了でも修復ウィンドウ内にある場合、キャッチアップキューに移動し、再びここに表示されます。",
+      catchUpHabitHeading: "見逃した習慣は欠勤としてカウントされます",
+      catchUpHabitText: "習慣が切れると、今日のリストから外れ、欠勤が記録されます。",
+      catchUpExpireHeading: "ウィンドウを過ぎると無効になります",
+      catchUpExpireText: "修復ウィンドウを超えると、インスタンスは無効になり、リマインダーが停止します。それは別の日に運ぶことはありません。",
+      emptyActiveTitle: "今日のタスクはありません",
+      emptyActiveHint: "1つのことを書き留めて、最初のステップを今のところ維持してください。",
+      emptyDoneTitle: "完了したタスクはまだありません",
+      emptyDoneHint: "完了したタスクはここに表示されます。",
+      quickAdd: "完了したいことを1つ追加",
+      minutesPerSession: "{n}分/セッション",
+      overdue: "期限切れ",
+      catchUpBadge: "追いつく",
+      overdueHint: "さらに{n}件の期限超過タスク",
+      goTasks: "すべてのタスクに移動",
+      untitled: "(無題)",
+      taskCheck: "「{title}」を完了にする",
+      taskUncheck: "「{title}」を未完了に戻す",
+      taskPlay: "「{title}」に集中する",
+      taskPause: "「{title}」を一時停止する",
+      taskMore: "その他のアクション: {title}",
+      rounds: "ラウンド {n}/{m}",
+      menuFocus: "フォーカス開始",
+      deleteTitle: "このタスクを削除しますか？",
+      deleteBody: "集中履歴は統計に残ります。この操作は元に戻せません。",
+      deleteConfirm: "削除",
+      deleted: "タスクを削除しました",
+      weekTitle: "今週の集中リズム",
+      viewStats: "統計を見る",
+      weekTotal: "今週は {time}",
+      weekBarTitle: "{date} · {n}分",
+      loadingTitle: "今日のプランを読み込み中…",
+      loadingHint: "自動で再試行します。更新は不要です。",
+      unitItems: "件"
     },
-    "guard": {
-      "eyebrow": "トマト Todo",
-      "title": "フォーカスガード",
-      "subtitle": "集中を開始すると、ネイティブガードがホワイトリスト外のウィンドウを元に戻し、注意を一つのことに保ちます。",
-      "refresh": "更新",
-      "modesTitle": "保護モード",
-      "modesHint": "クリックで切り替え、すぐに保存されます",
-      "modeOff": "フリーフォーカス",
-      "modeOffDesc": "何もロックされず、ポモドーロタイマーだけが動作します。",
-      "modeLock": "画面ロック",
-      "modeLockDesc": "集中中はタイマー以外のすべてのウィンドウを全画面レイヤーで覆います。",
-      "modeWhitelist": "アプリのホワイトリスト",
-      "modeWhitelistDesc": "ホワイトリストにあるアプリだけがフォアグラウンドに留まれます。",
-      "current": "現在",
-      "strictSection": "規律",
-      "strictLabel": "厳格モード",
-      "strictHint": "保護が有効な間は早期終了できません。タイマーが終わるまで待ってください。",
-      "strictOffHint": "自由集中が選択されています。画面ロックまたはアプリホワイトリストをオンにすると厳格モードが適用されます。",
-      "strictActiveHint": "厳格モードが有効です。早期終了はできず、このページにロック解除の操作はありません。",
-      "whitelistTitle": "アプリのホワイトリスト",
-      "whitelistHint": "入力はウィンドウタイトルではなくアプリID全体です。",
-      "whitelistDisabled": "このリストを編集するには「アプリホワイトリスト」に切り替えてください。",
-      "whitelistEmpty": "ホワイトリストは空です。実行中のアプリから選ぶか、アプリIDを入力してください。",
-      "manualTitle": "手動で追加",
-      "addApp": "追加",
-      "appPlaceholder": "アプリID（例: code）",
-      "removeApp": "{name} を削除",
-      "appRequired": "先にアプリIDを入力してください",
-      "appNoSpace": "アプリIDに空白は使用できません",
-      "appExists": "そのアプリはすでにホワイトリストにあります",
-      "appAdded": "ホワイトリストに追加しました: {name}",
-      "appRemoved": "ホワイトリストから削除しました: {name}",
-      "suggestionsTitle": "推奨アプリ",
-      "refreshApps": "アプリを更新",
-      "refreshBusy": "スキャン中…",
-      "refreshFound": "実行中のアプリが{n}件見つかりました。",
-      "refreshEmpty": "追加できる実行中のアプリはありません。",
-      "refreshFailed": "アプリ一覧を読み取れませんでした: {error}",
-      "appsHint": "ウィンドウのある実行中のアプリを最大8件表示します。その他のアプリIDは手動で入力できます。",
-      "noSuggestions": "追加できる実行中のアプリはありません。",
-      "semanticsTitle": "ホワイトリストの仕組み",
-      "semantics": [
+    guard: {
+      eyebrow: "トマト Todo",
+      title: "フォーカスガード",
+      subtitle: "集中を開始すると、ネイティブガードがホワイトリスト外のウィンドウを元に戻し、注意を一つのことに保ちます。",
+      refresh: "更新",
+      modesTitle: "保護モード",
+      modesHint: "クリックで切り替え、すぐに保存されます",
+      modeOff: "フリーフォーカス",
+      modeOffDesc: "何もロックされず、ポモドーロタイマーだけが動作します。",
+      modeLock: "画面ロック",
+      modeLockDesc: "集中中はタイマー以外のすべてのウィンドウを全画面レイヤーで覆います。",
+      modeWhitelist: "アプリのホワイトリスト",
+      modeWhitelistDesc: "ホワイトリストにあるアプリだけがフォアグラウンドに留まれます。",
+      current: "現在",
+      strictSection: "規律",
+      strictLabel: "厳格モード",
+      strictHint: "保護が有効な間は早期終了できません。タイマーが終わるまで待ってください。",
+      strictOffHint: "自由集中が選択されています。画面ロックまたはアプリホワイトリストをオンにすると厳格モードが適用されます。",
+      strictActiveHint: "厳格モードが有効です。早期終了はできず、このページにロック解除の操作はありません。",
+      whitelistTitle: "アプリのホワイトリスト",
+      whitelistHint: "入力はウィンドウタイトルではなくアプリID全体です。",
+      whitelistDisabled: "このリストを編集するには「アプリホワイトリスト」に切り替えてください。",
+      whitelistEmpty: "ホワイトリストは空です。実行中のアプリから選ぶか、アプリIDを入力してください。",
+      manualTitle: "手動で追加",
+      addApp: "追加",
+      appPlaceholder: "アプリID（例: code）",
+      removeApp: "{name} を削除",
+      appRequired: "先にアプリIDを入力してください",
+      appNoSpace: "アプリIDに空白は使用できません",
+      appExists: "そのアプリはすでにホワイトリストにあります",
+      appAdded: "ホワイトリストに追加しました: {name}",
+      appRemoved: "ホワイトリストから削除しました: {name}",
+      suggestionsTitle: "推奨アプリ",
+      refreshApps: "アプリを更新",
+      refreshBusy: "スキャン中…",
+      refreshFound: "実行中のアプリが{n}件見つかりました。",
+      refreshEmpty: "追加できる実行中のアプリはありません。",
+      refreshFailed: "アプリ一覧を読み取れませんでした: {error}",
+      appsHint: "ウィンドウのある実行中のアプリを最大8件表示します。その他のアプリIDは手動で入力できます。",
+      noSuggestions: "追加できる実行中のアプリはありません。",
+      semanticsTitle: "ホワイトリストの仕組み",
+      semantics: [
         "ホワイトリストはウィンドウやタブ単位ではなく、アプリID単位で機能します。",
         "保護が有効な間、ガードは約0.6秒ごとに前面のウィンドウを確認し、ホワイトリストにないものを戻します。",
         "システムショートカット、全画面ゲーム、複数モニターは切り戻しを妨げる場合があります。一部のウィンドウは手動での対応が必要です。",
         "ホワイトリストはアプリホワイトリスト集中モードでのみ有効です。画面ロック、クイックロック、定時ロックでは無視されます。",
         "プロジェクトは一般のホワイトリストを置き換える独自のホワイトリストを定義できます。それはこの設定より優先されます。"
       ],
-      "statusTitle": "ガードの状態",
-      "statusAvailable": "ガードは実行中です",
-      "statusUnavailable": "ガードは実行されていません",
-      "statusUnavailableHint": "保護ルールは保存されていますが、画面は実際にはロックされません。",
-      "backend": "バックエンド",
-      "locked": "ロック状態",
-      "lockedYes": "ロック済み",
-      "lockedNo": "未ロック",
-      "pid": "プロセスPID",
-      "guardWhitelist": "ガードのホワイトリスト",
-      "count": "{n}件のアプリ",
-      "unknown": "不明",
-      "activeBadge": "保護が有効",
-      "idleBadge": "保護されていません",
-      "activeHint": "保護が有効です。厳格モードは途中で終了できず、このページにはロック解除の操作はありません。",
-      "idleHint": "集中セッションを開始すると保護が引き継がれます。"
+      statusTitle: "ガードの状態",
+      statusAvailable: "ガードは実行中です",
+      statusUnavailable: "ガードは実行されていません",
+      statusUnavailableHint: "保護ルールは保存されていますが、画面は実際にはロックされません。",
+      backend: "バックエンド",
+      locked: "ロック状態",
+      lockedYes: "ロック済み",
+      lockedNo: "未ロック",
+      pid: "プロセスPID",
+      guardWhitelist: "ガードのホワイトリスト",
+      count: "{n}件のアプリ",
+      unknown: "不明",
+      activeBadge: "保護が有効",
+      idleBadge: "保護されていません",
+      activeHint: "保護が有効です。厳格モードは途中で終了できず、このページにはロック解除の操作はありません。",
+      idleHint: "集中セッションを開始すると保護が引き継がれます。"
     },
-    "habits": {
-      "eyebrow": "小さな一歩",
-      "subtitle": "習慣は繰り返される小さな行動であり、ビジョンは遠くの方向です。",
-      "tabHabits": "習慣",
-      "tabVisions": "ビジョン",
-      "habitsHint": "ドットは過去7日間を表します：塗りつぶしは達成、枠線は未達成、グレーは予定なし。",
-      "visionsHint": "純粋な方向の目印です。達成状態もプレッシャーもありません。",
-      "newHabit": "新しい習慣",
-      "newVision": "新しいビジョン",
-      "firstHabit": "最初の習慣を作成",
-      "firstVision": "最初のビジョンを書く",
-      "emptyHabitsTitle": "習慣はまだありません",
-      "emptyHabitsHint": "失敗しようがないほど小さなことから始めましょう。数日続けばリズムになります。",
-      "emptyVisionsTitle": "ビジョンはまだありません",
-      "emptyVisionsHint": "向かう先を書き留めましょう。達成する必要はなく、ただ見えていれば十分です。",
-      "everyDay": "毎日",
-      "weekly": "毎週",
-      "daySeparator": "、",
-      "slotText": "{days} {time}",
-      "focusPerSession": "集中{n}回",
-      "streakDays": "{n}日連続",
-      "missedCount": "{n}回未達成",
-      "dotDone": "完了",
-      "dotMissed": "未達成",
-      "dotPending": "To Do",
-      "dotIdle": "予定なし",
-      "dotTitle": "{date} · {status}",
-      "newHabitTitle": "新しい習慣",
-      "editHabitTitle": "習慣を編集",
-      "habitDialogSubtitle": "スケジュールで表示頻度が決まります。集中時間を空欄にするとデフォルトになります。",
-      "habitName": "習慣名",
-      "habitNamePlaceholder": "例：朝の読書、20分",
-      "habitProject": "グループ",
-      "noGroup": "グループなし",
-      "schedule": "スケジュール",
-      "time": "時間",
-      "focusMinutes": "集中時間（分）",
-      "focusMinutesHint": "空欄の場合はデフォルトの{n}を使用",
-      "slotTitle": "スロット{n}",
-      "addSlot": "スロットを追加",
-      "removeSlot": "削除",
-      "slotDuplicate": "2つのスロットが同じ日時になっています",
-      "slotsLimit": "習慣には最大49個のスロットを設定できます",
-      "nameError": "名前は1〜40文字で入力してください",
-      "daysError": "少なくとも1日を選択してください",
-      "timeError": "時刻はHH:MM形式で入力してください",
-      "focusError": "集中時間は1〜180分の整数で入力してください",
-      "saved": "習慣を保存しました",
-      "deleted": "削除しました",
-      "deleteHabit": "習慣を削除",
-      "deleteHabitTitle": "この習慣を削除しますか？",
-      "deleteHabitBody": "「{name}」の週間スケジュールも削除されます。記録済みの履歴は残ります。",
-      "newVisionTitle": "新しいビジョン",
-      "editVisionTitle": "ビジョンを編集",
-      "visionDialogSubtitle": "ビジョンは方向性であり、完了すべきタスクではありません。",
-      "visionName": "ビジョン名",
-      "visionNamePlaceholder": "例：英語の小説を読み終える",
-      "visionNotes": "1行",
-      "visionNotesPlaceholder": "なぜ重要ですか？",
-      "visionProject": "所属先",
-      "totalVision": "全体のビジョン",
-      "visionSaved": "ビジョンを保存しました",
-      "deleteVision": "ビジョンを削除",
-      "deleteVisionTitle": "このビジョンを削除しますか？",
-      "deleteVisionBody": "「{name}」が削除されます。タスクと記録はそのまま残ります。",
-      "untitled": "無題"
+    habits: {
+      eyebrow: "小さな一歩",
+      subtitle: "習慣は繰り返される小さな行動であり、ビジョンは遠くの方向です。",
+      tabHabits: "習慣",
+      tabVisions: "ビジョン",
+      habitsHint: "ドットは過去7日間を表します：塗りつぶしは達成、枠線は未達成、グレーは予定なし。",
+      visionsHint: "純粋な方向の目印です。達成状態もプレッシャーもありません。",
+      newHabit: "新しい習慣",
+      newVision: "新しいビジョン",
+      firstHabit: "最初の習慣を作成",
+      firstVision: "最初のビジョンを書く",
+      emptyHabitsTitle: "習慣はまだありません",
+      emptyHabitsHint: "失敗しようがないほど小さなことから始めましょう。数日続けばリズムになります。",
+      emptyVisionsTitle: "ビジョンはまだありません",
+      emptyVisionsHint: "向かう先を書き留めましょう。達成する必要はなく、ただ見えていれば十分です。",
+      everyDay: "毎日",
+      weekly: "毎週",
+      daySeparator: "、",
+      slotText: "{days} {time}",
+      focusPerSession: "集中{n}回",
+      streakDays: "{n}日連続",
+      missedCount: "{n}回未達成",
+      dotDone: "完了",
+      dotMissed: "未達成",
+      dotPending: "To Do",
+      dotIdle: "予定なし",
+      dotTitle: "{date} · {status}",
+      newHabitTitle: "新しい習慣",
+      editHabitTitle: "習慣を編集",
+      habitDialogSubtitle: "スケジュールで表示頻度が決まります。集中時間を空欄にするとデフォルトになります。",
+      habitName: "習慣名",
+      habitNamePlaceholder: "例：朝の読書、20分",
+      habitProject: "グループ",
+      noGroup: "グループなし",
+      schedule: "スケジュール",
+      time: "時間",
+      focusMinutes: "集中時間（分）",
+      focusMinutesHint: "空欄の場合はデフォルトの{n}を使用",
+      slotTitle: "スロット{n}",
+      addSlot: "スロットを追加",
+      removeSlot: "削除",
+      slotDuplicate: "2つのスロットが同じ日時になっています",
+      slotsLimit: "習慣には最大49個のスロットを設定できます",
+      nameError: "名前は1〜40文字で入力してください",
+      daysError: "少なくとも1日を選択してください",
+      timeError: "時刻はHH:MM形式で入力してください",
+      focusError: "集中時間は1〜180分の整数で入力してください",
+      saved: "習慣を保存しました",
+      deleted: "削除しました",
+      deleteHabit: "習慣を削除",
+      deleteHabitTitle: "この習慣を削除しますか？",
+      deleteHabitBody: "「{name}」の週間スケジュールも削除されます。記録済みの履歴は残ります。",
+      newVisionTitle: "新しいビジョン",
+      editVisionTitle: "ビジョンを編集",
+      visionDialogSubtitle: "ビジョンは方向性であり、完了すべきタスクではありません。",
+      visionName: "ビジョン名",
+      visionNamePlaceholder: "例：英語の小説を読み終える",
+      visionNotes: "1行",
+      visionNotesPlaceholder: "なぜ重要ですか？",
+      visionProject: "所属先",
+      totalVision: "全体のビジョン",
+      visionSaved: "ビジョンを保存しました",
+      deleteVision: "ビジョンを削除",
+      deleteVisionTitle: "このビジョンを削除しますか？",
+      deleteVisionBody: "「{name}」が削除されます。タスクと記録はそのまま残ります。",
+      untitled: "無題"
     },
-    "prefs": {
-      "eyebrow": "トマト Todo",
-      "title": "設定",
-      "subtitle": "ポモドーロ、学習プラン、リマインダー、データ。すべてこのデバイスに保存されます。",
-      "save": "設定を保存",
-      "saving": "保存中…",
-      "saved": "設定を保存しました",
-      "unsaved": "未保存の変更",
-      "discard": "変更を破棄",
-      "loading": "設定を読み込み中…",
-      "offlineTitle": "オフラインのランタイム",
-      "offlineHint": "設定が偽装されることはありません。ランタイムが戻ると自動的に読み込まれます。",
-      "saveFailed": "保存できませんでした: {error}",
-      "rangeError": "{label}は{min}から{max}の間の整数である必要があります",
-      "unitMin": "分",
-      "unitRound": "ラウンド",
-      "unitCount": "ポモドーロ",
-      "sectionFocus": "集中と休憩",
-      "sectionFocusHint": "デフォルトは次回のリセット後に適用されます。実行中のタイマーは影響を受けません。",
-      "focusMinutes": "集中時間の長さ",
-      "shortBreak": "休憩",
-      "longBreak": "前回の長い休憩",
-      "longBreakEvery": "長休憩の間隔",
-      "dailyGoal": "デイリーポモドーロゴール",
-      "autoBreak": "休憩を自動で開始",
-      "autoBreakHint": "集中が終わるとすぐに休憩タイマーを開始します。",
-      "autoFocus": "次のラウンドを自動で開始",
-      "autoFocusHint": "休憩後に現在のタスクを続行します。",
-      "autoStartTasks": "時間になったら自動で開始",
-      "autoStartTasksHint": "タスクのリマインダー時刻になったらフォーカスを開始します。タイマー、ロック、試験中は決して中断しません。",
-      "sectionPlan": "学習プラン",
-      "sectionPlanHint": "プランファイルはタスクとスケジュールのみをやり取りします。進捗とフォーカス履歴は保持されます。インポートはIDでマージされます。",
-      "exportPlan": "プランをエクスポート",
-      "importPlan": "プランをインポート",
-      "exportPending": "実行時エクスポートエンドポイントはまだ準備できていません。",
-      "exportFailed": "エクスポートに失敗しました: {error}",
-      "exportDone": "エクスポートしました",
-      "planImported": "プランをインポートしました",
-      "planImportFailed": "プランのインポートに失敗しました: {error}",
-      "importInvalid": "このファイルは有効なJSONではありません",
-      "importReadFailed": "ファイルを読み取れませんでした: {error}",
-      "sectionExperience": "エクスペリエンスとリマインダー",
-      "language": "言語",
-      "languageHint": "DSH の言語設定と同期します。初回起動時はブラウザーまたはシステムの言語に従います。",
-      "appearance": "外観",
-      "appearanceNote": "外観はDSH設定 → 外観に従います。トマトスキンはペーパーパレットを上に重ねます。",
-      "simpleMode": "コンパクトモード",
-      "simpleModeNote": "UIの密度はDSHによって管理されます。トマトのメインビューはナビゲーションと9つのページを維持します。",
-      "personaBackdrop": "ペルソナ背景",
-      "personaBackdropHint": "通常のページ背景に現在のペルソナのアートワークを表示します。フォーカスビューとガードビューでは非表示になります。",
-      "sound": "キーモーメントのサウンド",
-      "soundHint": "開始、一時停止、完了、リマインダー用の短い通知音。",
-      "soundVolume": "サウンドの音量",
-      "mute": "ミュート",
-      "notifications": "デスクトップ通知",
-      "notificationsHint": "ポモドーロ完了時とタスクリマインダーのシステム通知。",
-      "alwaysOnTop": "常に最前面に表示",
-      "alwaysOnTopHint": "サポートされるかどうかはDSHのウィンドウマネージャーに依存します。",
-      "preview": "プレビュー",
-      "previewHint": "サウンドプレビューは没入型サウンドレイヤーとともに提供されます。項目は今のところ残ります。",
-      "previewPending": "サウンドプレビューはまだ接続されていません",
-      "sectionDesktop": "デスクトップ統合",
-      "desktopHint": "DSHフォームではこれらはシステムとDSHによって処理されます。プラグインはスイッチを追加しません。",
-      "autostart": "ログイン時に起動",
-      "autostartValue": "インストールスクリプトとsystemdユーザーサービスによって管理されます（docs/CROSS_PLATFORM.mdを参照）。",
-      "tray": "閉じた後もトレイで実行を続ける",
-      "trayValue": "DSHにはシステムトレイがありません。メインビューを閉じてもタイマーやリマインダーは停止しません。",
-      "quit": "アプリを終了",
-      "quitValue": "DSHから終了します。タイマーと設定は終了前に保存されます。",
-      "sectionNetwork": "ネットワークプロキシ",
-      "networkHint": "プラグインはローカルランタイム（127.0.0.1）とのみ通信します。プロキシはDSHとシステム設定に従います。",
-      "sectionData": "データとバックアップ",
-      "dataHint": "完全なバックアップにはタスク、進捗、フォーカス履歴、設定、ロックスケジュールが含まれます。インポートすると現在のデータが置き換えられます。",
-      "exportBackup": "バックアップをエクスポート",
-      "importBackup": "バックアップをインポート",
-      "backupImported": "バックアップをインポートしました",
-      "backupImportFailed": "バックアップのインポートに失敗しました: {error}",
-      "confirmBackupTitle": "このバックアップをインポートしますか？",
-      "confirmBackupBody": "インポートすると現在のタスク、進捗、履歴、設定が置き換えられます。先にバックアップをエクスポートしてください。ストリクトモードとガードルールがバイパスされることは決してありません。",
-      "confirmImport": "インポート",
-      "fileFilter": "JSONファイル",
-      "exportBackupPending": "ランタイムのエクスポートエンドポイントはまだ準備できていません。"
+    prefs: {
+      eyebrow: "トマト Todo",
+      title: "設定",
+      subtitle: "ポモドーロ、学習プラン、リマインダー、データ。すべてこのデバイスに保存されます。",
+      save: "設定を保存",
+      saving: "保存中…",
+      saved: "設定を保存しました",
+      unsaved: "未保存の変更",
+      discard: "変更を破棄",
+      loading: "設定を読み込み中…",
+      offlineTitle: "オフラインのランタイム",
+      offlineHint: "設定が偽装されることはありません。ランタイムが戻ると自動的に読み込まれます。",
+      saveFailed: "保存できませんでした: {error}",
+      rangeError: "{label}は{min}から{max}の間の整数である必要があります",
+      unitMin: "分",
+      unitRound: "ラウンド",
+      unitCount: "ポモドーロ",
+      sectionFocus: "集中と休憩",
+      sectionFocusHint: "デフォルトは次回のリセット後に適用されます。実行中のタイマーは影響を受けません。",
+      focusMinutes: "集中時間の長さ",
+      shortBreak: "休憩",
+      longBreak: "前回の長い休憩",
+      longBreakEvery: "長休憩の間隔",
+      dailyGoal: "デイリーポモドーロゴール",
+      autoBreak: "休憩を自動で開始",
+      autoBreakHint: "集中が終わるとすぐに休憩タイマーを開始します。",
+      autoFocus: "次のラウンドを自動で開始",
+      autoFocusHint: "休憩後に現在のタスクを続行します。",
+      autoStartTasks: "時間になったら自動で開始",
+      autoStartTasksHint: "タスクのリマインダー時刻になったらフォーカスを開始します。タイマー、ロック、試験中は決して中断しません。",
+      sectionPlan: "学習プラン",
+      sectionPlanHint: "プランファイルはタスクとスケジュールのみをやり取りします。進捗とフォーカス履歴は保持されます。インポートはIDでマージされます。",
+      exportPlan: "プランをエクスポート",
+      importPlan: "プランをインポート",
+      exportPending: "実行時エクスポートエンドポイントはまだ準備できていません。",
+      exportFailed: "エクスポートに失敗しました: {error}",
+      exportDone: "エクスポートしました",
+      planImported: "プランをインポートしました",
+      planImportFailed: "プランのインポートに失敗しました: {error}",
+      importInvalid: "このファイルは有効なJSONではありません",
+      importReadFailed: "ファイルを読み取れませんでした: {error}",
+      sectionExperience: "エクスペリエンスとリマインダー",
+      language: "言語",
+      languageHint: "DSH の言語設定と同期します。初回起動時はブラウザーまたはシステムの言語に従います。",
+      appearance: "外観",
+      appearanceNote: "外観はDSH設定 → 外観に従います。トマトスキンはペーパーパレットを上に重ねます。",
+      simpleMode: "コンパクトモード",
+      simpleModeNote: "UIの密度はDSHによって管理されます。トマトのメインビューはナビゲーションと9つのページを維持します。",
+      personaBackdrop: "ペルソナ背景",
+      personaBackdropHint: "通常のページ背景に現在のペルソナのアートワークを表示します。フォーカスビューとガードビューでは非表示になります。",
+      sound: "キーモーメントのサウンド",
+      soundHint: "開始、一時停止、完了、リマインダー用の短い通知音。",
+      soundVolume: "サウンドの音量",
+      mute: "ミュート",
+      notifications: "デスクトップ通知",
+      notificationsHint: "ポモドーロ完了時とタスクリマインダーのシステム通知。",
+      alwaysOnTop: "常に最前面に表示",
+      alwaysOnTopHint: "サポートされるかどうかはDSHのウィンドウマネージャーに依存します。",
+      preview: "プレビュー",
+      previewHint: "サウンドプレビューは没入型サウンドレイヤーとともに提供されます。項目は今のところ残ります。",
+      previewPending: "サウンドプレビューはまだ接続されていません",
+      sectionDesktop: "デスクトップ統合",
+      desktopHint: "DSHフォームではこれらはシステムとDSHによって処理されます。プラグインはスイッチを追加しません。",
+      autostart: "ログイン時に起動",
+      autostartValue: "インストールスクリプトとsystemdユーザーサービスによって管理されます（docs/CROSS_PLATFORM.mdを参照）。",
+      tray: "閉じた後もトレイで実行を続ける",
+      trayValue: "DSHにはシステムトレイがありません。メインビューを閉じてもタイマーやリマインダーは停止しません。",
+      quit: "アプリを終了",
+      quitValue: "DSHから終了します。タイマーと設定は終了前に保存されます。",
+      sectionNetwork: "ネットワークプロキシ",
+      networkHint: "プラグインはローカルランタイム（127.0.0.1）とのみ通信します。プロキシはDSHとシステム設定に従います。",
+      sectionData: "データとバックアップ",
+      dataHint: "完全なバックアップにはタスク、進捗、フォーカス履歴、設定、ロックスケジュールが含まれます。インポートすると現在のデータが置き換えられます。",
+      exportBackup: "バックアップをエクスポート",
+      importBackup: "バックアップをインポート",
+      backupImported: "バックアップをインポートしました",
+      backupImportFailed: "バックアップのインポートに失敗しました: {error}",
+      confirmBackupTitle: "このバックアップをインポートしますか？",
+      confirmBackupBody: "インポートすると現在のタスク、進捗、履歴、設定が置き換えられます。先にバックアップをエクスポートしてください。ストリクトモードとガードルールがバイパスされることは決してありません。",
+      confirmImport: "インポート",
+      fileFilter: "JSONファイル",
+      exportBackupPending: "ランタイムのエクスポートエンドポイントはまだ準備できていません。"
     },
-    "print": {
-      "title": "タスクを印刷",
-      "subtitle": "テンプレートからタスクインスタンスを生成します。既に印刷された日付はスキップされます。",
-      "template": "テンプレート",
-      "untitled": "無題のテンプレート",
-      "emptyTitle": "テンプレートはまだありません",
-      "emptyHint": "タスクページでタスクのグループをテンプレートとして保存してから、戻って印刷してください。",
-      "noPrinting": "このテンプレートには使用可能な印刷ルールがありません",
-      "noPrintingHint": "先にテンプレートエディタで一回限り、カレンダー、または毎週のルールを設定してください。",
-      "ruleNone": "印刷ルールなし",
-      "ruleOnce": "一回 · {date}{time}",
-      "ruleCalendar": "カレンダー · {n}件の日付",
-      "ruleWeekly": "毎週 · {days}{times}",
-      "daySep": "、",
-      "timesSep": "·",
-      "untimed": "いつでも",
-      "autoLabel": "自動印刷",
-      "autoHint": "今日から{n}日先までの空きを埋めます。アプリが閉じている間は実行されません。",
-      "autoOn": "自動印刷オン",
-      "autoOff": "自動印刷オフ",
-      "dates": "予定日",
-      "pickDate": "日を選択",
-      "chipToday": "今日",
-      "chipTomorrow": "明日",
-      "chipThisWeek": "今週",
-      "chipNextDays": "次の7日間",
-      "chipAllDates": "すべてのルール日付（{n}）",
-      "chipRuleDate": "ルール日付：{date}",
-      "addDate": "追加",
-      "removeDate": "この日付を削除",
-      "pickedEmpty": "日付がまだありません — 上のクイック日付をタップするか、1つ選択してください。",
-      "invalidDate": "無効な日付です。別の日付を選択してください",
-      "preview": "プレビュー",
-      "previewCount": "{n}件のタスクを作成します",
-      "previewNone": "作成するものはありません",
-      "previewMore": "…他{n}件",
-      "skipped": "スキップします",
-      "skipPrinted": "印刷済み: {date}",
-      "skipNotInRule": "カレンダーにない: {date}",
-      "excludedHint": "ルール外の日付はバッチが失敗しないよう除外されます。",
-      "pickDateFirst": "少なくとも1つの日付を選択してください",
-      "confirm": "印刷",
-      "done": "印刷を送信しました"
+    print: {
+      title: "タスクを印刷",
+      subtitle: "テンプレートからタスクインスタンスを生成します。既に印刷された日付はスキップされます。",
+      template: "テンプレート",
+      untitled: "無題のテンプレート",
+      emptyTitle: "テンプレートはまだありません",
+      emptyHint: "タスクページでタスクのグループをテンプレートとして保存してから、戻って印刷してください。",
+      noPrinting: "このテンプレートには使用可能な印刷ルールがありません",
+      noPrintingHint: "先にテンプレートエディタで一回限り、カレンダー、または毎週のルールを設定してください。",
+      ruleNone: "印刷ルールなし",
+      ruleOnce: "一回 · {date}{time}",
+      ruleCalendar: "カレンダー · {n}件の日付",
+      ruleWeekly: "毎週 · {days}{times}",
+      daySep: "、",
+      timesSep: "·",
+      untimed: "いつでも",
+      autoLabel: "自動印刷",
+      autoHint: "今日から{n}日先までの空きを埋めます。アプリが閉じている間は実行されません。",
+      autoOn: "自動印刷オン",
+      autoOff: "自動印刷オフ",
+      dates: "予定日",
+      pickDate: "日を選択",
+      chipToday: "今日",
+      chipTomorrow: "明日",
+      chipThisWeek: "今週",
+      chipNextDays: "次の7日間",
+      chipAllDates: "すべてのルール日付（{n}）",
+      chipRuleDate: "ルール日付：{date}",
+      addDate: "追加",
+      removeDate: "この日付を削除",
+      pickedEmpty: "日付がまだありません — 上のクイック日付をタップするか、1つ選択してください。",
+      invalidDate: "無効な日付です。別の日付を選択してください",
+      preview: "プレビュー",
+      previewCount: "{n}件のタスクを作成します",
+      previewNone: "作成するものはありません",
+      previewMore: "…他{n}件",
+      skipped: "スキップします",
+      skipPrinted: "印刷済み: {date}",
+      skipNotInRule: "カレンダーにない: {date}",
+      excludedHint: "ルール外の日付はバッチが失敗しないよう除外されます。",
+      pickDateFirst: "少なくとも1つの日付を選択してください",
+      confirm: "印刷",
+      done: "印刷を送信しました"
     },
-    "schedule": {
-      "eyebrow": "トマト Todo",
-      "title": "予定されたロック",
-      "subtitle": "予定した時刻に全画面で休憩します。集中時間を消費せず、自動的に解除されます。",
-      "refresh": "更新",
-      "activeTitle": "ロック実行中",
-      "activeWindow": "{start} – {end}",
-      "activeStrict": "厳格",
-      "activeStrictHint": "厳格モードは途中で終了できません。タイマーが切れると解除されます。",
-      "activeHint": "ロック中はタスクとタイマーを変更できません。自動的に解除されます。",
-      "unnamed": "無題のブロック",
-      "total": "合計 {time}",
-      "quickTitle": "今すぐ休憩",
-      "quickHint": "画面はすぐにロックされ、終了時に解除されます。短い休憩は集中時間に数えられず、集中記録も作成されません。",
-      "quickMinutes": "時間（分）",
-      "quickCustomPlaceholder": "カスタム 1〜720",
-      "unit": "分",
-      "quickInvalid": "1〜720の整数の分を入力してください",
-      "quickStrictLabel": "厳格モード",
-      "quickStrictHint": "開始後は途中で終了できません。休憩が終わるまでお待ちください。",
-      "quickStart": "今すぐ開始",
-      "quickRunning": "ロックが実行中です。終了までお待ちください。",
-      "quickStarted": "{n}分の休憩を開始しました。",
-      "schedulesTitle": "繰り返し休憩ブロック",
-      "schedulesHint": "有効なブロックは週間カレンダーで発動します",
-      "addSchedule": "ブロックを追加",
-      "editSchedule": "ブロックを編集",
-      "deleteSchedule": "ブロックを削除",
-      "enabledOn": "有効",
-      "enabledOff": "無効",
-      "nextDay": "翌日 {time}",
-      "strictChip": "厳格",
-      "scheduleEmpty": "定期的な休憩ブロックはまだありません",
-      "scheduleEmptyHint": "例：「睡眠 22:00〜翌日 07:00、月曜日から日曜日、厳格モード」。",
-      "dialogNew": "休憩ブロックを追加",
-      "dialogEdit": "休憩ブロックを編集",
-      "dialogSubtitle": "設定した時刻に画面をロックします。日をまたぐブロックの場合は、終了時刻を開始時刻より前に設定してください。",
-      "nameLabel": "名前",
-      "namePlaceholder": "例：睡眠",
-      "startLabel": "開始",
-      "endLabel": "終了",
-      "daysLabel": "日",
-      "strictLabel": "厳格モード",
-      "strictHint": "厳格モードでは早期終了できません。",
-      "enabledLabel": "有効",
-      "enabledHint": "有効なブロックのみが重複チェックの対象となり、設定時刻に作動します。",
-      "errName": "名前は1〜40文字にしてください",
-      "errTime": "両方の時刻を有効なHH:MM形式で入力してください",
-      "errSameTime": "開始時刻と終了時刻は同じにできません。日をまたぐブロックの場合は、終了時刻を開始時刻より前に設定してください",
-      "errDays": "重複しない曜日を1つ以上選んでください（月曜日は1、日曜日は7）",
-      "errOverlap": "有効なブロック「{name}」と重複しています。曜日または時刻を調整してください",
-      "errLimit": "ロックブロックは最大20個までです",
-      "saved": "休憩ブロックを保存しました",
-      "deleted": "休憩ブロックを削除しました",
-      "deleteTitle": "この休憩ブロックを削除しますか？",
-      "deleteBody": "「{name}」は作動しなくなります。すでに進行中のロックには影響しません。",
-      "deleteHint": "この操作は元に戻せません。必要に応じて再度追加できます。"
+    schedule: {
+      eyebrow: "トマト Todo",
+      title: "予定されたロック",
+      subtitle: "予定した時刻に全画面で休憩します。集中時間を消費せず、自動的に解除されます。",
+      refresh: "更新",
+      activeTitle: "ロック実行中",
+      activeWindow: "{start} – {end}",
+      activeStrict: "厳格",
+      activeStrictHint: "厳格モードは途中で終了できません。タイマーが切れると解除されます。",
+      activeHint: "ロック中はタスクとタイマーを変更できません。自動的に解除されます。",
+      unnamed: "無題のブロック",
+      total: "合計 {time}",
+      quickTitle: "今すぐ休憩",
+      quickHint: "画面はすぐにロックされ、終了時に解除されます。短い休憩は集中時間に数えられず、集中記録も作成されません。",
+      quickMinutes: "時間（分）",
+      quickCustomPlaceholder: "カスタム 1〜720",
+      unit: "分",
+      quickInvalid: "1〜720の整数の分を入力してください",
+      quickStrictLabel: "厳格モード",
+      quickStrictHint: "開始後は途中で終了できません。休憩が終わるまでお待ちください。",
+      quickStart: "今すぐ開始",
+      quickRunning: "ロックが実行中です。終了までお待ちください。",
+      quickStarted: "{n}分の休憩を開始しました。",
+      schedulesTitle: "繰り返し休憩ブロック",
+      schedulesHint: "有効なブロックは週間カレンダーで発動します",
+      addSchedule: "ブロックを追加",
+      editSchedule: "ブロックを編集",
+      deleteSchedule: "ブロックを削除",
+      enabledOn: "有効",
+      enabledOff: "無効",
+      nextDay: "翌日 {time}",
+      strictChip: "厳格",
+      scheduleEmpty: "定期的な休憩ブロックはまだありません",
+      scheduleEmptyHint: "例：「睡眠 22:00〜翌日 07:00、月曜日から日曜日、厳格モード」。",
+      dialogNew: "休憩ブロックを追加",
+      dialogEdit: "休憩ブロックを編集",
+      dialogSubtitle: "設定した時刻に画面をロックします。日をまたぐブロックの場合は、終了時刻を開始時刻より前に設定してください。",
+      nameLabel: "名前",
+      namePlaceholder: "例：睡眠",
+      startLabel: "開始",
+      endLabel: "終了",
+      daysLabel: "日",
+      strictLabel: "厳格モード",
+      strictHint: "厳格モードでは早期終了できません。",
+      enabledLabel: "有効",
+      enabledHint: "有効なブロックのみが重複チェックの対象となり、設定時刻に作動します。",
+      errName: "名前は1〜40文字にしてください",
+      errTime: "両方の時刻を有効なHH:MM形式で入力してください",
+      errSameTime: "開始時刻と終了時刻は同じにできません。日をまたぐブロックの場合は、終了時刻を開始時刻より前に設定してください",
+      errDays: "重複しない曜日を1つ以上選んでください（月曜日は1、日曜日は7）",
+      errOverlap: "有効なブロック「{name}」と重複しています。曜日または時刻を調整してください",
+      errLimit: "ロックブロックは最大20個までです",
+      saved: "休憩ブロックを保存しました",
+      deleted: "休憩ブロックを削除しました",
+      deleteTitle: "この休憩ブロックを削除しますか？",
+      deleteBody: "「{name}」は作動しなくなります。すでに進行中のロックには影響しません。",
+      deleteHint: "この操作は元に戻せません。必要に応じて再度追加できます。"
     },
-    "search": {
-      "title": "一つを探す",
-      "subtitle": "タイトル、タグ、メモを検索します。Enterで最初の結果を開きます。",
-      "placeholder": "タスク、メモ、タグを検索…",
-      "idleTitle": "最近のタスク",
-      "empty": "一致するタスクがありません",
-      "emptyHint": "別のキーワードを試すか、この単語で新規作成してください。",
-      "create": "「{q}」というタイトルのタスクを作成",
-      "open": "未解決",
-      "project": "プロジェクト",
-      "noProject": "受信トレイ",
-      "completed": "完了",
-      "overdue": "期限切れ",
-      "today": "今日",
-      "untitled": "(無題)",
-      "hotkeys": "ショートカット",
-      "hotkeyNew": "新しいタスク",
-      "hotkeySearch": "タスクを検索",
-      "hotkeySpace": "タイマーを開始 / 一時停止",
-      "hotkeyEsc": "ダイアログを閉じる",
-      "tip": "入力中はタイマーのショートカットは無視されます。",
-      "count": "{n} 件の結果",
-      "help": "ヘルプ"
+    search: {
+      title: "一つを探す",
+      subtitle: "タイトル、タグ、メモを検索します。Enterで最初の結果を開きます。",
+      placeholder: "タスク、メモ、タグを検索…",
+      idleTitle: "最近のタスク",
+      empty: "一致するタスクがありません",
+      emptyHint: "別のキーワードを試すか、この単語で新規作成してください。",
+      create: "「{q}」というタイトルのタスクを作成",
+      open: "未解決",
+      project: "プロジェクト",
+      noProject: "受信トレイ",
+      completed: "完了",
+      overdue: "期限切れ",
+      today: "今日",
+      untitled: "(無題)",
+      hotkeys: "ショートカット",
+      hotkeyNew: "新しいタスク",
+      hotkeySearch: "タスクを検索",
+      hotkeySpace: "タイマーを開始 / 一時停止",
+      hotkeyEsc: "ダイアログを閉じる",
+      tip: "入力中はタイマーのショートカットは無視されます。",
+      count: "{n} 件の結果",
+      help: "ヘルプ"
     },
-    "stats": {
-      "eyebrow": "時間を振り返る",
-      "subtitle": "他人と比べず、自分の静かな前進だけを、一日ずつ。",
-      "refresh": "更新",
-      "labelTotalMinutes": "合計フォーカス時間",
-      "unitMinutes": "分",
-      "hintTotal": "すべてのフォーカスセッションの合計",
-      "labelPomodoros": "ポモドーロ",
-      "unitCount": "個",
-      "hintPomodoros": "完了したフォーカスラウンド",
-      "labelStreak": "連続フォーカス",
-      "unitDays": "日",
-      "hintStreak": "フォーカスを始めた日がカウントされます",
-      "labelMissed": "逃した習慣",
-      "unitTimes": "回",
-      "hintMissed": "過去28日間に未完了のままの予定された習慣",
-      "last7": "過去7日間",
-      "total": "合計 {value}",
-      "where": "時間の使われ方",
-      "noProjects": "プロジェクトのフォーカスはまだありません",
-      "noProjectsHint": "フォーカスセッションを完了すると、その時間がプロジェクト別にここに表示されます。",
-      "daily": "デイリーログ",
-      "dailyHint": "過去 {n} 日間",
-      "colDate": "日付",
-      "colCompleted": "完了",
-      "colMissed": "未達成",
-      "colVoided": "無効",
-      "trail": "フォーカスの軌跡",
-      "trailCount": "最新 {n}",
-      "unknownTask": "無題のタスク",
-      "completed": "完了",
-      "supplement": "見積もりから補完",
-      "endedEarly": "早期終了",
-      "noTrail": "セッションはまだありません",
-      "noTrailHint": "最初のポモドーロを開始すると、ここに記録が残ります。",
-      "noDays": "日別統計はまだありません",
-      "noDaysHint": "統計は日ごとに蓄積されます。また後で確認してください。"
+    stats: {
+      eyebrow: "時間を振り返る",
+      subtitle: "他人と比べず、自分の静かな前進だけを、一日ずつ。",
+      refresh: "更新",
+      labelTotalMinutes: "合計フォーカス時間",
+      unitMinutes: "分",
+      hintTotal: "すべてのフォーカスセッションの合計",
+      labelPomodoros: "ポモドーロ",
+      unitCount: "個",
+      hintPomodoros: "完了したフォーカスラウンド",
+      labelStreak: "連続フォーカス",
+      unitDays: "日",
+      hintStreak: "フォーカスを始めた日がカウントされます",
+      labelMissed: "逃した習慣",
+      unitTimes: "回",
+      hintMissed: "過去28日間に未完了のままの予定された習慣",
+      last7: "過去7日間",
+      total: "合計 {value}",
+      where: "時間の使われ方",
+      noProjects: "プロジェクトのフォーカスはまだありません",
+      noProjectsHint: "フォーカスセッションを完了すると、その時間がプロジェクト別にここに表示されます。",
+      daily: "デイリーログ",
+      dailyHint: "過去 {n} 日間",
+      colDate: "日付",
+      colCompleted: "完了",
+      colMissed: "未達成",
+      colVoided: "無効",
+      trail: "フォーカスの軌跡",
+      trailCount: "最新 {n}",
+      unknownTask: "無題のタスク",
+      completed: "完了",
+      supplement: "見積もりから補完",
+      endedEarly: "早期終了",
+      noTrail: "セッションはまだありません",
+      noTrailHint: "最初のポモドーロを開始すると、ここに記録が残ります。",
+      noDays: "日別統計はまだありません",
+      noDaysHint: "統計は日ごとに蓄積されます。また後で確認してください。"
     },
-    "task": {
-      "newTitle": "タスクを作成",
-      "editTitle": "タスクを編集",
-      "newSubtitle": "一度に一つずつ。日付とフォーカスブロックは後で設定できます。",
-      "editSubtitle": "日付、完了状態、セッションはこのインスタンスに属します。パターンを変更するにはテンプレートを編集してください。",
-      "title": "タイトル",
-      "titlePlaceholder": "何を終わらせたいですか？",
-      "project": "プロジェクト",
-      "noProject": "プロジェクトなし",
-      "dueDate": "予定日",
-      "reminder": "リマインダー",
-      "reminderHint": "空欄の場合はその日のリストに表示するだけです",
-      "focusMinutes": "セッションあたりのフォーカス",
-      "focusMinutesHint": "空欄の場合はデフォルトの {n} 分を使用します",
-      "estimate": "予定ポモドーロ数",
-      "estimateHint": "進捗は完了したフォーカスラウンドをカウントします",
-      "focusPreview": "約 {n} 分のフォーカス（休憩を除く）、休憩込みで {m} 分",
-      "priority": "優先度",
-      "scrap": "修復ウィンドウ",
-      "scrapHint": "計画ブロック後にまだ使用できる分。0 にすると時間通りに無効になります",
-      "tags": "タグ",
-      "tagsPlaceholder": "カンマ区切り、例：数学, ミス",
-      "notes": "メモ",
-      "notesPlaceholder": "参考資料、場所、自分へのメモ…",
-      "subtasks": "サブタスク",
-      "subtaskPlaceholder": "サブタスクを追加",
-      "addSubtask": "サブタスクを追加",
-      "removeSubtask": "サブタスクを削除",
-      "titleRequired": "タイトルは必須です",
-      "dateRequired": "予定日を選択してください",
-      "focusInvalid": "1セッションあたりの集中時間は1〜180分にしてください",
-      "estimateInvalid": "予定ポモドーロは1〜99にしてください",
-      "scrapInvalid": "修復ウィンドウは0〜10080分にしてください",
-      "tooManyTags": "タグは最大20個まで、各40文字以内です",
-      "subtaskEmpty": "サブタスクのタイトルは必須です",
-      "saved": "タスクを保存しました",
-      "created": "タスクを作成しました",
-      "deleted": "タスクを削除しました",
-      "deleteTitle": "このタスクを削除しますか？",
-      "deleteBody": "集中履歴は統計に残ります。この操作は元に戻せません。",
-      "deleteConfirm": "削除",
-      "edit": "編集",
-      "new": "新規",
-      "untouched": "無題のステップ",
-      "priorityNone": "なし",
-      "priorityLow": "低",
-      "priorityMedium": "中",
-      "priorityHigh": "高"
+    task: {
+      newTitle: "タスクを作成",
+      editTitle: "タスクを編集",
+      newSubtitle: "一度に一つずつ。日付とフォーカスブロックは後で設定できます。",
+      editSubtitle: "日付、完了状態、セッションはこのインスタンスに属します。パターンを変更するにはテンプレートを編集してください。",
+      title: "タイトル",
+      titlePlaceholder: "何を終わらせたいですか？",
+      project: "プロジェクト",
+      noProject: "プロジェクトなし",
+      dueDate: "予定日",
+      reminder: "リマインダー",
+      reminderHint: "空欄の場合はその日のリストに表示するだけです",
+      focusMinutes: "セッションあたりのフォーカス",
+      focusMinutesHint: "空欄の場合はデフォルトの {n} 分を使用します",
+      estimate: "予定ポモドーロ数",
+      estimateHint: "進捗は完了したフォーカスラウンドをカウントします",
+      focusPreview: "約 {n} 分のフォーカス（休憩を除く）、休憩込みで {m} 分",
+      priority: "優先度",
+      scrap: "修復ウィンドウ",
+      scrapHint: "計画ブロック後にまだ使用できる分。0 にすると時間通りに無効になります",
+      tags: "タグ",
+      tagsPlaceholder: "カンマ区切り、例：数学, ミス",
+      notes: "メモ",
+      notesPlaceholder: "参考資料、場所、自分へのメモ…",
+      subtasks: "サブタスク",
+      subtaskPlaceholder: "サブタスクを追加",
+      addSubtask: "サブタスクを追加",
+      removeSubtask: "サブタスクを削除",
+      titleRequired: "タイトルは必須です",
+      dateRequired: "予定日を選択してください",
+      focusInvalid: "1セッションあたりの集中時間は1〜180分にしてください",
+      estimateInvalid: "予定ポモドーロは1〜99にしてください",
+      scrapInvalid: "修復ウィンドウは0〜10080分にしてください",
+      tooManyTags: "タグは最大20個まで、各40文字以内です",
+      subtaskEmpty: "サブタスクのタイトルは必須です",
+      saved: "タスクを保存しました",
+      created: "タスクを作成しました",
+      deleted: "タスクを削除しました",
+      deleteTitle: "このタスクを削除しますか？",
+      deleteBody: "集中履歴は統計に残ります。この操作は元に戻せません。",
+      deleteConfirm: "削除",
+      edit: "編集",
+      new: "新規",
+      untouched: "無題のステップ",
+      priorityNone: "なし",
+      priorityLow: "低",
+      priorityMedium: "中",
+      priorityHigh: "高"
     },
-    "tasks": {
-      "eyebrow": "すべてのタスク",
-      "headline": "少しずつ、物事を終わらせよう。",
-      "countLine": "{n}件がまだあなたを待っています。",
-      "loadingTasks": "タスクを読み込み中…",
-      "loadingHint": "ランタイムが復帰するとタスクが表示されます。偽装はありません。",
-      "newTask": "新しいタスク",
-      "searchPlaceholder": "タイトル、タグ、メモを検索",
-      "clearSearch": "検索をクリア",
-      "allProjects": "すべてのプロジェクト",
-      "noProject": "プロジェクトなし",
-      "inbox": "受信箱",
-      "allPriorities": "すべての優先度",
-      "priorityHigh": "高",
-      "priorityMedium": "中",
-      "priorityLow": "低",
-      "priorityNone": "なし",
-      "sortTime": "日付順",
-      "sortPriority": "優先度",
-      "sortCreated": "作成日",
-      "tabActive": "To Do",
-      "tabCompleted": "完了",
-      "tabAll": "すべて",
-      "tabTemplates": "テンプレート",
-      "selectMode": "選択",
-      "selectDone": "選択を完了",
-      "batchSelected": "{n}件を選択中",
-      "batchComplete": "完了",
-      "batchMove": "移動",
-      "batchDelete": "削除",
-      "batchCancel": "キャンセル",
-      "batchDeleteTitle": "選択したタスクを削除しますか？",
-      "batchDeleteBody": "選択した{n}件のタスクが削除されます。フォーカス履歴は統計に残ります。",
-      "batchDeleted": "{n}件のタスクを削除しました",
-      "batchCompleted": "{n}件のタスクを完了しました",
-      "batchMoved": "{n}件のタスクを移動しました",
-      "moveTitle": "どの日に移動しますか？",
-      "moveHint": "選択したタスクはタイトル、プロジェクト、リマインダー、フォーカス設定を保持します。変更されるのは予定日のみです。",
-      "moveDate": "新しい予定日",
-      "moveConfirm": "移動",
-      "moveFailed": "移動できませんでした: {error}",
-      "deleteTitle": "このタスクを削除しますか？",
-      "deleteBody": "集中履歴は統計に残ります。この操作は元に戻せません。",
-      "deleteConfirm": "削除",
-      "deleted": "タスクを削除しました",
-      "perSession": "1セッション{n}分",
-      "overdue": "期限切れ",
-      "catchUp": "追いつく",
-      "habitKind": "習慣",
-      "startFocus": "フォーカス開始",
-      "focusOn": "{title}に集中",
-      "pauseFocus": "フォーカスを一時停止",
-      "moreActions": "その他のアクション",
-      "timerBusy": "先に現在のタイマーを終了してください",
-      "selectTask": "{title}を選択",
-      "completeTask": "{title}を完了",
-      "reopenTask": "{title}を再開",
-      "untitled": "無題のタスク",
-      "addPlaceholder": "完了したいことを追加",
-      "addSubmit": "追加",
-      "fullEdit": "詳細編集",
-      "added": "タスクを追加しました",
-      "templateUnnamed": "無題のテンプレート",
-      "printingOnce": "1回 · {date}{time}",
-      "printingCalendar": "カレンダー · {n}スロット",
-      "printingWeekly": "毎週 · {n}スロット",
-      "printingNone": "印刷ルールはまだありません",
-      "printingNoDate": "予定外",
-      "printingTimes": "· {times}",
-      "autoPrint": "自動印刷",
-      "manualPrint": "手動",
-      "printAhead": "{n}日前",
-      "templateEstimate": "ポモドーロ{n}回を予定",
-      "templateFocus": "1セッション{minutes}分",
-      "templateDefaultFocus": "1セッション{minutes}分（デフォルト）",
-      "templatesHint": "テンプレートは形と印刷ルールを保持します。印刷されたインスタンスは切り離されたままなので、必要に応じて同期してください。",
-      "templatesTitle": "テンプレートと印刷",
-      "newTemplate": "新規テンプレート",
-      "editTemplate": "テンプレートを編集",
-      "printTemplateAction": "テンプレートを印刷",
-      "syncTemplate": "未完了のインスタンスに形を同期",
-      "templateSynced": "テンプレートの形を未完了のインスタンスに同期しました",
-      "syncingTemplate": "同期中…",
-      "emptyActive": "タスクはまだありません — 追加しましょう",
-      "emptyActiveHint": "やることを1つ書き出して、最初の一歩を踏み出しましょう。",
-      "emptyCompleted": "やり遂げたことは残す価値があります",
-      "emptyCompletedHint": "完了したタスクはここに表示されます。",
-      "emptyAll": "タスクはまだありません",
-      "emptyAllHint": "やることを1つ書き出して、最初の一歩を踏み出しましょう。",
-      "emptySearch": "一致するタスクがありません",
-      "emptySearchHint": "別のキーワードを試すか、フィルターを解除してください。",
-      "emptyTemplates": "テンプレートはまだありません",
-      "emptyTemplatesHint": "テンプレートは形を保ち、インスタンスは各実行を記録します。"
+    tasks: {
+      eyebrow: "すべてのタスク",
+      headline: "少しずつ、物事を終わらせよう。",
+      countLine: "{n}件がまだあなたを待っています。",
+      loadingTasks: "タスクを読み込み中…",
+      loadingHint: "ランタイムが復帰するとタスクが表示されます。偽装はありません。",
+      newTask: "新しいタスク",
+      searchPlaceholder: "タイトル、タグ、メモを検索",
+      clearSearch: "検索をクリア",
+      allProjects: "すべてのプロジェクト",
+      noProject: "プロジェクトなし",
+      inbox: "受信箱",
+      allPriorities: "すべての優先度",
+      priorityHigh: "高",
+      priorityMedium: "中",
+      priorityLow: "低",
+      priorityNone: "なし",
+      sortTime: "日付順",
+      sortPriority: "優先度",
+      sortCreated: "作成日",
+      tabActive: "To Do",
+      tabCompleted: "完了",
+      tabAll: "すべて",
+      tabTemplates: "テンプレート",
+      selectMode: "選択",
+      selectDone: "選択を完了",
+      batchSelected: "{n}件を選択中",
+      batchComplete: "完了",
+      batchMove: "移動",
+      batchDelete: "削除",
+      batchCancel: "キャンセル",
+      batchDeleteTitle: "選択したタスクを削除しますか？",
+      batchDeleteBody: "選択した{n}件のタスクが削除されます。フォーカス履歴は統計に残ります。",
+      batchDeleted: "{n}件のタスクを削除しました",
+      batchCompleted: "{n}件のタスクを完了しました",
+      batchMoved: "{n}件のタスクを移動しました",
+      moveTitle: "どの日に移動しますか？",
+      moveHint: "選択したタスクはタイトル、プロジェクト、リマインダー、フォーカス設定を保持します。変更されるのは予定日のみです。",
+      moveDate: "新しい予定日",
+      moveConfirm: "移動",
+      moveFailed: "移動できませんでした: {error}",
+      deleteTitle: "このタスクを削除しますか？",
+      deleteBody: "集中履歴は統計に残ります。この操作は元に戻せません。",
+      deleteConfirm: "削除",
+      deleted: "タスクを削除しました",
+      perSession: "1セッション{n}分",
+      overdue: "期限切れ",
+      catchUp: "追いつく",
+      habitKind: "習慣",
+      startFocus: "フォーカス開始",
+      focusOn: "{title}に集中",
+      pauseFocus: "フォーカスを一時停止",
+      moreActions: "その他のアクション",
+      timerBusy: "先に現在のタイマーを終了してください",
+      selectTask: "{title}を選択",
+      completeTask: "{title}を完了",
+      reopenTask: "{title}を再開",
+      untitled: "無題のタスク",
+      addPlaceholder: "完了したいことを追加",
+      addSubmit: "追加",
+      fullEdit: "詳細編集",
+      added: "タスクを追加しました",
+      templateUnnamed: "無題のテンプレート",
+      printingOnce: "1回 · {date}{time}",
+      printingCalendar: "カレンダー · {n}スロット",
+      printingWeekly: "毎週 · {n}スロット",
+      printingNone: "印刷ルールはまだありません",
+      printingNoDate: "予定外",
+      printingTimes: "· {times}",
+      autoPrint: "自動印刷",
+      manualPrint: "手動",
+      printAhead: "{n}日前",
+      templateEstimate: "ポモドーロ{n}回を予定",
+      templateFocus: "1セッション{minutes}分",
+      templateDefaultFocus: "1セッション{minutes}分（デフォルト）",
+      templatesHint: "テンプレートは形と印刷ルールを保持します。印刷されたインスタンスは切り離されたままなので、必要に応じて同期してください。",
+      templatesTitle: "テンプレートと印刷",
+      newTemplate: "新規テンプレート",
+      editTemplate: "テンプレートを編集",
+      printTemplateAction: "テンプレートを印刷",
+      syncTemplate: "未完了のインスタンスに形を同期",
+      templateSynced: "テンプレートの形を未完了のインスタンスに同期しました",
+      syncingTemplate: "同期中…",
+      emptyActive: "タスクはまだありません — 追加しましょう",
+      emptyActiveHint: "やることを1つ書き出して、最初の一歩を踏み出しましょう。",
+      emptyCompleted: "やり遂げたことは残す価値があります",
+      emptyCompletedHint: "完了したタスクはここに表示されます。",
+      emptyAll: "タスクはまだありません",
+      emptyAllHint: "やることを1つ書き出して、最初の一歩を踏み出しましょう。",
+      emptySearch: "一致するタスクがありません",
+      emptySearchHint: "別のキーワードを試すか、フィルターを解除してください。",
+      emptyTemplates: "テンプレートはまだありません",
+      emptyTemplatesHint: "テンプレートは形を保ち、インスタンスは各実行を記録します。"
     },
-    "template": {
-      "newTitle": "新規テンプレート",
-      "editTitle": "テンプレートを編集",
-      "newSubtitle": "テンプレートは形と印刷ルールを保存し、インスタンスは各実行を記録します。",
-      "editSubtitle": "テンプレートを編集しても印刷済みのインスタンスは書き換わりません。未完了のものを更新するには同期を使ってください。",
-      "title": "タイトル",
-      "titleHint": "タイトルはテンプレート名です。習慣グループもこれを再利用します。",
-      "titlePlaceholder": "もう一度印刷する価値のあること",
-      "project": "プロジェクト",
-      "noProject": "プロジェクトなし",
-      "focusMinutes": "1セッションあたりの集中時間",
-      "focusMinutesHint": "空欄の場合はデフォルトの{n}分を使用します",
-      "estimate": "予定ポモドーロ数",
-      "scrap": "修復ウィンドウ",
-      "scrapHint": "プランブロック後にまだ使用可能な分数。0にすると時間通りに無効になります",
-      "priority": "優先度",
-      "tags": "タグ",
-      "tagsPlaceholder": "カンマ区切り、例：数学、間違い",
-      "notes": "メモ",
-      "notesPlaceholder": "参考資料、場所、または自分用のメモ…",
-      "subtasks": "サブタスク",
-      "subtaskPlaceholder": "サブタスクを追加",
-      "addSubtask": "サブタスクを追加",
-      "removeSubtask": "サブタスクを削除",
-      "untouched": "無題のステップ",
-      "printingTitle": "印刷ルール",
-      "printingHint": "このルールがインスタンスの出現時期を決定します。印刷されたインスタンスはテンプレートから切り離されます。",
-      "kindOnce": "1回",
-      "kindCalendar": "カレンダー",
-      "kindWeekly": "毎週",
-      "onceDate": "印刷日",
-      "onceTime": "開始時刻",
-      "timeOptional": "空欄は固定時刻なしを意味し、その日に参加するだけです",
-      "calendarHint": "同じ開始時刻を共有する日付は1つのスロットに入ります。スロットは開始時刻を共有できません。",
-      "addSlot": "スロットを追加",
-      "removeSlot": "スロットを削除",
-      "slotTime": "開始時刻",
-      "slotDates": "日付",
-      "addDate": "日付を追加",
-      "removeDate": "日付を削除",
-      "weeklyHint": "選択した曜日は印刷時に週全体に展開されます。同じ曜日/時刻は繰り返せません。",
-      "weeklyDays": "曜日",
-      "weeklyAutoHabit": "すべてのスロットに開始時刻がある毎週テンプレートは、コアによって習慣グループとして記録されます。",
-      "habitNote": "このテンプレートは習慣グループに紐付けられているため、開始時刻が必須です。",
-      "automatic": "自動印刷",
-      "automaticHint": "今日から先の日数分の隙間を埋めます。アプリが閉じている間は何も印刷されません。",
-      "printAhead": "先の日数",
-      "printAheadHint": "0〜90日",
-      "printNow": "保存後すぐに印刷",
-      "printNowOnce": "保存後すぐにこれを印刷",
-      "printNowCalendar": "保存後すぐにルールの日付を印刷",
-      "printNowWeekly": "保存後すぐに今週分を印刷",
-      "titleRequired": "テンプレートのタイトルは必須です",
-      "titleTooLong": "テンプレートのタイトルは200文字以内にしてください",
-      "focusInvalid": "セッションごとの集中時間は1〜180分にしてください",
-      "estimateInvalid": "予定ポモドーロ数は1〜99にしてください",
-      "scrapInvalid": "修復ウィンドウは0〜10080分にしてください",
-      "tooManyTags": "タグは最大20個まで、それぞれ40文字未満にしてください",
-      "subtaskEmpty": "サブタスクのタイトルは必須です",
-      "dateRequired": "印刷日を選択してください",
-      "dateInvalid": "無効な日付です。YYYY-MM-DD形式で入力してください",
-      "timeInvalid": "開始時刻はHH:MM形式にしてください",
-      "needSlot": "少なくとも1つのスロットが必要です",
-      "needDays": "各スロットには少なくとも1つの曜日が必要です",
-      "needDates": "各カレンダースロットには少なくとも1つの日付が必要です",
-      "duplicateDates": "同じ開始時刻に日付が重複しています。統合してください",
-      "duplicateTime": "スロットで開始時刻を共有できません",
-      "duplicateWeekly": "同じ開始時刻に曜日が重複しています。統合してください",
-      "needTime": "習慣テンプレートには開始時刻が必要です",
-      "mixedTime": "1つのルールで時刻ありと時刻なしのスロットを混在できません",
-      "aheadInvalid": "先の日数は0〜90にしてください",
-      "saved": "テンプレートを保存しました",
-      "created": "テンプレートを作成しました",
-      "savedAndPrinted": "テンプレートを保存しました。印刷を送信しました",
-      "deleted": "テンプレートを削除しました。インスタンスは保持されます",
-      "deleteTitle": "このテンプレートを削除しますか？",
-      "deleteBody": "印刷済みインスタンスは保持されますが、テンプレートとのリンクが失われ、印刷台帳はクリアされます。この操作は元に戻せません。",
-      "deleteConfirm": "削除",
-      "priorityNone": "なし",
-      "priorityLow": "低",
-      "priorityMedium": "中",
-      "priorityHigh": "高"
+    template: {
+      newTitle: "新規テンプレート",
+      editTitle: "テンプレートを編集",
+      newSubtitle: "テンプレートは形と印刷ルールを保存し、インスタンスは各実行を記録します。",
+      editSubtitle: "テンプレートを編集しても印刷済みのインスタンスは書き換わりません。未完了のものを更新するには同期を使ってください。",
+      title: "タイトル",
+      titleHint: "タイトルはテンプレート名です。習慣グループもこれを再利用します。",
+      titlePlaceholder: "もう一度印刷する価値のあること",
+      project: "プロジェクト",
+      noProject: "プロジェクトなし",
+      focusMinutes: "1セッションあたりの集中時間",
+      focusMinutesHint: "空欄の場合はデフォルトの{n}分を使用します",
+      estimate: "予定ポモドーロ数",
+      scrap: "修復ウィンドウ",
+      scrapHint: "プランブロック後にまだ使用可能な分数。0にすると時間通りに無効になります",
+      priority: "優先度",
+      tags: "タグ",
+      tagsPlaceholder: "カンマ区切り、例：数学、間違い",
+      notes: "メモ",
+      notesPlaceholder: "参考資料、場所、または自分用のメモ…",
+      subtasks: "サブタスク",
+      subtaskPlaceholder: "サブタスクを追加",
+      addSubtask: "サブタスクを追加",
+      removeSubtask: "サブタスクを削除",
+      untouched: "無題のステップ",
+      printingTitle: "印刷ルール",
+      printingHint: "このルールがインスタンスの出現時期を決定します。印刷されたインスタンスはテンプレートから切り離されます。",
+      kindOnce: "1回",
+      kindCalendar: "カレンダー",
+      kindWeekly: "毎週",
+      onceDate: "印刷日",
+      onceTime: "開始時刻",
+      timeOptional: "空欄は固定時刻なしを意味し、その日に参加するだけです",
+      calendarHint: "同じ開始時刻を共有する日付は1つのスロットに入ります。スロットは開始時刻を共有できません。",
+      addSlot: "スロットを追加",
+      removeSlot: "スロットを削除",
+      slotTime: "開始時刻",
+      slotDates: "日付",
+      addDate: "日付を追加",
+      removeDate: "日付を削除",
+      weeklyHint: "選択した曜日は印刷時に週全体に展開されます。同じ曜日/時刻は繰り返せません。",
+      weeklyDays: "曜日",
+      weeklyAutoHabit: "すべてのスロットに開始時刻がある毎週テンプレートは、コアによって習慣グループとして記録されます。",
+      habitNote: "このテンプレートは習慣グループに紐付けられているため、開始時刻が必須です。",
+      automatic: "自動印刷",
+      automaticHint: "今日から先の日数分の隙間を埋めます。アプリが閉じている間は何も印刷されません。",
+      printAhead: "先の日数",
+      printAheadHint: "0〜90日",
+      printNow: "保存後すぐに印刷",
+      printNowOnce: "保存後すぐにこれを印刷",
+      printNowCalendar: "保存後すぐにルールの日付を印刷",
+      printNowWeekly: "保存後すぐに今週分を印刷",
+      titleRequired: "テンプレートのタイトルは必須です",
+      titleTooLong: "テンプレートのタイトルは200文字以内にしてください",
+      focusInvalid: "セッションごとの集中時間は1〜180分にしてください",
+      estimateInvalid: "予定ポモドーロ数は1〜99にしてください",
+      scrapInvalid: "修復ウィンドウは0〜10080分にしてください",
+      tooManyTags: "タグは最大20個まで、それぞれ40文字未満にしてください",
+      subtaskEmpty: "サブタスクのタイトルは必須です",
+      dateRequired: "印刷日を選択してください",
+      dateInvalid: "無効な日付です。YYYY-MM-DD形式で入力してください",
+      timeInvalid: "開始時刻はHH:MM形式にしてください",
+      needSlot: "少なくとも1つのスロットが必要です",
+      needDays: "各スロットには少なくとも1つの曜日が必要です",
+      needDates: "各カレンダースロットには少なくとも1つの日付が必要です",
+      duplicateDates: "同じ開始時刻に日付が重複しています。統合してください",
+      duplicateTime: "スロットで開始時刻を共有できません",
+      duplicateWeekly: "同じ開始時刻に曜日が重複しています。統合してください",
+      needTime: "習慣テンプレートには開始時刻が必要です",
+      mixedTime: "1つのルールで時刻ありと時刻なしのスロットを混在できません",
+      aheadInvalid: "先の日数は0〜90にしてください",
+      saved: "テンプレートを保存しました",
+      created: "テンプレートを作成しました",
+      savedAndPrinted: "テンプレートを保存しました。印刷を送信しました",
+      deleted: "テンプレートを削除しました。インスタンスは保持されます",
+      deleteTitle: "このテンプレートを削除しますか？",
+      deleteBody: "印刷済みインスタンスは保持されますが、テンプレートとのリンクが失われ、印刷台帳はクリアされます。この操作は元に戻せません。",
+      deleteConfirm: "削除",
+      priorityNone: "なし",
+      priorityLow: "低",
+      priorityMedium: "中",
+      priorityHigh: "高"
     }
   };
 
@@ -2121,7 +2191,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     if (text === void 0) {
       const fallback = entry ? entry[EN] : void 0;
       text = fallback && fallback[name] !== void 0 ? fallback[name] : void 0;
-      if (text === void 0) text = entry && entry[ZH][name] !== void 0 ? entry[ZH][name] : key;
+      if (text === void 0)
+        text = entry && entry[ZH][name] !== void 0 ? entry[ZH][name] : key;
     }
     if (vars) {
       for (const k of Object.keys(vars)) {
@@ -2213,7 +2284,15 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     md: { height: 34, pad: "0 14px", font: 13.5, gap: 7, radius: 11, icon: 16 },
     lg: { height: 42, pad: "0 20px", font: 14.5, gap: 8, radius: 13, icon: 18 }
   };
-  function Card({ children, pad: pad3 = 20, style, flat = false, onClick, className = "", ...rest }) {
+  function Card({
+    children,
+    pad: pad3 = 20,
+    style,
+    flat = false,
+    onClick,
+    className = "",
+    ...rest
+  }) {
     return h(
       "div",
       {
@@ -2238,13 +2317,40 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           ...style
         }
       },
-      icon ? h(Icon, { name: icon, size: 17, style: { color: "var(--tomato-ink-3)" } }) : null,
+      icon ? h(Icon, {
+        name: icon,
+        size: 17,
+        style: { color: "var(--tomato-ink-3)" }
+      }) : null,
       h(
         "div",
-        { style: { fontSize: 14, fontWeight: 620, color: "var(--tomato-ink)", flex: "0 1 auto", minWidth: 0, marginRight: "auto" } },
+        {
+          style: {
+            fontSize: 14,
+            fontWeight: 620,
+            color: "var(--tomato-ink)",
+            flex: "0 1 auto",
+            minWidth: 0,
+            marginRight: "auto"
+          }
+        },
         title
       ),
-      hint ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)", flex: "1 1 220px", minWidth: 0, textAlign: "right", lineHeight: 1.5, overflowWrap: "anywhere" } }, hint) : null,
+      hint ? h(
+        "div",
+        {
+          style: {
+            fontSize: 12,
+            color: "var(--tomato-ink-3)",
+            flex: "1 1 220px",
+            minWidth: 0,
+            textAlign: "right",
+            lineHeight: 1.5,
+            overflowWrap: "anywhere"
+          }
+        },
+        hint
+      ) : null,
       action ?? null
     );
   }
@@ -2317,13 +2423,30 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     );
   }
   var CHIP_TONES = {
-    neutral: { bg: "var(--tomato-surface-2)", fg: "var(--tomato-ink-2)", bd: "transparent" },
-    brand: { bg: "var(--tomato-brand-soft)", fg: "var(--tomato-brand-deep)", bd: "transparent" },
+    neutral: {
+      bg: "var(--tomato-surface-2)",
+      fg: "var(--tomato-ink-2)",
+      bd: "transparent"
+    },
+    brand: {
+      bg: "var(--tomato-brand-soft)",
+      fg: "var(--tomato-brand-deep)",
+      bd: "transparent"
+    },
     leaf: { bg: "#7e9a6e20", fg: "#5f7b50", bd: "transparent" },
     sun: { bg: "#d5a55326", fg: "#a87b2d", bd: "transparent" },
     danger: { bg: "#b8503f18", fg: "#b8503f", bd: "transparent" }
   };
-  function Chip({ children, tone = "neutral", color, icon, style, onClick, active: active2 = false, title }) {
+  function Chip({
+    children,
+    tone = "neutral",
+    color,
+    icon,
+    style,
+    onClick,
+    active: active2 = false,
+    title
+  }) {
     const palette = CHIP_TONES[tone] || CHIP_TONES.neutral;
     return h(
       onClick ? "button" : "span",
@@ -2426,7 +2549,14 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           viewBox: `0 0 ${size} ${size}`,
           style: { position: "absolute", inset: 0, transform: "rotate(-90deg)" }
         },
-        h("circle", { cx: size / 2, cy: size / 2, r, fill: "none", stroke: track, strokeWidth: stroke }),
+        h("circle", {
+          cx: size / 2,
+          cy: size / 2,
+          r,
+          fill: "none",
+          stroke: track,
+          strokeWidth: stroke
+        }),
         h("circle", {
           className: "t-ring-progress",
           cx: size / 2,
@@ -2440,10 +2570,24 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           strokeDashoffset: c * (1 - v)
         })
       ),
-      children ? h("div", { className: pulse ? "t-pulse" : void 0, style: { position: "relative", zIndex: 1 } }, children) : null
+      children ? h(
+        "div",
+        {
+          className: pulse ? "t-pulse" : void 0,
+          style: { position: "relative", zIndex: 1 }
+        },
+        children
+      ) : null
     );
   }
-  function Bar({ value = 0, max = 1, color = "var(--tomato-brand)", height = 8, style, radius = 8 }) {
+  function Bar({
+    value = 0,
+    max = 1,
+    color = "var(--tomato-brand)",
+    height = 8,
+    style,
+    radius = 8
+  }) {
     const pct = max > 0 ? Math.max(0, Math.min(1, Number(value) / max)) * 100 : 0;
     return h(
       "div",
@@ -2481,7 +2625,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             className: "t-tab",
             "data-active": item.value === value,
             onClick: () => onChange?.(item.value),
-            style: { height: s.height - 6, fontSize: s.font, display: "flex", alignItems: "center", gap: 5 }
+            style: {
+              height: s.height - 6,
+              fontSize: s.font,
+              display: "flex",
+              alignItems: "center",
+              gap: 5
+            }
           },
           item.icon ? h(Icon, { name: item.icon, size: 14 }) : null,
           item.label
@@ -2556,7 +2706,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         label
       ) : null,
       children,
-      hint ? h("span", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } }, hint) : null
+      hint ? h(
+        "span",
+        { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+        hint
+      ) : null
     );
   }
   function Toggle({ checked, onChange, label, hint, style }) {
@@ -2566,8 +2720,22 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       label ? h(
         "div",
         { style: { flex: 1, minWidth: 0 } },
-        h("div", { style: { fontSize: 13.5, color: "var(--tomato-ink)" } }, label),
-        hint ? h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 2 } }, hint) : null
+        h(
+          "div",
+          { style: { fontSize: 13.5, color: "var(--tomato-ink)" } },
+          label
+        ),
+        hint ? h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              marginTop: 2
+            }
+          },
+          hint
+        ) : null
       ) : null,
       h(
         "button",
@@ -2680,22 +2848,57 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           h(
             "div",
             { style: { flex: 1, minWidth: 0 } },
-            h("div", { style: { fontSize: 16.5, fontWeight: 650, color: "var(--tomato-ink)" } }, title),
+            h(
+              "div",
+              {
+                style: {
+                  fontSize: 16.5,
+                  fontWeight: 650,
+                  color: "var(--tomato-ink)"
+                }
+              },
+              title
+            ),
             subtitle ? h(
               "div",
-              { style: { fontSize: 12.5, color: "var(--tomato-ink-3)", marginTop: 4, lineHeight: 1.5 } },
+              {
+                style: {
+                  fontSize: 12.5,
+                  color: "var(--tomato-ink-3)",
+                  marginTop: 4,
+                  lineHeight: 1.5
+                }
+              },
               subtitle
             ) : null
           ),
-          onClose ? h(IconBtn, { name: "x", onClick: onClose, title: t("common.close") }) : null
+          onClose ? h(IconBtn, {
+            name: "x",
+            onClick: onClose,
+            title: t("common.close")
+          }) : null
         ),
-        h("div", { className: "t-modal-body t-scroll", style: bodyStyle }, children),
+        h(
+          "div",
+          { className: "t-modal-body t-scroll", style: bodyStyle },
+          children
+        ),
         footer ? h("div", { className: "t-modal-foot" }, footer) : null
       )
     );
-    return createPortal(mask, typeof document !== "undefined" ? document.body : null);
+    return createPortal(
+      mask,
+      typeof document !== "undefined" ? document.body : null
+    );
   }
-  function Dropdown({ open, items, onClose, align = "right", width = 200, style }) {
+  function Dropdown({
+    open,
+    items,
+    onClose,
+    align = "right",
+    width = 200,
+    style
+  }) {
     const ref = useRef(null);
     useEffect(() => {
       if (!open) return void 0;
@@ -2734,7 +2937,14 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         }
       },
       items.map(
-        (item, i) => item.divider ? h("div", { key: `d${i}`, style: { height: 1, background: "var(--tomato-line)", margin: "5px 0" } }) : h(
+        (item, i) => item.divider ? h("div", {
+          key: `d${i}`,
+          style: {
+            height: 1,
+            background: "var(--tomato-line)",
+            margin: "5px 0"
+          }
+        }) : h(
           "button",
           {
             key: item.id ?? i,
@@ -2744,7 +2954,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
               onClose?.();
               item.onClick?.();
             },
-            style: { fontSize: 13, color: item.danger ? "#b8503f" : void 0, padding: "7px 10px" }
+            style: {
+              fontSize: 13,
+              color: item.danger ? "#b8503f" : void 0,
+              padding: "7px 10px"
+            }
           },
           item.icon ? h(Icon, { name: item.icon, size: 15 }) : null,
           item.label
@@ -2784,8 +2998,22 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         },
         h(Icon, { name: icon, size: 22 })
       ),
-      title ? h("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--tomato-ink-2)" } }, title) : null,
-      hint ? h("div", { style: { fontSize: 12.5, lineHeight: 1.6, maxWidth: 320 } }, hint) : null,
+      title ? h(
+        "div",
+        {
+          style: {
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--tomato-ink-2)"
+          }
+        },
+        title
+      ) : null,
+      hint ? h(
+        "div",
+        { style: { fontSize: 12.5, lineHeight: 1.6, maxWidth: 320 } },
+        hint
+      ) : null,
       action ?? null
     );
   }
@@ -2802,7 +3030,15 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       }
     });
   }
-  function Stat({ icon, label, value, unit, hint, tone = "brand", style }) {
+  function Stat({
+    icon,
+    label,
+    value,
+    unit,
+    hint,
+    tone = "brand",
+    style
+  }) {
     const tones = {
       brand: { bg: "var(--tomato-brand-soft)", fg: "var(--tomato-brand-deep)" },
       leaf: { bg: "#7e9a6e1f", fg: "#5f7b50" },
@@ -2843,7 +3079,17 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       h(
         "div",
         { style: { minWidth: 0, flex: 1 } },
-        h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginBottom: 3 } }, label),
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              marginBottom: 3
+            }
+          },
+          label
+        ),
         h(
           "div",
           { style: { display: "flex", alignItems: "baseline", gap: 4 } },
@@ -2851,13 +3097,32 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             "div",
             {
               className: "t-mono",
-              style: { fontSize: 24, fontWeight: 620, color: "var(--tomato-ink)", lineHeight: 1.15 }
+              style: {
+                fontSize: 24,
+                fontWeight: 620,
+                color: "var(--tomato-ink)",
+                lineHeight: 1.15
+              }
             },
             value
           ),
-          unit ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, unit) : null
+          unit ? h(
+            "div",
+            { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+            unit
+          ) : null
         ),
-        hint ? h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 3 } }, hint) : null
+        hint ? h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              marginTop: 3
+            }
+          },
+          hint
+        ) : null
       )
     );
   }
@@ -2908,15 +3173,28 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         ),
         subtitle ? h(
           "div",
-          { style: { marginTop: 8, fontSize: 13, color: "var(--tomato-ink-2)", lineHeight: 1.6 } },
+          {
+            style: {
+              marginTop: 8,
+              fontSize: 13,
+              color: "var(--tomato-ink-2)",
+              lineHeight: 1.6
+            }
+          },
           subtitle
         ) : null
       ),
-      actions ? h("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, actions) : null
+      actions ? h(
+        "div",
+        { style: { display: "flex", gap: 8, alignItems: "center" } },
+        actions
+      ) : null
     );
   }
   function Divider({ style }) {
-    return h("div", { style: { height: 1, background: "var(--tomato-line)", ...style } });
+    return h("div", {
+      style: { height: 1, background: "var(--tomato-line)", ...style }
+    });
   }
   function Check({ checked, onChange, label, disabled = false, style }) {
     return h(
@@ -2941,7 +3219,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   function Kbd({ children }) {
     return h("span", { className: "t-kbd" }, children);
   }
-  function ProgressDots({ total = 4, done = 0, color = "var(--tomato-brand)", size = 8, style }) {
+  function ProgressDots({
+    total = 4,
+    done = 0,
+    color = "var(--tomato-brand)",
+    size = 8,
+    style
+  }) {
     return h(
       "div",
       { style: { display: "flex", gap: 5, alignItems: "center", ...style } },
@@ -3085,7 +3369,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     return request("/api/state", opts);
   }
   function postDispatch(action, opts) {
-    return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
+    return request("/api/dispatch", {
+      ...opts,
+      method: "POST",
+      body: { action }
+    });
   }
   function getLibraryGrant(opts) {
     return request("/api/library/grant", opts);
@@ -3101,10 +3389,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     return request("/api/library/grant", { ...opts, method: "DELETE" });
   }
   function scanProjectLibrary(id, opts) {
-    return request("/api/projects/" + encodeURIComponent(id) + "/resources/scan", {
-      timeoutMs: 3e4,
-      ...opts
-    });
+    return request(
+      "/api/projects/" + encodeURIComponent(id) + "/resources/scan",
+      {
+        timeoutMs: 3e4,
+        ...opts
+      }
+    );
   }
   function getExportPlan(opts) {
     return request("/api/export/plan", { timeoutMs: 15e3, ...opts });
@@ -3283,10 +3574,30 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     }
   });
   var PERSONAS = [
-    { id: "atri", file: "atri.png", avatar: "default.webp", nameKey: "persona.atri" },
-    { id: "natsuki", file: "natsuki.png", avatar: "calm.webp", nameKey: "persona.natsuki" },
-    { id: "ryuji", file: "ryuji.png", avatar: "coach.webp", nameKey: "persona.ryuji" },
-    { id: "minamo", file: "minamo.png", avatar: "senpai.webp", nameKey: "persona.minamo" }
+    {
+      id: "atri",
+      file: "atri.png",
+      avatar: "default.webp",
+      nameKey: "persona.atri"
+    },
+    {
+      id: "natsuki",
+      file: "natsuki.png",
+      avatar: "calm.webp",
+      nameKey: "persona.natsuki"
+    },
+    {
+      id: "ryuji",
+      file: "ryuji.png",
+      avatar: "coach.webp",
+      nameKey: "persona.ryuji"
+    },
+    {
+      id: "minamo",
+      file: "minamo.png",
+      avatar: "senpai.webp",
+      nameKey: "persona.minamo"
+    }
   ];
   var KEY2 = "tomato-dsh.persona";
   var DEFAULT_ID = "atri";
@@ -3332,7 +3643,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     return Math.min(Math.max(0, lift), Math.max(0, Math.round(base.height - 40)));
   }
   function composerSeatRect() {
-    if (typeof document === "undefined" || typeof document.querySelectorAll !== "function") return null;
+    if (typeof document === "undefined" || typeof document.querySelectorAll !== "function")
+      return null;
     let best = null;
     for (const node of document.querySelectorAll("[data-composer-seat]")) {
       const rect = node.getBoundingClientRect();
@@ -3574,7 +3886,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           hint
         ) : null
       ),
-      h("div", { style: { display: "flex", alignItems: "center", gap: 10, flex: "none" } }, children)
+      h(
+        "div",
+        {
+          style: { display: "flex", alignItems: "center", gap: 10, flex: "none" }
+        },
+        children
+      )
     );
   }
   function TomatoSkinSettingsRow() {
@@ -3592,13 +3910,19 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       if (!settings) return;
       setSaving(true);
       setError(null);
-      const res = await tryDispatch({ type: "saveSettings", settings: { ...settings, personaBackdrop: next } });
+      const res = await tryDispatch({
+        type: "saveSettings",
+        settings: { ...settings, personaBackdrop: next }
+      });
       setSaving(false);
       if (!res.ok) setError(res.error);
     };
     return h(
       "div",
-      { className: "t-root", style: { display: "flex", flexDirection: "column", gap: 2 } },
+      {
+        className: "t-root",
+        style: { display: "flex", flexDirection: "column", gap: 2 }
+      },
       h(
         "div",
         {
@@ -3653,7 +3977,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       ),
       h(
         Row,
-        { label: t("skinprefs.persona"), hint: t("skinprefs.personaHint"), dim: !settings },
+        {
+          label: t("skinprefs.persona"),
+          hint: t("skinprefs.personaHint"),
+          dim: !settings
+        },
         h(Select, {
           value: persona,
           width: 140,
@@ -3891,7 +4219,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     };
   }
   function taskById(data, id) {
-    if (!data || !Array.isArray(data.tasks) || id === null || id === void 0) return null;
+    if (!data || !Array.isArray(data.tasks) || id === null || id === void 0)
+      return null;
     return data.tasks.find((task) => task.id === id) || null;
   }
   function projectById(data, id) {
@@ -3923,7 +4252,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     for (let i = n - 1; i >= 0; i -= 1) {
       const date = addDays(today, -i);
       const day = byDate.get(date);
-      out.push({ date, minutes: toMinutes(day ? day.seconds : 0), pomodoros: day ? day.pomodoros || 0 : 0 });
+      out.push({
+        date,
+        minutes: toMinutes(day ? day.seconds : 0),
+        pomodoros: day ? day.pomodoros || 0 : 0
+      });
     }
     return out;
   }
@@ -3932,7 +4265,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const totals = /* @__PURE__ */ new Map();
     for (const session of sessions) {
       const name = session.projectName || "—";
-      totals.set(name, (totals.get(name) || 0) + (Number(session.durationSecs) || 0));
+      totals.set(
+        name,
+        (totals.get(name) || 0) + (Number(session.durationSecs) || 0)
+      );
     }
     const projects = data && data.projects || [];
     const colorOf = new Map(projects.map((p) => [p.name, p.color]));
@@ -3949,7 +4285,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   function protectionView(state) {
     const data = state && state.data || {};
     const settings = data.settings || {};
-    const protection = settings.protection || { mode: "off", whitelist: [], strict: false };
+    const protection = settings.protection || {
+      mode: "off",
+      whitelist: [],
+      strict: false
+    };
     const timer = timerView(state);
     const guard = state && state.guard || { available: false };
     const focusing = timer.running && timer.mode === "focus";
@@ -3975,7 +4315,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const shortBreak = Number(settings && settings.shortBreakMinutes) || 5;
     const longBreak = Number(settings && settings.longBreakMinutes) || 15;
     let breaks = 0;
-    for (let i = 1; i < sessions; i += 1) breaks += i % every === 0 ? longBreak : shortBreak;
+    for (let i = 1; i < sessions; i += 1)
+      breaks += i % every === 0 ? longBreak : shortBreak;
     return sessions * focus + breaks;
   }
   function isCatchUp(input, task, today) {
@@ -3999,7 +4340,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   function catchUpTasks(input, today) {
     const data = input && input.data ? input.data : input;
     const tasks = data && data.tasks || [];
-    return tasks.filter((task) => isCatchUp(input, task, today)).sort((a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime)));
+    return tasks.filter((task) => isCatchUp(input, task, today)).sort(
+      (a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime))
+    );
   }
   function completedOn(data, today) {
     const tasks = data && data.tasks || [];
@@ -4074,7 +4417,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       });
     }
     const items = [...buckets.values()].filter((item) => item.grading > 0 || item.review > 0).sort((a, b) => b.grading + b.review - (a.grading + a.review));
-    const total = items.reduce((sum, item) => sum + item.grading + item.review, 0);
+    const total = items.reduce(
+      (sum, item) => sum + item.grading + item.review,
+      0
+    );
     return { total, items };
   }
 
@@ -4265,7 +4611,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       openPanelFn?.("tomato");
     } catch {
     }
-    writeNavState({ panel: "tomato", page: target || state && state.page || null });
+    writeNavState({
+      panel: "tomato",
+      page: target || state && state.page || null
+    });
     return true;
   }
   function restore() {
@@ -4347,12 +4696,25 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         { style: { minWidth: 0 } },
         h(
           "div",
-          { style: { fontSize: 14.5, fontWeight: 700, color: "var(--tomato-ink)", letterSpacing: ".01em" } },
+          {
+            style: {
+              fontSize: 14.5,
+              fontWeight: 700,
+              color: "var(--tomato-ink)",
+              letterSpacing: ".01em"
+            }
+          },
           "番茄 Todo"
         ),
         h(
           "div",
-          { style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
+          {
+            style: {
+              fontSize: 11,
+              color: "var(--tomato-ink-3)",
+              marginTop: 1
+            }
+          },
           "慢慢来，比较快"
         )
       )
@@ -4369,7 +4731,18 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         title: t(page.titleKey)
       },
       h(Icon, { name: page.icon, size: 18 }),
-      h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, t(page.titleKey)),
+      h(
+        "span",
+        {
+          style: {
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          }
+        },
+        t(page.titleKey)
+      ),
       badge !== null && badge !== void 0 && badge !== 0 ? active2 ? (
         // 选中项用一颗小红点（旧版样式），未选中项才显示数字。
         h("span", {
@@ -4439,7 +4812,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       },
       h(
         "span",
-        { style: { fontSize: 11, color: "var(--tomato-ink-3)", letterSpacing: ".02em" } },
+        {
+          style: {
+            fontSize: 11,
+            color: "var(--tomato-ink-3)",
+            letterSpacing: ".02em"
+          }
+        },
         title
       ),
       right ? h(
@@ -4468,7 +4847,15 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const online = state !== null;
     return h(
       "div",
-      { style: { marginTop: "auto", paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 } },
+      {
+        style: {
+          marginTop: "auto",
+          paddingTop: 16,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10
+        }
+      },
       // 每日番茄目标（旧版侧栏卡片）：数值 + 细进度条 + 说明。
       h(
         "div",
@@ -4476,15 +4863,34 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         h(
           "div",
           { style: { display: "flex", alignItems: "center", gap: 7 } },
-          h(Icon, { name: "leaf", size: 14, style: { color: "var(--tomato-ink-3)" } }),
+          h(Icon, {
+            name: "leaf",
+            size: 14,
+            style: { color: "var(--tomato-ink-3)" }
+          }),
           h(
             "span",
-            { style: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: 550, color: "var(--tomato-ink)" } },
+            {
+              style: {
+                flex: 1,
+                minWidth: 0,
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink)"
+              }
+            },
             t("nav.goalTitle")
           ),
           h(
             "span",
-            { className: "t-mono", style: { fontSize: 12, fontWeight: 600, color: "var(--tomato-ink)" } },
+            {
+              className: "t-mono",
+              style: {
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--tomato-ink)"
+              }
+            },
             `${done} / ${goal}`
           )
         ),
@@ -4500,11 +4906,20 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         ),
         h(
           "div",
-          { style: { marginTop: 7, fontSize: 10.5, lineHeight: 1.5, color: "var(--tomato-ink-3)" } },
+          {
+            style: {
+              marginTop: 7,
+              fontSize: 10.5,
+              lineHeight: 1.5,
+              color: "var(--tomato-ink-3)"
+            }
+          },
           t("nav.goalHint", { n: completedTasks })
         )
       ),
-      h("div", { style: { height: 1, background: "var(--tomato-line)", margin: "2px 9px" } }),
+      h("div", {
+        style: { height: 1, background: "var(--tomato-line)", margin: "2px 9px" }
+      }),
       h(
         "button",
         {
@@ -4575,14 +4990,25 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           ),
           h(
             "span",
-            { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+            {
+              className: "t-mono",
+              style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+            },
             counts.get(project.id) || 0
           )
         )
       )
     );
   }
-  function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave }) {
+  function NavColumn({
+    pages,
+    activeId,
+    onSelect,
+    state,
+    compact,
+    badges,
+    onLeave
+  }) {
     const data = state && state.data || {};
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const tasks = Array.isArray(data.tasks) ? data.tasks : [];
@@ -4607,7 +5033,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         items.push(h(AssistantItem, { key: "assistant", compact, onLeave }));
       }
     }
-    if (compact) items.push(h(AssistantItem, { key: "assistant", compact, onLeave }));
+    if (compact)
+      items.push(h(AssistantItem, { key: "assistant", compact, onLeave }));
     return h(
       "aside",
       {
@@ -4632,10 +5059,22 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       },
       compact ? h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, paddingRight: 10, flex: "none" } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            paddingRight: 10,
+            flex: "none"
+          }
+        },
         h(BrandBlock, { compact: true })
       ) : h(BrandBlock, { compact: false }),
-      compact ? null : h(SideCaption, { title: t("nav.space"), right: t("nav.personal"), style: { marginTop: 8 } }),
+      compact ? null : h(SideCaption, {
+        title: t("nav.space"),
+        right: t("nav.personal"),
+        style: { marginTop: 8 }
+      }),
       items,
       compact ? null : h(ProjectList, { projects, counts }),
       h(NavFooter, { state, compact, activeId, onSelect })
@@ -4710,7 +5149,14 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         "main",
         {
           className: "t-scroll t-root t-appmain",
-          style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto", position: "relative", zIndex: 1 }
+          style: {
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            overflowY: "auto",
+            position: "relative",
+            zIndex: 1
+          }
         },
         h(
           "div",
@@ -4718,9 +5164,21 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             key: active2 ? active2.id : "empty",
             className: "t-appcontent",
             // 顶部留出悬浮提醒条的位置（提醒在页面最顶端居中）。
-            style: { maxWidth: 1270, margin: 0, padding: narrow ? "40px 18px 60px" : "44px 28px 72px" }
+            style: {
+              maxWidth: 1270,
+              margin: 0,
+              padding: narrow ? "40px 18px 60px" : "44px 28px 72px"
+            }
           },
-          active2 ? h(active2.Component, { state, dispatch: props.dispatch, refresh, api: props.api, onLeave: props.onLeave, onAssistant: props.onAssistant, onLanguageChange: props.onLanguageChange }) : null
+          active2 ? h(active2.Component, {
+            state,
+            dispatch: props.dispatch,
+            refresh,
+            api: props.api,
+            onLeave: props.onLeave,
+            onAssistant: props.onAssistant,
+            onLanguageChange: props.onLanguageChange
+          }) : null
         )
       ),
       h(ToastHost, null)
@@ -4836,7 +5294,8 @@ ${JSON.stringify(refs, null, 2)}`;
       settingsSound = settings.sound === true;
       const volume = normalizeVolume(settings.soundVolume);
       if (volume !== null) {
-        if (pendingVolume !== null && Math.abs(volume - pendingVolume) < 5e-3) pendingVolume = null;
+        if (pendingVolume !== null && Math.abs(volume - pendingVolume) < 5e-3)
+          pendingVolume = null;
         settingsVolume = pendingVolume !== null ? pendingVolume : volume;
       }
     }
@@ -5006,8 +5465,9 @@ ${JSON.stringify(refs, null, 2)}`;
         }
       };
       const pending = ctx.resume();
-      if (pending && typeof pending.then === "function") pending.then(afterResume, () => {
-      });
+      if (pending && typeof pending.then === "function")
+        pending.then(afterResume, () => {
+        });
       else afterResume();
     } catch (e) {
       warnOnce(e);
@@ -5021,10 +5481,13 @@ ${JSON.stringify(refs, null, 2)}`;
     if (!ctx || !param) return;
     const now = typeof ctx.currentTime === "number" ? ctx.currentTime : 0;
     try {
-      if (typeof param.cancelAndHoldAtTime === "function") param.cancelAndHoldAtTime(now);
+      if (typeof param.cancelAndHoldAtTime === "function")
+        param.cancelAndHoldAtTime(now);
       else {
-        if (typeof param.cancelScheduledValues === "function") param.cancelScheduledValues(now);
-        if (typeof param.setValueAtTime === "function") param.setValueAtTime(param.value, now);
+        if (typeof param.cancelScheduledValues === "function")
+          param.cancelScheduledValues(now);
+        if (typeof param.setValueAtTime === "function")
+          param.setValueAtTime(param.value, now);
       }
       param.linearRampToValueAtTime(value, now + seconds);
     } catch {
@@ -5112,7 +5575,16 @@ ${JSON.stringify(refs, null, 2)}`;
     return {
       output: trem,
       startables: [src, filterLfo, gainLfo],
-      nodes: [src, highpass, lowpass, trem, filterLfo, filterDepth, gainLfo, gainDepth]
+      nodes: [
+        src,
+        highpass,
+        lowpass,
+        trem,
+        filterLfo,
+        filterDepth,
+        gainLfo,
+        gainDepth
+      ]
     };
   }
   function buildBrown(ctx) {
@@ -5179,7 +5651,10 @@ ${JSON.stringify(refs, null, 2)}`;
     entry.stopped = true;
     rampTo(entry.gain.gain, 0, FADE_SECS);
     try {
-      entry.timer = setTimeout(() => stopEntry(entry), Math.round(FADE_SECS * 1e3) + 120);
+      entry.timer = setTimeout(
+        () => stopEntry(entry),
+        Math.round(FADE_SECS * 1e3) + 120
+      );
     } catch {
       stopEntry(entry);
     }
@@ -5354,8 +5829,14 @@ ${JSON.stringify(refs, null, 2)}`;
       ensureAudio();
     }
     try {
-      doc.addEventListener("pointerdown", onGesture, { capture: true, passive: true });
-      doc.addEventListener("keydown", onGesture, { capture: true, passive: true });
+      doc.addEventListener("pointerdown", onGesture, {
+        capture: true,
+        passive: true
+      });
+      doc.addEventListener("keydown", onGesture, {
+        capture: true,
+        passive: true
+      });
     } catch (e) {
       try {
         doc.addEventListener("pointerdown", onGesture, true);
@@ -5567,7 +6048,17 @@ ${JSON.stringify(refs, null, 2)}`;
   var INK_2 = "#c9b7a1";
   var INK_3 = "#8f7d6b";
   var HAIRLINE = "#ffffff12";
-  function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel, onEarly, onInterrupt, onSkipRest }) {
+  function EndDialog({
+    strictActive,
+    canEarly,
+    busy,
+    focusMinutes,
+    mode,
+    onCancel,
+    onEarly,
+    onInterrupt,
+    onSkipRest
+  }) {
     const [phrase, setPhrase] = useState("");
     const confirmed = phrase.trim() === t("imm.confirmPhrase");
     const resting = mode !== "focus";
@@ -5581,7 +6072,14 @@ ${JSON.stringify(refs, null, 2)}`;
         width: 500,
         footer: resting ? h(
           "div",
-          { style: { display: "flex", gap: 9, justifyContent: "flex-end", width: "100%" } },
+          {
+            style: {
+              display: "flex",
+              gap: 9,
+              justifyContent: "flex-end",
+              width: "100%"
+            }
+          },
           h(Btn, { size: "md", onClick: onCancel }, t("imm.back")),
           h(
             Btn,
@@ -5596,7 +6094,15 @@ ${JSON.stringify(refs, null, 2)}`;
           )
         ) : h(
           "div",
-          { style: { display: "flex", gap: 9, justifyContent: "flex-end", width: "100%", flexWrap: "wrap" } },
+          {
+            style: {
+              display: "flex",
+              gap: 9,
+              justifyContent: "flex-end",
+              width: "100%",
+              flexWrap: "wrap"
+            }
+          },
           h(Btn, { size: "md", onClick: onCancel }, t("imm.back")),
           h(
             Btn,
@@ -5623,10 +6129,22 @@ ${JSON.stringify(refs, null, 2)}`;
           )
         )
       },
-      h("div", { style: { fontSize: 12.5, lineHeight: 1.8, color: "var(--tomato-ink-2)" } }, t("imm.detail")),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 12.5,
+            lineHeight: 1.8,
+            color: "var(--tomato-ink-2)"
+          }
+        },
+        t("imm.detail")
+      ),
       focusMinutes > 0 && !resting ? h(
         "div",
-        { style: { marginTop: 8, fontSize: 12, color: "var(--tomato-ink-3)" } },
+        {
+          style: { marginTop: 8, fontSize: 12, color: "var(--tomato-ink-3)" }
+        },
         t("common.minutes", { n: focusMinutes })
       ) : null,
       strictActive ? h(
@@ -5646,7 +6164,11 @@ ${JSON.stringify(refs, null, 2)}`;
             alignItems: "flex-start"
           }
         },
-        h(Icon, { name: "lock", size: 15, style: { color: "var(--tomato-sun)", flex: "none", marginTop: 1 } }),
+        h(Icon, {
+          name: "lock",
+          size: 15,
+          style: { color: "var(--tomato-sun)", flex: "none", marginTop: 1 }
+        }),
         t("imm.strictWarning")
       ) : null,
       resting ? null : h(
@@ -5654,7 +6176,13 @@ ${JSON.stringify(refs, null, 2)}`;
         { style: { marginTop: 16 } },
         h(
           "div",
-          { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginBottom: 6 } },
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              marginBottom: 6
+            }
+          },
           t("imm.typeHint")
         ),
         h("input", {
@@ -5667,7 +6195,13 @@ ${JSON.stringify(refs, null, 2)}`;
         }),
         !canEarly ? h(
           "div",
-          { style: { marginTop: 8, fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          {
+            style: {
+              marginTop: 8,
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)"
+            }
+          },
           t("imm.noTimeHint")
         ) : null
       )
@@ -5843,7 +6377,14 @@ ${JSON.stringify(refs, null, 2)}`;
         "div",
         {
           "aria-hidden": "true",
-          style: { position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: "#ffffff0a" }
+          style: {
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 2,
+            background: "#ffffff0a"
+          }
         },
         h("div", {
           style: {
@@ -5944,7 +6485,14 @@ ${JSON.stringify(refs, null, 2)}`;
           t("imm.paused")
         ) : h(
           "div",
-          { style: { fontSize: narrow ? 13 : 14.5, color: INK_2, letterSpacing: ".04em", lineHeight: 1.7 } },
+          {
+            style: {
+              fontSize: narrow ? 13 : 14.5,
+              color: INK_2,
+              letterSpacing: ".04em",
+              lineHeight: 1.7
+            }
+          },
           resting ? t("imm.restHint") : t("imm.onlyThis")
         ),
         task && !resting && !lockActive ? h(
@@ -6010,7 +6558,11 @@ ${JSON.stringify(refs, null, 2)}`;
             size: "sm",
             variant: "plain",
             icon: "calendar",
-            style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+            style: {
+              color: INK_2,
+              background: "transparent",
+              border: `1px solid ${HAIRLINE}`
+            },
             onClick: goSchedule
           },
           t("imm.schedule")
@@ -6024,7 +6576,11 @@ ${JSON.stringify(refs, null, 2)}`;
               size: "sm",
               variant: "plain",
               icon: soundKind === "silent" ? "mute" : "sound",
-              style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+              style: {
+                color: INK_2,
+                background: "transparent",
+                border: `1px solid ${HAIRLINE}`
+              },
               onClick: () => {
                 ensureAudio();
                 setSoundMenu((v) => !v);
@@ -6038,20 +6594,33 @@ ${JSON.stringify(refs, null, 2)}`;
             items: soundItems,
             align: "left",
             width: 208,
-            style: { top: "auto", bottom: "calc(100% + 8px)", left: "auto", right: 0 }
+            style: {
+              top: "auto",
+              bottom: "calc(100% + 8px)",
+              left: "auto",
+              right: 0
+            }
           })
         ) : null,
-        lockActive ? h(Btn, {
-          size: "sm",
-          icon: "unlock",
-          disabled: busy || strictActive,
-          onClick: interrupt
-        }, t("imm.interrupt")) : !resting ? h(
+        lockActive ? h(
+          Btn,
+          {
+            size: "sm",
+            icon: "unlock",
+            disabled: busy || strictActive,
+            onClick: interrupt
+          },
+          t("imm.interrupt")
+        ) : !resting ? h(
           Btn,
           {
             size: "sm",
             variant: "plain",
-            style: { color: "#d8b7a2", background: "transparent", border: `1px solid ${HAIRLINE}` },
+            style: {
+              color: "#d8b7a2",
+              background: "transparent",
+              border: `1px solid ${HAIRLINE}`
+            },
             onClick: () => setEnding(true)
           },
           t("imm.endEarly")
@@ -6061,7 +6630,11 @@ ${JSON.stringify(refs, null, 2)}`;
             size: "sm",
             variant: "plain",
             icon: "check",
-            style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+            style: {
+              color: INK_2,
+              background: "transparent",
+              border: `1px solid ${HAIRLINE}`
+            },
             disabled: busy || strictActive,
             title: strictActive ? t("imm.strictWarning") : void 0,
             onClick: skipRest
@@ -6087,7 +6660,14 @@ ${JSON.stringify(refs, null, 2)}`;
       // 锁机不能通过关闭沉浸层离开保护界面。
       !forced && h(
         "div",
-        { style: { position: "absolute", right: narrow ? 14 : 24, bottom: narrow ? 16 : 24, display: "flex" } },
+        {
+          style: {
+            position: "absolute",
+            right: narrow ? 14 : 24,
+            bottom: narrow ? 16 : 24,
+            display: "flex"
+          }
+        },
         h(IconBtn, {
           name: "minimize",
           size: 18,
@@ -6121,7 +6701,8 @@ ${JSON.stringify(refs, null, 2)}`;
     if (!prev || !next) return null;
     if (!prev.hydrated || !next.hydrated) return null;
     if (Number(next.serial) > Number(prev.serial)) return "complete";
-    if (!prev.running && next.running) return next.mode === "focus" ? "start" : "resume";
+    if (!prev.running && next.running)
+      return next.mode === "focus" ? "start" : "resume";
     if (prev.running && !next.running && next.paused) return "pause";
     if (Number(next.reminders) > Number(prev.reminders)) return "reminder";
     return null;
@@ -6237,19 +6818,23 @@ ${JSON.stringify(refs, null, 2)}`;
         paused: view.paused,
         mode: view.mode,
         serial: Number(view.timer.completionSerial) || 0,
-        reminders: (data && data.tasks || []).filter((item) => item.reminderPending).length
+        reminders: (data && data.tasks || []).filter(
+          (item) => item.reminderPending
+        ).length
       };
       const prev = prevRef.current;
       prevRef.current = next;
       if (prev === null) return;
       const cue = attentionCue(prev, next);
       if (cue) sound.playCue(cue);
-      if (cue === "complete") navigate({ reason: "complete", serial: next.serial });
+      if (cue === "complete")
+        navigate({ reason: "complete", serial: next.serial });
     }, [view.running, view.paused, view.mode, view.timer.completionSerial, data]);
     useEffect(() => {
       if (!expanded) return void 0;
       const onDown = (e) => {
-        if (rootRef.current && !rootRef.current.contains(e.target)) setExpanded(false);
+        if (rootRef.current && !rootRef.current.contains(e.target))
+          setExpanded(false);
       };
       document.addEventListener("mousedown", onDown, true);
       return () => document.removeEventListener("mousedown", onDown, true);
@@ -6271,7 +6856,10 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const startRound = async () => {
       ensureAudio();
-      const ok = await act({ type: "startTimer" }, view.paused ? t("hud.notifyResumed") : null);
+      const ok = await act(
+        { type: "startTimer" },
+        view.paused ? t("hud.notifyResumed") : null
+      );
       if (ok) openImmersive();
     };
     const pauseRound = () => act({ type: "pauseTimer" }, t("hud.notifyPaused"));
@@ -6313,22 +6901,51 @@ ${JSON.stringify(refs, null, 2)}`;
         "span",
         {
           className: view.running ? "t-pulse" : void 0,
-          style: { display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flex: "none"
+          }
         },
         h(
           Ring,
-          { value: ringValue, size: 32, stroke: 3, color: ringColor, track: "var(--tomato-surface-3)" },
-          h(Icon, { name: "tomato", size: 14, stroke: 1.7, style: { color: ringColor } })
+          {
+            value: ringValue,
+            size: 32,
+            stroke: 3,
+            color: ringColor,
+            track: "var(--tomato-surface-3)"
+          },
+          h(Icon, {
+            name: "tomato",
+            size: 14,
+            stroke: 1.7,
+            style: { color: ringColor }
+          })
         )
       ),
       narrow ? null : h(
         "span",
-        { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.25, minWidth: 0 } },
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            lineHeight: 1.25,
+            minWidth: 0
+          }
+        },
         h(
           "span",
           {
             className: view.running ? "t-mono" : void 0,
-            style: { fontSize: 12.5, fontWeight: 620, color: "var(--tomato-ink)", whiteSpace: "nowrap" }
+            style: {
+              fontSize: 12.5,
+              fontWeight: 620,
+              color: "var(--tomato-ink)",
+              whiteSpace: "nowrap"
+            }
           },
           label
         ),
@@ -6391,7 +7008,9 @@ ${JSON.stringify(refs, null, 2)}`;
           box: 30,
           disabled: busy,
           title: primaryTitle,
-          style: { color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-ink)" },
+          style: {
+            color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-ink)"
+          },
           onClick: (e) => {
             e.stopPropagation();
             if (view.running) pauseRound();
@@ -6423,10 +7042,21 @@ ${JSON.stringify(refs, null, 2)}`;
         h(
           "div",
           { style: { display: "flex", alignItems: "center", gap: 8 } },
-          h(Icon, { name: "tomato", size: 15, style: { color: "var(--tomato-brand)" } }),
+          h(Icon, {
+            name: "tomato",
+            size: 15,
+            style: { color: "var(--tomato-brand)" }
+          }),
           h(
             "span",
-            { style: { fontSize: 12.5, fontWeight: 620, color: "var(--tomato-ink)", flex: 1 } },
+            {
+              style: {
+                fontSize: 12.5,
+                fontWeight: 620,
+                color: "var(--tomato-ink)",
+                flex: 1
+              }
+            },
             t("hud.hint")
           ),
           h(
@@ -6441,10 +7071,20 @@ ${JSON.stringify(refs, null, 2)}`;
         h(Bar, { value: done, max: goal, height: 6 }),
         h(
           "div",
-          { style: { display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 } },
+          {
+            style: {
+              display: "flex",
+              alignItems: "baseline",
+              gap: 8,
+              minWidth: 0
+            }
+          },
           h(
             "span",
-            { className: view.running ? "t-mono" : void 0, style: { fontSize: 12.5, color: "var(--tomato-ink)" } },
+            {
+              className: view.running ? "t-mono" : void 0,
+              style: { fontSize: 12.5, color: "var(--tomato-ink)" }
+            },
             label
           ),
           h(
@@ -6466,7 +7106,13 @@ ${JSON.stringify(refs, null, 2)}`;
           { style: { display: "flex", gap: 7 } },
           view.running ? h(
             Btn,
-            { size: "sm", icon: "pause", disabled: busy, style: { flex: 1 }, onClick: pauseRound },
+            {
+              size: "sm",
+              icon: "pause",
+              disabled: busy,
+              style: { flex: 1 },
+              onClick: pauseRound
+            },
             t("hud.pause")
           ) : h(
             Btn,
@@ -6504,7 +7150,11 @@ ${JSON.stringify(refs, null, 2)}`;
           },
           h(Icon, { name: "focus", size: 16 }),
           t("hud.openImmersive"),
-          h(Icon, { name: "chevronRight", size: 14, style: { marginLeft: "auto", opacity: 0.6 } })
+          h(Icon, {
+            name: "chevronRight",
+            size: 14,
+            style: { marginLeft: "auto", opacity: 0.6 }
+          })
         ) : null,
         h(
           "button",
@@ -6519,7 +7169,11 @@ ${JSON.stringify(refs, null, 2)}`;
           },
           h(Icon, { name: "focus", size: 16 }),
           t("hud.openApp"),
-          h(Icon, { name: "chevronRight", size: 14, style: { marginLeft: "auto", opacity: 0.6 } })
+          h(Icon, {
+            name: "chevronRight",
+            size: 14,
+            style: { marginLeft: "auto", opacity: 0.6 }
+          })
         )
       ) : null
     );
@@ -6580,7 +7234,9 @@ ${JSON.stringify(refs, null, 2)}`;
     const start = async (event) => {
       event?.stopPropagation?.();
       setBusy(true);
-      const res = await tryDispatch({ type: view.running ? "pauseTimer" : "startTimer" });
+      const res = await tryDispatch({
+        type: view.running ? "pauseTimer" : "startTimer"
+      });
       setBusy(false);
       if (!res.ok) {
         notify(res.error || t("common.writeFailed"), "danger");
@@ -6610,17 +7266,34 @@ ${JSON.stringify(refs, null, 2)}`;
           flexWrap: "wrap"
         }
       },
-      h(Icon, { name: "tomato", size: 15, style: { color: "var(--tomato-brand)", flex: "none" } }),
+      h(Icon, {
+        name: "tomato",
+        size: 15,
+        style: { color: "var(--tomato-brand)", flex: "none" }
+      }),
       h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, flexWrap: "wrap" } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flex: 1,
+            minWidth: 0,
+            flexWrap: "wrap"
+          }
+        },
         h(
           "span",
           { style: { color: "var(--tomato-ink)", fontWeight: 550 } },
           view.running ? t("dock.running", { time: fmtClock(view.remainingSecs) }) : t("dock.idle")
         ),
         h(Chip, { icon: "tasks" }, t("dock.due", { n: due })),
-        h(Chip, { icon: "clock", tone: "brand" }, t("dock.minutes", { n: focusMinutes }))
+        h(
+          Chip,
+          { icon: "clock", tone: "brand" },
+          t("dock.minutes", { n: focusMinutes })
+        )
       ),
       h(
         "button",
@@ -6650,7 +7323,13 @@ ${JSON.stringify(refs, null, 2)}`;
             e.stopPropagation();
             openPanel?.();
           },
-          style: { height: 27, padding: "0 10px", borderRadius: 9, fontFamily: "inherit", fontSize: 12 }
+          style: {
+            height: 27,
+            padding: "0 10px",
+            borderRadius: 9,
+            fontFamily: "inherit",
+            fontSize: 12
+          }
         },
         t("dock.view"),
         h(Icon, { name: "chevronRight", size: 13 })
@@ -6668,7 +7347,9 @@ ${JSON.stringify(refs, null, 2)}`;
       name: "tomato",
       size,
       stroke: 1.5,
-      style: { color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" }
+      style: {
+        color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-brand)"
+      }
     });
   }
 
@@ -6707,7 +7388,8 @@ ${JSON.stringify(refs, null, 2)}`;
     const nowSecs = secondsOfNow();
     const due = [];
     for (const task of data.tasks || []) {
-      if (task.completed || !task.reminderPending || task.reminderExpired) continue;
+      if (task.completed || !task.reminderPending || task.reminderExpired)
+        continue;
       if (task.dueDate !== today || !task.reminderTime) continue;
       const start = parseHHMM(task.reminderTime);
       if (start === null) continue;
@@ -6715,7 +7397,9 @@ ${JSON.stringify(refs, null, 2)}`;
       if (nowSecs < start || nowSecs >= end) continue;
       due.push({ task, start });
     }
-    due.sort((a, b) => a.start - b.start || String(a.task.id).localeCompare(String(b.task.id)));
+    due.sort(
+      (a, b) => a.start - b.start || String(a.task.id).localeCompare(String(b.task.id))
+    );
     const primary = due.length > 0 ? due[0].task : null;
     return { primary, extra: Math.max(0, due.length - 1) };
   }
@@ -6785,7 +7469,11 @@ ${JSON.stringify(refs, null, 2)}`;
           minWidth: 0
         }
       },
-      h(Icon, { name: "bell", size: 14, style: { color: "var(--tomato-accent-fg)" } }),
+      h(Icon, {
+        name: "bell",
+        size: 14,
+        style: { color: "var(--tomato-accent-fg)" }
+      }),
       h(
         "span",
         {
@@ -6798,7 +7486,11 @@ ${JSON.stringify(refs, null, 2)}`;
           }
         },
         t("reminder.prefix"),
-        task.reminderTime ? h("span", { className: "t-mono", style: { marginLeft: 5 } }, task.reminderTime) : null
+        task.reminderTime ? h(
+          "span",
+          { className: "t-mono", style: { marginLeft: 5 } },
+          task.reminderTime
+        ) : null
       ),
       project ? h(
         "span",
@@ -6843,22 +7535,44 @@ ${JSON.stringify(refs, null, 2)}`;
       ),
       inline ? extra > 0 ? h(
         "span",
-        { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+        {
+          style: {
+            fontSize: 11,
+            color: "var(--tomato-ink-3)",
+            flex: "none"
+          }
+        },
         t("reminder.more", { n: extra })
       ) : null : h(
         "span",
-        { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+        {
+          style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" }
+        },
         t("reminder.minutes", { n: minutes, round: rounds }),
         extra > 0 ? ` · ${t("reminder.more", { n: extra })}` : ""
       ),
       error ? h(
         "span",
-        { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)", flex: "none" } },
+        {
+          style: {
+            fontSize: 11,
+            color: "var(--dsw-alias-state-error-primary, #b8503f)",
+            flex: "none"
+          }
+        },
         error
       ) : null,
       h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 6, flex: "none", marginLeft: "auto" } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            flex: "none",
+            marginLeft: "auto"
+          }
+        },
         h(
           Btn,
           {
@@ -7010,7 +7724,12 @@ ${JSON.stringify(refs, null, 2)}`;
       untouched: "Untitled step"
     }
   });
-  var PRIORITY_KEYS = ["priorityNone", "priorityLow", "priorityMedium", "priorityHigh"];
+  var PRIORITY_KEYS = [
+    "priorityNone",
+    "priorityLow",
+    "priorityMedium",
+    "priorityHigh"
+  ];
   registerCopy("task", {
     zh: {
       priorityNone: "无",
@@ -7070,7 +7789,11 @@ ${JSON.stringify(refs, null, 2)}`;
       priority: Number(task.priority) || 0,
       estimate: String(Math.max(1, Number(task.estimate) || 1)),
       tagsText: Array.isArray(task.tags) ? task.tags.join(", ") : "",
-      subtasks: Array.isArray(task.subtasks) ? task.subtasks.map((sub) => ({ id: sub.id, title: sub.title, done: !!sub.done })) : []
+      subtasks: Array.isArray(task.subtasks) ? task.subtasks.map((sub) => ({
+        id: sub.id,
+        title: sub.title,
+        done: !!sub.done
+      })) : []
     };
   }
   function TaskDialog({
@@ -7115,7 +7838,9 @@ ${JSON.stringify(refs, null, 2)}`;
     const addSubtask = () => {
       const title = subInput.trim();
       if (title === "") return;
-      patch({ subtasks: [...draft.subtasks, { id: newId(), title, done: false }] });
+      patch({
+        subtasks: [...draft.subtasks, { id: newId(), title, done: false }]
+      });
       setSubInput("");
     };
     const submit = async () => {
@@ -7220,22 +7945,34 @@ ${JSON.stringify(refs, null, 2)}`;
       ),
       h(
         "div",
-        { style: { fontSize: 13.5, color: "var(--tomato-ink)", fontWeight: 550 } },
+        {
+          style: {
+            fontSize: 13.5,
+            color: "var(--tomato-ink)",
+            fontWeight: 550
+          }
+        },
         draft.title || t("task.untouched")
       )
     ) : h(
       "div",
       { style: { display: "flex", flexDirection: "column", gap: 16 } },
-      h(Field, { label: t("task.title") }, h(Input, {
-        value: draft.title,
-        onChange: (value) => patch({ title: value }),
-        placeholder: t("task.titlePlaceholder"),
-        maxLength: 200,
-        autoFocus: true
-      })),
+      h(
+        Field,
+        { label: t("task.title") },
+        h(Input, {
+          value: draft.title,
+          onChange: (value) => patch({ title: value }),
+          placeholder: t("task.titlePlaceholder"),
+          maxLength: 200,
+          autoFocus: true
+        })
+      ),
       h(
         "div",
-        { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 } },
+        {
+          style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }
+        },
         h(
           Field,
           { label: t("task.project") },
@@ -7243,7 +7980,10 @@ ${JSON.stringify(refs, null, 2)}`;
             value: draft.projectId,
             options: [
               { value: "", label: t("task.noProject") },
-              ...projects.map((project) => ({ value: project.id, label: project.name }))
+              ...projects.map((project) => ({
+                value: project.id,
+                label: project.name
+              }))
             ],
             onChange: (value) => patch({ projectId: value }),
             width: "100%"
@@ -7321,25 +8061,41 @@ ${JSON.stringify(refs, null, 2)}`;
       h(
         "div",
         {
-          style: { fontSize: 12, color: "var(--tomato-ink-3)", display: "flex", alignItems: "center", gap: 6 }
+          style: {
+            fontSize: 12,
+            color: "var(--tomato-ink-3)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6
+          }
         },
         h(Icon, { name: "timer", size: 14 }),
         t("task.focusPreview", { n: workMinutes, m: blockMinutes })
       ),
-      h(Field, { label: t("task.notes") }, h(TextArea, {
-        value: draft.notes,
-        onChange: (value) => patch({ notes: value }),
-        placeholder: t("task.notesPlaceholder"),
-        rows: 3,
-        style: { maxHeight: 160 }
-      })),
+      h(
+        Field,
+        { label: t("task.notes") },
+        h(TextArea, {
+          value: draft.notes,
+          onChange: (value) => patch({ notes: value }),
+          placeholder: t("task.notesPlaceholder"),
+          rows: 3,
+          style: { maxHeight: 160 }
+        })
+      ),
       h(Divider, null),
       h(
         "div",
         { style: { display: "flex", flexDirection: "column", gap: 8 } },
         h(
           "div",
-          { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+          {
+            style: {
+              fontSize: 12,
+              fontWeight: 550,
+              color: "var(--tomato-ink-2)"
+            }
+          },
           t("task.subtasks")
         ),
         draft.subtasks.length > 0 ? h(
@@ -7389,7 +8145,11 @@ ${JSON.stringify(refs, null, 2)}`;
                 size: 14,
                 box: 28,
                 title: t("task.removeSubtask"),
-                onClick: () => patch({ subtasks: draft.subtasks.filter((_, i) => i !== index) })
+                onClick: () => patch({
+                  subtasks: draft.subtasks.filter(
+                    (_, i) => i !== index
+                  )
+                })
               })
             )
           )
@@ -7441,50 +8201,81 @@ ${JSON.stringify(refs, null, 2)}`;
     const footer = confirmDelete ? h(
       "div",
       { style: { display: "flex", gap: 9, marginLeft: "auto" } },
-      h(Btn, {
-        variant: "ghost",
-        size: "sm",
-        onClick: () => setConfirmDelete(false),
-        disabled: busy
-      }, t("common.cancel")),
-      h(Btn, {
-        variant: "danger",
-        size: "sm",
-        icon: "trash",
-        onClick: remove,
-        disabled: busy
-      }, t("task.deleteConfirm"))
+      h(
+        Btn,
+        {
+          variant: "ghost",
+          size: "sm",
+          onClick: () => setConfirmDelete(false),
+          disabled: busy
+        },
+        t("common.cancel")
+      ),
+      h(
+        Btn,
+        {
+          variant: "danger",
+          size: "sm",
+          icon: "trash",
+          onClick: remove,
+          disabled: busy
+        },
+        t("task.deleteConfirm")
+      )
     ) : h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 9, width: "100%" } },
-      editing ? h(Btn, {
-        variant: "danger",
-        size: "sm",
-        icon: "trash",
-        onClick: () => setConfirmDelete(true),
-        disabled: busy
-      }, t("common.delete")) : null,
-      h("div", { style: { flex: 1 } }),
-      h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
-      h(Btn, {
-        variant: "primary",
-        size: "sm",
-        icon: "check",
-        onClick: submit,
-        disabled: busy
-      }, editing ? t("common.save") : t("common.add"))
-    );
-    return h(Modal, {
-      open,
-      onClose: () => {
-        if (!busy) onClose?.();
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          width: "100%"
+        }
       },
-      icon: confirmDelete ? "trash" : editing ? "edit" : "plus",
-      title: confirmDelete ? t("task.deleteTitle") : editing ? t("task.editTitle") : t("task.newTitle"),
-      subtitle: confirmDelete ? void 0 : editing ? t("task.editSubtitle") : t("task.newSubtitle"),
-      width: 620,
-      footer
-    }, body);
+      editing ? h(
+        Btn,
+        {
+          variant: "danger",
+          size: "sm",
+          icon: "trash",
+          onClick: () => setConfirmDelete(true),
+          disabled: busy
+        },
+        t("common.delete")
+      ) : null,
+      h("div", { style: { flex: 1 } }),
+      h(
+        Btn,
+        { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+        t("common.cancel")
+      ),
+      h(
+        Btn,
+        {
+          variant: "primary",
+          size: "sm",
+          icon: "check",
+          onClick: submit,
+          disabled: busy
+        },
+        editing ? t("common.save") : t("common.add")
+      )
+    );
+    return h(
+      Modal,
+      {
+        open,
+        onClose: () => {
+          if (!busy) onClose?.();
+        },
+        icon: confirmDelete ? "trash" : editing ? "edit" : "plus",
+        title: confirmDelete ? t("task.deleteTitle") : editing ? t("task.editTitle") : t("task.newTitle"),
+        subtitle: confirmDelete ? void 0 : editing ? t("task.editSubtitle") : t("task.newSubtitle"),
+        width: 620,
+        footer
+      },
+      body
+    );
   }
 
   // plugin/src/client/pages/search.js
@@ -7592,7 +8383,9 @@ ${JSON.stringify(refs, null, 2)}`;
       h(Icon, {
         name: task.completed ? "check" : "tasks",
         size: 17,
-        style: { color: task.completed ? "var(--tomato-leaf)" : "var(--tomato-ink-3)" }
+        style: {
+          color: task.completed ? "var(--tomato-leaf)" : "var(--tomato-ink-3)"
+        }
       }),
       h(
         "span",
@@ -7614,10 +8407,25 @@ ${JSON.stringify(refs, null, 2)}`;
         ),
         h(
           "span",
-          { style: { display: "flex", alignItems: "center", gap: 7, marginTop: 3, fontSize: 11.5 } },
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              marginTop: 3,
+              fontSize: 11.5
+            }
+          },
           project ? h(
             "span",
-            { style: { display: "inline-flex", alignItems: "center", gap: 4, color: "var(--tomato-ink-3)" } },
+            {
+              style: {
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                color: "var(--tomato-ink-3)"
+              }
+            },
             h("span", {
               style: {
                 width: 6,
@@ -7627,20 +8435,38 @@ ${JSON.stringify(refs, null, 2)}`;
               }
             }),
             project.name
-          ) : h("span", { style: { color: "var(--tomato-ink-3)" } }, t("search.noProject")),
+          ) : h(
+            "span",
+            { style: { color: "var(--tomato-ink-3)" } },
+            t("search.noProject")
+          ),
           task.dueDate ? h(
             "span",
-            { style: { color: overdue ? "var(--tomato-sun)" : "var(--tomato-ink-3)" } },
+            {
+              style: {
+                color: overdue ? "var(--tomato-sun)" : "var(--tomato-ink-3)"
+              }
+            },
             task.dueDate === task.todayKey ? t("search.today") : task.dueDate
           ) : null,
           Array.isArray(task.tags) && task.tags.length > 0 ? h(
             "span",
-            { style: { color: "var(--tomato-ink-3)", overflow: "hidden", textOverflow: "ellipsis" } },
+            {
+              style: {
+                color: "var(--tomato-ink-3)",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
+              }
+            },
             `#${task.tags.slice(0, 2).join(" #")}`
           ) : null
         )
       ),
-      h(Icon, { name: "arrowRight", size: 14, style: { color: "var(--tomato-ink-3)" } })
+      h(Icon, {
+        name: "arrowRight",
+        size: 14,
+        style: { color: "var(--tomato-ink-3)" }
+      })
     );
   }
   function SearchDialog({ open, onClose, onOpenTask, onCreate }) {
@@ -7670,14 +8496,28 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const body = h(
       "div",
-      { style: { display: "flex", flexDirection: "column", gap: 10, minHeight: 220 } },
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          minHeight: 220
+        }
+      },
       h(
         "div",
-        { style: { position: "relative", display: "flex", alignItems: "center" } },
+        {
+          style: { position: "relative", display: "flex", alignItems: "center" }
+        },
         h(Icon, {
           name: "search",
           size: 16,
-          style: { position: "absolute", left: 12, color: "var(--tomato-ink-3)", pointerEvents: "none" }
+          style: {
+            position: "absolute",
+            left: 12,
+            color: "var(--tomato-ink-3)",
+            pointerEvents: "none"
+          }
         }),
         h(Input, {
           value: query,
@@ -7707,10 +8547,19 @@ ${JSON.stringify(refs, null, 2)}`;
         { style: { display: "flex", alignItems: "center", gap: 8 } },
         h(
           "span",
-          { style: { fontSize: 11.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--tomato-ink-3)" } },
+          {
+            style: {
+              fontSize: 11.5,
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+              color: "var(--tomato-ink-3)"
+            }
+          },
           normalized === "" ? t("search.idleTitle") : t("search.count", { n: results.length })
         ),
-        h("span", { style: { flex: 1, height: 1, background: "var(--tomato-line)" } })
+        h("span", {
+          style: { flex: 1, height: 1, background: "var(--tomato-line)" }
+        })
       ),
       results.length > 0 ? h(
         "div",
@@ -7735,9 +8584,27 @@ ${JSON.stringify(refs, null, 2)}`;
             textAlign: "center"
           }
         },
-        h(Icon, { name: "search", size: 22, style: { color: "var(--tomato-ink-3)" } }),
-        h("div", { style: { fontSize: 13.5, color: "var(--tomato-ink-2)" } }, t("search.empty")),
-        h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)", lineHeight: 1.6 } }, t("search.emptyHint")),
+        h(Icon, {
+          name: "search",
+          size: 22,
+          style: { color: "var(--tomato-ink-3)" }
+        }),
+        h(
+          "div",
+          { style: { fontSize: 13.5, color: "var(--tomato-ink-2)" } },
+          t("search.empty")
+        ),
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 12,
+              color: "var(--tomato-ink-3)",
+              lineHeight: 1.6
+            }
+          },
+          t("search.emptyHint")
+        ),
         onCreate && query.trim() !== "" ? h(
           "button",
           {
@@ -7748,7 +8615,11 @@ ${JSON.stringify(refs, null, 2)}`;
               onClose?.();
               onCreate(title);
             },
-            style: { padding: "7px 14px", fontSize: 12.5, height: "auto" }
+            style: {
+              padding: "7px 14px",
+              fontSize: 12.5,
+              height: "auto"
+            }
           },
           t("search.create", { q: query.trim() })
         ) : null
@@ -7767,23 +8638,47 @@ ${JSON.stringify(refs, null, 2)}`;
             color: "var(--tomato-ink-3)"
           }
         },
-        h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "Ctrl K"), t("search.hotkeySearch")),
-        h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "N"), t("search.hotkeyNew")),
-        h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "Space"), t("search.hotkeySpace")),
-        h("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, h(Kbd, null, "Esc"), t("search.hotkeyEsc")),
+        h(
+          "span",
+          { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+          h(Kbd, null, "Ctrl K"),
+          t("search.hotkeySearch")
+        ),
+        h(
+          "span",
+          { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+          h(Kbd, null, "N"),
+          t("search.hotkeyNew")
+        ),
+        h(
+          "span",
+          { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+          h(Kbd, null, "Space"),
+          t("search.hotkeySpace")
+        ),
+        h(
+          "span",
+          { style: { display: "inline-flex", alignItems: "center", gap: 5 } },
+          h(Kbd, null, "Esc"),
+          t("search.hotkeyEsc")
+        ),
         h("span", { style: { flex: 1 } }),
         h("span", { style: { color: "var(--tomato-ink-3)" } }, t("search.tip"))
       )
     );
-    return h(Modal, {
-      open,
-      onClose,
-      icon: "search",
-      title: t("search.title"),
-      subtitle: t("search.subtitle"),
-      width: 560,
-      bodyStyle: { minHeight: 220 }
-    }, body);
+    return h(
+      Modal,
+      {
+        open,
+        onClose,
+        icon: "search",
+        title: t("search.title"),
+        subtitle: t("search.subtitle"),
+        width: 560,
+        bodyStyle: { minHeight: 220 }
+      },
+      body
+    );
   }
 
   // plugin/src/client/pages/focus.js
@@ -8058,7 +8953,10 @@ ${JSON.stringify(refs, null, 2)}`;
       parts.push(
         h(
           "span",
-          { key: "wlReady", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          {
+            key: "wlReady",
+            style: { fontSize: 11.5, color: "var(--tomato-ink-3)" }
+          },
           t("focus.whitelistReady", {
             n: protection.effectiveWhitelist.length || protection.whitelist.length
           })
@@ -8066,7 +8964,11 @@ ${JSON.stringify(refs, null, 2)}`;
       );
     } else if (view.mode === "focus" && protection.mode === "off") {
       parts.push(
-        h("span", { key: "off", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } }, t("focus.protectOff"))
+        h(
+          "span",
+          { key: "off", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          t("focus.protectOff")
+        )
       );
     }
     const guard = state && state.guard;
@@ -8074,7 +8976,10 @@ ${JSON.stringify(refs, null, 2)}`;
       parts.push(
         h(
           "span",
-          { key: "guard", style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          {
+            key: "guard",
+            style: { fontSize: 11.5, color: "var(--tomato-ink-3)" }
+          },
           t("focus.guardUnavailable")
         )
       );
@@ -8136,14 +9041,39 @@ ${JSON.stringify(refs, null, 2)}`;
       // 标题行（与旧版一致：卡片名 + 沉浸入口）
       h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, padding: "16px 22px 0" } },
-        h(Icon, { name: "clock", size: 15, style: { color: "var(--tomato-ink-3)" } }),
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "16px 22px 0"
+          }
+        },
+        h(Icon, {
+          name: "clock",
+          size: 15,
+          style: { color: "var(--tomato-ink-3)" }
+        }),
         h(
           "div",
-          { style: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)" } },
+          {
+            style: {
+              flex: 1,
+              minWidth: 0,
+              fontSize: 13,
+              fontWeight: 620,
+              color: "var(--tomato-ink)"
+            }
+          },
           t("focus.timerTitle")
         ),
-        h(IconBtn, { name: "expand", size: 15, box: 28, title: t("focus.expand"), onClick: onExpand })
+        h(IconBtn, {
+          name: "expand",
+          size: 15,
+          box: 28,
+          title: t("focus.expand"),
+          onClick: onExpand
+        })
       ),
       // 模式切换：占满卡片宽度，三段等分
       h(
@@ -8159,7 +9089,13 @@ ${JSON.stringify(refs, null, 2)}`;
       ),
       h(
         "div",
-        { style: { display: "flex", justifyContent: "center", padding: "12px 22px 0" } },
+        {
+          style: {
+            display: "flex",
+            justifyContent: "center",
+            padding: "12px 22px 0"
+          }
+        },
         h(
           Ring,
           {
@@ -8181,7 +9117,11 @@ ${JSON.stringify(refs, null, 2)}`;
               }
             },
             // 旧版只在计时进行/暂停/休息时显示状态，空闲时不占一行。
-            view.running || view.paused || resting ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, status) : null,
+            view.running || view.paused || resting ? h(
+              "div",
+              { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+              status
+            ) : null,
             h(
               "div",
               {
@@ -8251,13 +9191,25 @@ ${JSON.stringify(refs, null, 2)}`;
             },
             selected ? selected.title : t("focus.freeFocus")
           ),
-          h(Icon, { name: "chevronDown", size: 15, style: { color: "var(--tomato-ink-3)" } })
+          h(Icon, {
+            name: "chevronDown",
+            size: 15,
+            style: { color: "var(--tomato-ink-3)" }
+          })
         )
       ),
       // 旧版的按钮组是居中的一小簇：重置 / 开始 / 跳过，不拉满整行。
       h(
         "div",
-        { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "16px 22px 0" } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+            padding: "16px 22px 0"
+          }
+        },
         h(IconBtn, {
           name: "refresh",
           size: 17,
@@ -8287,7 +9239,11 @@ ${JSON.stringify(refs, null, 2)}`;
           disabled: busy
         })
       ),
-      h("div", { style: { padding: "0 22px" } }, h(ProtectionLine, { state, view, protection })),
+      h(
+        "div",
+        { style: { padding: "0 22px" } },
+        h(ProtectionLine, { state, view, protection })
+      ),
       h(
         "div",
         {
@@ -8356,15 +9312,39 @@ ${JSON.stringify(refs, null, 2)}`;
               color: "var(--tomato-ink-2)"
             }
           },
-          h(Icon, { name: "sound", size: 16, style: { color: "var(--tomato-ink-3)" } }),
-          h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.soundChoose")),
-          h("span", { style: { color: "var(--tomato-ink-3)" } }, t(`sound.${soundKind}`)),
-          h(Icon, { name: "chevronRight", size: 14, style: { color: "var(--tomato-ink-3)" } })
+          h(Icon, {
+            name: "sound",
+            size: 16,
+            style: { color: "var(--tomato-ink-3)" }
+          }),
+          h(
+            "span",
+            { style: { flex: 1, textAlign: "left" } },
+            t("focus.soundChoose")
+          ),
+          h(
+            "span",
+            { style: { color: "var(--tomato-ink-3)" } },
+            t(`sound.${soundKind}`)
+          ),
+          h(Icon, {
+            name: "chevronRight",
+            size: 14,
+            style: { color: "var(--tomato-ink-3)" }
+          })
         )
       )
     );
   }
-  function TaskMeta({ task, project, color, today, catchUpFlag, overdue, settings }) {
+  function TaskMeta({
+    task,
+    project,
+    color,
+    today,
+    catchUpFlag,
+    overdue,
+    settings
+  }) {
     const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
     const doneSubtasks = subtasks.filter((sub) => sub && sub.done).length;
     const tags = Array.isArray(task.tags) ? task.tags : [];
@@ -8374,7 +9354,10 @@ ${JSON.stringify(refs, null, 2)}`;
       items.push(
         h(
           "span",
-          { key: "reminder", style: { display: "inline-flex", alignItems: "center", gap: 4 } },
+          {
+            key: "reminder",
+            style: { display: "inline-flex", alignItems: "center", gap: 4 }
+          },
           h(Icon, { name: "clock", size: 11.5 }),
           h("span", { className: "t-mono" }, task.reminderTime)
         )
@@ -8382,14 +9365,21 @@ ${JSON.stringify(refs, null, 2)}`;
     }
     if (focusMinutes > 0) {
       items.push(
-        h("span", { key: "focus" }, t("focus.minutesPerSession", { n: focusMinutes }))
+        h(
+          "span",
+          { key: "focus" },
+          t("focus.minutesPerSession", { n: focusMinutes })
+        )
       );
     }
     if (project) {
       items.push(
         h(
           "span",
-          { key: "project", style: { display: "inline-flex", alignItems: "center", gap: 4 } },
+          {
+            key: "project",
+            style: { display: "inline-flex", alignItems: "center", gap: 4 }
+          },
           h("span", {
             style: {
               width: 6,
@@ -8405,17 +9395,38 @@ ${JSON.stringify(refs, null, 2)}`;
     }
     if (overdue) {
       items.push(
-        h(Chip, { key: "due", tone: "danger", style: { height: 18, fontSize: 10.5, padding: "0 6px" } }, t("focus.overdue"))
+        h(
+          Chip,
+          {
+            key: "due",
+            tone: "danger",
+            style: { height: 18, fontSize: 10.5, padding: "0 6px" }
+          },
+          t("focus.overdue")
+        )
       );
     } else if (catchUpFlag) {
       items.push(
-        h(Chip, { key: "due", tone: "sun", style: { height: 18, fontSize: 10.5, padding: "0 6px" } }, t("focus.catchUpBadge"))
+        h(
+          Chip,
+          {
+            key: "due",
+            tone: "sun",
+            style: { height: 18, fontSize: 10.5, padding: "0 6px" }
+          },
+          t("focus.catchUpBadge")
+        )
       );
     } else if (task.dueDate) {
       items.push(
         h(
           "span",
-          { key: "due", style: { color: task.dueDate === today ? "var(--tomato-ink-2)" : "var(--tomato-ink-3)" } },
+          {
+            key: "due",
+            style: {
+              color: task.dueDate === today ? "var(--tomato-ink-2)" : "var(--tomato-ink-3)"
+            }
+          },
           task.dueDate === today ? t("common.today") : dayLabel(task.dueDate, today)
         )
       );
@@ -8424,7 +9435,10 @@ ${JSON.stringify(refs, null, 2)}`;
       items.push(
         h(
           "span",
-          { key: "subs", style: { display: "inline-flex", alignItems: "center", gap: 3 } },
+          {
+            key: "subs",
+            style: { display: "inline-flex", alignItems: "center", gap: 3 }
+          },
           h(Icon, { name: "tasks", size: 11.5 }),
           `${doneSubtasks}/${subtasks.length}`
         )
@@ -8549,7 +9563,15 @@ ${JSON.stringify(refs, null, 2)}`;
       ),
       h(
         "div",
-        { style: { position: "relative", display: "flex", alignItems: "center", gap: 2, flex: "none" } },
+        {
+          style: {
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            flex: "none"
+          }
+        },
         h("span", {
           style: {
             width: 5,
@@ -8579,14 +9601,20 @@ ${JSON.stringify(refs, null, 2)}`;
           size: 15,
           box: 30,
           disabled: busy,
-          title: activeTimer ? t("focus.taskPause", { title: task.title || t("focus.untitled") }) : t("focus.taskPlay", { title: task.title || t("focus.untitled") }),
+          title: activeTimer ? t("focus.taskPause", {
+            title: task.title || t("focus.untitled")
+          }) : t("focus.taskPlay", {
+            title: task.title || t("focus.untitled")
+          }),
           onClick: () => actions.play(task)
         }),
         h(IconBtn, {
           name: "more",
           size: 16,
           box: 28,
-          title: t("focus.taskMore", { title: task.title || t("focus.untitled") }),
+          title: t("focus.taskMore", {
+            title: task.title || t("focus.untitled")
+          }),
           onClick: () => setMenuOpen((open) => !open)
         }),
         h(Dropdown, {
@@ -8595,7 +9623,12 @@ ${JSON.stringify(refs, null, 2)}`;
           width: 188,
           onClose: () => setMenuOpen(false),
           items: [
-            { id: "edit", label: t("common.edit"), icon: "edit", onClick: () => actions.edit(task) },
+            {
+              id: "edit",
+              label: t("common.edit"),
+              icon: "edit",
+              onClick: () => actions.edit(task)
+            },
             ...done ? [] : [
               {
                 id: "focus",
@@ -8633,10 +9666,23 @@ ${JSON.stringify(refs, null, 2)}`;
             marginBottom: 2
           }
         },
-        h("span", { style: { fontSize: 12.5, fontWeight: 550, color: "var(--tomato-ink-2)" } }, title),
         h(
           "span",
-          { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+          {
+            style: {
+              fontSize: 12.5,
+              fontWeight: 550,
+              color: "var(--tomato-ink-2)"
+            }
+          },
+          title
+        ),
+        h(
+          "span",
+          {
+            className: "t-mono",
+            style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+          },
           tasks.length
         ),
         onHelp ? h(
@@ -8726,13 +9772,26 @@ ${JSON.stringify(refs, null, 2)}`;
       )
     );
   }
-  function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp }) {
+  function TodayCard({
+    data,
+    today,
+    tab,
+    onTab,
+    view,
+    busy,
+    actions,
+    onCatchUpHelp
+  }) {
     const pending = todayTasks(data, today);
     const overdue = overdueTasks(data, today);
     const catchUps = catchUpTasks(data, today);
     const catchIds = new Set(catchUps.map((task) => task.id));
-    const timed = pending.filter((task) => task.reminderTime && !catchIds.has(task.id));
-    const untimed = pending.filter((task) => !task.reminderTime && !catchIds.has(task.id));
+    const timed = pending.filter(
+      (task) => task.reminderTime && !catchIds.has(task.id)
+    );
+    const untimed = pending.filter(
+      (task) => !task.reminderTime && !catchIds.has(task.id)
+    );
     const completed = completedOn(data, today);
     const tabs = [
       { value: "active", label: t("focus.tabActive"), count: pending.length },
@@ -8833,7 +9892,10 @@ ${JSON.stringify(refs, null, 2)}`;
           { style: { display: "flex", alignItems: "center", gap: 10 } },
           h(
             Chip,
-            { tone: "neutral", style: { height: 20, fontSize: 10.5, padding: "0 7px" } },
+            {
+              tone: "neutral",
+              style: { height: 20, fontSize: 10.5, padding: "0 7px" }
+            },
             String(pending.length)
           ),
           h(
@@ -8865,7 +9927,10 @@ ${JSON.stringify(refs, null, 2)}`;
             item.label,
             h(
               "span",
-              { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+              {
+                className: "t-mono",
+                style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+              },
               item.count
             )
           )
@@ -9013,8 +10078,16 @@ ${JSON.stringify(refs, null, 2)}`;
                 "div",
                 {
                   key: day.date,
-                  title: t("focus.weekBarTitle", { date: dayLabel(day.date, today), n: minutes }),
-                  style: { display: "flex", justifyContent: "center", alignItems: "flex-end", height: "100%" }
+                  title: t("focus.weekBarTitle", {
+                    date: dayLabel(day.date, today),
+                    n: minutes
+                  }),
+                  style: {
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "flex-end",
+                    height: "100%"
+                  }
                 },
                 h("div", {
                   style: {
@@ -9094,7 +10167,13 @@ ${JSON.stringify(refs, null, 2)}`;
         "div",
         {
           className: "t-scroll",
-          style: { display: "flex", flexDirection: "column", gap: 2, maxHeight: 330, paddingRight: 2 }
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            maxHeight: 330,
+            paddingRight: 2
+          }
         },
         h(
           "button",
@@ -9106,7 +10185,11 @@ ${JSON.stringify(refs, null, 2)}`;
             style: { padding: "8px 10px" }
           },
           h(Icon, { name: "sparkle", size: 16 }),
-          h("span", { style: { flex: 1, minWidth: 0 } }, t("focus.freeFocusOption"))
+          h(
+            "span",
+            { style: { flex: 1, minWidth: 0 } },
+            t("focus.freeFocusOption")
+          )
         ),
         tasks.length > 0 ? tasks.map(
           (task) => h(
@@ -9135,13 +10218,23 @@ ${JSON.stringify(refs, null, 2)}`;
             ),
             task.reminderTime ? h(
               "span",
-              { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+              {
+                className: "t-mono",
+                style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+              },
               task.reminderTime
             ) : null
           )
         ) : h(
           "div",
-          { style: { padding: "22px 12px", fontSize: 12.5, color: "var(--tomato-ink-3)", textAlign: "center" } },
+          {
+            style: {
+              padding: "22px 12px",
+              fontSize: 12.5,
+              color: "var(--tomato-ink-3)",
+              textAlign: "center"
+            }
+          },
           t("focus.noPickTasks")
         )
       )
@@ -9158,7 +10251,11 @@ ${JSON.stringify(refs, null, 2)}`;
         footer: h(
           "div",
           { style: { marginLeft: "auto" } },
-          h(Btn, { variant: "plain", size: "sm", onClick: onClose }, t("common.cancel"))
+          h(
+            Btn,
+            { variant: "plain", size: "sm", onClick: onClose },
+            t("common.cancel")
+          )
         )
       },
       body
@@ -9166,10 +10263,22 @@ ${JSON.stringify(refs, null, 2)}`;
   }
   function CatchUpDialog({ open, onClose }) {
     const sections = [
-      { heading: t("focus.catchUpDesignHeading"), text: t("focus.catchUpDesignText") },
-      { heading: t("focus.catchUpWhenHeading"), text: t("focus.catchUpWhenText") },
-      { heading: t("focus.catchUpHabitHeading"), text: t("focus.catchUpHabitText") },
-      { heading: t("focus.catchUpExpireHeading"), text: t("focus.catchUpExpireText") }
+      {
+        heading: t("focus.catchUpDesignHeading"),
+        text: t("focus.catchUpDesignText")
+      },
+      {
+        heading: t("focus.catchUpWhenHeading"),
+        text: t("focus.catchUpWhenText")
+      },
+      {
+        heading: t("focus.catchUpHabitHeading"),
+        text: t("focus.catchUpHabitText")
+      },
+      {
+        heading: t("focus.catchUpExpireHeading"),
+        text: t("focus.catchUpExpireText")
+      }
     ];
     return h(
       Modal,
@@ -9182,7 +10291,11 @@ ${JSON.stringify(refs, null, 2)}`;
         footer: h(
           "div",
           { style: { marginLeft: "auto" } },
-          h(Btn, { variant: "primary", size: "sm", onClick: onClose }, t("common.close"))
+          h(
+            Btn,
+            { variant: "primary", size: "sm", onClick: onClose },
+            t("common.close")
+          )
         )
       },
       h(
@@ -9194,7 +10307,13 @@ ${JSON.stringify(refs, null, 2)}`;
             { key: section.heading },
             h(
               "div",
-              { style: { fontSize: 12.5, fontWeight: 600, color: "var(--tomato-ink)" } },
+              {
+                style: {
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: "var(--tomato-ink)"
+                }
+              },
               section.heading
             ),
             h(
@@ -9231,7 +10350,11 @@ ${JSON.stringify(refs, null, 2)}`;
         footer: h(
           "div",
           { style: { marginLeft: "auto" } },
-          h(Btn, { variant: "primary", size: "sm", onClick: onClose }, t("common.close"))
+          h(
+            Btn,
+            { variant: "primary", size: "sm", onClick: onClose },
+            t("common.close")
+          )
         )
       },
       h(
@@ -9261,7 +10384,13 @@ ${JSON.stringify(refs, null, 2)}`;
           { style: { display: "flex", flexDirection: "column", gap: 8 } },
           h(
             "div",
-            { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+            {
+              style: {
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink-2)"
+              }
+            },
             t("sound.volume")
           ),
           h(
@@ -9276,7 +10405,8 @@ ${JSON.stringify(refs, null, 2)}`;
               "aria-label": t("sound.volume"),
               onChange: (event) => {
                 const next = Number(event.target.value);
-                if (amb && typeof amb.setVolume === "function") amb.setVolume(next);
+                if (amb && typeof amb.setVolume === "function")
+                  amb.setVolume(next);
               },
               style: { flex: 1, accentColor: "var(--tomato-brand)" }
             }),
@@ -9284,7 +10414,12 @@ ${JSON.stringify(refs, null, 2)}`;
               "span",
               {
                 className: "t-mono",
-                style: { fontSize: 12, color: "var(--tomato-ink-2)", minWidth: 38, textAlign: "right" }
+                style: {
+                  fontSize: 12,
+                  color: "var(--tomato-ink-2)",
+                  minWidth: 38,
+                  textAlign: "right"
+                }
               },
               `${percent}%`
             )
@@ -9292,7 +10427,13 @@ ${JSON.stringify(refs, null, 2)}`;
         ),
         amb && amb.enabled === false ? h(
           "div",
-          { style: { fontSize: 11.5, lineHeight: 1.6, color: "var(--tomato-ink-3)" } },
+          {
+            style: {
+              fontSize: 11.5,
+              lineHeight: 1.6,
+              color: "var(--tomato-ink-3)"
+            }
+          },
           t("sound.mutedHint")
         ) : null
       )
@@ -9310,22 +10451,46 @@ ${JSON.stringify(refs, null, 2)}`;
         footer: h(
           "div",
           { style: { display: "flex", gap: 9, marginLeft: "auto" } },
-          h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
           h(
             Btn,
-            { variant: "danger", size: "sm", icon: "trash", onClick: onConfirm, disabled: busy },
+            { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+            t("common.cancel")
+          ),
+          h(
+            Btn,
+            {
+              variant: "danger",
+              size: "sm",
+              icon: "trash",
+              onClick: onConfirm,
+              disabled: busy
+            },
             t("focus.deleteConfirm")
           )
         )
       },
       h(
         "div",
-        { style: { fontSize: 13.5, fontWeight: 550, color: "var(--tomato-ink)", lineHeight: 1.6 } },
+        {
+          style: {
+            fontSize: 13.5,
+            fontWeight: 550,
+            color: "var(--tomato-ink)",
+            lineHeight: 1.6
+          }
+        },
         task ? task.title || t("focus.untitled") : ""
       ),
       h(
         "div",
-        { style: { fontSize: 12, lineHeight: 1.7, color: "var(--tomato-ink-3)", marginTop: 6 } },
+        {
+          style: {
+            fontSize: 12,
+            lineHeight: 1.7,
+            color: "var(--tomato-ink-3)",
+            marginTop: 6
+          }
+        },
         t("focus.deleteBody")
       )
     );
@@ -9348,8 +10513,10 @@ ${JSON.stringify(refs, null, 2)}`;
         if (e.key !== "n" && e.key !== "N") return;
         const el = e.target;
         const tag = el && el.tagName || "";
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el && el.isContentEditable) return;
-        if (editor || searchOpen || pickerOpen || soundOpen || catchUpOpen || deleteTarget) return;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el && el.isContentEditable)
+          return;
+        if (editor || searchOpen || pickerOpen || soundOpen || catchUpOpen || deleteTarget)
+          return;
         e.preventDefault();
         setEditor({ title: "" });
       };
@@ -9495,11 +10662,21 @@ ${JSON.stringify(refs, null, 2)}`;
       grading.total > 0 ? h(GradingBanner, {
         items: grading.items,
         total: grading.total,
-        onAssistant: () => props.onAssistant?.("triage", grading.items.flatMap((item) => item.records))
+        onAssistant: () => props.onAssistant?.(
+          "triage",
+          grading.items.flatMap((item) => item.records)
+        )
       }) : null,
       h(
         "div",
-        { style: { display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" } },
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 20,
+            alignItems: "flex-start"
+          }
+        },
         h(
           "div",
           { style: { flex: "1 1 420px", maxWidth: 500, minWidth: 0 } },
@@ -9566,8 +10743,15 @@ ${JSON.stringify(refs, null, 2)}`;
         onPick: chooseTask,
         onClose: () => setPickerOpen(false)
       }),
-      h(SoundDialog, { open: soundOpen, onClose: () => setSoundOpen(false), amb }),
-      h(CatchUpDialog, { open: catchUpOpen, onClose: () => setCatchUpOpen(false) }),
+      h(SoundDialog, {
+        open: soundOpen,
+        onClose: () => setSoundOpen(false),
+        amb
+      }),
+      h(CatchUpDialog, {
+        open: catchUpOpen,
+        onClose: () => setCatchUpOpen(false)
+      }),
       h(DeleteTaskDialog, {
         open: !!deleteTarget,
         task: deleteTarget,
@@ -11829,7 +13013,9 @@ ${JSON.stringify(refs, null, 2)}`;
   var NO_DATE = "9999-12-31";
   var NO_TIME = "99:99";
   function compareByTime(a, b) {
-    return String(a.dueDate || NO_DATE).localeCompare(String(b.dueDate || NO_DATE)) || String(a.reminderTime || NO_TIME).localeCompare(String(b.reminderTime || NO_TIME)) || (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0);
+    return String(a.dueDate || NO_DATE).localeCompare(String(b.dueDate || NO_DATE)) || String(a.reminderTime || NO_TIME).localeCompare(
+      String(b.reminderTime || NO_TIME)
+    ) || (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0);
   }
   function sortTasks(tasks, sort) {
     const items = tasks.slice();
@@ -11852,16 +13038,24 @@ ${JSON.stringify(refs, null, 2)}`;
     if (rule.kind === "once") {
       const date = rule.date ? dayLabel(rule.date, today) : "";
       const time = rule.time ? ` ${rule.time}` : "";
-      return t("tasks.printingOnce", { date: date || t("tasks.printingNoDate"), time });
+      return t("tasks.printingOnce", {
+        date: date || t("tasks.printingNoDate"),
+        time
+      });
     }
     if (rule.kind === "calendar") {
       const slots = Array.isArray(rule.slots) ? rule.slots : [];
-      const n = slots.reduce((sum, slot) => sum + (Array.isArray(slot.dates) ? slot.dates.length : 0), 0);
+      const n = slots.reduce(
+        (sum, slot) => sum + (Array.isArray(slot.dates) ? slot.dates.length : 0),
+        0
+      );
       return t("tasks.printingCalendar", { n });
     }
     if (rule.kind === "weekly") {
       const slots = Array.isArray(rule.slots) ? rule.slots : [];
-      const times = Array.from(new Set(slots.map((slot) => slot.time).filter(Boolean)));
+      const times = Array.from(
+        new Set(slots.map((slot) => slot.time).filter(Boolean))
+      );
       const summary = t("tasks.printingWeekly", { n: slots.length });
       return times.length > 0 ? `${summary}${t("tasks.printingTimes", { times: times.join(" / ") })}` : summary;
     }
@@ -11880,17 +13074,45 @@ ${JSON.stringify(refs, null, 2)}`;
       priority: priorityOf(task),
       estimate: Math.max(1, Number(task.estimate) || 1),
       tags: Array.isArray(task.tags) ? task.tags.slice() : [],
-      subtasks: Array.isArray(task.subtasks) ? task.subtasks.map((sub) => ({ id: sub.id, title: sub.title, done: !!sub.done })) : [],
+      subtasks: Array.isArray(task.subtasks) ? task.subtasks.map((sub) => ({
+        id: sub.id,
+        title: sub.title,
+        done: !!sub.done
+      })) : [],
       ...patch,
       repeat: "none"
     };
   }
   function SummaryStrip({ counts }) {
     const items = [
-      { key: "all", icon: "tasks", label: t("tasks.tabAll"), n: counts.all, tone: "neutral" },
-      { key: "active", icon: "clock", label: t("tasks.tabActive"), n: counts.active, tone: "brand" },
-      { key: "completed", icon: "check", label: t("tasks.tabCompleted"), n: counts.completed, tone: "leaf" },
-      { key: "templates", icon: "sparkle", label: t("tasks.tabTemplates"), n: counts.templates, tone: "neutral" }
+      {
+        key: "all",
+        icon: "tasks",
+        label: t("tasks.tabAll"),
+        n: counts.all,
+        tone: "neutral"
+      },
+      {
+        key: "active",
+        icon: "clock",
+        label: t("tasks.tabActive"),
+        n: counts.active,
+        tone: "brand"
+      },
+      {
+        key: "completed",
+        icon: "check",
+        label: t("tasks.tabCompleted"),
+        n: counts.completed,
+        tone: "leaf"
+      },
+      {
+        key: "templates",
+        icon: "sparkle",
+        label: t("tasks.tabTemplates"),
+        n: counts.templates,
+        tone: "neutral"
+      }
     ];
     return h(
       "div",
@@ -11935,9 +13157,15 @@ ${JSON.stringify(refs, null, 2)}`;
   }) {
     const tabItems = [
       { value: "active", label: `${t("tasks.tabActive")} ${counts.active}` },
-      { value: "completed", label: `${t("tasks.tabCompleted")} ${counts.completed}` },
+      {
+        value: "completed",
+        label: `${t("tasks.tabCompleted")} ${counts.completed}`
+      },
       { value: "all", label: `${t("tasks.tabAll")} ${counts.all}` },
-      { value: "templates", label: `${t("tasks.tabTemplates")} ${counts.templates}` }
+      {
+        value: "templates",
+        label: `${t("tasks.tabTemplates")} ${counts.templates}`
+      }
     ];
     const projectOptions = [
       { value: "all", label: t("tasks.allProjects") },
@@ -11946,10 +13174,12 @@ ${JSON.stringify(refs, null, 2)}`;
     ];
     const priorityOptions = [
       { value: "all", label: t("tasks.allPriorities") },
-      ...["priorityHigh", "priorityMedium", "priorityLow", "priorityNone"].map((key, index) => ({
-        value: String(3 - index),
-        label: t(`tasks.${key}`)
-      }))
+      ...["priorityHigh", "priorityMedium", "priorityLow", "priorityNone"].map(
+        (key, index) => ({
+          value: String(3 - index),
+          label: t(`tasks.${key}`)
+        })
+      )
     ];
     const sortOptions = [
       { value: "time", label: t("tasks.sortTime") },
@@ -11998,7 +13228,12 @@ ${JSON.stringify(refs, null, 2)}`;
             h(Icon, {
               name: "search",
               size: 15,
-              style: { position: "absolute", left: 11, color: "var(--tomato-ink-3)", pointerEvents: "none" }
+              style: {
+                position: "absolute",
+                left: 11,
+                color: "var(--tomato-ink-3)",
+                pointerEvents: "none"
+              }
             }),
             h(Input, {
               value: query,
@@ -12067,7 +13302,13 @@ ${JSON.stringify(refs, null, 2)}`;
       },
       h(
         "span",
-        { style: { fontSize: 12.5, fontWeight: 620, color: "var(--tomato-brand-deep)" } },
+        {
+          style: {
+            fontSize: 12.5,
+            fontWeight: 620,
+            color: "var(--tomato-brand-deep)"
+          }
+        },
         t("tasks.batchSelected", { n: count })
       ),
       h("span", { style: { flex: 1 } }),
@@ -12104,7 +13345,11 @@ ${JSON.stringify(refs, null, 2)}`;
         },
         t("tasks.batchDelete")
       ),
-      h(Btn, { variant: "plain", size: "sm", onClick: onCancel, disabled: busy }, t("tasks.batchCancel"))
+      h(
+        Btn,
+        { variant: "plain", size: "sm", onClick: onCancel, disabled: busy },
+        t("tasks.batchCancel")
+      )
     );
   }
   var META_ITEM = { display: "inline-flex", alignItems: "center", gap: 4 };
@@ -12138,8 +13383,20 @@ ${JSON.stringify(refs, null, 2)}`;
     const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
     const subtaskDone = subtasks.filter((sub) => sub.done).length;
     const menuItems = [
-      { id: "edit", label: t("common.edit"), icon: "edit", onClick: () => onEdit(task) },
-      ...completed ? [] : [{ id: "focus", label: t("tasks.startFocus"), icon: "focus", onClick: () => onPlay(task) }],
+      {
+        id: "edit",
+        label: t("common.edit"),
+        icon: "edit",
+        onClick: () => onEdit(task)
+      },
+      ...completed ? [] : [
+        {
+          id: "focus",
+          label: t("tasks.startFocus"),
+          icon: "focus",
+          onClick: () => onPlay(task)
+        }
+      ],
       { divider: true },
       {
         id: "delete",
@@ -12163,16 +13420,34 @@ ${JSON.stringify(refs, null, 2)}`;
           color: "var(--tomato-ink-3)"
         }
       },
-      isHabit ? h(Chip, { tone: "leaf", icon: "habit", style: { height: 19, fontSize: 11 } }, t("tasks.habitKind")) : null,
-      task.reminderTime ? h("span", { style: META_ITEM }, h(Icon, { name: "clock", size: 12 }), task.reminderTime) : null,
-      task.focusMinutes != null ? h("span", { style: META_ITEM }, t("tasks.perSession", { n: task.focusMinutes })) : null,
+      isHabit ? h(
+        Chip,
+        { tone: "leaf", icon: "habit", style: { height: 19, fontSize: 11 } },
+        t("tasks.habitKind")
+      ) : null,
+      task.reminderTime ? h(
+        "span",
+        { style: META_ITEM },
+        h(Icon, { name: "clock", size: 12 }),
+        task.reminderTime
+      ) : null,
+      task.focusMinutes != null ? h(
+        "span",
+        { style: META_ITEM },
+        t("tasks.perSession", { n: task.focusMinutes })
+      ) : null,
       project ? h(
         "span",
         { style: META_ITEM },
         h(Dot, { color: projectColor(data, project.id), size: 6 }),
         project.name
       ) : null,
-      task.dueDate ? h("span", { style: META_ITEM }, h(Icon, { name: "calendar", size: 12 }), dayLabel(task.dueDate, today)) : null,
+      task.dueDate ? h(
+        "span",
+        { style: META_ITEM },
+        h(Icon, { name: "calendar", size: 12 }),
+        dayLabel(task.dueDate, today)
+      ) : null,
       overdue ? h(Chip, { tone: "danger" }, t("tasks.overdue")) : null,
       catchUp ? h(Chip, { tone: "sun" }, t("tasks.catchUp")) : null,
       subtasks.length > 0 ? h(
@@ -12184,7 +13459,11 @@ ${JSON.stringify(refs, null, 2)}`;
       tags.map(
         (tag, index) => h(
           Chip,
-          { key: `tag-${index}`, tone: "neutral", style: { height: 19, fontSize: 11, maxWidth: 140 } },
+          {
+            key: `tag-${index}`,
+            tone: "neutral",
+            style: { height: 19, fontSize: 11, maxWidth: 140 }
+          },
           `#${tag}`
         )
       )
@@ -12332,15 +13611,33 @@ ${JSON.stringify(refs, null, 2)}`;
           flexWrap: "wrap"
         }
       },
-      h(Icon, { name: "sparkle", size: 16, style: { color: "var(--tomato-brand-deep)" } }),
+      h(Icon, {
+        name: "sparkle",
+        size: 16,
+        style: { color: "var(--tomato-brand-deep)" }
+      }),
       h(
         "div",
-        { style: { fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)", flex: 1, minWidth: 0 } },
+        {
+          style: {
+            fontSize: 13,
+            fontWeight: 620,
+            color: "var(--tomato-ink)",
+            flex: 1,
+            minWidth: 0
+          }
+        },
         t("tasks.templatesTitle")
       ),
       h(
         Btn,
-        { variant: "soft", size: "sm", icon: "plus", onClick: onNew, disabled: !onNew },
+        {
+          variant: "soft",
+          size: "sm",
+          icon: "plus",
+          onClick: onNew,
+          disabled: !onNew
+        },
         t("tasks.newTemplate")
       )
     );
@@ -12348,19 +13645,16 @@ ${JSON.stringify(refs, null, 2)}`;
       return h(
         "div",
         null,
-        h(
-          Empty,
-          {
-            icon: "calendar",
-            title: t("tasks.emptyTemplates"),
-            hint: t("tasks.emptyTemplatesHint"),
-            action: onNew ? h(
-              Btn,
-              { variant: "primary", size: "sm", icon: "plus", onClick: onNew },
-              t("tasks.newTemplate")
-            ) : null
-          }
-        ),
+        h(Empty, {
+          icon: "calendar",
+          title: t("tasks.emptyTemplates"),
+          hint: t("tasks.emptyTemplatesHint"),
+          action: onNew ? h(
+            Btn,
+            { variant: "primary", size: "sm", icon: "plus", onClick: onNew },
+            t("tasks.newTemplate")
+          ) : null
+        }),
         hint
       );
     }
@@ -12395,7 +13689,14 @@ ${JSON.stringify(refs, null, 2)}`;
             },
             h(
               "div",
-              { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 } },
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 8
+                }
+              },
               h(
                 "span",
                 {
@@ -12477,17 +13778,31 @@ ${JSON.stringify(refs, null, 2)}`;
                 h(Icon, { name: "calendarClock", size: 12 }),
                 printingSummary(template, today)
               ),
-              Number.isFinite(ahead) && ahead >= 0 ? h("span", { style: META_ITEM }, t("tasks.printAhead", { n: ahead })) : null,
-              h("span", { style: META_ITEM }, t("tasks.templateEstimate", { n: estimate })),
+              Number.isFinite(ahead) && ahead >= 0 ? h(
+                "span",
+                { style: META_ITEM },
+                t("tasks.printAhead", { n: ahead })
+              ) : null,
               h(
                 "span",
                 { style: META_ITEM },
-                focus != null && focus > 0 ? t("tasks.templateFocus", { minutes: fmtMinutes(focus) }) : t("tasks.templateDefaultFocus", { minutes: fmtMinutes(defaultFocus) })
+                t("tasks.templateEstimate", { n: estimate })
+              ),
+              h(
+                "span",
+                { style: META_ITEM },
+                focus != null && focus > 0 ? t("tasks.templateFocus", { minutes: fmtMinutes(focus) }) : t("tasks.templateDefaultFocus", {
+                  minutes: fmtMinutes(defaultFocus)
+                })
               ),
               tags.map(
                 (tag, tagIndex) => h(
                   Chip,
-                  { key: `tag-${tagIndex}`, tone: "neutral", style: { height: 19, fontSize: 11 } },
+                  {
+                    key: `tag-${tagIndex}`,
+                    tone: "neutral",
+                    style: { height: 19, fontSize: 11 }
+                  },
                   `#${tag}`
                 )
               )
@@ -12512,7 +13827,11 @@ ${JSON.stringify(refs, null, 2)}`;
           flexWrap: "wrap"
         }
       },
-      h(Icon, { name: "plus", size: 17, style: { color: "var(--tomato-brand)" } }),
+      h(Icon, {
+        name: "plus",
+        size: 17,
+        style: { color: "var(--tomato-brand)" }
+      }),
       h(Input, {
         value,
         onChange,
@@ -12537,7 +13856,11 @@ ${JSON.stringify(refs, null, 2)}`;
         },
         t("tasks.addSubmit")
       ),
-      h(Btn, { variant: "plain", size: "sm", icon: "edit", onClick: onFullEdit }, t("tasks.fullEdit"))
+      h(
+        Btn,
+        { variant: "plain", size: "sm", icon: "edit", onClick: onFullEdit },
+        t("tasks.fullEdit")
+      )
     );
   }
   function TasksPage() {
@@ -12596,14 +13919,17 @@ ${JSON.stringify(refs, null, 2)}`;
         } else if (projectId !== "all" && task.projectId !== projectId) {
           return false;
         }
-        if (priority !== "all" && priorityOf(task) !== Number(priority)) return false;
+        if (priority !== "all" && priorityOf(task) !== Number(priority))
+          return false;
         return matchesQuery(task, normalizedQuery);
       }),
       sort
     );
     const editingTask = editor && editor.id ? taskById(data, editor.id) : null;
     const dialogOpen2 = !!editor && (!editor.id || !!editingTask);
-    const editingTemplate = templateEditor && templateEditor.id ? templates.find((template) => template && template.id === templateEditor.id) || null : null;
+    const editingTemplate = templateEditor && templateEditor.id ? templates.find(
+      (template) => template && template.id === templateEditor.id
+    ) || null : null;
     const templateDialogOpen = !!templateEditor && (!templateEditor.id || !!editingTemplate);
     const prints = Array.isArray(data.prints) ? data.prints : [];
     const showToastError = (error) => notify(error || t("common.writeFailed"), "danger");
@@ -12662,7 +13988,9 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const runBatchComplete = async () => {
       if (batchBusy) return;
-      const targets = tasks.filter((task) => picked.includes(task.id) && !task.completed);
+      const targets = tasks.filter(
+        (task) => picked.includes(task.id) && !task.completed
+      );
       if (targets.length === 0) {
         clearSelection();
         return;
@@ -12745,7 +14073,10 @@ ${JSON.stringify(refs, null, 2)}`;
       }
       setBatchBusy(false);
       if (failure) {
-        notify(t("tasks.moveFailed", { error: failure || t("common.writeFailed") }), "danger");
+        notify(
+          t("tasks.moveFailed", { error: failure || t("common.writeFailed") }),
+          "danger"
+        );
         return;
       }
       setMoveOpen(false);
@@ -12786,7 +14117,9 @@ ${JSON.stringify(refs, null, 2)}`;
       setTemplateEditor(template && template.id ? { id: template.id } : {});
     };
     const openPrint = (template) => {
-      setPrintDialog({ templateId: template && template.id ? template.id : null });
+      setPrintDialog({
+        templateId: template && template.id ? template.id : null
+      });
     };
     const runSyncTemplate = async (template) => {
       if (!template || syncingId !== null) return;
@@ -12808,7 +14141,11 @@ ${JSON.stringify(refs, null, 2)}`;
         null,
         h(
           Btn,
-          { variant: "ghost", icon: "search", onClick: () => setSearchOpen(true) },
+          {
+            variant: "ghost",
+            icon: "search",
+            onClick: () => setSearchOpen(true)
+          },
           t("common.search")
         ),
         h(
@@ -12846,7 +14183,19 @@ ${JSON.stringify(refs, null, 2)}`;
         )
       );
     }
-    const emptyProps = normalizedQuery ? { icon: "search", title: t("tasks.emptySearch"), hint: t("tasks.emptySearchHint") } : tab === "completed" ? { icon: "check", title: t("tasks.emptyCompleted"), hint: t("tasks.emptyCompletedHint") } : tab === "all" ? { icon: "tasks", title: t("tasks.emptyAll"), hint: t("tasks.emptyAllHint") } : {
+    const emptyProps = normalizedQuery ? {
+      icon: "search",
+      title: t("tasks.emptySearch"),
+      hint: t("tasks.emptySearchHint")
+    } : tab === "completed" ? {
+      icon: "check",
+      title: t("tasks.emptyCompleted"),
+      hint: t("tasks.emptyCompletedHint")
+    } : tab === "all" ? {
+      icon: "tasks",
+      title: t("tasks.emptyAll"),
+      hint: t("tasks.emptyAllHint")
+    } : {
       icon: "leaf",
       title: t("tasks.emptyActive"),
       hint: t("tasks.emptyActiveHint"),
@@ -12918,7 +14267,12 @@ ${JSON.stringify(refs, null, 2)}`;
           "div",
           null,
           visible.map(
-            (task, index) => h(TaskRow2, { key: task.id, task, last: index === visible.length - 1, ...rowProps })
+            (task, index) => h(TaskRow2, {
+              key: task.id,
+              task,
+              last: index === visible.length - 1,
+              ...rowProps
+            })
           )
         )
       ),
@@ -12970,7 +14324,13 @@ ${JSON.stringify(refs, null, 2)}`;
         width: 460,
         children: h(
           "div",
-          { style: { fontSize: 13, color: "var(--tomato-ink-2)", lineHeight: 1.7 } },
+          {
+            style: {
+              fontSize: 13,
+              color: "var(--tomato-ink-2)",
+              lineHeight: 1.7
+            }
+          },
           pendingDelete && pendingDelete.batch ? t("tasks.batchDeleteBody", { n: pendingDelete.ids.length }) : t("tasks.deleteBody")
         ),
         footer: h(
@@ -12978,12 +14338,21 @@ ${JSON.stringify(refs, null, 2)}`;
           { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
           h(
             Btn,
-            { variant: "ghost", onClick: () => setPendingDelete(null), disabled: batchBusy },
+            {
+              variant: "ghost",
+              onClick: () => setPendingDelete(null),
+              disabled: batchBusy
+            },
             t("common.cancel")
           ),
           h(
             Btn,
-            { variant: "danger", icon: "trash", onClick: confirmDelete, disabled: batchBusy },
+            {
+              variant: "danger",
+              icon: "trash",
+              onClick: confirmDelete,
+              disabled: batchBusy
+            },
             t("tasks.deleteConfirm")
           )
         )
@@ -13002,7 +14371,13 @@ ${JSON.stringify(refs, null, 2)}`;
           { style: { display: "flex", flexDirection: "column", gap: 8 } },
           h(
             "div",
-            { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+            {
+              style: {
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink-2)"
+              }
+            },
             t("tasks.moveDate")
           ),
           h(Input, { type: "date", value: moveDate, onChange: setMoveDate })
@@ -13012,7 +14387,11 @@ ${JSON.stringify(refs, null, 2)}`;
           { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
           h(
             Btn,
-            { variant: "ghost", onClick: () => setMoveOpen(false), disabled: batchBusy },
+            {
+              variant: "ghost",
+              onClick: () => setMoveOpen(false),
+              disabled: batchBusy
+            },
             t("common.cancel")
           ),
           h(
@@ -13214,10 +14593,13 @@ ${JSON.stringify(refs, null, 2)}`;
   };
   function habitTemplate(templates, habitId) {
     if (!habitId) return null;
-    return templates.find((item) => item && item.shape && item.shape.habitId === habitId) || null;
+    return templates.find(
+      (item) => item && item.shape && item.shape.habitId === habitId
+    ) || null;
   }
   function slotsOfTemplate(template) {
-    if (!template || !template.printing || template.printing.kind !== "weekly") return [];
+    if (!template || !template.printing || template.printing.kind !== "weekly")
+      return [];
     const slots = Array.isArray(template.printing.slots) ? template.printing.slots : [];
     return slots.filter(
       (slot) => slot && Array.isArray(slot.days) && slot.days.some((day) => day >= 1 && day <= 7) && typeof slot.time === "string" && slot.time.length > 0
@@ -13263,7 +14645,14 @@ ${JSON.stringify(refs, null, 2)}`;
     let streak = 0;
     let cursor = today;
     for (let i = 0; i < STREAK_LOOKBACK; i += 1) {
-      const status = statusOfDay(cursor, grouped, slots, hasTemplate, today, firstDate);
+      const status = statusOfDay(
+        cursor,
+        grouped,
+        slots,
+        hasTemplate,
+        today,
+        firstDate
+      );
       if (status === "done") streak += 1;
       else if (status === "missed") break;
       cursor = addDays(cursor, -1);
@@ -13295,7 +14684,9 @@ ${JSON.stringify(refs, null, 2)}`;
     return Array.isArray(labels) ? labels : [];
   }
   function slotText(slot) {
-    const days = Array.from(new Set(slot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b);
+    const days = Array.from(
+      new Set(slot.days.filter((day) => day >= 1 && day <= 7))
+    ).sort((a, b) => a - b);
     if (days.length === 0) return "";
     const labels = weekFullLabels();
     const everyDay = days.length === 7;
@@ -13366,17 +14757,33 @@ ${JSON.stringify(refs, null, 2)}`;
     }
     if (focus > 0) {
       meta.push(
-        h(Chip, { key: "focus", tone: "neutral", icon: "timer" }, t("habits.focusPerSession", { n: fmtMinutes(focus) }))
+        h(
+          Chip,
+          { key: "focus", tone: "neutral", icon: "timer" },
+          t("habits.focusPerSession", { n: fmtMinutes(focus) })
+        )
       );
     }
     slots.forEach((slot, index) => {
-      meta.push(h(Chip, { key: `slot-${index}`, tone: "neutral", icon: "clock" }, slotText(slot)));
+      meta.push(
+        h(
+          Chip,
+          { key: `slot-${index}`, tone: "neutral", icon: "clock" },
+          slotText(slot)
+        )
+      );
     });
     return h(
       Card,
       {
         pad: 18,
-        style: { flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 13 }
+        style: {
+          flex: "1 1 300px",
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 13
+        }
       },
       h(
         "div",
@@ -13395,7 +14802,11 @@ ${JSON.stringify(refs, null, 2)}`;
         h(
           "div",
           { style: { flex: 1, minWidth: 0 } },
-          h("div", { style: NAME_STYLE, title: habit.name || t("habits.untitled") }, habit.name || t("habits.untitled"))
+          h(
+            "div",
+            { style: NAME_STYLE, title: habit.name || t("habits.untitled") },
+            habit.name || t("habits.untitled")
+          )
         ),
         h(IconBtn, {
           name: "edit",
@@ -13412,12 +14823,30 @@ ${JSON.stringify(refs, null, 2)}`;
           onClick: () => onDelete(habit)
         })
       ),
-      meta.length > 0 ? h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" } }, meta) : null,
+      meta.length > 0 ? h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            alignItems: "center"
+          }
+        },
+        meta
+      ) : null,
       h(
         "div",
         { style: { display: "flex", gap: 4, marginTop: "auto" } },
         dates.map((date) => {
-          const status = statusOfDay(date, grouped, slots, template !== null, today, firstDate);
+          const status = statusOfDay(
+            date,
+            grouped,
+            slots,
+            template !== null,
+            today,
+            firstDate
+          );
           const isToday = date === today;
           const title = t("habits.dotTitle", {
             date: dayLabel(date, today),
@@ -13439,7 +14868,15 @@ ${JSON.stringify(refs, null, 2)}`;
             },
             h(
               "span",
-              { style: { width: 13, height: 13, display: "grid", placeItems: "center", flex: "none" } },
+              {
+                style: {
+                  width: 13,
+                  height: 13,
+                  display: "grid",
+                  placeItems: "center",
+                  flex: "none"
+                }
+              },
               h(
                 "span",
                 { style: dotStyle(status) },
@@ -13464,9 +14901,24 @@ ${JSON.stringify(refs, null, 2)}`;
       ),
       h(
         "div",
-        { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" } },
-        h(Chip, { tone: "sun", icon: "flame" }, t("habits.streakDays", { n: streak })),
-        h(Chip, { tone: "danger", icon: "moon" }, t("habits.missedCount", { n: missed }))
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            alignItems: "center"
+          }
+        },
+        h(
+          Chip,
+          { tone: "sun", icon: "flame" },
+          t("habits.streakDays", { n: streak })
+        ),
+        h(
+          Chip,
+          { tone: "danger", icon: "moon" },
+          t("habits.missedCount", { n: missed })
+        )
       )
     );
   }
@@ -13478,7 +14930,13 @@ ${JSON.stringify(refs, null, 2)}`;
       Card,
       {
         pad: 18,
-        style: { flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }
+        style: {
+          flex: "1 1 300px",
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12
+        }
       },
       h(
         "div",
@@ -13494,7 +14952,11 @@ ${JSON.stringify(refs, null, 2)}`;
           },
           h(Icon, { name: "sparkle", size: 17 })
         ),
-        h("div", { style: { flex: 1, minWidth: 0 } }, h("div", { style: NAME_STYLE, title: name }, name)),
+        h(
+          "div",
+          { style: { flex: 1, minWidth: 0 } },
+          h("div", { style: NAME_STYLE, title: name }, name)
+        ),
         h(IconBtn, {
           name: "edit",
           size: 15,
@@ -13512,18 +14974,37 @@ ${JSON.stringify(refs, null, 2)}`;
       ),
       notes ? h(
         "div",
-        { style: { fontSize: 12.5, lineHeight: 1.65, color: "var(--tomato-ink-2)", whiteSpace: "pre-wrap" } },
+        {
+          style: {
+            fontSize: 12.5,
+            lineHeight: 1.65,
+            color: "var(--tomato-ink-2)",
+            whiteSpace: "pre-wrap"
+          }
+        },
         notes
       ) : null,
       h(
         "div",
-        { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: "auto" } },
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            alignItems: "center",
+            marginTop: "auto"
+          }
+        },
         project ? h(
           Chip,
           { tone: "neutral" },
           h(Dot, { color: projectColor(data, project.id), size: 6 }),
           project.name
-        ) : h(Chip, { tone: "brand", icon: "arrowRight" }, t("habits.totalVision"))
+        ) : h(
+          Chip,
+          { tone: "brand", icon: "arrowRight" },
+          t("habits.totalVision")
+        )
       )
     );
   }
@@ -13555,18 +15036,26 @@ ${JSON.stringify(refs, null, 2)}`;
     const shape = template && template.shape || {};
     const initialSlots = slotsOfTemplate(template);
     const slotsFromTemplate = initialSlots.length > 0 ? initialSlots.map((slot) => ({
-      days: Array.isArray(slot.days) && slot.days.length > 0 ? Array.from(new Set(slot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b) : [...ALL_DAYS],
+      days: Array.isArray(slot.days) && slot.days.length > 0 ? Array.from(
+        new Set(slot.days.filter((day) => day >= 1 && day <= 7))
+      ).sort((a, b) => a - b) : [...ALL_DAYS],
       time: normalizeTime(slot.time)
     })) : [{ days: [...ALL_DAYS], time: normalizeTime(null) }];
     const defaultFocus = Number((data.settings || {}).focusMinutes) || 45;
-    const [name, setName] = useState(habit && typeof habit.name === "string" ? habit.name : "");
+    const [name, setName] = useState(
+      habit && typeof habit.name === "string" ? habit.name : ""
+    );
     const [projectId, setProjectId] = useState(shape.projectId || "");
     const [slots, setSlots] = useState(slotsFromTemplate);
-    const [focus, setFocus] = useState(Number(shape.focusMinutes) >= 1 ? String(shape.focusMinutes) : "");
+    const [focus, setFocus] = useState(
+      Number(shape.focusMinutes) >= 1 ? String(shape.focusMinutes) : ""
+    );
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const patchSlot = (index, patch) => {
-      setSlots((previous) => previous.map((slot, at) => at === index ? { ...slot, ...patch } : slot));
+      setSlots(
+        (previous) => previous.map((slot, at) => at === index ? { ...slot, ...patch } : slot)
+      );
     };
     const toggleSlotDay = (index, day) => {
       setSlots(
@@ -13651,7 +15140,10 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const projectOptions = [
       { value: "", label: t("habits.noGroup") },
-      ...projects.map((project) => ({ value: project.id, label: project.name || project.id }))
+      ...projects.map((project) => ({
+        value: project.id,
+        label: project.name || project.id
+      }))
     ];
     const weekFull = weekFullLabels();
     const body = h(
@@ -13671,17 +15163,35 @@ ${JSON.stringify(refs, null, 2)}`;
       h(
         Field,
         { label: t("habits.habitProject") },
-        h(Select, { value: projectId, options: projectOptions, onChange: setProjectId, width: "100%" })
+        h(Select, {
+          value: projectId,
+          options: projectOptions,
+          onChange: setProjectId,
+          width: "100%"
+        })
       ),
       h(
         "div",
-        { style: { display: "flex", flexDirection: "column", gap: 8, minWidth: 0 } },
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            minWidth: 0
+          }
+        },
         h(
           "div",
           { style: { display: "flex", alignItems: "center", gap: 8 } },
           h(
             "span",
-            { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+            {
+              style: {
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink-2)"
+              }
+            },
             t("habits.schedule")
           ),
           h("div", { style: { flex: 1 } }),
@@ -13750,8 +15260,19 @@ ${JSON.stringify(refs, null, 2)}`;
             ),
             h(
               "div",
-              { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" } },
-              h("span", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, t("habits.time")),
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 9,
+                  flexWrap: "wrap"
+                }
+              },
+              h(
+                "span",
+                { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+                t("habits.time")
+              ),
               h(Input, {
                 type: "time",
                 value: slot.time,
@@ -13764,7 +15285,10 @@ ${JSON.stringify(refs, null, 2)}`;
       ),
       h(
         Field,
-        { label: t("habits.focusMinutes"), hint: t("habits.focusMinutesHint", { n: fmtMinutes(defaultFocus) }) },
+        {
+          label: t("habits.focusMinutes"),
+          hint: t("habits.focusMinutesHint", { n: fmtMinutes(defaultFocus) })
+        },
         h(Input, {
           type: "number",
           value: focus,
@@ -13793,8 +15317,22 @@ ${JSON.stringify(refs, null, 2)}`;
         t("habits.deleteHabit")
       ) : null,
       h("div", { style: { flex: 1 } }),
-      h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
-      h(Btn, { variant: "primary", size: "sm", icon: "check", onClick: submit, disabled: busy }, t("common.save"))
+      h(
+        Btn,
+        { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+        t("common.cancel")
+      ),
+      h(
+        Btn,
+        {
+          variant: "primary",
+          size: "sm",
+          icon: "check",
+          onClick: submit,
+          disabled: busy
+        },
+        t("common.save")
+      )
     );
     return h(
       Modal,
@@ -13817,9 +15355,15 @@ ${JSON.stringify(refs, null, 2)}`;
     const visions = Array.isArray(data.visions) ? data.visions : [];
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const vision = editing ? visions.find((item) => item && item.id === visionId) || null : null;
-    const [name, setName] = useState(vision && typeof vision.name === "string" ? vision.name : "");
-    const [projectId, setProjectId] = useState(vision && vision.projectId ? vision.projectId : "");
-    const [notes, setNotes] = useState(vision && typeof vision.notes === "string" ? vision.notes : "");
+    const [name, setName] = useState(
+      vision && typeof vision.name === "string" ? vision.name : ""
+    );
+    const [projectId, setProjectId] = useState(
+      vision && vision.projectId ? vision.projectId : ""
+    );
+    const [notes, setNotes] = useState(
+      vision && typeof vision.notes === "string" ? vision.notes : ""
+    );
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const submit = async () => {
@@ -13849,7 +15393,10 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const projectOptions = [
       { value: "", label: t("habits.totalVision") },
-      ...projects.map((project) => ({ value: project.id, label: project.name || project.id }))
+      ...projects.map((project) => ({
+        value: project.id,
+        label: project.name || project.id
+      }))
     ];
     const body = h(
       "div",
@@ -13868,7 +15415,12 @@ ${JSON.stringify(refs, null, 2)}`;
       h(
         Field,
         { label: t("habits.visionProject") },
-        h(Select, { value: projectId, options: projectOptions, onChange: setProjectId, width: "100%" })
+        h(Select, {
+          value: projectId,
+          options: projectOptions,
+          onChange: setProjectId,
+          width: "100%"
+        })
       ),
       h(
         Field,
@@ -13900,8 +15452,22 @@ ${JSON.stringify(refs, null, 2)}`;
         t("habits.deleteVision")
       ) : null,
       h("div", { style: { flex: 1 } }),
-      h(Btn, { variant: "plain", size: "sm", onClick: onClose, disabled: busy }, t("common.cancel")),
-      h(Btn, { variant: "primary", size: "sm", icon: "check", onClick: submit, disabled: busy }, t("common.save"))
+      h(
+        Btn,
+        { variant: "plain", size: "sm", onClick: onClose, disabled: busy },
+        t("common.cancel")
+      ),
+      h(
+        Btn,
+        {
+          variant: "primary",
+          size: "sm",
+          icon: "check",
+          onClick: submit,
+          disabled: busy
+        },
+        t("common.save")
+      )
     );
     return h(
       Modal,
@@ -13987,10 +15553,26 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const toolbar = h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" } },
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 16,
+          flexWrap: "wrap"
+        }
+      },
       h(
         "div",
-        { style: { flex: 1, minWidth: 220, fontSize: 12.5, lineHeight: 1.6, color: "var(--tomato-ink-3)" } },
+        {
+          style: {
+            flex: 1,
+            minWidth: 220,
+            fontSize: 12.5,
+            lineHeight: 1.6,
+            color: "var(--tomato-ink-3)"
+          }
+        },
         tab === "habits" ? t("habits.habitsHint") : t("habits.visionsHint")
       ),
       h(
@@ -14013,13 +15595,25 @@ ${JSON.stringify(refs, null, 2)}`;
         hint: t("habits.emptyHabitsHint"),
         action: h(
           Btn,
-          { variant: "soft", size: "sm", icon: "plus", onClick: () => openHabit({ mode: "new" }) },
+          {
+            variant: "soft",
+            size: "sm",
+            icon: "plus",
+            onClick: () => openHabit({ mode: "new" })
+          },
           t("habits.firstHabit")
         )
       })
     ) : h(
       "div",
-      { style: { display: "flex", flexWrap: "wrap", gap: 14, alignItems: "stretch" } },
+      {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 14,
+          alignItems: "stretch"
+        }
+      },
       habits.map(
         (habit, index) => h(HabitCard, {
           key: habit.id || `habit-${index}`,
@@ -14029,7 +15623,11 @@ ${JSON.stringify(refs, null, 2)}`;
           tasks,
           today,
           onEdit: (id) => openHabit({ mode: "edit", habitId: id }),
-          onDelete: (item) => setDeleteConfirm({ kind: "habit", id: item.id, name: item.name || t("habits.untitled") })
+          onDelete: (item) => setDeleteConfirm({
+            kind: "habit",
+            id: item.id,
+            name: item.name || t("habits.untitled")
+          })
         })
       )
     );
@@ -14042,20 +15640,36 @@ ${JSON.stringify(refs, null, 2)}`;
         hint: t("habits.emptyVisionsHint"),
         action: h(
           Btn,
-          { variant: "soft", size: "sm", icon: "plus", onClick: () => openVision({ mode: "new" }) },
+          {
+            variant: "soft",
+            size: "sm",
+            icon: "plus",
+            onClick: () => openVision({ mode: "new" })
+          },
           t("habits.firstVision")
         )
       })
     ) : h(
       "div",
-      { style: { display: "flex", flexWrap: "wrap", gap: 14, alignItems: "stretch" } },
+      {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 14,
+          alignItems: "stretch"
+        }
+      },
       visions.map(
         (vision, index) => h(VisionCard, {
           key: vision.id || `vision-${index}`,
           vision,
           data,
           onEdit: (id) => openVision({ mode: "edit", visionId: id }),
-          onDelete: (item) => setDeleteConfirm({ kind: "vision", id: item.id, name: item.name || t("habits.untitled") })
+          onDelete: (item) => setDeleteConfirm({
+            kind: "vision",
+            id: item.id,
+            name: item.name || t("habits.untitled")
+          })
         })
       )
     );
@@ -14073,7 +15687,11 @@ ${JSON.stringify(refs, null, 2)}`;
         onClose: () => setHabitDialog(null),
         onRequestDelete: (target) => {
           setHabitDialog(null);
-          setDeleteConfirm({ kind: "habit", id: target.id, name: target.name });
+          setDeleteConfirm({
+            kind: "habit",
+            id: target.id,
+            name: target.name
+          });
         }
       }) : null,
       visionDialog ? h(VisionDialog, {
@@ -14084,7 +15702,11 @@ ${JSON.stringify(refs, null, 2)}`;
         onClose: () => setVisionDialog(null),
         onRequestDelete: (target) => {
           setVisionDialog(null);
-          setDeleteConfirm({ kind: "vision", id: target.id, name: target.name });
+          setDeleteConfirm({
+            kind: "vision",
+            id: target.id,
+            name: target.name
+          });
         }
       }) : null,
       deleteConfirm ? h(
@@ -14095,26 +15717,45 @@ ${JSON.stringify(refs, null, 2)}`;
             if (!deleting) setDeleteConfirm(null);
           },
           icon: "trash",
-          title: t(deleteConfirm.kind === "habit" ? "habits.deleteHabitTitle" : "habits.deleteVisionTitle"),
+          title: t(
+            deleteConfirm.kind === "habit" ? "habits.deleteHabitTitle" : "habits.deleteVisionTitle"
+          ),
           width: 420,
           footer: h(
             "div",
             { style: { display: "flex", gap: 9, marginLeft: "auto" } },
             h(
               Btn,
-              { variant: "ghost", size: "sm", onClick: () => setDeleteConfirm(null), disabled: deleting },
+              {
+                variant: "ghost",
+                size: "sm",
+                onClick: () => setDeleteConfirm(null),
+                disabled: deleting
+              },
               t("common.cancel")
             ),
             h(
               Btn,
-              { variant: "danger", size: "sm", icon: "trash", onClick: confirmDelete, disabled: deleting },
+              {
+                variant: "danger",
+                size: "sm",
+                icon: "trash",
+                onClick: confirmDelete,
+                disabled: deleting
+              },
               t("common.delete")
             )
           )
         },
         h(
           "div",
-          { style: { fontSize: 13, lineHeight: 1.65, color: "var(--tomato-ink-2)" } },
+          {
+            style: {
+              fontSize: 13,
+              lineHeight: 1.65,
+              color: "var(--tomato-ink-2)"
+            }
+          },
           t(
             deleteConfirm.kind === "habit" ? "habits.deleteHabitBody" : "habits.deleteVisionBody",
             { name: deleteConfirm.name }
@@ -14331,7 +15972,10 @@ ${JSON.stringify(refs, null, 2)}`;
     const totalMinutes = Math.round((Number(stats.totalSeconds) || 0) / 60);
     const totalPomodoros = Number(stats.totalPomodoros) || 0;
     const streak = Number(stats.streak) || 0;
-    const missedTotal = days.reduce((sum, day) => sum + (Number(day && day.missed) || 0), 0);
+    const missedTotal = days.reduce(
+      (sum, day) => sum + (Number(day && day.missed) || 0),
+      0
+    );
     const week = recentDays({ days }, 7, today);
     const weekTotal = week.reduce((sum, day) => sum + day.minutes, 0);
     const sessions = (Array.isArray(data.sessions) ? data.sessions : []).filter(
@@ -14404,7 +16048,9 @@ ${JSON.stringify(refs, null, 2)}`;
         hint: t("stats.total", { value: fmtMinutes(weekTotal) })
       }),
       h(WeekChart, { days: week, today }),
-      h("div", { style: { height: 1, background: "var(--tomato-line)", marginTop: 6 } })
+      h("div", {
+        style: { height: 1, background: "var(--tomato-line)", marginTop: 6 }
+      })
     );
     const projectCard = h(
       Card,
@@ -14422,7 +16068,9 @@ ${JSON.stringify(refs, null, 2)}`;
             "div",
             {
               key: row.name,
-              style: { marginBottom: index === distribution.length - 1 ? 0 : 12 }
+              style: {
+                marginBottom: index === distribution.length - 1 ? 0 : 12
+              }
             },
             h(
               "div",
@@ -14437,8 +16085,18 @@ ${JSON.stringify(refs, null, 2)}`;
               },
               h(
                 "div",
-                { style: { display: "flex", alignItems: "center", gap: 7, minWidth: 0 } },
-                h(Dot, { color: row.color || "var(--tomato-brand)", size: 7 }),
+                {
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    minWidth: 0
+                  }
+                },
+                h(Dot, {
+                  color: row.color || "var(--tomato-brand)",
+                  size: 7
+                }),
                 h(
                   "div",
                   {
@@ -14457,7 +16115,11 @@ ${JSON.stringify(refs, null, 2)}`;
                 "div",
                 {
                   className: "t-mono",
-                  style: { fontSize: 11.5, color: "var(--tomato-ink-3)", flex: "none" }
+                  style: {
+                    fontSize: 11.5,
+                    color: "var(--tomato-ink-3)",
+                    flex: "none"
+                  }
                 },
                 fmtMinutes(row.minutes)
               )
@@ -14480,7 +16142,11 @@ ${JSON.stringify(refs, null, 2)}`;
         title: t("stats.daily"),
         hint: dayRows.length > 0 ? t("stats.dailyHint", { n: dayRows.length }) : null
       }),
-      dayRows.length === 0 ? h(Empty, { icon: "stats", title: t("stats.noDays"), hint: t("stats.noDaysHint") }) : h(
+      dayRows.length === 0 ? h(Empty, {
+        icon: "stats",
+        title: t("stats.noDays"),
+        hint: t("stats.noDaysHint")
+      }) : h(
         "div",
         null,
         h(
@@ -14542,7 +16208,11 @@ ${JSON.stringify(refs, null, 2)}`;
         title: t("stats.trail"),
         hint: t("stats.trailCount", { n: trail.length })
       }),
-      trail.length === 0 ? h(Empty, { icon: "clock", title: t("stats.noTrail"), hint: t("stats.noTrailHint") }) : h(
+      trail.length === 0 ? h(Empty, {
+        icon: "clock",
+        title: t("stats.noTrail"),
+        hint: t("stats.noTrailHint")
+      }) : h(
         "div",
         null,
         trail.map((session, index) => {
@@ -14577,7 +16247,13 @@ ${JSON.stringify(refs, null, 2)}`;
               ),
               session.projectName ? h(
                 "div",
-                { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 2 } },
+                {
+                  style: {
+                    fontSize: 11.5,
+                    color: "var(--tomato-ink-3)",
+                    marginTop: 2
+                  }
+                },
                 session.projectName
               ) : null
             ),
@@ -14585,7 +16261,11 @@ ${JSON.stringify(refs, null, 2)}`;
               "div",
               {
                 className: "t-mono",
-                style: { fontSize: 11.5, color: "var(--tomato-ink-3)", flex: "none" }
+                style: {
+                  fontSize: 11.5,
+                  color: "var(--tomato-ink-3)",
+                  flex: "none"
+                }
               },
               fmtSessionTime(session.endedAt)
             ),
@@ -14809,7 +16489,8 @@ ${JSON.stringify(refs, null, 2)}`;
   }
   function fmtBand(start, end) {
     const range = bandRange(start, end);
-    if (range && range.end > 1440) return `${start} – ${t("calendar.nextDay")} ${end}`;
+    if (range && range.end > 1440)
+      return `${start} – ${t("calendar.nextDay")} ${end}`;
     return `${start} – ${end}`;
   }
   function tint(color, fallback = "var(--tomato-surface-2)") {
@@ -14856,7 +16537,8 @@ ${JSON.stringify(refs, null, 2)}`;
         });
       }
       for (const exam of assessments) {
-        if (!exam || exam.kind === "homework" || typeof exam.startsAt !== "number") continue;
+        if (!exam || exam.kind === "homework" || typeof exam.startsAt !== "number")
+          continue;
         if (exam.startsAt < dayStart || exam.startsAt >= dayEnd) continue;
         const endsAt = Number(exam.endsAt) > 0 ? Number(exam.endsAt) : exam.startsAt + 3600;
         teaching.push({
@@ -14869,18 +16551,28 @@ ${JSON.stringify(refs, null, 2)}`;
         });
       }
       teaching.sort((a, b) => a.startMin - b.startMin);
-      const dayBlocks = blocks.filter((block) => block && Array.isArray(block.days) && block.days.includes(weekday)).map((block) => ({ ...block, attention: block.attention === "light" ? "light" : "required" }));
+      const dayBlocks = blocks.filter(
+        (block) => block && Array.isArray(block.days) && block.days.includes(weekday)
+      ).map((block) => ({
+        ...block,
+        attention: block.attention === "light" ? "light" : "required"
+      }));
       const dayRests = schedules.filter(
         (schedule) => schedule && schedule.enabled !== false && Array.isArray(schedule.days) && schedule.days.includes(weekday)
       );
       const dayTasks = allTasks.filter(
         (task) => task && task.dueDate === date && task.reminderTime && !lessonTaskIds.has(task.id)
-      ).sort((a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime))).map((task) => {
+      ).sort(
+        (a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime))
+      ).map((task) => {
         const startSecs = parseHHMM(task.reminderTime);
         if (startSecs === null) return null;
         const estimate = Math.max(1, Number(task.estimate) || 1);
         const focus = Math.max(1, Number(task.focusMinutes) || focusMinutes);
-        const minutes = Math.max(30, estimate * focus + (estimate - 1) * breakMinutes);
+        const minutes = Math.max(
+          30,
+          estimate * focus + (estimate - 1) * breakMinutes
+        );
         return {
           raw: task,
           title: task.title || t("calendar.untitled"),
@@ -14890,7 +16582,14 @@ ${JSON.stringify(refs, null, 2)}`;
           completed: !!task.completed
         };
       }).filter(Boolean);
-      return { date, weekday, teaching, blocks: dayBlocks, rests: dayRests, tasks: dayTasks };
+      return {
+        date,
+        weekday,
+        teaching,
+        blocks: dayBlocks,
+        rests: dayRests,
+        tasks: dayTasks
+      };
     });
     return { today, monday, days, data };
   }
@@ -14902,7 +16601,9 @@ ${JSON.stringify(refs, null, 2)}`;
     const out = [];
     const add = (dayIndex, tone, message, key) => out.push({ key, dayIndex, tone, message });
     days.forEach((day, dayIndex) => {
-      const required = day.blocks.filter((block) => block.attention === "required");
+      const required = day.blocks.filter(
+        (block) => block.attention === "required"
+      );
       const light = day.blocks.filter((block) => block.attention === "light");
       const rangeOfBlock = (block) => bandRange(block.start, block.end);
       const rangeOfRest = (rest) => bandRange(rest.start, rest.end);
@@ -14911,7 +16612,10 @@ ${JSON.stringify(refs, null, 2)}`;
         const currentRange = { start: current4.startMin, end: current4.endMin };
         for (let j = i + 1; j < day.teaching.length; j += 1) {
           const next = day.teaching[j];
-          const minutes = overlapOf(currentRange, { start: next.startMin, end: next.endMin });
+          const minutes = overlapOf(currentRange, {
+            start: next.startMin,
+            end: next.endMin
+          });
           if (minutes > 0) {
             add(
               dayIndex,
@@ -14972,7 +16676,10 @@ ${JSON.stringify(refs, null, 2)}`;
       }
       for (let i = 0; i < required.length; i += 1) {
         for (let j = i + 1; j < required.length; j += 1) {
-          const minutes = overlapOf(rangeOfBlock(required[i]), rangeOfBlock(required[j]));
+          const minutes = overlapOf(
+            rangeOfBlock(required[i]),
+            rangeOfBlock(required[j])
+          );
           if (minutes > 0) {
             add(
               dayIndex,
@@ -15193,7 +16900,10 @@ ${JSON.stringify(refs, null, 2)}`;
                 "div",
                 {
                   className: "t-mono",
-                  style: { fontSize: 10.5, color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)" }
+                  style: {
+                    fontSize: 10.5,
+                    color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)"
+                  }
                 },
                 day.date.slice(5).replace("-", "/")
               ),
@@ -15348,19 +17058,51 @@ ${JSON.stringify(refs, null, 2)}`;
   function Legend() {
     const item = (key, style, label) => h(
       "span",
-      { key, style: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+      {
+        key,
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 11.5,
+          color: "var(--tomato-ink-3)"
+        }
+      },
       h("span", {
-        style: { width: 12, height: 12, borderRadius: 3, borderLeft: "3px solid", ...style }
+        style: {
+          width: 12,
+          height: 12,
+          borderRadius: 3,
+          borderLeft: "3px solid",
+          ...style
+        }
       }),
       label
     );
     return h(
       "div",
-      { style: { display: "flex", gap: 16, flexWrap: "wrap", padding: "0 18px 12px" } },
-      item("teaching", { background: "var(--tomato-surface-2)", borderLeftColor: "var(--tomato-accent)" }, t("calendar.legendTeaching")),
+      {
+        style: {
+          display: "flex",
+          gap: 16,
+          flexWrap: "wrap",
+          padding: "0 18px 12px"
+        }
+      },
+      item(
+        "teaching",
+        {
+          background: "var(--tomato-surface-2)",
+          borderLeftColor: "var(--tomato-accent)"
+        },
+        t("calendar.legendTeaching")
+      ),
       item(
         "task",
-        { background: "var(--tomato-surface)", borderLeftColor: "var(--tomato-ink-3)" },
+        {
+          background: "var(--tomato-surface)",
+          borderLeftColor: "var(--tomato-ink-3)"
+        },
         t("calendar.legendTask")
       ),
       item(
@@ -15371,7 +17113,15 @@ ${JSON.stringify(refs, null, 2)}`;
         },
         t("calendar.legendRequired")
       ),
-      item("light", { background: "var(--tomato-surface-2)", borderLeftColor: "var(--tomato-leaf)", borderLeftStyle: "dashed" }, t("calendar.legendLight")),
+      item(
+        "light",
+        {
+          background: "var(--tomato-surface-2)",
+          borderLeftColor: "var(--tomato-leaf)",
+          borderLeftStyle: "dashed"
+        },
+        t("calendar.legendLight")
+      ),
       item(
         "rest",
         {
@@ -15386,8 +17136,22 @@ ${JSON.stringify(refs, null, 2)}`;
     return h(
       "div",
       { style: { display: "flex", gap: 12, padding: "6px 0", fontSize: 13 } },
-      h("span", { style: { width: 64, flex: "none", color: "var(--tomato-ink-3)" } }, label),
-      h("span", { style: { color: "var(--tomato-ink)", minWidth: 0, overflowWrap: "anywhere" } }, value)
+      h(
+        "span",
+        { style: { width: 64, flex: "none", color: "var(--tomato-ink-3)" } },
+        label
+      ),
+      h(
+        "span",
+        {
+          style: {
+            color: "var(--tomato-ink)",
+            minWidth: 0,
+            overflowWrap: "anywhere"
+          }
+        },
+        value
+      )
     );
   }
   function BlockEditor({ editor, onChange, onClose, onSave, onDelete, saving }) {
@@ -15409,36 +17173,76 @@ ${JSON.stringify(refs, null, 2)}`;
         width: 520,
         footer: h(
           "div",
-          { style: { display: "flex", alignItems: "center", gap: 10, width: "100%" } },
-          editor.id ? h(Btn, { variant: "danger", size: "sm", icon: "trash", onClick: onDelete }, t("calendar.deleteBlock")) : null,
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: "100%"
+            }
+          },
+          editor.id ? h(
+            Btn,
+            {
+              variant: "danger",
+              size: "sm",
+              icon: "trash",
+              onClick: onDelete
+            },
+            t("calendar.deleteBlock")
+          ) : null,
           h("span", { style: { flex: 1 } }),
-          h(Btn, { variant: "ghost", size: "md", onClick: onClose }, t("common.cancel")),
-          h(Btn, { variant: "primary", size: "md", onClick: onSave, disabled: saving }, t("common.save"))
+          h(
+            Btn,
+            { variant: "ghost", size: "md", onClick: onClose },
+            t("common.cancel")
+          ),
+          h(
+            Btn,
+            { variant: "primary", size: "md", onClick: onSave, disabled: saving },
+            t("common.save")
+          )
         )
       },
       h(
         "div",
         { style: { display: "flex", flexDirection: "column", gap: 14 } },
-        h(Field, { label: t("calendar.nameLabel") }, h(Input, {
-          value: editor.title,
-          autoFocus: true,
-          maxLength: 40,
-          placeholder: t("calendar.namePlaceholder"),
-          onChange: (value) => onChange({ ...editor, title: value, error: "" })
-        })),
+        h(
+          Field,
+          { label: t("calendar.nameLabel") },
+          h(Input, {
+            value: editor.title,
+            autoFocus: true,
+            maxLength: 40,
+            placeholder: t("calendar.namePlaceholder"),
+            onChange: (value) => onChange({ ...editor, title: value, error: "" })
+          })
+        ),
         h(
           "div",
           { style: { display: "flex", gap: 12 } },
-          h(Field, { label: t("calendar.startLabel"), style: { flex: 1 } }, h(Input, {
-            type: "time",
-            value: editor.start,
-            onChange: (value) => onChange({ ...editor, start: value, error: "" })
-          })),
-          h(Field, { label: t("calendar.endLabel"), hint: t("calendar.endHint"), style: { flex: 1 } }, h(Input, {
-            type: "time",
-            value: editor.end,
-            onChange: (value) => onChange({ ...editor, end: value, error: "" })
-          }))
+          h(
+            Field,
+            { label: t("calendar.startLabel"), style: { flex: 1 } },
+            h(Input, {
+              type: "time",
+              value: editor.start,
+              onChange: (value) => onChange({ ...editor, start: value, error: "" })
+            })
+          ),
+          h(
+            Field,
+            {
+              label: t("calendar.endLabel"),
+              hint: t("calendar.endHint"),
+              style: { flex: 1 }
+            },
+            h(Input, {
+              type: "time",
+              value: editor.end,
+              onChange: (value) => onChange({ ...editor, end: value, error: "" })
+            })
+          )
         ),
         h(
           Field,
@@ -15472,20 +17276,28 @@ ${JSON.stringify(refs, null, 2)}`;
             )
           )
         ),
-        h(Field, { label: t("calendar.attentionLabel") }, h(Select, {
-          value: editor.attention,
-          options: [
-            { value: "required", label: t("calendar.attentionRequired") },
-            { value: "light", label: t("calendar.attentionLight") }
-          ],
-          onChange: (value) => onChange({ ...editor, attention: value })
-        })),
-        h(Field, { label: t("calendar.notesLabel") }, h(TextArea, {
-          value: editor.notes,
-          rows: 2,
-          placeholder: t("calendar.notesPlaceholder"),
-          onChange: (value) => onChange({ ...editor, notes: value })
-        })),
+        h(
+          Field,
+          { label: t("calendar.attentionLabel") },
+          h(Select, {
+            value: editor.attention,
+            options: [
+              { value: "required", label: t("calendar.attentionRequired") },
+              { value: "light", label: t("calendar.attentionLight") }
+            ],
+            onChange: (value) => onChange({ ...editor, attention: value })
+          })
+        ),
+        h(
+          Field,
+          { label: t("calendar.notesLabel") },
+          h(TextArea, {
+            value: editor.notes,
+            rows: 2,
+            placeholder: t("calendar.notesPlaceholder"),
+            onChange: (value) => onChange({ ...editor, notes: value })
+          })
+        ),
         editor.error ? h(
           "div",
           {
@@ -15521,7 +17333,10 @@ ${JSON.stringify(refs, null, 2)}`;
       (total, day) => total + day.blocks.length + day.rests.length + day.teaching.length,
       0
     );
-    const teachingCount = week.days.reduce((total, day) => total + day.teaching.length, 0);
+    const teachingCount = week.days.reduce(
+      (total, day) => total + day.teaching.length,
+      0
+    );
     const summary = t("calendar.summary", {
       range: `${week.days[0].date.slice(5).replace("-", "/")} – ${week.days[6].date.slice(5).replace("-", "/")}`,
       items: itemCount,
@@ -15582,7 +17397,10 @@ ${JSON.stringify(refs, null, 2)}`;
       });
       setSaving(false);
       if (!result.ok) {
-        setEditor({ ...editor, error: t("calendar.saveFailed", { error: result.error }) });
+        setEditor({
+          ...editor,
+          error: t("calendar.saveFailed", { error: result.error })
+        });
         return;
       }
       setEditor(null);
@@ -15624,12 +17442,16 @@ ${JSON.stringify(refs, null, 2)}`;
         title: t("nav.calendar"),
         subtitle: t("calendar.subtitle"),
         actions: [
-          h(Btn, {
-            key: "add",
-            variant: "primary",
-            icon: "plus",
-            onClick: () => openNewBlock({})
-          }, t("calendar.addBlock"))
+          h(
+            Btn,
+            {
+              key: "add",
+              variant: "primary",
+              icon: "plus",
+              onClick: () => openNewBlock({})
+            },
+            t("calendar.addBlock")
+          )
         ]
       }),
       // 周切换 + 网格
@@ -15657,16 +17479,37 @@ ${JSON.stringify(refs, null, 2)}`;
             { style: { flex: 1, minWidth: 220 } },
             h(
               "div",
-              { className: "t-mono", style: { fontSize: 13.5, fontWeight: 600, color: "var(--tomato-ink)" } },
+              {
+                className: "t-mono",
+                style: {
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: "var(--tomato-ink)"
+                }
+              },
               summary
             ),
-            h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 2 } }, t("calendar.clickHint"))
+            h(
+              "div",
+              {
+                style: {
+                  fontSize: 11.5,
+                  color: "var(--tomato-ink-3)",
+                  marginTop: 2
+                }
+              },
+              t("calendar.clickHint")
+            )
           ),
-          weekOffset !== 0 ? h(Btn, {
-            variant: "soft",
-            size: "sm",
-            onClick: () => setWeekOffset(0)
-          }, t("calendar.thisWeek")) : null,
+          weekOffset !== 0 ? h(
+            Btn,
+            {
+              variant: "soft",
+              size: "sm",
+              onClick: () => setWeekOffset(0)
+            },
+            t("calendar.thisWeek")
+          ) : null,
           h(IconBtn, {
             name: "chevronRight",
             title: t("calendar.next"),
@@ -15728,7 +17571,13 @@ ${JSON.stringify(refs, null, 2)}`;
               { style: { minWidth: 0 } },
               h(
                 "div",
-                { style: { fontSize: 10.5, color: "var(--tomato-ink-3)", marginBottom: 2 } },
+                {
+                  style: {
+                    fontSize: 10.5,
+                    color: "var(--tomato-ink-3)",
+                    marginBottom: 2
+                  }
+                },
                 t("calendar.conflictDay", {
                   day: weekdayLabel(item.dayIndex),
                   date: week.days[item.dayIndex].date.slice(5).replace("-", "/")
@@ -15757,18 +17606,30 @@ ${JSON.stringify(refs, null, 2)}`;
           icon: "grip",
           title: t("calendar.blocksTitle"),
           hint: t("calendar.blocksHint", { n: allBlocks.length }),
-          action: h(Btn, {
-            variant: "ghost",
-            size: "sm",
-            icon: "plus",
-            onClick: () => openNewBlock({})
-          }, t("calendar.addBlock"))
+          action: h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "plus",
+              onClick: () => openNewBlock({})
+            },
+            t("calendar.addBlock")
+          )
         }),
         allBlocks.length === 0 ? h(Empty, {
           icon: "calendar",
           title: t("calendar.blocksEmptyTitle"),
           hint: t("calendar.blocksEmptyHint"),
-          action: h(Btn, { variant: "soft", icon: "plus", onClick: () => openNewBlock({}) }, t("calendar.gridEmptyAction"))
+          action: h(
+            Btn,
+            {
+              variant: "soft",
+              icon: "plus",
+              onClick: () => openNewBlock({})
+            },
+            t("calendar.gridEmptyAction")
+          )
         }) : allBlocks.slice().sort(
           (a, b) => (a.days && a.days[0]) - (b.days && b.days[0]) || String(a.start).localeCompare(String(b.start)) || String(a.title).localeCompare(String(b.title))
         ).map((block) => {
@@ -15797,13 +17658,40 @@ ${JSON.stringify(refs, null, 2)}`;
               { style: { flex: 1, minWidth: 0 } },
               h(
                 "div",
-                { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-                h("span", { style: { fontSize: 13.5, fontWeight: 600, color: "var(--tomato-ink)" } }, block.title || t("calendar.untitled")),
-                h(Chip, { tone: light ? "leaf" : "brand" }, light ? t("calendar.legendLight") : t("calendar.legendRequired"))
+                {
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap"
+                  }
+                },
+                h(
+                  "span",
+                  {
+                    style: {
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      color: "var(--tomato-ink)"
+                    }
+                  },
+                  block.title || t("calendar.untitled")
+                ),
+                h(
+                  Chip,
+                  { tone: light ? "leaf" : "brand" },
+                  light ? t("calendar.legendLight") : t("calendar.legendRequired")
+                )
               ),
               h(
                 "div",
-                { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 3 } },
+                {
+                  style: {
+                    fontSize: 11.5,
+                    color: "var(--tomato-ink-3)",
+                    marginTop: 3
+                  }
+                },
                 `${dayText} · ${fmtBand(block.start, block.end)}${block.notes ? ` · ${block.notes}` : ""}`
               )
             ),
@@ -15859,23 +17747,46 @@ ${JSON.stringify(refs, null, 2)}`;
           width: 480,
           footer: h(
             "div",
-            { style: { display: "flex", gap: 10, justifyContent: "flex-end", width: "100%" } },
-            detail.kind === "block" ? h(Btn, {
-              variant: "danger",
-              size: "sm",
-              icon: "trash",
-              onClick: () => {
-                setPendingDelete(detail.item);
-                setDetail(null);
+            {
+              style: {
+                display: "flex",
+                gap: 10,
+                justifyContent: "flex-end",
+                width: "100%"
               }
-            }, t("calendar.deleteBlock")) : null,
-            detail.kind === "block" ? h(Btn, {
-              variant: "primary",
-              size: "md",
-              icon: "edit",
-              onClick: () => openEditBlock(detail.item)
-            }, t("common.edit")) : null,
-            h(Btn, { variant: "ghost", size: "md", onClick: () => setDetail(null) }, t("calendar.close"))
+            },
+            detail.kind === "block" ? h(
+              Btn,
+              {
+                variant: "danger",
+                size: "sm",
+                icon: "trash",
+                onClick: () => {
+                  setPendingDelete(detail.item);
+                  setDetail(null);
+                }
+              },
+              t("calendar.deleteBlock")
+            ) : null,
+            detail.kind === "block" ? h(
+              Btn,
+              {
+                variant: "primary",
+                size: "md",
+                icon: "edit",
+                onClick: () => openEditBlock(detail.item)
+              },
+              t("common.edit")
+            ) : null,
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "md",
+                onClick: () => setDetail(null)
+              },
+              t("calendar.close")
+            )
           )
         },
         detail.kind === "teaching" ? [
@@ -15893,7 +17804,9 @@ ${JSON.stringify(refs, null, 2)}`;
             key: "date",
             label: t("calendar.detailTime"),
             value: `${week.days.find(
-              (day) => day.teaching.some((entry) => entry.raw.id === detail.item.raw.id)
+              (day) => day.teaching.some(
+                (entry) => entry.raw.id === detail.item.raw.id
+              )
             )?.date.slice(5).replace("-", "/") || ""} ${fmtHHMM(detail.item.startMin * 60)}–${fmtHHMM(detail.item.endMin * 60)}`
           }),
           h(DetailRow, {
@@ -15919,7 +17832,14 @@ ${JSON.stringify(refs, null, 2)}`;
           }),
           h(
             "div",
-            { style: { fontSize: 12, color: "var(--tomato-ink-3)", marginTop: 8, lineHeight: 1.6 } },
+            {
+              style: {
+                fontSize: 12,
+                color: "var(--tomato-ink-3)",
+                marginTop: 8,
+                lineHeight: 1.6
+              }
+            },
             t("calendar.detailRestHint")
           )
         ] : [
@@ -15959,15 +17879,47 @@ ${JSON.stringify(refs, null, 2)}`;
           width: 440,
           footer: h(
             "div",
-            { style: { display: "flex", gap: 10, justifyContent: "flex-end", width: "100%" } },
-            h(Btn, { variant: "ghost", size: "md", onClick: () => setPendingDelete(null) }, t("common.cancel")),
-            h(Btn, { variant: "danger", size: "md", icon: "trash", onClick: () => deleteBlock(pendingDelete) }, t("common.delete"))
+            {
+              style: {
+                display: "flex",
+                gap: 10,
+                justifyContent: "flex-end",
+                width: "100%"
+              }
+            },
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "md",
+                onClick: () => setPendingDelete(null)
+              },
+              t("common.cancel")
+            ),
+            h(
+              Btn,
+              {
+                variant: "danger",
+                size: "md",
+                icon: "trash",
+                onClick: () => deleteBlock(pendingDelete)
+              },
+              t("common.delete")
+            )
           )
         },
         h(
           "div",
-          { style: { fontSize: 12.5, color: "var(--tomato-ink-2)", lineHeight: 1.7 } },
-          `${fmtBand(pendingDelete.start, pendingDelete.end)} · ${(Array.isArray(pendingDelete.days) ? pendingDelete.days : []).map((day) => weekdayLabel(day - 1)).join(" · ")}`
+          {
+            style: {
+              fontSize: 12.5,
+              color: "var(--tomato-ink-2)",
+              lineHeight: 1.7
+            }
+          },
+          `${fmtBand(pendingDelete.start, pendingDelete.end)} · ${(Array.isArray(
+            pendingDelete.days
+          ) ? pendingDelete.days : []).map((day) => weekdayLabel(day - 1)).join(" · ")}`
         )
       ) : null
     );
@@ -16858,16 +18810,20 @@ ${JSON.stringify(refs, null, 2)}`;
         total > 0 ? `${score} / ${total}` : String(score)
       ) : null,
       h(Chip, { tone: statusTone(status) }, statusLabel(status)),
-      action && onAssistant ? h(Btn, {
-        variant: "ghost",
-        size: "sm",
-        onClick: () => onAssistant(action, {
-          projectId: assessment.projectId,
-          assessmentId: assessment.id,
-          submissionId: submission?.id,
-          gradeId: grade?.id
-        })
-      }, t(`education.${actionKey[action]}`)) : null
+      action && onAssistant ? h(
+        Btn,
+        {
+          variant: "ghost",
+          size: "sm",
+          onClick: () => onAssistant(action, {
+            projectId: assessment.projectId,
+            assessmentId: assessment.id,
+            submissionId: submission?.id,
+            gradeId: grade?.id
+          })
+        },
+        t(`education.${actionKey[action]}`)
+      ) : null
     );
   }
   function ProjectTaskRow({ task, onToggle }) {
@@ -17034,27 +18990,116 @@ ${JSON.stringify(refs, null, 2)}`;
       pathBox,
       h(
         "div",
-        { style: { fontSize: 12, color: "var(--tomato-ink-3)", lineHeight: 1.6, marginTop: 9 } },
+        {
+          style: {
+            fontSize: 12,
+            color: "var(--tomato-ink-3)",
+            lineHeight: 1.6,
+            marginTop: 9
+          }
+        },
         authorized ? t("education.librarySharedHint") : t("education.libraryMissingHint")
       ),
       unavailable ? h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 9 } },
-        h("span", { style: { fontSize: 12, color: "#b8503f" } }, strOr(library.reason) || t("education.libraryUnavailable")),
-        onReload ? h(Btn, { variant: "ghost", size: "sm", icon: "refresh", onClick: onReload }, t("education.libraryRetry")) : null
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            marginTop: 9
+          }
+        },
+        h(
+          "span",
+          { style: { fontSize: 12, color: "#b8503f" } },
+          strOr(library.reason) || t("education.libraryUnavailable")
+        ),
+        onReload ? h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "refresh",
+            onClick: onReload
+          },
+          t("education.libraryRetry")
+        ) : null
       ) : null,
       h(
         "div",
         { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 } },
         loading ? null : authorized ? [
-          h(Btn, { key: "change", variant: "soft", size: "sm", icon: "folder", onClick: openAuthorize }, t("education.libraryChange")),
-          h(Btn, { key: "scan", variant: "ghost", size: "sm", icon: "refresh", onClick: scanAll, disabled: busy }, t("education.libraryScan")),
-          h(Btn, { key: "revoke", variant: "ghost", size: "sm", icon: "trash", onClick: openRevoke }, t("education.libraryRevoke"))
-        ] : h(Btn, { variant: "primary", size: "sm", icon: "folder", onClick: openAuthorize }, t("education.libraryAuthorize"))
+          h(
+            Btn,
+            {
+              key: "change",
+              variant: "soft",
+              size: "sm",
+              icon: "folder",
+              onClick: openAuthorize
+            },
+            t("education.libraryChange")
+          ),
+          h(
+            Btn,
+            {
+              key: "scan",
+              variant: "ghost",
+              size: "sm",
+              icon: "refresh",
+              onClick: scanAll,
+              disabled: busy
+            },
+            t("education.libraryScan")
+          ),
+          h(
+            Btn,
+            {
+              key: "revoke",
+              variant: "ghost",
+              size: "sm",
+              icon: "trash",
+              onClick: openRevoke
+            },
+            t("education.libraryRevoke")
+          )
+        ] : h(
+          Btn,
+          {
+            variant: "primary",
+            size: "sm",
+            icon: "folder",
+            onClick: openAuthorize
+          },
+          t("education.libraryAuthorize")
+        )
       ),
-      scan ? h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 9 } }, scan) : null
+      scan ? h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            marginTop: 9
+          }
+        },
+        scan
+      ) : null
     );
-    const errorLine = error ? h("div", { style: { fontSize: 12, color: "#b8503f", lineHeight: 1.55, marginTop: 10 } }, error) : null;
+    const errorLine = error ? h(
+      "div",
+      {
+        style: {
+          fontSize: 12,
+          color: "#b8503f",
+          lineHeight: 1.55,
+          marginTop: 10
+        }
+      },
+      error
+    ) : null;
     const authorizeDialog = h(
       Modal,
       {
@@ -17066,8 +19111,16 @@ ${JSON.stringify(refs, null, 2)}`;
         footer: h(
           "div",
           { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
-          h(Btn, { variant: "ghost", onClick: closeDialog, disabled: busy }, t("common.cancel")),
-          h(Btn, { variant: "primary", onClick: submit, disabled: busy }, busy ? t("education.librarySaving") : t("education.libraryAuthorize"))
+          h(
+            Btn,
+            { variant: "ghost", onClick: closeDialog, disabled: busy },
+            t("common.cancel")
+          ),
+          h(
+            Btn,
+            { variant: "primary", onClick: submit, disabled: busy },
+            busy ? t("education.librarySaving") : t("education.libraryAuthorize")
+          )
         )
       },
       h(
@@ -17075,7 +19128,10 @@ ${JSON.stringify(refs, null, 2)}`;
         { style: { display: "flex", flexDirection: "column", gap: 10 } },
         h(
           Field,
-          { label: t("education.libraryDialogLabel"), hint: t("education.libraryDialogHint") },
+          {
+            label: t("education.libraryDialogLabel"),
+            hint: t("education.libraryDialogHint")
+          },
           h(Input, {
             value: directory,
             onChange: (value) => {
@@ -17104,13 +19160,27 @@ ${JSON.stringify(refs, null, 2)}`;
         footer: h(
           "div",
           { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
-          h(Btn, { variant: "ghost", onClick: closeDialog, disabled: busy }, t("common.cancel")),
-          h(Btn, { variant: "danger", onClick: revoke, disabled: busy }, busy ? t("education.libraryRevoking") : t("education.libraryRevoke"))
+          h(
+            Btn,
+            { variant: "ghost", onClick: closeDialog, disabled: busy },
+            t("common.cancel")
+          ),
+          h(
+            Btn,
+            { variant: "danger", onClick: revoke, disabled: busy },
+            busy ? t("education.libraryRevoking") : t("education.libraryRevoke")
+          )
         )
       },
       errorLine ? h("div", null, errorLine) : null
     );
-    return h("div", { style: { marginBottom: 16 } }, card, authorizeDialog, revokeDialog);
+    return h(
+      "div",
+      { style: { marginBottom: 16 } },
+      card,
+      authorizeDialog,
+      revokeDialog
+    );
   }
   function ProjectDetail({
     data,
@@ -17348,7 +19418,11 @@ ${JSON.stringify(refs, null, 2)}`;
           }
         },
         study.examMode === true ? h(Chip, { tone: "brand" }, t("education.examMode")) : null,
-        usesSharedLibrary ? h(Chip, { tone: "neutral", icon: "folder" }, t("education.directorySharedLabel")) : null,
+        usesSharedLibrary ? h(
+          Chip,
+          { tone: "neutral", icon: "folder" },
+          t("education.directorySharedLabel")
+        ) : null,
         study.syllabusId ? h(
           Chip,
           { tone: "neutral", icon: "tag" },
@@ -17675,11 +19749,15 @@ ${JSON.stringify(refs, null, 2)}`;
         icon: "tasks",
         title: t("education.assessmentsTitle"),
         hint: t("education.attentionHint", { n: assessments.length }),
-        action: onAssistant ? h(Btn, {
-          variant: "soft",
-          size: "sm",
-          onClick: () => onAssistant("assign", { projectId })
-        }, t("education.assignAction")) : null
+        action: onAssistant ? h(
+          Btn,
+          {
+            variant: "soft",
+            size: "sm",
+            onClick: () => onAssistant("assign", { projectId })
+          },
+          t("education.assignAction")
+        ) : null
       }),
       assessments.length === 0 ? mutedText(t("education.assessmentsEmpty")) : assessments.map(
         (assessment, assessmentIndex) => h(AssessmentRow, {
@@ -18242,17 +20320,25 @@ ${JSON.stringify(refs, null, 2)}`;
           h(
             "div",
             { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-            h(Btn, {
-              variant: "soft",
-              size: "sm",
-              iconRight: "arrowRight",
-              onClick: () => setDetailId(study.projectId)
-            }, t("education.viewDetail")),
-            onAssistant ? h(Btn, {
-              variant: "ghost",
-              size: "sm",
-              onClick: () => onAssistant("assign", { projectId: study.projectId })
-            }, t("education.assignAction")) : null
+            h(
+              Btn,
+              {
+                variant: "soft",
+                size: "sm",
+                iconRight: "arrowRight",
+                onClick: () => setDetailId(study.projectId)
+              },
+              t("education.viewDetail")
+            ),
+            onAssistant ? h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                onClick: () => onAssistant("assign", { projectId: study.projectId })
+              },
+              t("education.assignAction")
+            ) : null
           )
         )
       );
@@ -18345,7 +20431,8 @@ ${JSON.stringify(refs, null, 2)}`;
           pendingCorrection.push({ assessment, grade, error });
         }
       }
-      if (submission !== null && grade === null) pendingGrade.push({ assessment, submission });
+      if (submission !== null && grade === null)
+        pendingGrade.push({ assessment, submission });
     }
     const attentionRow = (key, color, title, kind, timeText, note, status, action, onAction) => h(
       "div",
@@ -19124,7 +21211,9 @@ ${JSON.stringify(refs, null, 2)}`;
         const ranked = list.map((app) => ({
           id: String(app.id ?? ""),
           name: String(app.name ?? app.id ?? "")
-        })).filter((app) => app.id !== "" && app.id !== "dsh-desktop" && app.id !== "studio.dsh.desktop").sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+        })).filter(
+          (app) => app.id !== "" && app.id !== "dsh-desktop" && app.id !== "studio.dsh.desktop"
+        ).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
         setApps(ranked);
         if (ranked.length === 0) notify(t("guard.refreshEmpty"), "neutral");
         else notify(t("guard.refreshFound", { n: ranked.length }), "brand");
@@ -21545,9 +23634,12 @@ ${JSON.stringify(refs, null, 2)}`;
     let removeJapaneseSettings = null;
     if (typeof locale?.register === "function") {
       try {
-        removeJapaneseSettings = locale.register("settings.locale", "ja", { "language.title": "言語" });
+        removeJapaneseSettings = locale.register("settings.locale", "ja", {
+          "language.title": "言語"
+        });
       } catch (error) {
-        if (!String(error?.message || error).includes("already has locale")) throw error;
+        if (!String(error?.message || error).includes("already has locale"))
+          throw error;
       }
     }
     setLocale(localeId(locale));
@@ -21585,7 +23677,8 @@ ${JSON.stringify(refs, null, 2)}`;
     }
     const leaveToConversation = () => {
       try {
-        if (layout && typeof layout.selectPanel === "function") layout.selectPanel(null);
+        if (layout && typeof layout.selectPanel === "function")
+          layout.selectPanel(null);
       } catch {
       }
       setPanelVisible(false);
@@ -21595,7 +23688,9 @@ ${JSON.stringify(refs, null, 2)}`;
       try {
         const sessions = ctx.get?.("sessions") ?? ctx.sessions;
         const conversation = ctx.get?.("conversation") ?? ctx.conversation;
-        const current4 = Object.values(sessions?.list?.getSnapshot?.()?.byId ?? {}).find((row) => (row.retainedBy?.mainView ?? 0) > 0)?.id;
+        const current4 = Object.values(
+          sessions?.list?.getSnapshot?.()?.byId ?? {}
+        ).find((row) => (row.retainedBy?.mainView ?? 0) > 0)?.id;
         const binding = current4 ? sessions?.binding?.(current4) : null;
         if (binding && conversation?.input?.requestDraftInitialization) {
           const result = conversation.input.requestDraftInitialization(binding, {
@@ -21611,7 +23706,10 @@ ${JSON.stringify(refs, null, 2)}`;
         const workspace = ctx.get?.("uiWorkspace") ?? ctx.uiWorkspace;
         if (typeof workspace?.startSession === "function") {
           leaveToConversation();
-          workspace.startSession(void 0, { prompt, whenDraftExists: "append" });
+          workspace.startSession(void 0, {
+            prompt,
+            whenDraftExists: "append"
+          });
           return true;
         }
       } catch (error) {
@@ -21635,7 +23733,8 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const restoreSidebar = () => {
       try {
-        if (layout && typeof layout.toggleSidebar === "function") layout.toggleSidebar();
+        if (layout && typeof layout.toggleSidebar === "function")
+          layout.toggleSidebar();
       } catch {
       }
     };
@@ -21655,13 +23754,25 @@ ${JSON.stringify(refs, null, 2)}`;
       try {
         ctx.slots.inject(key, () => ctx.slots.register(options, Component));
       } catch (e) {
-        console.warn(`[tomato] slot ${key} 注册失败：`, e && e.message ? e.message : e);
+        console.warn(
+          `[tomato] slot ${key} 注册失败：`,
+          e && e.message ? e.message : e
+        );
       }
     };
-    safeInject2("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
+    safeInject2(
+      "main",
+      { name: "main", key: "tomato" },
+      () => h(AppShell, pageProps)
+    );
     safeInject2(
       "sidebar.panellist",
-      { name: "sidebar.panellist", id: "tomato", order: 10, label: () => t("side.label") },
+      {
+        name: "sidebar.panellist",
+        id: "tomato",
+        order: 10,
+        label: () => t("side.label")
+      },
       SidebarTomatoIcon
     );
     safeInject2(
@@ -21674,7 +23785,11 @@ ${JSON.stringify(refs, null, 2)}`;
       { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
       () => h(DockCard, { openPanel })
     );
-    safeInject2("shell.overlay", { name: "shell.overlay", id: "tomato-persona", order: -990 }, PersonaBackdrop);
+    safeInject2(
+      "shell.overlay",
+      { name: "shell.overlay", id: "tomato-persona", order: -990 },
+      PersonaBackdrop
+    );
     safeInject2(
       "shell.overlay",
       { name: "shell.overlay", id: "tomato-top-reminder", order: 850 },

@@ -16,7 +16,12 @@ import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import { Ring, Btn, IconBtn, Bar, notify } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
-import { timerView, fmtClock, taskById, protectionView } from "../shared/derive.js";
+import {
+  timerView,
+  fmtClock,
+  taskById,
+  protectionView,
+} from "../shared/derive.js";
 import { useImmersiveOpen, openImmersive, openEndDialog } from "./immersive.js";
 import { attentionCue } from "./attention.js";
 import { navigate } from "./navigation.js";
@@ -153,14 +158,17 @@ export function Hud({ openPanel }) {
       paused: view.paused,
       mode: view.mode,
       serial: Number(view.timer.completionSerial) || 0,
-      reminders: ((data && data.tasks) || []).filter((item) => item.reminderPending).length,
+      reminders: ((data && data.tasks) || []).filter(
+        (item) => item.reminderPending,
+      ).length,
     };
     const prev = prevRef.current;
     prevRef.current = next;
     if (prev === null) return;
     const cue = attentionCue(prev, next);
     if (cue) sound.playCue(cue);
-    if (cue === "complete") navigate({ reason: "complete", serial: next.serial });
+    if (cue === "complete")
+      navigate({ reason: "complete", serial: next.serial });
     // 音效只在状态跃迁时触发；sound 的引用稳定，不参与依赖以免重复播放。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.running, view.paused, view.mode, view.timer.completionSerial, data]);
@@ -169,7 +177,8 @@ export function Hud({ openPanel }) {
   useEffect(() => {
     if (!expanded) return undefined;
     const onDown = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) setExpanded(false);
+      if (rootRef.current && !rootRef.current.contains(e.target))
+        setExpanded(false);
     };
     document.addEventListener("mousedown", onDown, true);
     return () => document.removeEventListener("mousedown", onDown, true);
@@ -195,7 +204,10 @@ export function Hud({ openPanel }) {
   const startRound = async () => {
     ensureAudio();
     // 节点音效由下面的状态跃迁 effect 统一播放，这里不重复发声。
-    const ok = await act({ type: "startTimer" }, view.paused ? t("hud.notifyResumed") : null);
+    const ok = await act(
+      { type: "startTimer" },
+      view.paused ? t("hud.notifyResumed") : null,
+    );
     if (ok) openImmersive();
   };
 
@@ -213,13 +225,14 @@ export function Hud({ openPanel }) {
       : idleBreak
         ? modeLabel(view.mode)
         : `${done} / ${goal} ${t("hud.pomodoro")}`;
-  const subline = task && (focusMode || view.running)
-    ? task.title
-    : idleBreak
-      ? t("hud.restNext", { mode: modeLabel(view.mode) })
-      : protection.active
-        ? t("hud.protected")
-        : t("hud.noTask");
+  const subline =
+    task && (focusMode || view.running)
+      ? task.title
+      : idleBreak
+        ? t("hud.restNext", { mode: modeLabel(view.mode) })
+        : protection.active
+          ? t("hud.protected")
+          : t("hud.noTask");
   const primaryTitle = view.running
     ? t("hud.pause")
     : view.paused
@@ -227,7 +240,11 @@ export function Hud({ openPanel }) {
       : idleBreak
         ? t("hud.startRest")
         : t("hud.start");
-  const primaryLabel = view.paused ? t("hud.resume") : idleBreak ? t("hud.startRest") : t("hud.start");
+  const primaryLabel = view.paused
+    ? t("hud.resume")
+    : idleBreak
+      ? t("hud.startRest")
+      : t("hud.start");
   const ringValue = goal > 0 ? Math.min(1, done / goal) : 0;
   const ringColor = view.running
     ? "var(--tomato-brand)"
@@ -265,24 +282,53 @@ export function Hud({ openPanel }) {
       "span",
       {
         className: view.running ? "t-pulse" : undefined,
-        style: { display: "flex", alignItems: "center", justifyContent: "center", flex: "none" },
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flex: "none",
+        },
       },
       h(
         Ring,
-        { value: ringValue, size: 32, stroke: 3, color: ringColor, track: "var(--tomato-surface-3)" },
-        h(Icon, { name: "tomato", size: 14, stroke: 1.7, style: { color: ringColor } }),
+        {
+          value: ringValue,
+          size: 32,
+          stroke: 3,
+          color: ringColor,
+          track: "var(--tomato-surface-3)",
+        },
+        h(Icon, {
+          name: "tomato",
+          size: 14,
+          stroke: 1.7,
+          style: { color: ringColor },
+        }),
       ),
     ),
     narrow
       ? null
       : h(
           "span",
-          { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.25, minWidth: 0 } },
+          {
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              lineHeight: 1.25,
+              minWidth: 0,
+            },
+          },
           h(
             "span",
             {
               className: view.running ? "t-mono" : undefined,
-              style: { fontSize: 12.5, fontWeight: 620, color: "var(--tomato-ink)", whiteSpace: "nowrap" },
+              style: {
+                fontSize: 12.5,
+                fontWeight: 620,
+                color: "var(--tomato-ink)",
+                whiteSpace: "nowrap",
+              },
             },
             label,
           ),
@@ -333,7 +379,8 @@ export function Hud({ openPanel }) {
           borderRadius: 23,
           width: narrow ? 46 : undefined,
           pointerEvents: "auto",
-          background: "color-mix(in srgb, var(--tomato-surface) 88%, transparent)",
+          background:
+            "color-mix(in srgb, var(--tomato-surface) 88%, transparent)",
           backdropFilter: "blur(12px)",
           boxShadow: view.running
             ? "0 8px 22px -12px #b9573f73, 0 0 0 1px var(--tomato-line)"
@@ -350,7 +397,11 @@ export function Hud({ openPanel }) {
             box: 30,
             disabled: busy,
             title: primaryTitle,
-            style: { color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-ink)" },
+            style: {
+              color: view.running
+                ? "var(--tomato-brand-deep)"
+                : "var(--tomato-ink)",
+            },
             onClick: (e) => {
               e.stopPropagation();
               if (view.running) pauseRound();
@@ -385,10 +436,21 @@ export function Hud({ openPanel }) {
           h(
             "div",
             { style: { display: "flex", alignItems: "center", gap: 8 } },
-            h(Icon, { name: "tomato", size: 15, style: { color: "var(--tomato-brand)" } }),
+            h(Icon, {
+              name: "tomato",
+              size: 15,
+              style: { color: "var(--tomato-brand)" },
+            }),
             h(
               "span",
-              { style: { fontSize: 12.5, fontWeight: 620, color: "var(--tomato-ink)", flex: 1 } },
+              {
+                style: {
+                  fontSize: 12.5,
+                  fontWeight: 620,
+                  color: "var(--tomato-ink)",
+                  flex: 1,
+                },
+              },
               t("hud.hint"),
             ),
             h(
@@ -403,10 +465,20 @@ export function Hud({ openPanel }) {
           h(Bar, { value: done, max: goal, height: 6 }),
           h(
             "div",
-            { style: { display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 } },
+            {
+              style: {
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                minWidth: 0,
+              },
+            },
             h(
               "span",
-              { className: view.running ? "t-mono" : undefined, style: { fontSize: 12.5, color: "var(--tomato-ink)" } },
+              {
+                className: view.running ? "t-mono" : undefined,
+                style: { fontSize: 12.5, color: "var(--tomato-ink)" },
+              },
               label,
             ),
             h(
@@ -429,7 +501,13 @@ export function Hud({ openPanel }) {
             view.running
               ? h(
                   Btn,
-                  { size: "sm", icon: "pause", disabled: busy, style: { flex: 1 }, onClick: pauseRound },
+                  {
+                    size: "sm",
+                    icon: "pause",
+                    disabled: busy,
+                    style: { flex: 1 },
+                    onClick: pauseRound,
+                  },
                   t("hud.pause"),
                 )
               : h(
@@ -471,7 +549,11 @@ export function Hud({ openPanel }) {
                 },
                 h(Icon, { name: "focus", size: 16 }),
                 t("hud.openImmersive"),
-                h(Icon, { name: "chevronRight", size: 14, style: { marginLeft: "auto", opacity: 0.6 } }),
+                h(Icon, {
+                  name: "chevronRight",
+                  size: 14,
+                  style: { marginLeft: "auto", opacity: 0.6 },
+                }),
               )
             : null,
           h(
@@ -487,7 +569,11 @@ export function Hud({ openPanel }) {
             },
             h(Icon, { name: "focus", size: 16 }),
             t("hud.openApp"),
-            h(Icon, { name: "chevronRight", size: 14, style: { marginLeft: "auto", opacity: 0.6 } }),
+            h(Icon, {
+              name: "chevronRight",
+              size: 14,
+              style: { marginLeft: "auto", opacity: 0.6 },
+            }),
           ),
         )
       : null,

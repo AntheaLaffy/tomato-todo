@@ -12,7 +12,11 @@ const PAGES = new Map();
  * - badge(state): number|null，导航右侧计数
  */
 export function registerPage(page) {
-  if (!page || typeof page.id !== "string" || typeof page.Component !== "function") {
+  if (
+    !page ||
+    typeof page.id !== "string" ||
+    typeof page.Component !== "function"
+  ) {
     throw new Error("registerPage: 需要 {id, Component}");
   }
   PAGES.set(page.id, {

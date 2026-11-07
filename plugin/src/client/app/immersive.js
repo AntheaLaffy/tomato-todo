@@ -12,7 +12,13 @@ import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import { Btn, IconBtn, Dropdown, Modal, notify } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
-import { timerView, fmtClock, taskById, protectionView, toMinutes } from "../shared/derive.js";
+import {
+  timerView,
+  fmtClock,
+  taskById,
+  protectionView,
+  toMinutes,
+} from "../shared/derive.js";
 import { setDesktopFullscreen } from "../shared/api.js";
 import { navigate } from "./navigation.js";
 import { useAmbience, ensureAudio } from "./sound.js";
@@ -28,7 +34,8 @@ registerCopy("imm", {
     earlyComplete: "提前完成",
     interrupt: "结束并解锁",
     noTimeHint: "还没有专注用时，再坚持一下就能提前完成。",
-    strictWarning: "严格模式生效中：计时结束前不能提前完成或退出，到时自动解除。",
+    strictWarning:
+      "严格模式生效中：计时结束前不能提前完成或退出，到时自动解除。",
     badgeWhitelist: "应用白名单保护中",
     badgeLock: "界面锁定中",
     badgeBreakLock: "休息锁机中",
@@ -62,8 +69,10 @@ registerCopy("imm", {
     back: "Keep going",
     earlyComplete: "Complete early",
     interrupt: "End and unlock",
-    noTimeHint: "No focus time yet — a little longer and you can complete it early.",
-    strictWarning: "Strict mode is on: you can't finish or leave early until the timer ends.",
+    noTimeHint:
+      "No focus time yet — a little longer and you can complete it early.",
+    strictWarning:
+      "Strict mode is on: you can't finish or leave early until the timer ends.",
     badgeWhitelist: "App whitelist active",
     badgeLock: "Screen locked",
     badgeBreakLock: "Break lock active",
@@ -182,7 +191,17 @@ const HAIRLINE = "#ffffff12";
 
 // ------------------------------------------------------------ 结束确认（2b）
 
-function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel, onEarly, onInterrupt, onSkipRest }) {
+function EndDialog({
+  strictActive,
+  canEarly,
+  busy,
+  focusMinutes,
+  mode,
+  onCancel,
+  onEarly,
+  onInterrupt,
+  onSkipRest,
+}) {
   const [phrase, setPhrase] = useState("");
   const confirmed = phrase.trim() === t("imm.confirmPhrase");
   const resting = mode !== "focus";
@@ -197,7 +216,14 @@ function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel,
       footer: resting
         ? h(
             "div",
-            { style: { display: "flex", gap: 9, justifyContent: "flex-end", width: "100%" } },
+            {
+              style: {
+                display: "flex",
+                gap: 9,
+                justifyContent: "flex-end",
+                width: "100%",
+              },
+            },
             h(Btn, { size: "md", onClick: onCancel }, t("imm.back")),
             h(
               Btn,
@@ -213,7 +239,15 @@ function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel,
           )
         : h(
             "div",
-            { style: { display: "flex", gap: 9, justifyContent: "flex-end", width: "100%", flexWrap: "wrap" } },
+            {
+              style: {
+                display: "flex",
+                gap: 9,
+                justifyContent: "flex-end",
+                width: "100%",
+                flexWrap: "wrap",
+              },
+            },
             h(Btn, { size: "md", onClick: onCancel }, t("imm.back")),
             h(
               Btn,
@@ -240,11 +274,23 @@ function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel,
             ),
           ),
     },
-    h("div", { style: { fontSize: 12.5, lineHeight: 1.8, color: "var(--tomato-ink-2)" } }, t("imm.detail")),
+    h(
+      "div",
+      {
+        style: {
+          fontSize: 12.5,
+          lineHeight: 1.8,
+          color: "var(--tomato-ink-2)",
+        },
+      },
+      t("imm.detail"),
+    ),
     focusMinutes > 0 && !resting
       ? h(
           "div",
-          { style: { marginTop: 8, fontSize: 12, color: "var(--tomato-ink-3)" } },
+          {
+            style: { marginTop: 8, fontSize: 12, color: "var(--tomato-ink-3)" },
+          },
           t("common.minutes", { n: focusMinutes }),
         )
       : null,
@@ -266,7 +312,11 @@ function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel,
               alignItems: "flex-start",
             },
           },
-          h(Icon, { name: "lock", size: 15, style: { color: "var(--tomato-sun)", flex: "none", marginTop: 1 } }),
+          h(Icon, {
+            name: "lock",
+            size: 15,
+            style: { color: "var(--tomato-sun)", flex: "none", marginTop: 1 },
+          }),
           t("imm.strictWarning"),
         )
       : null,
@@ -277,7 +327,13 @@ function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel,
           { style: { marginTop: 16 } },
           h(
             "div",
-            { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginBottom: 6 } },
+            {
+              style: {
+                fontSize: 11.5,
+                color: "var(--tomato-ink-3)",
+                marginBottom: 6,
+              },
+            },
             t("imm.typeHint"),
           ),
           h("input", {
@@ -291,7 +347,13 @@ function EndDialog({ strictActive, canEarly, busy, focusMinutes, mode, onCancel,
           !canEarly
             ? h(
                 "div",
-                { style: { marginTop: 8, fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+                {
+                  style: {
+                    marginTop: 8,
+                    fontSize: 11.5,
+                    color: "var(--tomato-ink-3)",
+                  },
+                },
                 t("imm.noTimeHint"),
               )
             : null,
@@ -318,7 +380,8 @@ export function Immersive() {
   const task = taskById(data, view.taskId);
   const protection = protectionView(state);
   const lockActive = !!(data.lock && data.lock.active);
-  const forced = lockActive || (protection.active && protection.mode === "lock");
+  const forced =
+    lockActive || (protection.active && protection.mode === "lock");
   const visible = open || forced;
   const now = useNow((view.running || lockActive) && visible);
 
@@ -327,8 +390,11 @@ export function Immersive() {
     : view.running && typeof view.timer.deadline === "number"
       ? Math.max(0, Math.round(view.timer.deadline - now / 1000))
       : view.remainingSecs;
-  const totalSecs = lockActive ? data.lock.active.endsAt - data.lock.active.startedAt : view.totalSecs;
-  const progress = totalSecs > 0 ? Math.max(0, Math.min(1, 1 - liveRemaining / totalSecs)) : 0;
+  const totalSecs = lockActive
+    ? data.lock.active.endsAt - data.lock.active.startedAt
+    : view.totalSecs;
+  const progress =
+    totalSecs > 0 ? Math.max(0, Math.min(1, 1 - liveRemaining / totalSecs)) : 0;
   const resting = lockActive || view.mode !== "focus";
   const focusMinutes = toMinutes(view.totalSecs - liveRemaining);
   const cycleEvery = Number(settings.longBreakEvery) || 4;
@@ -432,21 +498,35 @@ export function Immersive() {
 
   const strictActive = !!(
     (data.lock && data.lock.active && data.lock.active.strict) ||
-    (view.running && view.mode === "focus" && protection.mode !== "off" && protection.strict)
+    (view.running &&
+      view.mode === "focus" &&
+      protection.mode !== "off" &&
+      protection.strict)
   );
-  const canEarly = !lockActive && !resting && view.remainingSecs < view.totalSecs;
+  const canEarly =
+    !lockActive && !resting && view.remainingSecs < view.totalSecs;
 
   const soundKind = ambience.kind || "silent";
   const soundKindLabel =
-    soundKind === "rain" ? t("sound.rain") : soundKind === "brown" ? t("sound.brown") : "";
+    soundKind === "rain"
+      ? t("sound.rain")
+      : soundKind === "brown"
+        ? t("sound.brown")
+        : "";
   // 静音时显示入口名，播放中带上当前音色，一眼知道「现在在放什么」。
-  const soundLabel = soundKindLabel === "" ? t("imm.sound") : `${t("imm.sound")} · ${soundKindLabel}`;
+  const soundLabel =
+    soundKindLabel === ""
+      ? t("imm.sound")
+      : `${t("imm.sound")} · ${soundKindLabel}`;
   const soundItems = ["rain", "brown", "silent"].map((kind) => ({
     id: kind,
     icon: kind === soundKind ? "check" : kind === "silent" ? "mute" : "sound",
     label:
-      (kind === "rain" ? t("sound.rain") : kind === "brown" ? t("sound.brown") : t("sound.silent")) +
-      (kind === soundKind ? " ·" : ""),
+      (kind === "rain"
+        ? t("sound.rain")
+        : kind === "brown"
+          ? t("sound.brown")
+          : t("sound.silent")) + (kind === soundKind ? " ·" : ""),
     onClick: () => ambience.setKind(kind),
   }));
 
@@ -463,7 +543,8 @@ export function Immersive() {
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
-        background: "radial-gradient(120% 120% at 50% -18%, #3a2a20 0%, #251b14 46%, #16100c 100%)",
+        background:
+          "radial-gradient(120% 120% at 50% -18%, #3a2a20 0%, #251b14 46%, #16100c 100%)",
         color: INK,
       },
     },
@@ -505,7 +586,14 @@ export function Immersive() {
       "div",
       {
         "aria-hidden": "true",
-        style: { position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: "#ffffff0a" },
+        style: {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 2,
+          background: "#ffffff0a",
+        },
       },
       h("div", {
         style: {
@@ -568,7 +656,11 @@ export function Immersive() {
             opacity: 0.9,
           },
         },
-        lockActive ? data.lock.active.name : resting ? t("imm.badgeRest") : t("imm.focusLabel"),
+        lockActive
+          ? data.lock.active.name
+          : resting
+            ? t("imm.badgeRest")
+            : t("imm.focusLabel"),
       ),
       h(
         "div",
@@ -608,7 +700,14 @@ export function Immersive() {
           )
         : h(
             "div",
-            { style: { fontSize: narrow ? 13 : 14.5, color: INK_2, letterSpacing: ".04em", lineHeight: 1.7 } },
+            {
+              style: {
+                fontSize: narrow ? 13 : 14.5,
+                color: INK_2,
+                letterSpacing: ".04em",
+                lineHeight: 1.7,
+              },
+            },
             resting ? t("imm.restHint") : t("imm.onlyThis"),
           ),
       task && !resting && !lockActive
@@ -676,17 +775,22 @@ export function Immersive() {
           width: "calc(100vw - 40px)",
         },
       },
-      !forced && h(
-        Btn,
-        {
-          size: "sm",
-          variant: "plain",
-          icon: "calendar",
-          style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
-          onClick: goSchedule,
-        },
-        t("imm.schedule"),
-      ),
+      !forced &&
+        h(
+          Btn,
+          {
+            size: "sm",
+            variant: "plain",
+            icon: "calendar",
+            style: {
+              color: INK_2,
+              background: "transparent",
+              border: `1px solid ${HAIRLINE}`,
+            },
+            onClick: goSchedule,
+          },
+          t("imm.schedule"),
+        ),
       !resting
         ? h(
             "div",
@@ -697,7 +801,11 @@ export function Immersive() {
                 size: "sm",
                 variant: "plain",
                 icon: soundKind === "silent" ? "mute" : "sound",
-                style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+                style: {
+                  color: INK_2,
+                  background: "transparent",
+                  border: `1px solid ${HAIRLINE}`,
+                },
                 onClick: () => {
                   ensureAudio();
                   setSoundMenu((v) => !v);
@@ -711,39 +819,58 @@ export function Immersive() {
               items: soundItems,
               align: "left",
               width: 208,
-              style: { top: "auto", bottom: "calc(100% + 8px)", left: "auto", right: 0 },
+              style: {
+                top: "auto",
+                bottom: "calc(100% + 8px)",
+                left: "auto",
+                right: 0,
+              },
             }),
           )
         : null,
       lockActive
-        ? h(Btn, {
-            size: "sm", icon: "unlock", disabled: busy || strictActive,
-            onClick: interrupt,
-          }, t("imm.interrupt"))
-        : !resting
         ? h(
             Btn,
             {
               size: "sm",
-              variant: "plain",
-              style: { color: "#d8b7a2", background: "transparent", border: `1px solid ${HAIRLINE}` },
-              onClick: () => setEnding(true),
-            },
-            t("imm.endEarly"),
-          )
-        : h(
-            Btn,
-            {
-              size: "sm",
-              variant: "plain",
-              icon: "check",
-              style: { color: INK_2, background: "transparent", border: `1px solid ${HAIRLINE}` },
+              icon: "unlock",
               disabled: busy || strictActive,
-              title: strictActive ? t("imm.strictWarning") : undefined,
-              onClick: skipRest,
+              onClick: interrupt,
             },
-            t("imm.skipRest"),
-          ),
+            t("imm.interrupt"),
+          )
+        : !resting
+          ? h(
+              Btn,
+              {
+                size: "sm",
+                variant: "plain",
+                style: {
+                  color: "#d8b7a2",
+                  background: "transparent",
+                  border: `1px solid ${HAIRLINE}`,
+                },
+                onClick: () => setEnding(true),
+              },
+              t("imm.endEarly"),
+            )
+          : h(
+              Btn,
+              {
+                size: "sm",
+                variant: "plain",
+                icon: "check",
+                style: {
+                  color: INK_2,
+                  background: "transparent",
+                  border: `1px solid ${HAIRLINE}`,
+                },
+                disabled: busy || strictActive,
+                title: strictActive ? t("imm.strictWarning") : undefined,
+                onClick: skipRest,
+              },
+              t("imm.skipRest"),
+            ),
     ),
     // 左下：轮次信息（安静地放，不抢焦点）
     !narrow
@@ -763,23 +890,31 @@ export function Immersive() {
         )
       : null,
     // 锁机不能通过关闭沉浸层离开保护界面。
-    !forced && h(
-      "div",
-      { style: { position: "absolute", right: narrow ? 14 : 24, bottom: narrow ? 16 : 24, display: "flex" } },
-      h(IconBtn, {
-        name: "minimize",
-        size: 18,
-        box: 36,
-        title: t("imm.exit"),
-        style: {
-          color: INK_2,
-          border: `1px solid ${HAIRLINE}`,
-          background: "#ffffff0a",
-          borderRadius: 12,
+    !forced &&
+      h(
+        "div",
+        {
+          style: {
+            position: "absolute",
+            right: narrow ? 14 : 24,
+            bottom: narrow ? 16 : 24,
+            display: "flex",
+          },
         },
-        onClick: closeImmersive,
-      }),
-    ),
+        h(IconBtn, {
+          name: "minimize",
+          size: 18,
+          box: 36,
+          title: t("imm.exit"),
+          style: {
+            color: INK_2,
+            border: `1px solid ${HAIRLINE}`,
+            background: "#ffffff0a",
+            borderRadius: 12,
+          },
+          onClick: closeImmersive,
+        }),
+      ),
     ending
       ? h(EndDialog, {
           strictActive,

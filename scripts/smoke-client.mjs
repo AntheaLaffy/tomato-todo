@@ -32,7 +32,9 @@ function tryRequire(name) {
 const React = tryRequire("react");
 const ReactDOMServer = tryRequire("react-dom/server");
 if (!React || !ReactDOMServer) {
-  console.error("smoke-client: 需要 react 与 react-dom（在 ~/node_modules 或 dsh 安装里）");
+  console.error(
+    "smoke-client: 需要 react 与 react-dom（在 ~/node_modules 或 dsh 安装里）",
+  );
   process.exit(2);
 }
 
@@ -51,7 +53,8 @@ function makeNode(tag) {
     setAttribute(k, v) {
       this.attributes[k] = String(v);
       if (k.startsWith("data-") && this === globalDocument.documentElement) {
-        this.dataset[k.slice(5).replace(/-([a-z])/g, (m) => m.toUpperCase())] = String(v);
+        this.dataset[k.slice(5).replace(/-([a-z])/g, (m) => m.toUpperCase())] =
+          String(v);
       }
     },
     removeAttribute(k) {
@@ -110,7 +113,13 @@ const fakeWindow = {
   __ModuleLoader__: null,
   addEventListener() {},
   removeEventListener() {},
-  matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }),
+  matchMedia: () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+  }),
   localStorage: {
     getItem: (k) => (storage.has(k) ? storage.get(k) : null),
     setItem: (k, v) => storage.set(k, String(v)),
@@ -188,7 +197,10 @@ const effects = [];
 const localeListeners = new Set();
 const localeState = {
   active: "zh",
-  locales: [{ id: "zh", label: "中文" }, { id: "en", label: "English" }],
+  locales: [
+    { id: "zh", label: "中文" },
+    { id: "en", label: "English" },
+  ],
 };
 const services = {
   theme: {
@@ -197,7 +209,10 @@ const services = {
       return () => {};
     },
     getTheme() {
-      return { preference: "light", active: { id: "light", colorScheme: "light", tokens: {} } };
+      return {
+        preference: "light",
+        active: { id: "light", colorScheme: "light", tokens: {} },
+      };
     },
     register() {
       return () => {};
@@ -212,14 +227,17 @@ const services = {
     addLanguage(language) {
       localeState.locales.push(language);
       return () => {
-        localeState.locales = localeState.locales.filter((item) => item.id !== language.id);
+        localeState.locales = localeState.locales.filter(
+          (item) => item.id !== language.id,
+        );
       };
     },
     register() {
       return () => {};
     },
     setLocale(id) {
-      if (!localeState.locales.some((item) => item.id === id)) throw new Error("unknown locale");
+      if (!localeState.locales.some((item) => item.id === id))
+        throw new Error("unknown locale");
       localeState.active = id;
       for (const fn of localeListeners) fn();
     },
@@ -271,14 +289,26 @@ for (const key of expectedSlots) {
   if (!got.has(key)) failures.push(`缺少 slot 注册：${key}`);
 }
 if (overrides.length === 0) failures.push("没有调用 theme.overrideTokens");
-if (!localeState.locales.some((item) => item.id === "ja")) failures.push("没有向 DSH 注册日语");
-const tomatoEntry = slotRegistrations.find((r) => r.key === "sidebar.panellist");
-if (tomatoEntry?.registration?.options?.id !== "tomato") failures.push("侧栏入口没有绑定番茄主面板");
-if (slotRegistrations.some((r) => r.key === "sidebar.footer.action" && r.registration?.options?.id === "tomato-progress")) {
+if (!localeState.locales.some((item) => item.id === "ja"))
+  failures.push("没有向 DSH 注册日语");
+const tomatoEntry = slotRegistrations.find(
+  (r) => r.key === "sidebar.panellist",
+);
+if (tomatoEntry?.registration?.options?.id !== "tomato")
+  failures.push("侧栏入口没有绑定番茄主面板");
+if (
+  slotRegistrations.some(
+    (r) =>
+      r.key === "sidebar.footer.action" &&
+      r.registration?.options?.id === "tomato-progress",
+  )
+) {
   failures.push("番茄侧栏入口重复注册");
 }
-if (!head.children.some((n) => n.id === "tomato-skin-style")) failures.push("没有注入皮肤样式表");
-if (!body.children.some((n) => n.id === "tomato-ambient")) failures.push("没有注入氛围层");
+if (!head.children.some((n) => n.id === "tomato-skin-style"))
+  failures.push("没有注入皮肤样式表");
+if (!body.children.some((n) => n.id === "tomato-ambient"))
+  failures.push("没有注入氛围层");
 
 // ---------- 渲染冒烟 ----------
 const localDate = (offsetDays = 0) => {
@@ -295,24 +325,136 @@ let sampleState = {
     version: 4,
     identities: [],
     tasks: [
-      { id: "t1", title: "语法加强 Day05（下）", completed: false, dueDate: localDate(0), reminderTime: "20:00", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 45, focusMinutes: 25, priority: 1, scrapMinutes: 0, kind: "plain" },
+      {
+        id: "t1",
+        title: "语法加强 Day05（下）",
+        completed: false,
+        dueDate: localDate(0),
+        reminderTime: "20:00",
+        projectId: "p1",
+        tags: [],
+        subtasks: [],
+        notes: "",
+        estimate: 45,
+        focusMinutes: 25,
+        priority: 1,
+        scrapMinutes: 0,
+        kind: "plain",
+      },
       // 逾期任务：只该出现在「全部任务」，不该混进今日专注
-      { id: "t3", title: "高数 1-5 极限运算法则", completed: false, dueDate: localDate(-3), reminderTime: "09:40", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 45, priority: 1, scrapMinutes: 30, reminderPending: false, reminderFired: true, reminderExpired: true, completedAt: null, createdAt: 1700000000 },
+      {
+        id: "t3",
+        title: "高数 1-5 极限运算法则",
+        completed: false,
+        dueDate: localDate(-3),
+        reminderTime: "09:40",
+        projectId: "p1",
+        tags: [],
+        subtasks: [],
+        notes: "",
+        estimate: 1,
+        focusMinutes: 45,
+        priority: 1,
+        scrapMinutes: 30,
+        reminderPending: false,
+        reminderFired: true,
+        reminderExpired: true,
+        completedAt: null,
+        createdAt: 1700000000,
+      },
       // reminderPending + 当前时段：验证页面内提醒条（提醒时刻=5 分钟前，计划块尚未结束）
-      { id: "t2", title: "408 真题：数据结构错题回顾", completed: false, dueDate: localDate(0), reminderTime: (() => { const d = new Date(Date.now() - 5 * 60000); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; })(), projectId: "p1", tags: ["408"], subtasks: [], notes: "", estimate: 2, focusMinutes: 25, priority: 2, scrapMinutes: 30, reminderPending: true, reminderFired: true, reminderExpired: false, completedAt: null, createdAt: 1700000000 },
+      {
+        id: "t2",
+        title: "408 真题：数据结构错题回顾",
+        completed: false,
+        dueDate: localDate(0),
+        reminderTime: (() => {
+          const d = new Date(Date.now() - 5 * 60000);
+          return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        })(),
+        projectId: "p1",
+        tags: ["408"],
+        subtasks: [],
+        notes: "",
+        estimate: 2,
+        focusMinutes: 25,
+        priority: 2,
+        scrapMinutes: 30,
+        reminderPending: true,
+        reminderFired: true,
+        reminderExpired: false,
+        completedAt: null,
+        createdAt: 1700000000,
+      },
       // 跨项目交错日期：全部任务必须全局排序，不能先按项目分桶。
-      { id: "t4", title: "跨项目明日任务", completed: false, dueDate: localDate(1), reminderTime: null, projectId: "p2", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 25, priority: 0, scrapMinutes: 0, createdAt: 1700000001 },
-      { id: "t5", title: "原项目后日任务", completed: false, dueDate: localDate(2), reminderTime: null, projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 25, priority: 0, scrapMinutes: 0, createdAt: 1700000002 },
+      {
+        id: "t4",
+        title: "跨项目明日任务",
+        completed: false,
+        dueDate: localDate(1),
+        reminderTime: null,
+        projectId: "p2",
+        tags: [],
+        subtasks: [],
+        notes: "",
+        estimate: 1,
+        focusMinutes: 25,
+        priority: 0,
+        scrapMinutes: 0,
+        createdAt: 1700000001,
+      },
+      {
+        id: "t5",
+        title: "原项目后日任务",
+        completed: false,
+        dueDate: localDate(2),
+        reminderTime: null,
+        projectId: "p1",
+        tags: [],
+        subtasks: [],
+        notes: "",
+        estimate: 1,
+        focusMinutes: 25,
+        priority: 0,
+        scrapMinutes: 0,
+        createdAt: 1700000002,
+      },
     ],
     blocks: [],
     templates: [],
     prints: [{ templateId: "tpl1", date: "2026-11-04" }],
-    projects: [{ id: "p1", name: "数学一", color: "#df7561", appWhitelist: null }, { id: "p2", name: "英语", color: "#75aabb", appWhitelist: null }],
+    projects: [
+      { id: "p1", name: "数学一", color: "#df7561", appWhitelist: null },
+      { id: "p2", name: "英语", color: "#75aabb", appWhitelist: null },
+    ],
     habits: [{ id: "h1", name: "晨间" }],
-    visions: [{ id: "v1", name: "把数学一学扎实", notes: "不是周期任务，是方向", projectId: null }],
+    visions: [
+      {
+        id: "v1",
+        name: "把数学一学扎实",
+        notes: "不是周期任务，是方向",
+        projectId: null,
+      },
+    ],
     blocks: [
-      { id: "b1", title: "OS 训练营", days: [1, 3, 5], start: "20:00", end: "22:00", attention: "required", notes: "线上" },
-      { id: "b2", title: "午睡", days: [1, 2, 3, 4, 5, 6, 7], start: "13:00", end: "13:30", attention: "light", notes: "" },
+      {
+        id: "b1",
+        title: "OS 训练营",
+        days: [1, 3, 5],
+        start: "20:00",
+        end: "22:00",
+        attention: "required",
+        notes: "线上",
+      },
+      {
+        id: "b2",
+        title: "午睡",
+        days: [1, 2, 3, 4, 5, 6, 7],
+        start: "13:00",
+        end: "13:30",
+        attention: "light",
+        notes: "",
+      },
     ],
     templates: [
       {
@@ -329,7 +471,10 @@ let sampleState = {
           tags: ["英语"],
           subtasks: [{ id: "s1", title: "查生词" }],
         },
-        printing: { kind: "weekly", slots: [{ days: [1, 3, 5], time: "20:00" }] },
+        printing: {
+          kind: "weekly",
+          slots: [{ days: [1, 3, 5], time: "20:00" }],
+        },
         automatic: false,
         printAheadDays: 1,
       },
@@ -353,7 +498,17 @@ let sampleState = {
       },
     ],
     sessions: [
-      { id: "s1", source: "timer", taskId: "t1", taskTitle: "语法加强 Day05（下）", projectName: "数学一", startedAt: 1700000000, endedAt: 1700001500, durationSecs: 1500, completed: true },
+      {
+        id: "s1",
+        source: "timer",
+        taskId: "t1",
+        taskTitle: "语法加强 Day05（下）",
+        projectName: "数学一",
+        startedAt: 1700000000,
+        endedAt: 1700001500,
+        durationSecs: 1500,
+        completed: true,
+      },
     ],
     education: { projects: [], events: [], summaries: [] },
     settings: {
@@ -391,28 +546,66 @@ let sampleState = {
     lock: { schedules: [], active: null, suppressedUntil: 0 },
     education: {},
   },
-  stats: { todaySeconds: 1200, todayPomodoros: 2, todayCompleted: 1, totalSeconds: 36000, totalPomodoros: 26, streak: 3, days: [] },
-  guard: { available: true, backend: "niri / Wayland", locked: false, whitelist: [], pid: 1234 },
+  stats: {
+    todaySeconds: 1200,
+    todayPomodoros: 2,
+    todayCompleted: 1,
+    totalSeconds: 36000,
+    totalPomodoros: 26,
+    streak: 3,
+    days: [],
+  },
+  guard: {
+    available: true,
+    backend: "niri / Wayland",
+    locked: false,
+    whitelist: [],
+    pid: 1234,
+  },
 };
 if (!process.env.SMOKE_LIVE) {
   const now = sampleState.serverTime;
   sampleState.data.education = {
     projects: [{ projectId: "p1", target: "130+", examMode: true }],
     assessments: [
-      { id: "homework-to-submit", projectId: "p1", kind: "homework",
-        title: "待交作业", startsAt: now - 3600, endsAt: now + 86400, questions: [] },
-      { id: "homework-to-grade", projectId: "p1", kind: "homework",
-        title: "待批改作业", startsAt: now - 86400, endsAt: now + 86400, questions: [] },
+      {
+        id: "homework-to-submit",
+        projectId: "p1",
+        kind: "homework",
+        title: "待交作业",
+        startsAt: now - 3600,
+        endsAt: now + 86400,
+        questions: [],
+      },
+      {
+        id: "homework-to-grade",
+        projectId: "p1",
+        kind: "homework",
+        title: "待批改作业",
+        startsAt: now - 86400,
+        endsAt: now + 86400,
+        questions: [],
+      },
     ],
-    submissions: [{ id: "submission-to-grade", assessmentId: "homework-to-grade", submittedAt: now - 60 }],
-    grades: [], events: [], summaries: [],
+    submissions: [
+      {
+        id: "submission-to-grade",
+        assessmentId: "homework-to-grade",
+        submittedAt: now - 60,
+      },
+    ],
+    grades: [],
+    events: [],
+    summaries: [],
   };
 }
 
 // SMOKE_LIVE=1：用运行中的 runtime 真实 /api/state 渲染（数据面联调）；不可达时退回样例。
 if (process.env.SMOKE_LIVE) {
   try {
-    const res = await fetch("http://127.0.0.1:43987/api/state", { signal: AbortSignal.timeout(4000) });
+    const res = await fetch("http://127.0.0.1:43987/api/state", {
+      signal: AbortSignal.timeout(4000),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const live = await res.json();
     if (!live || !live.data) throw new Error("state 缺少 data 字段");
@@ -422,7 +615,9 @@ if (process.env.SMOKE_LIVE) {
         `${(live.data.sessions || []).length} 会话 / ${(live.data.projects || []).length} 项目）`,
     );
   } catch (e) {
-    console.warn(`smoke-client: 实时 /api/state 不可用（${e.message}），改用样例数据`);
+    console.warn(
+      `smoke-client: 实时 /api/state 不可用（${e.message}），改用样例数据`,
+    );
   }
 }
 
@@ -433,7 +628,8 @@ context.fetch = (url) =>
   Promise.resolve({
     ok: true,
     status: 200,
-    json: async () => (String(url).includes("/api/state") ? sampleState : { ok: true }),
+    json: async () =>
+      String(url).includes("/api/state") ? sampleState : { ok: true },
   });
 // 触发一次轮询刷新：等一拍让 fetch 结果落到 store，然后同步渲染。
 await new Promise((resolve) => realSetTimeout(resolve, 250));
@@ -444,14 +640,27 @@ for (const { key, registration } of slotRegistrations) {
   const element = React.createElement(registration.Component, {});
   try {
     // 同一 slot 可能有多条注册（例如输入框上方：提醒条 + 入口卡），拼接渲染结果。
-    renderedBy[key] = (renderedBy[key] || "") + ReactDOMServer.renderToStaticMarkup(element);
+    renderedBy[key] =
+      (renderedBy[key] || "") + ReactDOMServer.renderToStaticMarkup(element);
   } catch (e) {
-    failures.push(`渲染 ${key} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
+    failures.push(
+      `渲染 ${key} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`,
+    );
   }
 }
 
 // 逐页渲染主视图：AppShell 的初始页读 localStorage，所以换 key 重挂即可覆盖九页。
-const PAGE_IDS = ["focus", "tasks", "habits", "stats", "calendar", "education", "guard", "schedule", "preferences"];
+const PAGE_IDS = [
+  "focus",
+  "tasks",
+  "habits",
+  "stats",
+  "calendar",
+  "education",
+  "guard",
+  "schedule",
+  "preferences",
+];
 // 每页一个只有该页才出现的标记，防止「九页渲染的是同一页」这类回归。
 const PAGE_MARKERS = {
   focus: "今天，也要慢慢向前。",
@@ -473,25 +682,44 @@ const handoffs = [];
 const panelSelections = [];
 services.layout.selectPanel = (id) => panelSelections.push(id);
 services.sessions = {
-  list: { getSnapshot: () => ({ byId: { active: { id: "active", retainedBy: { mainView: 1 } } } }) },
+  list: {
+    getSnapshot: () => ({
+      byId: { active: { id: "active", retainedBy: { mainView: 1 } } },
+    }),
+  },
   binding: (id) => ({ sessionId: id }),
   scope: (id) => ({ sessionId: id }),
 };
-services.conversation = { input: {
-  requestDraftInitialization: (binding, options) => { handoffs.push({ binding, options }); return "applied"; },
-  for: () => ({ focus() {} }),
-} };
+services.conversation = {
+  input: {
+    requestDraftInitialization: (binding, options) => {
+      handoffs.push({ binding, options });
+      return "applied";
+    },
+    for: () => ({ focus() {} }),
+  },
+};
 for (const [kind, records, ids] of [
   ["assign", { projectId: "p1" }, ["p1"]],
   ["submit", { projectId: "p1", assessmentId: "a1" }, ["p1", "a1"]],
-  ["grade", { projectId: "p1", assessmentId: "a1", submissionId: "s1" }, ["p1", "a1", "s1"]],
+  [
+    "grade",
+    { projectId: "p1", assessmentId: "a1", submissionId: "s1" },
+    ["p1", "a1", "s1"],
+  ],
 ]) {
-  if (!nav?.openAssistant?.(kind, records)) failures.push(`${kind} 没有打开学习助手草稿`);
+  if (!nav?.openAssistant?.(kind, records))
+    failures.push(`${kind} 没有打开学习助手草稿`);
   const handoff = handoffs.at(-1);
   const prompt = handoff?.options?.prompt ?? "";
-  if (handoff?.binding?.sessionId !== "active" || handoff?.options?.whenDraftExists !== "append" ||
-      !prompt.includes("tomato_get_education") || !prompt.includes("tomato_education") ||
-      ids.some((id) => !prompt.includes(`\"${id}\"`)) || panelSelections.at(-1) !== null) {
+  if (
+    handoff?.binding?.sessionId !== "active" ||
+    handoff?.options?.whenDraftExists !== "append" ||
+    !prompt.includes("tomato_get_education") ||
+    !prompt.includes("tomato_education") ||
+    ids.some((id) => !prompt.includes(`\"${id}\"`)) ||
+    panelSelections.at(-1) !== null
+  ) {
     failures.push(`${kind} 草稿没有保留已有输入、插件工具或稳定记录 ID`);
   }
 }
@@ -504,16 +732,21 @@ for (const pageId of PAGE_IDS) {
       React.createElement(mainRegistration.registration.Component, {}),
     );
     renderedBy[`page:${pageId}`] = markup;
-    if (!markup || markup.length < 500) failures.push(`页面 ${pageId} 渲染为空`);
+    if (!markup || markup.length < 500)
+      failures.push(`页面 ${pageId} 渲染为空`);
     const marker = PAGE_MARKERS[pageId];
-    if (marker && !markup.includes(marker)) failures.push(`页面 ${pageId} 缺少标记「${marker}」（切页可能失效）`);
+    if (marker && !markup.includes(marker))
+      failures.push(`页面 ${pageId} 缺少标记「${marker}」（切页可能失效）`);
     if (pageId === "focus" && !process.env.SMOKE_LIVE) {
       // 今日专注只该列今天计划的任务；逾期任务只能作为底部提示出现。
-      if (!markup.includes("另有 1 件逾期任务")) failures.push("今日专注没有逾期提示");
+      if (!markup.includes("另有 1 件逾期任务"))
+        failures.push("今日专注没有逾期提示");
       if (markup.includes("已逾期")) failures.push("今日专注混入了逾期任务行");
     }
   } catch (e) {
-    failures.push(`渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
+    failures.push(
+      `渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`,
+    );
   }
 }
 if (!process.env.SMOKE_LIVE) {
@@ -522,9 +755,16 @@ if (!process.env.SMOKE_LIVE) {
     if (!education.includes(label)) failures.push(`教学页缺少操作「${label}」`);
   }
   const allTasks = renderedBy["page:tasks"] || "";
-  const positions = ["高数 1-5 极限运算法则", "语法加强 Day05（下）", "跨项目明日任务", "原项目后日任务"]
-    .map((title) => allTasks.indexOf(title));
-  if (positions.some((n) => n < 0) || positions.some((n, i) => i > 0 && n <= positions[i - 1])) {
+  const positions = [
+    "高数 1-5 极限运算法则",
+    "语法加强 Day05（下）",
+    "跨项目明日任务",
+    "原项目后日任务",
+  ].map((title) => allTasks.indexOf(title));
+  if (
+    positions.some((n) => n < 0) ||
+    positions.some((n, i) => i > 0 && n <= positions[i - 1])
+  ) {
     failures.push("全部任务没有跨项目按到期日全局排序");
   }
 }
@@ -544,7 +784,10 @@ const japanesePrefs = ReactDOMServer.renderToStaticMarkup(
 if (!japanesePrefs.includes("言語") || !japanesePrefs.includes("日本語")) {
   failures.push("DSH 切到日语后番茄设置没有同步");
 }
-if (!japanesePrefs.includes("すべてのタスク") || !japanesePrefs.includes("設定")) {
+if (
+  !japanesePrefs.includes("すべてのタスク") ||
+  !japanesePrefs.includes("設定")
+) {
   failures.push("番茄 Todo 主视图没有显示日语导航");
 }
 if (tomatoEntry && tomatoEntry.registration.options.label() !== "トマト Todo") {
@@ -567,7 +810,8 @@ for (const pageId of PAGE_IDS) {
     const markup = ReactDOMServer.renderToStaticMarkup(
       React.createElement(mainRegistration.registration.Component, {}),
     );
-    if (!markup.includes(japaneseMarkers[pageId])) failures.push(`页面 ${pageId} 的日语文案没有显示`);
+    if (!markup.includes(japaneseMarkers[pageId]))
+      failures.push(`页面 ${pageId} 的日语文案没有显示`);
   } catch (error) {
     failures.push(`日语页面 ${pageId} 渲染失败：${error.message}`);
   }
@@ -578,7 +822,8 @@ if (!process.env.SMOKE_LIVE) {
     React.createElement(mainRegistration.registration.Component, {}),
   );
   for (const label of ["宿題を出す", "宿題を提出", "宿題を採点"]) {
-    if (!education.includes(label)) failures.push(`日语教学页缺少操作「${label}」`);
+    if (!education.includes(label))
+      failures.push(`日语教学页缺少操作「${label}」`);
   }
 }
 services.locale.setLocale("zh");
@@ -596,27 +841,37 @@ if (!process.env.SMOKE_LIVE) {
   if (!overlay.includes("408 真题")) failures.push("顶栏居中的提醒条没有渲染");
   if (!overlay.includes("开始专注")) failures.push("提醒条没有开始按钮");
   if (overlay.includes("个番茄")) failures.push("提醒浮层里不该出现番茄计数");
-  if (!overlay.includes("assets/personas/")) failures.push("看板娘立绘没有渲染");
-  if (!overlay.includes('id="tomato-persona-wrap"')) failures.push("看板娘缺少外层容器（切换列没地方挂）");
-  if (overlay.includes("tomato-persona-board")) failures.push("已删除的页内看板娘又回来了");
-  if ((head.children.find((n) => n.id === "tomato-skin-style") || {}).textContent?.includes?.("#tomato-persona-switch") === false) {
+  if (!overlay.includes("assets/personas/"))
+    failures.push("看板娘立绘没有渲染");
+  if (!overlay.includes('id="tomato-persona-wrap"'))
+    failures.push("看板娘缺少外层容器（切换列没地方挂）");
+  if (overlay.includes("tomato-persona-board"))
+    failures.push("已删除的页内看板娘又回来了");
+  if (
+    (
+      head.children.find((n) => n.id === "tomato-skin-style") || {}
+    ).textContent?.includes?.("#tomato-persona-switch") === false
+  ) {
     failures.push("皮肤样式缺少看板娘切换列");
   }
   if ((renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
     failures.push("提醒又回到了浮层弹窗");
   }
   const dock = renderedBy["conversation.composer.dock"] || "";
-  if (/[0-9]+ \/ 8 番茄/.test(dock)) failures.push("番茄预计/实际又回到了最下面那条面板");
+  if (/[0-9]+ \/ 8 番茄/.test(dock))
+    failures.push("番茄预计/实际又回到了最下面那条面板");
   if (!(renderedBy["sidebar.panellist"] || "").includes("svg")) {
     failures.push("侧栏面板列表没有番茄图标");
   }
 }
-if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注")) failures.push("入口卡没有渲染开始专注按钮");
+if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注"))
+  failures.push("入口卡没有渲染开始专注按钮");
 if ((renderedBy["shell.overlay"] || "").includes("个番茄")) {
   failures.push("右上角 HUD 空闲时仍在显示番茄计数");
 }
 
-if (!(renderedBy["conversation.composer.dock"] || "").includes("今日待办")) failures.push("入口卡没有渲染今日待办");
+if (!(renderedBy["conversation.composer.dock"] || "").includes("今日待办"))
+  failures.push("入口卡没有渲染今日待办");
 
 // 清理 effect（验证 dispose 路径不抛错）
 for (const fn of effects) {

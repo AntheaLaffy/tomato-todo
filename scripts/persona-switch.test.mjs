@@ -29,7 +29,12 @@ const render = (currentId) =>
 
 test("切换列渲染四个角色，只有当前角色高亮", () => {
   const html = render("natsuki");
-  for (const file of ["default.webp", "calm.webp", "coach.webp", "senpai.webp"]) {
+  for (const file of [
+    "default.webp",
+    "calm.webp",
+    "coach.webp",
+    "senpai.webp",
+  ]) {
     assert.ok(html.includes(file), `缺少头像素材 ${file}`);
   }
   assert.equal((html.match(/class="t-persona-pick"/g) || []).length, 4);
