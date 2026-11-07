@@ -4826,9 +4826,16 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   function bindPanelInfo(observer) {
     panelInfoObs = observer && typeof observer.subscribe === "function" ? observer : null;
     if (panelInfoObs === null) return;
+    let last = void 0;
     const sync = () => {
-      const snapshot2 = panelInfoObs.getSnapshot?.() ?? null;
-      setPanelVisible(snapshot2?.activePanelId === "tomato");
+      const panelId = panelInfoObs.getSnapshot?.()?.activePanelId ?? null;
+      if (last === void 0) {
+        last = panelId;
+        return;
+      }
+      if (panelId === last) return;
+      last = panelId;
+      setPanelVisible(panelId === "tomato");
     };
     sync();
     panelInfoObs.subscribe(sync);
