@@ -1,46 +1,73 @@
-// 提醒横幅：定时任务到点时，在任意页面顶部出现的一张纸色便签。
+// 提醒条：到点时在当前页面里的一条细行（不是浮层弹窗）。
 //
-// 语义对齐 @tomato/core 的 reminders.pendingReminder：只在计时器空闲
-// （未运行、未开始、剩余满额、无锁机）时提醒；「开始专注」走 core 的
-// startReminder（它会清 pending 并直接开始这一轮），「稍后再说」只在本次
-// 会话里收起，不改数据（core 没有 snooze 语义，作废由重修窗口/提醒到期决定）。
+// 设计取舍（来自用户反馈）：
+// - 浮层卡片像广告，一定被关掉；提醒只在页面内以一行细条出现，与内容同层。
+// - 只提醒「当前时间段」的任务：计划块（提醒时刻 + 计划时长）还没结束才算当前；
+//   超过预设结尾的是待补/逾期，属于「全部任务」的事，不再打扰。
+// - 「稍后」要跨刷新持久：按 任务+日期+时刻 记到 localStorage，下次刷新不再冒出来；
+//   过期条目自动清理。开始专注走 core 的 startReminder（清 pending 并直接开始）。
 import { h, useState, useEffect } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
-import { Btn, IconBtn } from "../shared/ui.js";
+import { Btn } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
-import { fmtClock, taskById } from "../shared/derive.js";
+import { parseHHMM, todayKey, windowMinutes } from "../shared/derive.js";
 import { openImmersive } from "./immersive.js";
 
 registerCopy("reminder", {
   zh: {
-    now: "该做这件事了",
+    prefix: "现在",
     start: "开始专注",
-    later: "稍后再说",
-    more: "还有 {n} 条提醒",
+    later: "稍后",
+    more: "另有 {n} 条到点",
     minutes: "{n} 分钟 · 第 {round} 轮",
-    skipped: "已收起，提醒仍在待办里",
+    title: "该做这件事了",
   },
   en: {
-    now: "Time for this one",
+    prefix: "Now",
     start: "Start focus",
     later: "Later",
-    more: "{n} more reminders",
+    more: "{n} more due",
     minutes: "{n} min · round {round}",
-    skipped: "Dismissed — it stays in your tasks",
+    title: "Time for this one",
   },
 });
 
-// 落在 HUD 正下方、右侧对齐：既不压 DSH 顶部栏，也不盖住页面大标题。
-const BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 64px)";
-
-const dismissed = new Set();
+const DISMISS_KEY = "tomato-dsh.reminders-dismissed";
+const DISMISS_TTL_MS = 48 * 3600 * 1000;
 
 function reminderKey(task) {
   return `${task.id}|${task.dueDate}|${task.reminderTime}`;
 }
 
-// 与 core reminders.reminderIdle 等价：只有真正空闲时才提醒，避免打扰正在专注的人。
+function loadDismissed() {
+  const now = Date.now();
+  const out = {};
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY);
+    if (!raw) return out;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return out;
+    for (const [key, at] of Object.entries(parsed)) {
+      if (typeof at === "number" && now - at < DISMISS_TTL_MS) out[key] = at;
+    }
+  } catch {
+    return out;
+  }
+  return out;
+}
+
+function persistDismissed(map) {
+  try {
+    localStorage.setItem(DISMISS_KEY, JSON.stringify(map));
+  } catch {
+    /* 隐私模式：本次会话内仍生效 */
+  }
+}
+
+let dismissed = loadDismissed();
+
+// 与 core reminders.reminderIdle 等价：只有真正空闲时才提醒。
 function isIdle(state) {
   const data = (state && state.data) || {};
   const timer = data.timer || {};
@@ -53,38 +80,57 @@ function isIdle(state) {
   );
 }
 
-/** 当前应提醒的任务（按 日期|时间|id 取最早）。 */
-export function pendingReminderTask(state, ignored = dismissed) {
-  if (!isIdle(state)) return null;
-  const tasks = (state && state.data && state.data.tasks) || [];
-  let best = null;
-  for (const task of tasks) {
-    if (task.completed || !task.reminderPending) continue;
-    if (ignored.has(reminderKey(task))) continue;
-    const key = `${task.dueDate}|${task.reminderTime}|${task.id}`;
-    if (best === null || key < `${best.dueDate}|${best.reminderTime}|${best.id}`) best = task;
-  }
-  return best;
+function secondsOfNow() {
+  const now = new Date();
+  return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 }
 
-export function ReminderBanner() {
+/**
+ * 当前时间段的提醒：计划块还没结束才提醒。
+ * 返回 { primary, extra }；extra 为同一时段内其它到点任务数。
+ */
+export function currentReminders(state) {
+  if (!isIdle(state)) return { primary: null, extra: 0 };
+  const data = (state && state.data) || {};
+  const settings = data.settings || {};
+  const today = (state && state.today) || todayKey(state && state.serverTime);
+  const nowSecs = secondsOfNow();
+  const due = [];
+  for (const task of data.tasks || []) {
+    if (task.completed || !task.reminderPending || task.reminderExpired) continue;
+    if (task.dueDate !== today || !task.reminderTime) continue;
+    const start = parseHHMM(task.reminderTime);
+    if (start === null) continue;
+    const end = start + windowMinutes(task, settings) * 60;
+    // 只保留「当前时间段」：计划块尚未结束；超过结尾的交给待补/逾期视图。
+    if (nowSecs < start || nowSecs >= end) continue;
+    if (dismissed[reminderKey(task)]) continue;
+    due.push({ task, start });
+  }
+  due.sort((a, b) => a.start - b.start || String(a.task.id).localeCompare(String(b.task.id)));
+  const primary = due.length > 0 ? due[0].task : null;
+  return { primary, extra: Math.max(0, due.length - 1) };
+}
+
+/**
+ * ReminderStrip({ variant })
+ * variant = "page"（番茄主视图内）| "dock"（对话输入框上方）。
+ * 只在有当前时段提醒时渲染，否则返回 null。
+ */
+export function ReminderStrip({ variant = "page" }) {
   const state = useSnapshot();
-  const [tick, setTick] = useState(0);
+  const [, force] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  // 计时结束/数据变化后重新评估（dismissed 是模块级集合，变更时强制刷新）。
+  // 每分钟重算：时段结束/新的到点提醒自动出现或消失。
   useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), 5000);
+    const id = setInterval(() => force((n) => n + 1), 30_000);
     return () => clearInterval(id);
   }, []);
-  void tick;
 
-  const task = pendingReminderTask(state);
+  const { primary: task, extra } = currentReminders(state);
   if (!task) return null;
-  const pendingCount = ((state && state.data && state.data.tasks) || []).filter(
-    (item) => !item.completed && item.reminderPending && !dismissed.has(reminderKey(item)),
-  ).length;
 
   const data = (state && state.data) || {};
   const settings = data.settings || {};
@@ -105,133 +151,118 @@ export function ReminderBanner() {
   };
 
   const later = () => {
-    dismissed.add(reminderKey(task));
-    setTick((n) => n + 1);
+    dismissed = { ...dismissed, [reminderKey(task)]: Date.now() };
+    persistDismissed(dismissed);
+    force((n) => n + 1);
   };
+
+  const compact = variant === "dock";
 
   return h(
     "div",
     {
       className: "t-root",
       style: {
-        position: "fixed",
-        top: BANNER_TOP,
-        right: 18,
-        zIndex: 45,
-        width: "min(320px, calc(100vw - 36px))",
-        pointerEvents: "auto",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: compact ? "7px 10px" : "9px 12px",
+        marginBottom: compact ? 6 : 18,
+        borderRadius: 12,
+        border: "1px solid var(--tomato-line)",
+        background: "color-mix(in srgb, var(--tomato-brand-soft) 62%, var(--tomato-surface))",
+        flexWrap: "wrap",
+        minWidth: 0,
       },
     },
+    h(Icon, { name: "bell", size: 14, style: { color: "var(--tomato-accent-fg)" } }),
     h(
-      "div",
+      "span",
       {
-        className: "t-card",
         style: {
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          padding: "12px 13px",
-          borderRadius: 15,
-          background: "color-mix(in srgb, var(--tomato-surface) 94%, transparent)",
-          backdropFilter: "blur(12px)",
+          fontSize: 11.5,
+          fontWeight: 600,
+          color: "var(--tomato-accent-fg)",
+          letterSpacing: ".02em",
+          flex: "none",
         },
       },
-      h(
-        "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
-        h(
-          "div",
+      t("reminder.prefix"),
+      task.reminderTime ? h("span", { className: "t-mono", style: { marginLeft: 5 } }, task.reminderTime) : null,
+    ),
+    project
+      ? h(
+          "span",
           {
             style: {
-              width: 26,
-              height: 26,
-              borderRadius: 9,
-              background: "var(--tomato-brand-soft)",
-              color: "var(--tomato-accent-fg)",
-              display: "grid",
-              placeItems: "center",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
               flex: "none",
             },
           },
-          h(Icon, { name: "bell", size: 14 }),
-        ),
-        h(
-          "div",
-          {
+          h("span", {
             style: {
-              display: "flex",
-              alignItems: "baseline",
-              gap: 7,
-              fontSize: 11.5,
-              color: "var(--tomato-ink-3)",
-              minWidth: 0,
-              flexWrap: "wrap",
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: project.color || "var(--tomato-ink-3)",
+              display: "inline-block",
             },
-          },
-          t("reminder.now"),
-          project
-            ? h(
-                "span",
-                { style: { display: "inline-flex", alignItems: "center", gap: 4 } },
-                h("span", {
-                  style: {
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: project.color || "var(--tomato-ink-3)",
-                    display: "inline-block",
-                  },
-                }),
-                project.name,
-              )
-            : null,
-          task.reminderTime ? h("span", { className: "t-mono" }, task.reminderTime) : null,
-        ),
-      ),
-      h(
-        "div",
-        {
-          style: {
-            fontSize: 13.5,
-            fontWeight: 600,
-            lineHeight: 1.35,
-            color: "var(--tomato-ink)",
-          },
+          }),
+          project.name,
+        )
+      : null,
+    h(
+      "span",
+      {
+        style: {
+          flex: 1,
+          minWidth: 120,
+          fontSize: 12.5,
+          fontWeight: 550,
+          color: "var(--tomato-ink)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
         },
-        task.title,
-      ),
-      h(
-        "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-        h(
+      },
+      task.title,
+    ),
+    h(
+      "span",
+      { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+      t("reminder.minutes", { n: minutes, round: rounds }),
+      extra > 0 ? ` · ${t("reminder.more", { n: extra })}` : "",
+    ),
+    error
+      ? h(
           "span",
-          { style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
-          t("reminder.minutes", { n: minutes, round: rounds }),
-        ),
-        pendingCount > 1
-          ? h(
-              "span",
-              { style: { fontSize: 11, color: "var(--tomato-accent-fg)" } },
-              t("reminder.more", { n: pendingCount - 1 }),
-            )
-          : null,
-        error
-          ? h(
-              "span",
-              { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)" } },
-              error,
-            )
-          : null,
+          { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)", flex: "none" } },
+          error,
+        )
+      : null,
+    h(
+      "div",
+      { style: { display: "flex", alignItems: "center", gap: 6, flex: "none", marginLeft: "auto" } },
+      h(
+        Btn,
+        { size: "sm", variant: "plain", disabled: busy, onClick: later, style: { height: 24, fontSize: 11.5 } },
+        t("reminder.later"),
       ),
       h(
-        "div",
-        { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 2 } },
-        h(Btn, { size: "sm", variant: "plain", disabled: busy, onClick: later }, t("reminder.later")),
-        h(
-          Btn,
-          { size: "sm", variant: "primary", icon: "play", disabled: busy, onClick: start },
-          t("reminder.start"),
-        ),
+        Btn,
+        {
+          size: "sm",
+          variant: "soft",
+          icon: "play",
+          disabled: busy,
+          onClick: start,
+          style: { height: 24, fontSize: 11.5 },
+        },
+        t("reminder.start"),
       ),
     ),
   );

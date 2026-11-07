@@ -22,6 +22,8 @@ import {
 } from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
+import { TomatoHeaderButton } from "./header-entry.js";
+import { ReminderStrip } from "./reminders.js";
 import "./nav-copy.js";
 import "../pages/index.js";
 
@@ -30,8 +32,8 @@ function PanelIcon({ size, active }) {
   return h(Icon, {
     name: "tomato",
     size: size || 20,
-    stroke: 1.5,
-    style: { color: active ? "var(--tomato-brand)" : "currentColor" },
+    stroke: active ? 1.8 : 1.5,
+    style: { color: active ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" },
   });
 }
 
@@ -153,7 +155,19 @@ export function registerApp(ctx) {
 
   safeInject(
     "conversation.composer.dock",
+    { name: "conversation.composer.dock", id: "tomato-reminder", order: 4 },
+    () => h(ReminderStrip, { variant: "dock" }),
+  );
+
+  safeInject(
+    "conversation.composer.dock",
     { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
     () => h(DockCard, { openPanel }),
+  );
+
+  safeInject(
+    "conversation.header.leading",
+    { name: "conversation.header.leading" },
+    () => h(TomatoHeaderButton, { openPanel }),
   );
 }

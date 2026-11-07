@@ -2590,302 +2590,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     }
   }
 
-  // plugin/src/client/app/frame.js
-  function loadActivePage(pages) {
-    const saved = getActivePageId();
-    if (saved && pages.some((page) => page.id === saved)) return saved;
-    return pages.length > 0 ? pages[0].id : null;
-  }
-  function useViewportNarrow(threshold = 980) {
-    const [narrow, setNarrow] = useState(
-      typeof window !== "undefined" ? window.innerWidth < threshold : false
-    );
-    useEffect(() => {
-      const onResize = () => setNarrow(window.innerWidth < threshold);
-      window.addEventListener("resize", onResize);
-      return () => window.removeEventListener("resize", onResize);
-    }, [threshold]);
-    return narrow;
-  }
-  function BrandBlock({ compact }) {
-    return h(
-      "div",
-      {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 11,
-          padding: compact ? "0" : "4px 8px 18px",
-          flex: "none"
-        }
-      },
-      h(
-        "div",
-        {
-          style: {
-            width: 36,
-            height: 36,
-            borderRadius: 12,
-            background: "linear-gradient(145deg, var(--tomato-brand) 0%, var(--tomato-brand-deep) 100%)",
-            color: "var(--tomato-on-brand)",
-            display: "grid",
-            placeItems: "center",
-            boxShadow: "0 8px 18px -10px #b9573fbb",
-            flex: "none"
-          }
-        },
-        h(Icon, { name: "tomato", size: 21, stroke: 1.5 })
-      ),
-      compact ? null : h(
-        "div",
-        { style: { minWidth: 0 } },
-        h(
-          "div",
-          { style: { fontSize: 14.5, fontWeight: 700, color: "var(--tomato-ink)", letterSpacing: ".01em" } },
-          "番茄 Todo"
-        ),
-        h(
-          "div",
-          { style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
-          "慢慢来，比较快"
-        )
-      )
-    );
-  }
-  function NavItem({ page, active: active2, onSelect, badge }) {
-    return h(
-      "button",
-      {
-        type: "button",
-        className: "t-navitem",
-        "data-active": active2,
-        onClick: () => onSelect(page.id),
-        title: t(page.titleKey)
-      },
-      h(Icon, { name: page.icon, size: 18 }),
-      h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, t(page.titleKey)),
-      badge !== null && badge !== void 0 && badge !== 0 ? h(
-        "span",
-        {
-          className: "t-mono",
-          style: {
-            fontSize: 11,
-            color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
-            background: active2 ? "transparent" : "var(--tomato-surface-2)",
-            borderRadius: 6,
-            padding: "1px 5px",
-            minWidth: 18,
-            textAlign: "center"
-          }
-        },
-        badge
-      ) : null
-    );
-  }
-  function AssistantItem({ compact, onLeave }) {
-    if (!onLeave) return null;
-    return h(
-      "button",
-      {
-        type: "button",
-        className: "t-navitem",
-        onClick: onLeave,
-        title: t("nav.assistantHint"),
-        style: {
-          marginTop: compact ? 0 : 10,
-          flex: "none",
-          borderTop: compact ? "none" : "1px solid var(--tomato-line)",
-          borderRadius: compact ? 11 : "0 0 11px 11px",
-          paddingTop: compact ? void 0 : 12,
-          color: "var(--tomato-ink-2)"
-        }
-      },
-      h(Icon, { name: "chat", size: 17 }),
-      h("span", { style: { flex: 1, minWidth: 0 } }, t("nav.assistant")),
-      h(Icon, { name: "arrowRight", size: 13, style: { opacity: 0.55 } })
-    );
-  }
-  function NavFooter({ state, compact }) {
-    const data = state && state.data || {};
-    const settings = data.settings || {};
-    const stats = state && state.stats || {};
-    const goal = Number(settings.dailyGoal) || 8;
-    const done = Number(stats.todayPomodoros) || 0;
-    const online = state !== null;
-    if (compact) return null;
-    return h(
-      "div",
-      { style: { marginTop: "auto", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 } },
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "11px 12px",
-            borderRadius: 13,
-            background: "var(--tomato-surface-2)"
-          }
-        },
-        h(
-          Ring,
-          { value: goal > 0 ? done / goal : 0, size: 34, stroke: 4, color: "var(--tomato-brand)" },
-          h(
-            "span",
-            { className: "t-mono", style: { fontSize: 10.5, fontWeight: 600, color: "var(--tomato-ink-2)" } },
-            `${done}`
-          )
-        ),
-        h(
-          "div",
-          { style: { minWidth: 0 } },
-          h("div", { style: { fontSize: 12, color: "var(--tomato-ink)", fontWeight: 550 } }, "今日番茄"),
-          h(
-            "div",
-            { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
-            `${done} / ${goal}`
-          )
-        )
-      ),
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            fontSize: 11,
-            color: online ? "var(--tomato-ink-3)" : "#b8503f",
-            padding: "0 4px"
-          }
-        },
-        h("span", {
-          style: {
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: online ? "var(--tomato-leaf)" : "#b8503f",
-            flex: "none"
-          }
-        }),
-        online ? t("common.savedLocal") : t("common.offline")
-      )
-    );
-  }
-  function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave }) {
-    return h(
-      "aside",
-      {
-        style: {
-          width: compact ? "auto" : 236,
-          flex: "none",
-          display: "flex",
-          flexDirection: compact ? "row" : "column",
-          gap: 3,
-          padding: compact ? "12px 16px" : "22px 16px 18px",
-          borderRight: compact ? "none" : "1px solid var(--tomato-line)",
-          borderBottom: compact ? "1px solid var(--tomato-line)" : "none",
-          background: compact ? "transparent" : "color-mix(in srgb, var(--tomato-surface-2) 55%, transparent)",
-          overflowX: compact ? "auto" : void 0,
-          overflowY: "auto",
-          alignItems: compact ? "center" : "stretch"
-        },
-        className: "t-scroll"
-      },
-      compact ? h(
-        "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, paddingRight: 10, flex: "none" } },
-        h(BrandBlock, { compact: true })
-      ) : h(BrandBlock, { compact: false }),
-      pages.map(
-        (page) => h(NavItem, {
-          key: page.id,
-          page,
-          active: page.id === activeId,
-          onSelect,
-          badge: page.badge ? page.badge(state) : null
-        })
-      ),
-      h(AssistantItem, { compact, onLeave }),
-      h(NavFooter, { state, compact })
-    );
-  }
-  function AppShell(props) {
-    const state = useSnapshot();
-    useEffect(() => {
-      const collapse = props.collapseSidebar;
-      const restore = props.restoreSidebar;
-      if (typeof collapse !== "function") return void 0;
-      const collapsedByUs = collapse();
-      return () => {
-        if (collapsedByUs && typeof restore === "function") restore();
-      };
-    }, []);
-    useEffect(() => {
-      refresh();
-    }, []);
-    const pages = pageList();
-    const [activeId, setActiveId] = useState(() => loadActivePage(pages));
-    const narrow = useViewportNarrow();
-    const active2 = pages.find((page) => page.id === activeId) ?? pages[0] ?? null;
-    useEffect(() => subscribeActivePage(setActiveId), []);
-    useEffect(() => {
-      if (active2 === null && pages.length > 0) setActivePageId(pages[0].id);
-    }, [pages.length]);
-    const badges = {};
-    for (const page of pages) {
-      badges[page.id] = page.badge ? page.badge(state) : null;
-    }
-    return h(
-      "div",
-      {
-        className: "t-root",
-        style: {
-          display: "flex",
-          flexDirection: narrow ? "column" : "row",
-          // 全屏接管：番茄主视图固定铺满视口，盖住 DSH 的侧栏与顶部栏；
-          // 点「学习助手」切回对话面板时本组件卸载，DSH 界面自然恢复。
-          // 不设 z-index：保持 z-auto，让 shell.overlay（DSH 固定 z20：HUD/提醒/沉浸）
-          // 与自家对话框（z60）仍在正确的层级里。
-          position: "fixed",
-          inset: 0,
-          height: "100%",
-          width: "100%",
-          minHeight: 0,
-          background: "var(--tomato-paper)",
-          overflow: "hidden"
-        }
-      },
-      h(NavColumn, {
-        pages,
-        activeId: active2 ? active2.id : null,
-        onSelect: setActivePageId,
-        state,
-        compact: narrow,
-        badges,
-        onLeave: props.onLeave
-      }),
-      h(
-        "main",
-        {
-          className: "t-scroll t-root",
-          style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" }
-        },
-        h(
-          "div",
-          {
-            key: active2 ? active2.id : "empty",
-            className: "t-fadein",
-            style: { maxWidth: 1180, margin: "0 auto", padding: narrow ? "22px 18px 60px" : "30px 40px 72px" }
-          },
-          active2 ? h(active2.Component, { state, dispatch: props.dispatch, refresh, api: props.api }) : null
-        )
-      ),
-      h(ToastHost, null)
-    );
-  }
-
   // plugin/src/client/app/sound.js
   registerCopy("sound", {
     zh: {
@@ -4214,6 +3918,520 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     );
   }
 
+  // plugin/src/client/app/reminders.js
+  registerCopy("reminder", {
+    zh: {
+      prefix: "现在",
+      start: "开始专注",
+      later: "稍后",
+      more: "另有 {n} 条到点",
+      minutes: "{n} 分钟 · 第 {round} 轮",
+      title: "该做这件事了"
+    },
+    en: {
+      prefix: "Now",
+      start: "Start focus",
+      later: "Later",
+      more: "{n} more due",
+      minutes: "{n} min · round {round}",
+      title: "Time for this one"
+    }
+  });
+  var DISMISS_KEY = "tomato-dsh.reminders-dismissed";
+  var DISMISS_TTL_MS = 48 * 3600 * 1e3;
+  function reminderKey(task) {
+    return `${task.id}|${task.dueDate}|${task.reminderTime}`;
+  }
+  function loadDismissed() {
+    const now = Date.now();
+    const out = {};
+    try {
+      const raw = localStorage.getItem(DISMISS_KEY);
+      if (!raw) return out;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return out;
+      for (const [key, at] of Object.entries(parsed)) {
+        if (typeof at === "number" && now - at < DISMISS_TTL_MS) out[key] = at;
+      }
+    } catch {
+      return out;
+    }
+    return out;
+  }
+  function persistDismissed(map) {
+    try {
+      localStorage.setItem(DISMISS_KEY, JSON.stringify(map));
+    } catch {
+    }
+  }
+  var dismissed = loadDismissed();
+  function isIdle(state) {
+    const data = state && state.data || {};
+    const timer = data.timer || {};
+    const lock = data.lock || {};
+    return !timer.running && (timer.startedAt ?? null) === null && Number(timer.remainingSecs) === Number(timer.durationSecs) && (lock.active ?? null) === null;
+  }
+  function secondsOfNow() {
+    const now = /* @__PURE__ */ new Date();
+    return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  }
+  function currentReminders(state) {
+    if (!isIdle(state)) return { primary: null, extra: 0 };
+    const data = state && state.data || {};
+    const settings = data.settings || {};
+    const today = state && state.today || todayKey(state && state.serverTime);
+    const nowSecs = secondsOfNow();
+    const due = [];
+    for (const task of data.tasks || []) {
+      if (task.completed || !task.reminderPending || task.reminderExpired) continue;
+      if (task.dueDate !== today || !task.reminderTime) continue;
+      const start = parseHHMM(task.reminderTime);
+      if (start === null) continue;
+      const end = start + windowMinutes(task, settings) * 60;
+      if (nowSecs < start || nowSecs >= end) continue;
+      if (dismissed[reminderKey(task)]) continue;
+      due.push({ task, start });
+    }
+    due.sort((a, b) => a.start - b.start || String(a.task.id).localeCompare(String(b.task.id)));
+    const primary = due.length > 0 ? due[0].task : null;
+    return { primary, extra: Math.max(0, due.length - 1) };
+  }
+  function ReminderStrip({ variant = "page" }) {
+    const state = useSnapshot();
+    const [, force] = useState(0);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    useEffect(() => {
+      const id = setInterval(() => force((n) => n + 1), 3e4);
+      return () => clearInterval(id);
+    }, []);
+    const { primary: task, extra } = currentReminders(state);
+    if (!task) return null;
+    const data = state && state.data || {};
+    const settings = data.settings || {};
+    const project = (data.projects || []).find((p) => p.id === task.projectId) || null;
+    const minutes = Number(task.focusMinutes ?? settings.focusMinutes) || 0;
+    const rounds = Number(task.estimate) || 1;
+    const start = async () => {
+      setBusy(true);
+      setError(null);
+      const res = await tryDispatch({ type: "startReminder", id: task.id });
+      setBusy(false);
+      if (!res.ok) {
+        setError(res.error || t("common.writeFailed"));
+        return;
+      }
+      openImmersive();
+    };
+    const later = () => {
+      dismissed = { ...dismissed, [reminderKey(task)]: Date.now() };
+      persistDismissed(dismissed);
+      force((n) => n + 1);
+    };
+    const compact = variant === "dock";
+    return h(
+      "div",
+      {
+        className: "t-root",
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: compact ? "7px 10px" : "9px 12px",
+          marginBottom: compact ? 6 : 18,
+          borderRadius: 12,
+          border: "1px solid var(--tomato-line)",
+          background: "color-mix(in srgb, var(--tomato-brand-soft) 62%, var(--tomato-surface))",
+          flexWrap: "wrap",
+          minWidth: 0
+        }
+      },
+      h(Icon, { name: "bell", size: 14, style: { color: "var(--tomato-accent-fg)" } }),
+      h(
+        "span",
+        {
+          style: {
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: "var(--tomato-accent-fg)",
+            letterSpacing: ".02em",
+            flex: "none"
+          }
+        },
+        t("reminder.prefix"),
+        task.reminderTime ? h("span", { className: "t-mono", style: { marginLeft: 5 } }, task.reminderTime) : null
+      ),
+      project ? h(
+        "span",
+        {
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            flex: "none"
+          }
+        },
+        h("span", {
+          style: {
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: project.color || "var(--tomato-ink-3)",
+            display: "inline-block"
+          }
+        }),
+        project.name
+      ) : null,
+      h(
+        "span",
+        {
+          style: {
+            flex: 1,
+            minWidth: 120,
+            fontSize: 12.5,
+            fontWeight: 550,
+            color: "var(--tomato-ink)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }
+        },
+        task.title
+      ),
+      h(
+        "span",
+        { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+        t("reminder.minutes", { n: minutes, round: rounds }),
+        extra > 0 ? ` · ${t("reminder.more", { n: extra })}` : ""
+      ),
+      error ? h(
+        "span",
+        { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)", flex: "none" } },
+        error
+      ) : null,
+      h(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 6, flex: "none", marginLeft: "auto" } },
+        h(
+          Btn,
+          { size: "sm", variant: "plain", disabled: busy, onClick: later, style: { height: 24, fontSize: 11.5 } },
+          t("reminder.later")
+        ),
+        h(
+          Btn,
+          {
+            size: "sm",
+            variant: "soft",
+            icon: "play",
+            disabled: busy,
+            onClick: start,
+            style: { height: 24, fontSize: 11.5 }
+          },
+          t("reminder.start")
+        )
+      )
+    );
+  }
+
+  // plugin/src/client/app/frame.js
+  function loadActivePage(pages) {
+    const saved = getActivePageId();
+    if (saved && pages.some((page) => page.id === saved)) return saved;
+    return pages.length > 0 ? pages[0].id : null;
+  }
+  function useViewportNarrow(threshold = 980) {
+    const [narrow, setNarrow] = useState(
+      typeof window !== "undefined" ? window.innerWidth < threshold : false
+    );
+    useEffect(() => {
+      const onResize = () => setNarrow(window.innerWidth < threshold);
+      window.addEventListener("resize", onResize);
+      return () => window.removeEventListener("resize", onResize);
+    }, [threshold]);
+    return narrow;
+  }
+  function BrandBlock({ compact }) {
+    return h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 11,
+          padding: compact ? "0" : "4px 8px 18px",
+          flex: "none"
+        }
+      },
+      h(
+        "div",
+        {
+          style: {
+            width: 36,
+            height: 36,
+            borderRadius: 12,
+            background: "linear-gradient(145deg, var(--tomato-brand) 0%, var(--tomato-brand-deep) 100%)",
+            color: "var(--tomato-on-brand)",
+            display: "grid",
+            placeItems: "center",
+            boxShadow: "0 8px 18px -10px #b9573fbb",
+            flex: "none"
+          }
+        },
+        h(Icon, { name: "tomato", size: 21, stroke: 1.5 })
+      ),
+      compact ? null : h(
+        "div",
+        { style: { minWidth: 0 } },
+        h(
+          "div",
+          { style: { fontSize: 14.5, fontWeight: 700, color: "var(--tomato-ink)", letterSpacing: ".01em" } },
+          "番茄 Todo"
+        ),
+        h(
+          "div",
+          { style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
+          "慢慢来，比较快"
+        )
+      )
+    );
+  }
+  function NavItem({ page, active: active2, onSelect, badge }) {
+    return h(
+      "button",
+      {
+        type: "button",
+        className: "t-navitem",
+        "data-active": active2,
+        onClick: () => onSelect(page.id),
+        title: t(page.titleKey)
+      },
+      h(Icon, { name: page.icon, size: 18 }),
+      h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, t(page.titleKey)),
+      badge !== null && badge !== void 0 && badge !== 0 ? h(
+        "span",
+        {
+          className: "t-mono",
+          style: {
+            fontSize: 11,
+            color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
+            background: active2 ? "transparent" : "var(--tomato-surface-2)",
+            borderRadius: 6,
+            padding: "1px 5px",
+            minWidth: 18,
+            textAlign: "center"
+          }
+        },
+        badge
+      ) : null
+    );
+  }
+  function AssistantItem({ compact, onLeave }) {
+    if (!onLeave) return null;
+    return h(
+      "button",
+      {
+        type: "button",
+        className: "t-navitem",
+        onClick: onLeave,
+        title: t("nav.assistantHint"),
+        style: {
+          marginTop: compact ? 0 : 10,
+          flex: "none",
+          borderTop: compact ? "none" : "1px solid var(--tomato-line)",
+          borderRadius: compact ? 11 : "0 0 11px 11px",
+          paddingTop: compact ? void 0 : 12,
+          color: "var(--tomato-ink-2)"
+        }
+      },
+      h(Icon, { name: "chat", size: 17 }),
+      h("span", { style: { flex: 1, minWidth: 0 } }, t("nav.assistant")),
+      h(Icon, { name: "arrowRight", size: 13, style: { opacity: 0.55 } })
+    );
+  }
+  function NavFooter({ state, compact }) {
+    const data = state && state.data || {};
+    const settings = data.settings || {};
+    const stats = state && state.stats || {};
+    const goal = Number(settings.dailyGoal) || 8;
+    const done = Number(stats.todayPomodoros) || 0;
+    const online = state !== null;
+    if (compact) return null;
+    return h(
+      "div",
+      { style: { marginTop: "auto", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 } },
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "11px 12px",
+            borderRadius: 13,
+            background: "var(--tomato-surface-2)"
+          }
+        },
+        h(
+          Ring,
+          { value: goal > 0 ? done / goal : 0, size: 34, stroke: 4, color: "var(--tomato-brand)" },
+          h(
+            "span",
+            { className: "t-mono", style: { fontSize: 10.5, fontWeight: 600, color: "var(--tomato-ink-2)" } },
+            `${done}`
+          )
+        ),
+        h(
+          "div",
+          { style: { minWidth: 0 } },
+          h("div", { style: { fontSize: 12, color: "var(--tomato-ink)", fontWeight: 550 } }, "今日番茄"),
+          h(
+            "div",
+            { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
+            `${done} / ${goal}`
+          )
+        )
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            fontSize: 11,
+            color: online ? "var(--tomato-ink-3)" : "#b8503f",
+            padding: "0 4px"
+          }
+        },
+        h("span", {
+          style: {
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: online ? "var(--tomato-leaf)" : "#b8503f",
+            flex: "none"
+          }
+        }),
+        online ? t("common.savedLocal") : t("common.offline")
+      )
+    );
+  }
+  function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave }) {
+    return h(
+      "aside",
+      {
+        style: {
+          width: compact ? "auto" : 236,
+          flex: "none",
+          display: "flex",
+          flexDirection: compact ? "row" : "column",
+          gap: 3,
+          padding: compact ? "12px 16px" : "22px 16px 18px",
+          borderRight: compact ? "none" : "1px solid var(--tomato-line)",
+          borderBottom: compact ? "1px solid var(--tomato-line)" : "none",
+          background: compact ? "transparent" : "color-mix(in srgb, var(--tomato-surface-2) 55%, transparent)",
+          overflowX: compact ? "auto" : void 0,
+          overflowY: "auto",
+          alignItems: compact ? "center" : "stretch"
+        },
+        className: "t-scroll"
+      },
+      compact ? h(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 8, paddingRight: 10, flex: "none" } },
+        h(BrandBlock, { compact: true })
+      ) : h(BrandBlock, { compact: false }),
+      pages.map(
+        (page) => h(NavItem, {
+          key: page.id,
+          page,
+          active: page.id === activeId,
+          onSelect,
+          badge: page.badge ? page.badge(state) : null
+        })
+      ),
+      h(AssistantItem, { compact, onLeave }),
+      h(NavFooter, { state, compact })
+    );
+  }
+  function AppShell(props) {
+    const state = useSnapshot();
+    useEffect(() => {
+      const collapse = props.collapseSidebar;
+      const restore = props.restoreSidebar;
+      if (typeof collapse !== "function") return void 0;
+      const collapsedByUs = collapse();
+      return () => {
+        if (collapsedByUs && typeof restore === "function") restore();
+      };
+    }, []);
+    useEffect(() => {
+      refresh();
+    }, []);
+    const pages = pageList();
+    const [activeId, setActiveId] = useState(() => loadActivePage(pages));
+    const narrow = useViewportNarrow();
+    const active2 = pages.find((page) => page.id === activeId) ?? pages[0] ?? null;
+    useEffect(() => subscribeActivePage(setActiveId), []);
+    useEffect(() => {
+      if (active2 === null && pages.length > 0) setActivePageId(pages[0].id);
+    }, [pages.length]);
+    const badges = {};
+    for (const page of pages) {
+      badges[page.id] = page.badge ? page.badge(state) : null;
+    }
+    return h(
+      "div",
+      {
+        className: "t-root",
+        style: {
+          display: "flex",
+          flexDirection: narrow ? "column" : "row",
+          // 全屏接管：番茄主视图固定铺满视口，盖住 DSH 的侧栏与顶部栏；
+          // 点「学习助手」切回对话面板时本组件卸载，DSH 界面自然恢复。
+          // 不设 z-index：保持 z-auto，让 shell.overlay（DSH 固定 z20：HUD/提醒/沉浸）
+          // 与自家对话框（z60）仍在正确的层级里。
+          position: "fixed",
+          inset: 0,
+          height: "100%",
+          width: "100%",
+          minHeight: 0,
+          background: "var(--tomato-paper)",
+          overflow: "hidden"
+        }
+      },
+      h(NavColumn, {
+        pages,
+        activeId: active2 ? active2.id : null,
+        onSelect: setActivePageId,
+        state,
+        compact: narrow,
+        badges,
+        onLeave: props.onLeave
+      }),
+      h(
+        "main",
+        {
+          className: "t-scroll t-root",
+          style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" }
+        },
+        h(
+          "div",
+          {
+            key: active2 ? active2.id : "empty",
+            className: "t-fadein",
+            style: { maxWidth: 1180, margin: "0 auto", padding: narrow ? "22px 18px 60px" : "30px 40px 72px" }
+          },
+          h(ReminderStrip, { variant: "page" }),
+          active2 ? h(active2.Component, { state, dispatch: props.dispatch, refresh, api: props.api }) : null
+        )
+      ),
+      h(ToastHost, null)
+    );
+  }
+
   // plugin/src/client/app/hud.js
   registerCopy("hud", {
     zh: {
@@ -4611,212 +4829,12 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     );
   }
 
-  // plugin/src/client/app/reminders.js
-  registerCopy("reminder", {
-    zh: {
-      now: "该做这件事了",
-      start: "开始专注",
-      later: "稍后再说",
-      more: "还有 {n} 条提醒",
-      minutes: "{n} 分钟 · 第 {round} 轮",
-      skipped: "已收起，提醒仍在待办里"
-    },
-    en: {
-      now: "Time for this one",
-      start: "Start focus",
-      later: "Later",
-      more: "{n} more reminders",
-      minutes: "{n} min · round {round}",
-      skipped: "Dismissed — it stays in your tasks"
-    }
-  });
-  var BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 64px)";
-  var dismissed = /* @__PURE__ */ new Set();
-  function reminderKey(task) {
-    return `${task.id}|${task.dueDate}|${task.reminderTime}`;
-  }
-  function isIdle(state) {
-    const data = state && state.data || {};
-    const timer = data.timer || {};
-    const lock = data.lock || {};
-    return !timer.running && (timer.startedAt ?? null) === null && Number(timer.remainingSecs) === Number(timer.durationSecs) && (lock.active ?? null) === null;
-  }
-  function pendingReminderTask(state, ignored = dismissed) {
-    if (!isIdle(state)) return null;
-    const tasks = state && state.data && state.data.tasks || [];
-    let best = null;
-    for (const task of tasks) {
-      if (task.completed || !task.reminderPending) continue;
-      if (ignored.has(reminderKey(task))) continue;
-      const key = `${task.dueDate}|${task.reminderTime}|${task.id}`;
-      if (best === null || key < `${best.dueDate}|${best.reminderTime}|${best.id}`) best = task;
-    }
-    return best;
-  }
-  function ReminderBanner() {
-    const state = useSnapshot();
-    const [tick, setTick] = useState(0);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState(null);
-    useEffect(() => {
-      const id = setInterval(() => setTick((n) => n + 1), 5e3);
-      return () => clearInterval(id);
-    }, []);
-    void tick;
-    const task = pendingReminderTask(state);
-    if (!task) return null;
-    const pendingCount = (state && state.data && state.data.tasks || []).filter(
-      (item) => !item.completed && item.reminderPending && !dismissed.has(reminderKey(item))
-    ).length;
-    const data = state && state.data || {};
-    const settings = data.settings || {};
-    const project = (data.projects || []).find((p) => p.id === task.projectId) || null;
-    const minutes = Number(task.focusMinutes ?? settings.focusMinutes) || 0;
-    const rounds = Number(task.estimate) || 1;
-    const start = async () => {
-      setBusy(true);
-      setError(null);
-      const res = await tryDispatch({ type: "startReminder", id: task.id });
-      setBusy(false);
-      if (!res.ok) {
-        setError(res.error || t("common.writeFailed"));
-        return;
-      }
-      openImmersive();
-    };
-    const later = () => {
-      dismissed.add(reminderKey(task));
-      setTick((n) => n + 1);
-    };
-    return h(
-      "div",
-      {
-        className: "t-root",
-        style: {
-          position: "fixed",
-          top: BANNER_TOP,
-          right: 18,
-          zIndex: 45,
-          width: "min(320px, calc(100vw - 36px))",
-          pointerEvents: "auto"
-        }
-      },
-      h(
-        "div",
-        {
-          className: "t-card",
-          style: {
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            padding: "12px 13px",
-            borderRadius: 15,
-            background: "color-mix(in srgb, var(--tomato-surface) 94%, transparent)",
-            backdropFilter: "blur(12px)"
-          }
-        },
-        h(
-          "div",
-          { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
-          h(
-            "div",
-            {
-              style: {
-                width: 26,
-                height: 26,
-                borderRadius: 9,
-                background: "var(--tomato-brand-soft)",
-                color: "var(--tomato-accent-fg)",
-                display: "grid",
-                placeItems: "center",
-                flex: "none"
-              }
-            },
-            h(Icon, { name: "bell", size: 14 })
-          ),
-          h(
-            "div",
-            {
-              style: {
-                display: "flex",
-                alignItems: "baseline",
-                gap: 7,
-                fontSize: 11.5,
-                color: "var(--tomato-ink-3)",
-                minWidth: 0,
-                flexWrap: "wrap"
-              }
-            },
-            t("reminder.now"),
-            project ? h(
-              "span",
-              { style: { display: "inline-flex", alignItems: "center", gap: 4 } },
-              h("span", {
-                style: {
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: project.color || "var(--tomato-ink-3)",
-                  display: "inline-block"
-                }
-              }),
-              project.name
-            ) : null,
-            task.reminderTime ? h("span", { className: "t-mono" }, task.reminderTime) : null
-          )
-        ),
-        h(
-          "div",
-          {
-            style: {
-              fontSize: 13.5,
-              fontWeight: 600,
-              lineHeight: 1.35,
-              color: "var(--tomato-ink)"
-            }
-          },
-          task.title
-        ),
-        h(
-          "div",
-          { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-          h(
-            "span",
-            { style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
-            t("reminder.minutes", { n: minutes, round: rounds })
-          ),
-          pendingCount > 1 ? h(
-            "span",
-            { style: { fontSize: 11, color: "var(--tomato-accent-fg)" } },
-            t("reminder.more", { n: pendingCount - 1 })
-          ) : null,
-          error ? h(
-            "span",
-            { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)" } },
-            error
-          ) : null
-        ),
-        h(
-          "div",
-          { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 2 } },
-          h(Btn, { size: "sm", variant: "plain", disabled: busy, onClick: later }, t("reminder.later")),
-          h(
-            Btn,
-            { size: "sm", variant: "primary", icon: "play", disabled: busy, onClick: start },
-            t("reminder.start")
-          )
-        )
-      )
-    );
-  }
-
   // plugin/src/client/app/overlay.js
   function AppOverlay({ openPanel }) {
     return h(
       Fragment,
       null,
       h(Hud, { openPanel }),
-      h(ReminderBanner, null),
       h(Immersive, null),
       h(ToastHost, null)
     );
@@ -4920,6 +4938,71 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         },
         t("dock.view"),
         h(Icon, { name: "chevronRight", size: 13 })
+      )
+    );
+  }
+
+  // plugin/src/client/app/header-entry.js
+  registerCopy("header", {
+    zh: { label: "番茄 Todo", today: "今日 {n}", running: "专注中", open: "进入番茄 Todo" },
+    en: { label: "Tomato Todo", today: "{n} today", running: "Focusing", open: "Open Tomato Todo" }
+  });
+  function TomatoHeaderButton({ openPanel }) {
+    const state = useSnapshot();
+    const data = state && state.data || {};
+    const today = state && state.today || todayKey(state && state.serverTime);
+    const view = timerView(state);
+    const count = todayTasks(data, today).length;
+    return h(
+      "button",
+      {
+        type: "button",
+        onClick: () => openPanel?.(),
+        title: t("header.open"),
+        className: "t-root",
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 7,
+          height: 28,
+          padding: "0 10px 0 8px",
+          marginRight: 6,
+          borderRadius: 9,
+          border: "1px solid var(--tomato-line)",
+          background: "var(--tomato-brand-soft)",
+          color: "var(--tomato-accent-fg)",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          fontSize: 12,
+          fontWeight: 600,
+          lineHeight: 1,
+          whiteSpace: "nowrap",
+          flex: "none"
+        }
+      },
+      h(Icon, { name: "tomato", size: 15, stroke: 1.6 }),
+      t("header.label"),
+      view.running ? h(
+        "span",
+        {
+          className: "t-mono",
+          style: { fontSize: 11, fontWeight: 600, padding: "1px 5px", borderRadius: 6, background: "#ffffff2e" }
+        },
+        fmtClock(view.remainingSecs)
+      ) : h(
+        "span",
+        {
+          className: "t-mono",
+          style: {
+            fontSize: 11,
+            fontWeight: 600,
+            padding: "1px 5px",
+            borderRadius: 6,
+            background: "var(--tomato-surface)",
+            color: "var(--tomato-ink-2)"
+          }
+        },
+        count
       )
     );
   }
@@ -18753,8 +18836,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     return h(Icon, {
       name: "tomato",
       size: size || 20,
-      stroke: 1.5,
-      style: { color: active2 ? "var(--tomato-brand)" : "currentColor" }
+      stroke: active2 ? 1.8 : 1.5,
+      style: { color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" }
     });
   }
   function localeId(locale) {
@@ -18853,8 +18936,18 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     );
     safeInject2(
       "conversation.composer.dock",
+      { name: "conversation.composer.dock", id: "tomato-reminder", order: 4 },
+      () => h(ReminderStrip, { variant: "dock" })
+    );
+    safeInject2(
+      "conversation.composer.dock",
       { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
       () => h(DockCard, { openPanel })
+    );
+    safeInject2(
+      "conversation.header.leading",
+      { name: "conversation.header.leading" },
+      () => h(TomatoHeaderButton, { openPanel })
     );
   }
 

@@ -253,20 +253,25 @@ if (!head.children.some((n) => n.id === "tomato-skin-style")) failures.push("没
 if (!body.children.some((n) => n.id === "tomato-ambient")) failures.push("没有注入氛围层");
 
 // ---------- 渲染冒烟 ----------
+const localDate = (offsetDays = 0) => {
+  const d = new Date(Date.now() + offsetDays * 86400000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 let sampleState = {
   serverTime: Math.floor(Date.now() / 1000),
-  today: new Date().toISOString().slice(0, 10),
+  today: localDate(0),
   taskKinds: {},
   remainingSecs: 1200,
   data: {
     version: 4,
     identities: [],
     tasks: [
-      { id: "t1", title: "语法加强 Day05（下）", completed: false, dueDate: new Date().toISOString().slice(0, 10), reminderTime: "20:00", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 45, focusMinutes: 25, priority: 1, scrapMinutes: 0, kind: "plain" },
+      { id: "t1", title: "语法加强 Day05（下）", completed: false, dueDate: localDate(0), reminderTime: "20:00", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 45, focusMinutes: 25, priority: 1, scrapMinutes: 0, kind: "plain" },
       // 逾期任务：只该出现在「全部任务」，不该混进今日专注
-      { id: "t3", title: "高数 1-5 极限运算法则", completed: false, dueDate: "2026-11-04", reminderTime: "09:40", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 45, priority: 1, scrapMinutes: 30, reminderPending: false, reminderFired: true, reminderExpired: true, completedAt: null, createdAt: 1700000000 },
-      // reminderPending：验证提醒横幅（core reminders.pendingReminder 语义）
-      { id: "t2", title: "408 真题：数据结构错题回顾", completed: false, dueDate: new Date().toISOString().slice(0, 10), reminderTime: "21:30", projectId: "p1", tags: ["408"], subtasks: [], notes: "", estimate: 2, focusMinutes: 25, priority: 2, scrapMinutes: 30, reminderPending: true, reminderFired: true, reminderExpired: false, completedAt: null, createdAt: 1700000000 },
+      { id: "t3", title: "高数 1-5 极限运算法则", completed: false, dueDate: localDate(-3), reminderTime: "09:40", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 45, priority: 1, scrapMinutes: 30, reminderPending: false, reminderFired: true, reminderExpired: true, completedAt: null, createdAt: 1700000000 },
+      // reminderPending + 当前时段：验证页面内提醒条（提醒时刻=5 分钟前，计划块尚未结束）
+      { id: "t2", title: "408 真题：数据结构错题回顾", completed: false, dueDate: localDate(0), reminderTime: (() => { const d = new Date(Date.now() - 5 * 60000); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; })(), projectId: "p1", tags: ["408"], subtasks: [], notes: "", estimate: 2, focusMinutes: 25, priority: 2, scrapMinutes: 30, reminderPending: true, reminderFired: true, reminderExpired: false, completedAt: null, createdAt: 1700000000 },
     ],
     blocks: [],
     templates: [],
@@ -393,7 +398,8 @@ for (const { key, registration } of slotRegistrations) {
   if (!registration || typeof registration.Component !== "function") continue;
   const element = React.createElement(registration.Component, {});
   try {
-    renderedBy[key] = ReactDOMServer.renderToStaticMarkup(element);
+    // 同一 slot 可能有多条注册（例如输入框上方：提醒条 + 入口卡），拼接渲染结果。
+    renderedBy[key] = (renderedBy[key] || "") + ReactDOMServer.renderToStaticMarkup(element);
   } catch (e) {
     failures.push(`渲染 ${key} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
   }
@@ -445,9 +451,13 @@ for (const word of ["今日专注", "全部任务", "数据统计", "偏好设�
   if (!mainMarkup.includes(word)) failures.push(`主视图导航缺少「${word}」`);
 }
 if (!(renderedBy["shell.overlay"] || "").includes("番茄")) failures.push("overlay 渲染内容里没有番茄文案");
-// 提醒横幅只在样例数据里有一条待提醒任务；实时数据此刻可能没有到期提醒。
-if (!process.env.SMOKE_LIVE && !(renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
-  failures.push("提醒横幅没有渲染");
+// 提醒条只在该任务的「当前时段」内渲染；样例构造了提醒时刻=5 分钟前的任务。
+if (!process.env.SMOKE_LIVE) {
+  const dock = renderedBy["conversation.composer.dock"] || "";
+  if (!dock.includes("408 真题")) failures.push("输入框上方的提醒条没有渲染");
+  if ((renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
+    failures.push("提醒又回到了浮层弹窗");
+  }
 }
 if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注")) failures.push("入口卡没有渲染开始专注按钮");
 if (!(renderedBy["shell.overlay"] || "").includes("个番茄")) failures.push("HUD 没有渲染今日番茄计数");

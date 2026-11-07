@@ -9,6 +9,7 @@ import { IconBtn, Ring, ToastHost } from "../shared/ui.js";
 import { useSnapshot, refresh as refreshStore } from "../shared/store.js";
 import { todayKey, timerView, greeting } from "../shared/derive.js";
 import { pageList } from "./registry.js";
+import { ReminderStrip } from "./reminders.js";
 import {
   getActivePageId,
   setActivePageId,
@@ -328,6 +329,7 @@ export function AppShell(props) {
           className: "t-fadein",
           style: { maxWidth: 1180, margin: "0 auto", padding: narrow ? "22px 18px 60px" : "30px 40px 72px" },
         },
+        h(ReminderStrip, { variant: "page" }),
         active
           ? h(active.Component, { state, dispatch: props.dispatch, refresh: refreshStore, api: props.api })
           : null,

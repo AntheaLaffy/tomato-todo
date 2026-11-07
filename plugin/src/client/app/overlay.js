@@ -5,14 +5,12 @@ import { h, Fragment } from "../runtime.js";
 import { ToastHost } from "../shared/ui.js";
 import { Hud } from "./hud.js";
 import { Immersive } from "./immersive.js";
-import { ReminderBanner } from "./reminders.js";
 
 export function AppOverlay({ openPanel }) {
   return h(
     Fragment,
     null,
     h(Hud, { openPanel }),
-    h(ReminderBanner, null),
     h(Immersive, null),
     h(ToastHost, null),
   );
