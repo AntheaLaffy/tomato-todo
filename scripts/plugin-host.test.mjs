@@ -32,8 +32,8 @@ test("plugin Host tools cover the runtime contract without an MCP client", async
       },
     },
   };
-  // 测试不落盘：linkSkills 会真的往 ~/.agents/skills 建链接，这里关掉；
-  // 夹具里的 ctx 也没有 logger，走日志分支会直接抛错。
+  // 测试不碰真实的 agent 技能目录：linkSkills 会往 ~/.agents/skills 建链接，
+  // 夹具里的 ctx 也没有 logger，走日志分支还会直接抛错。
   apply(ctx, { tomatoBin: "/fake/tomato-runtime", linkSkills: false });
   for (const spec of TOOLS) {
     assert.ok(registered.has(`tomato_${spec.name}`), spec.name);
