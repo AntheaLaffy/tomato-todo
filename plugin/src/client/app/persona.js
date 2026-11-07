@@ -112,14 +112,14 @@ export function PersonaBackdrop() {
       pointerEvents: "none",
       userSelect: "none",
       zIndex: 1,
-      opacity: 0.94,
-      filter: "drop-shadow(0 14px 24px #3a24151a)",
-      // 左缘渐隐（叠在卡片上的部分接近透明）+ 下缘轻微淡出，像背景板而不是贴纸。
+      opacity: 1,
+      filter: "drop-shadow(0 16px 26px #3a241524)",
+      // 只在最左缘做很短的渐隐（避免压到卡片边缘时生硬），主体保持清晰。
       WebkitMaskImage:
-        "linear-gradient(to right, transparent 0%, #0006 16%, #000c 34%, #000 52%), linear-gradient(to top, transparent 0%, #000 8%)",
+        "linear-gradient(to right, transparent 0%, #0009 8%, #000 20%), linear-gradient(to top, transparent 0%, #000 4%)",
       WebkitMaskComposite: "source-in",
       maskImage:
-        "linear-gradient(to right, transparent 0%, #0006 16%, #000c 34%, #000 52%), linear-gradient(to top, transparent 0%, #000 8%)",
+        "linear-gradient(to right, transparent 0%, #0009 8%, #000 20%), linear-gradient(to top, transparent 0%, #000 4%)",
       maskComposite: "intersect",
     },
   });
