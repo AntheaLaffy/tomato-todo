@@ -270,7 +270,19 @@ body[data-ds-dark-theme] .t-mask{background:#00000073}
 html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
 /* 窄屏不显示看板娘，避免压住正文。 */
-@media (max-width:1100px){#tomato-persona{display:none!important}}
+/* 竖屏/窄窗口：看板娘照样显示，只按窗口收紧尺寸并往右下角让位。 */
+@media (max-width:1500px){
+  #tomato-persona{height:min(30vh, 260px)!important;max-width:26vw!important;bottom:3vh!important}
+}
+@media (max-width:1100px){
+  #tomato-persona{height:min(24vh, 200px)!important;max-width:32vw!important;right:6px!important;bottom:2vh!important}
+}
+@media (max-width:760px){
+  #tomato-persona{height:min(19vh, 150px)!important;max-width:38vw!important;opacity:.9!important}
+}
+@media (max-width:520px){
+  #tomato-persona{display:none!important}
+}
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
 /* 看板娘是悬浮装饰：卡片保持居中，立绘左缘用渐隐遮罩，碰到卡片处自然透明。 */
