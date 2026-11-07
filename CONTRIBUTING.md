@@ -17,9 +17,9 @@ pnpm install
 ```sh
 pnpm core:test     # packages/core 的 vitest 测试（零依赖、全量语义覆盖）
 pnpm runtime:test  # runtime 的 node --test 测试
-pnpm check         # core:test + runtime:test
+pnpm check         # check:host-tools + core:test + runtime:test + check:client
 pnpm build:runtime # esbuild 把 @tomato/core 打进 runtime 产物（随插件分发）
-pnpm format        # Prettier（packages/ runtime/ plugin/ scripts tests）
+pnpm format        # Prettier（packages/ runtime/ plugin/ scripts）
 
 cargo build --manifest-path crates/guard/Cargo.toml   # 守卫二进制
 ```
@@ -51,7 +51,7 @@ git worktree add ../tomato-ts-<workflow> -b tomato-ts-<workflow>
 
 ## 测试与验证
 
-- **领域核心**：crates/core 的 Rust 测试逐条移植为 vitest，语义以旧测试为基准（`crates/core/src/tests.rs`、`education_tests.rs`、`template_tests.rs`），不做缩水。
+- **领域核心**：旧 Rust 核心（crates/core）的测试逐条移植为 vitest，语义以旧测试为基准，不做缩水；旧栈已删除，移植口径见 [MIGRATION.md](MIGRATION.md) 阶段 1。
 - **runtime**：`node --test runtime/test/` 覆盖计划文件读写、域引擎接线、计时/提醒、HTTP API 与 MCP 契约；端到端使用独立临时数据目录，不碰用户数据。
 - **守卫**：构建后用独立嵌套桌面验证——白名单放行、非白名单回焦、全屏锁定、托盘与通知。安装脚本验证同样使用临时用户目录。
 - **学习助手 = DSH 对话**：验证走 MCP 工具集成（`--mcp` stdio 与 `/mcp` 两种传输），不花用户模型额度；真实账号、联网与桌面行为由你自测，写清怎么复现。

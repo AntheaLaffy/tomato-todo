@@ -62,7 +62,7 @@ crates/agent/src/external.rs 的工具清单，语义保留、实现全部重写
      （/health、/api/snapshot|today|stats 只读 CORS 127.0.0.1:3080；写端点同 Origin 白名单；
      /mcp streamable HTTP 桩：Bearer token 认证、拒 Origin、initialize/ping/tools/list/tools/call）、
      --mcp stdio 转发桥（读 agent/connection.json 的 mcpUrl+token，未运行报中文错误）、
-     `runtime/src/guard-client.mjs`（127.0.0.1:43988，未跑时优雅返回）、
+     `runtime/src/guard-client.ts`（127.0.0.1:43988，未跑时优雅返回）、
      `runtime/scripts/bundle-core.mjs`（esbuild 打包 @tomato/core 的 TODO 脚本）。
      测试 `node --test`（runtime/ 内）38 条全绿；Node 24 原生 TS 剥离直接跑 .ts。
    - [偏离] `node --test runtime/test/` 在 Node 24 不接受裸目录参数，脚本用 `node --test`

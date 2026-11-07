@@ -1,29 +1,36 @@
 ---
 mode: maintenance
-generated_at: 2026-10-09
+generated_at: 2026-11-07
 ---
 
-开发进程启动、停止、Linux 用户安装、旧库迁移导出与 AUR 发布。
+构建、安装、迁移导出、AUR 发布与手册维护脚本。每个脚本都自带解释「为什么存在」的头注释，
+新增脚本时按同一格式补一行。
 
 ## 文件
 
-| File                           | Domain   | Function                                                                                                                                    |
-| ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| dev.mjs                        | 构建     | 启动 Rust 预览服务及 Vite 并处理退出                                                                                                        |
-| install-desktop-integration.py | 桌面集成 | 安装 GNOME 扩展到用户 XDG 目录，提供启用命令而不自动启用，支持临时 home 和 dry-run                                                          |
-| install.py                     | 安装     | 旧 Tauri 时代的用户安装脚本（随收尾阶段退役，由 install.mjs 取代）                                                                          |
-| install.mjs                    | 安装     | 安装 runtime+guard 到 ~/.local/lib/tomato/，写 systemd user unit 并 enable runtime 自启；--dry-run/--uninstall，manifest 记录路径以安全卸载 |
-| niri-guard.test.mjs             | 验证     | 独立 Xvfb+niri 与真实 GTK 窗口：运行中应用枚举、全屏/退出、白名单、锁机忽略白名单、释放与确认抢焦；仅连接临时桌面 |
-| export-sqlite.mjs              | 迁移     | 一次性把旧 sqlite 库导出为 plan.json 与 backup-v4.json（v3 先按 crates/core/src/migration.rs 语义升级；只读打开、原子写、--force 覆盖）     |
-| build-host-tools.mjs           | 构建     | 从 runtime/src/tools.mjs 生成插件自带 Host 工具 schema；`--check` 拒绝与运行时漂移                         |
-| plugin-host.test.mjs           | 验证     | 验证全部 Host 工具注册与教学读取转发；`LIVE_TOMATO=1` 时只读联通当前实例                            |
-| build-agent.mjs                | 构建     | 打包固定版本 Pi SDK、按本机或显式 Rust 目标校验并内置 Node 运行时，生成 agent/bundle（不含私人数据与 npm 绝对路径 .bin 软链）               |
-| agent-runtime.mjs              | 构建     | Linux/Windows/macOS x64/ARM64 的固定 Node 版本、官方校验和与 Rust 目标选择，拒绝不兼容 ABI                                                  |
-| check-android-apk.py           | 构建     | 校验 universal APK 的四个原生 ABI、ELF 架构和桌面 Node 资源排除；供本机原生测试和 CI 共用                                                   |
-| publish-aur.mjs                | 发布     | 下载发行 tarball、动态计算 sha256、由 packaging/aur 模板渲染 PKGBUILD/.SRCINFO；`--push` 时提交并推送到 AUR                                 |
-| handbook-tests.py              | 维护     | 人工章节→测试映射，采集 Rust/Node 用例与脚本断言，生成 95 测试索引并同步章节页眉                                                            |
-| handbook-paths.py              | 维护     | 汇总关键文件与事实出处，生成 04 导航附录的阅读入口和调用链；排除本机维护记录及构建目录                                                      |
-| handbook-stats.py              | 维护     | 采集源码/文档规模、版本、Git 状态与测试入口，生成 01 规模盘点                                                                               |
-| handbook-backlog.py            | 维护     | 从各章节 F 段采集待补项，生成 90 待补清单                                                                                                   |
-| check-handbook.py              | 维护     | 检查手册结构、版本、出处、措辞、隐私与章节体量                                                                                              |
-| handbook_chapters.py           | 维护     | 手册章节名匹配规则，供采集与校验脚本共享                                                                                                    |
+| File | Domain | Function |
+| --- | --- | --- |
+| build-client.mjs | 构建 | esbuild 把 `plugin/src/client/**` 打成单入口 `plugin/client.js`（DSH 客户端半只认一个入口） |
+| build-host-tools.mjs | 构建 | 从 `runtime/src/tools.mjs` 生成插件自带的 Host 工具 schema（`plugin/host-tool-specs.js`）；`--check` 拒绝与运行时漂移 |
+| build-runtime.mjs | 构建 | 把 `@tomato/core` 打进 `runtime/vendor/core.mjs`，让随插件分发的 runtime 不依赖 node_modules |
+| smoke-client.mjs | 验证 | 假 DOM + 真 React 把 `plugin/client.js` 跑一遍：slot 注册、主题覆盖、九页渲染 |
+| install.mjs | 安装 | Linux 单用户安装 runtime+guard 到 `~/.local/lib/tomato/`，写 systemd user unit 并启用 runtime；`--dry-run`/`--uninstall`，manifest 记录路径以安全卸载 |
+| install-desktop-integration.py | 桌面集成 | 安装 GNOME Shell 桥接扩展到用户 XDG 目录，提供启用命令而不自动启用，支持临时 home 与 dry-run |
+| export-sqlite.mjs | 迁移 | 一次性把旧 sqlite 库导出为 plan.json 与 backup-v4.json（v3 先按 core 的迁移语义升级；只读打开、原子写、`--force` 覆盖） |
+| import-backup.mjs | 迁移 | 把旧完整备份 v4 与现有 plan.json 合并进 runtime 数据目录；幂等、失败不写坏原文件 |
+| publish-aur.mjs | 发布 | 下载发行 tarball、从文件动态计算 sha256、由 `packaging/aur` 模板渲染 PKGBUILD/.SRCINFO；`--push` 时提交并推送到 AUR |
+| handbook-stats.py | 维护 | 采集源码/文档规模、版本与测试入口，生成 `docs/HANDBOOK/01-规模盘点.md` |
+| handbook-tests.py | 维护 | 采集 vitest/node/Rust 用例与脚本断言，生成 `docs/HANDBOOK/95-测试索引.md` |
+| handbook-paths.py | 维护 | 汇总关键文件与事实出处，生成 `docs/HANDBOOK/04-导航对照.md` 的附录区块 |
+| handbook-backlog.py | 维护 | 从各章 F 段采集待补项，生成 `docs/HANDBOOK/90-待补清单.md` |
+| handbook_chapters.py | 维护 | 手册章节文件名的唯一正则，供采集与校验脚本共享 |
+| check-handbook.py | 维护 | 检查手册结构、版本页眉、出处、措辞、隐私与章节体量 |
+| attention.test.mjs | 验证 | 到点音效只看状态跃迁；后台提醒不切走 DSH 对话 |
+| modal-ssr.test.mjs | 验证 | 拿不到 react-dom 时对话框退回内联渲染而不抛错（无浏览器冒烟依赖它） |
+| navigation-filter.test.mjs | 验证 | 侧栏项目筛选信号只被消费一次，切页与筛选值分离 |
+| persona-switch.test.mjs | 验证 | 角色背景板切换列：四个角色、高亮、订阅广播 |
+| niri-guard.test.mjs | 验证 | 独立 Xvfb+niri 与真实 GTK 窗口：运行中应用枚举、全屏/退出、白名单、锁机忽略白名单、释放与确认抢焦；仅连接临时桌面 |
+| plugin-host.test.mjs | 验证 | 全部 Host 工具注册与教学读取转发；`LIVE_TOMATO=1` 时只读联通当前实例 |
+| export-sqlite.test.mjs | 验证 | 旧库导出：迁移规则、计划形状、备份完整性、幂等、不改原库（临时目录自建库） |
+| import-backup.test.mjs | 验证 | 备份导入：合并结果、重复运行幂等、坏输入不写坏原文件 |
+| install.test.mjs | 验证 | 安装/卸载：布局、权限、manifest、systemd 调用序列、拒绝覆盖非托管文件（隔离 home） |

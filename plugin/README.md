@@ -1,7 +1,7 @@
 # @local/tomato-dsh — 番茄 Todo 的 DeepSeek Harness 插件包
 
-番茄 Todo 整体插件化的 DSH 插件包（v2）。源码在 tomato 仓库的 `plugin/` 目录
-（与 `/home/fuurin/code/tomato-dsh` 同步分发）。
+番茄 Todo 整体插件化的 DSH 插件包。源码就在本仓库的 `plugin/` 目录，版本随仓库
+（根 `package.json` 与 CHANGELOG 的 `0.x`）一起走；不再对应独立的 tomato-dsh 仓库。
 
 ## 提供什么
 

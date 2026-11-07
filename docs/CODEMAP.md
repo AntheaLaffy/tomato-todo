@@ -21,7 +21,6 @@ generated_at: 2026-10-10
 | backup.example.json | 示例 | 无私人数据、包含静态模板与停用锁机规则的备份示例 |
 | MCP.md | 设计记录 | tomato-runtime 对外提供的 MCP stdio/HTTP 入口、token 位置、工具语义表与安全边界（助手本身在 DSH 侧） |
 | CROSS_PLATFORM.md | 适配记录 | Linux 各桌面后端/扩展安装与 Windows/macOS/Android 的当前验证证据、助手交叉打包命令与完整平台验收缺口 |
-| MCP.md | 使用指南 | 给助手自建 MCP 服务器：最小实现、mcp.json 字段、exposure、工具命名与资源、传输选型、安全边界与排错 |
 | HANDBOOK/README.md | 参考手册 | **面向读代码的人**：读法、六段结构（事实 / 取舍理由 / 机制 / 语义规则与不变量 / 边界与坑 / 待补）、覆盖表与维护约定 |
 | HANDBOOK/00、03、80、90、95 | 参考手册 | 读法与约定、概念索引、规则速查（带规则 ID）、待补清单与测试索引（后三个由脚本生成） |
 | HANDBOOK/04-导航对照.md | 维护者附录 | 章节 ↔ CODEMAP 任务指南 ↔ 关键文件与符号、阅读顺序、大文件的读法；由 `scripts/handbook-paths.py` 生成 |

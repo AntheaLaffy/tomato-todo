@@ -65,11 +65,11 @@ jobs:
       - name: Runtime tests
         run: pnpm runtime:test
 
-      # CI 只检查、不改写：格式不符直接报错。runtime/ 与 plugin/ 由并行工作流落地，
-      # 本分支可能暂缺；目录不存在时跳过对应检查，目录合并后自动生效。
+      # CI 只检查、不改写：格式不符直接报错。glob 与根 package.json 的 format 一致；
+      # runtime/ 与 plugin/ 不存在时跳过对应检查。
       - name: Prettier check
         run: |
-          pnpm exec prettier --check "packages/**/*.ts" scripts tests
+          pnpm exec prettier --check "packages/**/*.ts" "scripts/**/*.{mjs,js}"
           if [ -d runtime ]; then pnpm exec prettier --check "runtime/**/*.{ts,mjs}"; fi
           if [ -d plugin ]; then pnpm exec prettier --check "plugin/**/*.{js,json,yml}"; fi
 
@@ -86,8 +86,8 @@ jobs:
       - name: Handbook structure check
         run: python3 scripts/check-handbook.py
 
-      # crates/guard 由并行工作流落地；--locked 依赖根 Cargo.lock 收录 guard 依赖，
-      # 构建与锁文件保持一致。Linux 上做完整构建：guard 是唯一在真实 Linux 桌面运行的原生目标。
+      # guard 是独立 Cargo 工作区（根目录没有 Cargo.toml），--locked 使用
+      # crates/guard/Cargo.lock。Linux 上做完整构建：guard 是唯一在真实 Linux 桌面运行的原生目标。
       - name: Build guard (Linux)
         run: cargo build --locked --manifest-path crates/guard/Cargo.toml
 

@@ -30,10 +30,5 @@
     "runtime",
     "plugin"
   ],
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "description": "番茄 Todo 重写：DSH 插件 + Node runtime + 原生守卫"
 }
