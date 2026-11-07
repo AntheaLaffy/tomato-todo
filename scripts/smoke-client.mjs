@@ -957,23 +957,51 @@ if (typeof nav?.openProject === "function") {
 }
 
 // 作业/考试工作台：对话框挂在页面内部，导航钩子切不过去，直接渲染组件。
-// fixture 里有题目 sourceIds 与项目考纲，SSR（effect 不跑）也能验证资料区。
-if (!process.env.SMOKE_LIVE) {
-  const AssignmentDialog = nav?.AssignmentDialog;
-  if (typeof AssignmentDialog !== "function") {
-    failures.push("没有暴露 AssignmentDialog 测试钩子");
+// fixture 里有题目 sourceIds 与项目考纲，SSR（effect 不跑）也能验证资料区；
+// SMOKE_LIVE=1 时用运行中 runtime 的第一条作业/课程渲染，形状不对会当场炸。
+const AssignmentDialog = nav?.AssignmentDialog;
+if (typeof AssignmentDialog !== "function") {
+  failures.push("没有暴露 AssignmentDialog 测试钩子");
+} else {
+  const renderDialog = (props) =>
+    ReactDOMServer.renderToStaticMarkup(
+      React.createElement(AssignmentDialog, {
+        open: true,
+        onClose: () => {},
+        data: sampleState.data,
+        today: sampleState.today,
+        now: sampleState.serverTime,
+        ...props,
+      }),
+    );
+  if (process.env.SMOKE_LIVE) {
+    const liveEducation = sampleState.data.education || {};
+    const liveAssessments = Array.isArray(liveEducation.assessments)
+      ? liveEducation.assessments
+      : [];
+    const liveLessons = Array.isArray(liveEducation.lessons)
+      ? liveEducation.lessons
+      : [];
+    const liveAssessment = liveAssessments[0] || null;
+    const liveLesson = liveAssessment ? null : liveLessons[0] || null;
+    if (liveAssessment || liveLesson) {
+      try {
+        const markup = renderDialog(
+          liveAssessment
+            ? { assessmentId: liveAssessment.id }
+            : { lessonId: liveLesson.id },
+        );
+        renderedBy["dialog:assignment-live"] = markup;
+        if (!markup || markup.length < 500)
+          failures.push("实时数据的工作台渲染为空");
+        const title = liveAssessment ? liveAssessment.title : liveLesson.title;
+        if (title && !markup.includes(title))
+          failures.push("实时工作台没有渲染记录标题");
+      } catch (e) {
+        failures.push(`渲染实时工作台失败：${e && e.message ? e.message : e}`);
+      }
+    }
   } else {
-    const renderDialog = (props) =>
-      ReactDOMServer.renderToStaticMarkup(
-        React.createElement(AssignmentDialog, {
-          open: true,
-          onClose: () => {},
-          data: sampleState.data,
-          today: sampleState.today,
-          now: sampleState.serverTime,
-          ...props,
-        }),
-      );
     try {
       const homework = renderDialog({ assessmentId: "homework-to-submit" });
       renderedBy["dialog:assignment"] = homework;
