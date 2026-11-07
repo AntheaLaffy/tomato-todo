@@ -18,8 +18,10 @@ import { assistantPrompt } from "./assistant-prompt.js";
 import {
   bindPanelOpener,
   getActivePageId,
+  navigate,
   resetActivePageCache,
   setActivePageId,
+  setPanelVisible,
 } from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
@@ -103,15 +105,15 @@ export function registerApp(ctx) {
   if (typeof ctx.effect === "function") ctx.effect(() => cleanup);
 
   const layout = ctx.get ? ctx.get("layout") : null;
-  const openPanel = () => {
-    try {
-      if (layout && typeof layout.selectPanel === "function") layout.selectPanel("tomato");
-    } catch {
-      /* DSH 版本差异时忽略 */
-    }
-  };
+  // 组件里的「打开番茄」是用户主动动作：交给 navigate 统一持久化面板状态。
+  const openPanel = () => navigate({ reason: "user" });
 
-  bindPanelOpener(openPanel);
+  // navigate 需要的是裸的 selectPanel，不是会再次进入 navigate 的 openPanel。
+  bindPanelOpener(
+    layout && typeof layout.selectPanel === "function"
+      ? (panelId) => layout.selectPanel(panelId)
+      : null,
+  );
 
   // 测试钩子：无浏览器冒烟（scripts/smoke-client.mjs）需要跨页重挂主视图；
   // 也方便在真实页面控制台里排查导航。只有测试页显式置位时才暴露。
@@ -134,6 +136,8 @@ export function registerApp(ctx) {
     } catch {
       /* DSH 版本差异时忽略 */
     }
+    // 主动回到对话也要记住：刷新后不该再把面板打开。
+    setPanelVisible(false);
   };
   const openAssistant = (kind, records) => {
     const prompt = assistantPrompt(kind, records);

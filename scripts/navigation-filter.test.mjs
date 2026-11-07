@@ -24,17 +24,18 @@ test("项目筛选：订阅者收到值，切页到 tasks，取走后清空", ()
   assert.equal(nav.takeTasksFilter(), null);
 });
 
-test("openPanelAt：切页并调用绑定的面板打开器", () => {
+test("navigate(user)：切页并调用绑定的面板打开器", () => {
   let opened = 0;
-  nav.bindPanelOpener(() => {
+  nav.bindPanelOpener((panelId) => {
+    assert.equal(panelId, "tomato");
     opened += 1;
   });
-  nav.openPanelAt("focus");
+  assert.equal(nav.navigate({ page: "focus", reason: "user" }), true);
   assert.equal(opened, 1);
   assert.equal(nav.getActivePageId(), "focus");
 
   nav.bindPanelOpener(null);
-  nav.openPanelAt("stats");
+  assert.equal(nav.navigate({ page: "stats", reason: "user" }), true);
   assert.equal(opened, 1);
   assert.equal(nav.getActivePageId(), "stats");
 });

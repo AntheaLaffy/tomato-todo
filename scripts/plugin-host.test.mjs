@@ -32,7 +32,9 @@ test("plugin Host tools cover the runtime contract without an MCP client", async
       },
     },
   };
-  apply(ctx, { tomatoBin: "/fake/tomato-runtime" });
+  // linkSkills: false —— 这个用例只验证 Host 工具契约，不该在真实 HOME 里
+  // 创建/替换 Agent 技能目录的符号链接（夹具里的 ctx 也没有 logger）。
+  apply(ctx, { tomatoBin: "/fake/tomato-runtime", linkSkills: false });
   for (const spec of TOOLS) {
     assert.ok(registered.has(`tomato_${spec.name}`), spec.name);
   }

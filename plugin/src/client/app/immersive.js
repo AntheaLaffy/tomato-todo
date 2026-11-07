@@ -14,7 +14,7 @@ import { Btn, IconBtn, Dropdown, Modal, notify } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
 import { timerView, fmtClock, taskById, protectionView, toMinutes } from "../shared/derive.js";
 import { setDesktopFullscreen } from "../shared/api.js";
-import { openPanelAt } from "./navigation.js";
+import { navigate } from "./navigation.js";
 import { useAmbience, ensureAudio } from "./sound.js";
 
 registerCopy("imm", {
@@ -409,7 +409,7 @@ export function Immersive() {
 
   const goSchedule = () => {
     closeImmersive();
-    openPanelAt("calendar");
+    navigate({ page: "calendar", reason: "user" });
   };
 
   if (!visible) return null;

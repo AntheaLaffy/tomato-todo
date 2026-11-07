@@ -18,6 +18,8 @@ import { Ring, Btn, IconBtn, Bar, notify } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
 import { timerView, fmtClock, taskById, protectionView } from "../shared/derive.js";
 import { useImmersiveOpen, openImmersive, openEndDialog } from "./immersive.js";
+import { attentionCue } from "./attention.js";
+import { navigate } from "./navigation.js";
 import { useSound, ensureAudio } from "./sound.js";
 
 registerCopy("hud", {
@@ -107,21 +109,6 @@ function modeLabel(mode) {
 }
 
 /**
- * 状态跃迁 → 播放一次对应音效，不改变 DSH 当前页面。
- *
- * 只看跃迁（首次快照 prev 为 null 时不动手），轮询重复渲染不会反复跳页；
- * 同时发生时以「一轮结束」优先。
- */
-export function attentionCue(prev, next) {
-  if (!prev || !next) return null;
-  if (Number(next.serial) > Number(prev.serial)) return "complete";
-  if (!prev.running && next.running) return next.mode === "focus" ? "start" : "resume";
-  if (prev.running && !next.running && next.paused) return "pause";
-  if (Number(next.reminders) > Number(prev.reminders)) return "reminder";
-  return null;
-}
-
-/**
  * Hud({ openPanel })
  * openPanel：切换到主视图（由 app/main.js 注入 ctx.layout.selectPanel）。
  */
@@ -155,9 +142,13 @@ export function Hud({ openPanel }) {
   const idleBreak = !alive && !focusMode; // 专注结束、尚未开始休息
 
   // 关键节点音效：开始 / 暂停 / 完成 / 提醒。只看状态跃迁，轮询重复渲染不重复响。
+  // 只有「一轮结束」会把界面切到今日专注；提醒只亮 HUD / 顶栏提醒条并播放提示音，
+  // 不打断正在输入的对话（窗口置前由 runtime → guard 的原生 focus 负责）。
   const prevRef = useRef(null);
   useEffect(() => {
     const next = {
+      // store 在首次请求返回前是 null；只有拿到真实快照才允许比较跃迁。
+      hydrated: !!(state && state.data),
       running: view.running,
       paused: view.paused,
       mode: view.mode,
@@ -169,6 +160,7 @@ export function Hud({ openPanel }) {
     if (prev === null) return;
     const cue = attentionCue(prev, next);
     if (cue) sound.playCue(cue);
+    if (cue === "complete") navigate({ reason: "complete", serial: next.serial });
     // 音效只在状态跃迁时触发；sound 的引用稳定，不参与依赖以免重复播放。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.running, view.paused, view.mode, view.timer.completionSerial, data]);

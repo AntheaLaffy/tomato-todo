@@ -16,7 +16,7 @@
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs && node scripts/smoke-client.mjs",
     "check:client:live": "node scripts/build-client.mjs && SMOKE_LIVE=1 node scripts/smoke-client.mjs",
-    "test:tools": "node --test scripts/export-sqlite.test.mjs scripts/import-backup.test.mjs scripts/install.test.mjs scripts/persona-switch.test.mjs scripts/modal-ssr.test.mjs scripts/navigation-filter.test.mjs scripts/attention.test.mjs scripts/plugin-host.test.mjs"
+    "test:tools": "node --test scripts/export-sqlite.test.mjs scripts/import-backup.test.mjs scripts/install.test.mjs scripts/persona-switch.test.mjs scripts/modal-ssr.test.mjs scripts/navigation-filter.test.mjs scripts/attention.test.mjs scripts/refresh-navigation.test.mjs scripts/plugin-host.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

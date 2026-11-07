@@ -13,7 +13,8 @@ import {
   getActivePageId,
   openTasksForProject,
   setActivePageId,
-  subscribeActivePage,
+  setPanelVisible,
+  subscribe,
 } from "./navigation.js";
 
 function loadActivePage(pages) {
@@ -394,6 +395,14 @@ export function AppShell(props) {
     return () => root.removeAttribute("data-tomato-takeover");
   }, []);
 
+  // 记住番茄面板是否可见：DSH 自己也能打开/关闭面板（侧栏入口、切回对话），
+  // 不经过 app/main.js 的 openPanel/leaveToConversation，所以以本组件的挂载
+  // 周期为准。刷新时按这个标记恢复面板，避免「在对话里刷新却被拉回番茄」。
+  useEffect(() => {
+    setPanelVisible(true);
+    return () => setPanelVisible(false);
+  }, []);
+
   // 兜底：即使 fixed 接管受祖先裁剪影响，也把 DSH 侧栏收起来（离开时还原）。
   useEffect(() => {
     const collapse = props.collapseSidebar;
@@ -414,7 +423,7 @@ export function AppShell(props) {
   const active = pages.find((page) => page.id === activeId) ?? pages[0] ?? null;
 
   // 跨模块导航：沉浸层等外部入口经 navigation.js 切页。
-  useEffect(() => subscribeActivePage(setActiveId), []);
+  useEffect(() => subscribe(setActiveId), []);
 
   useEffect(() => {
     if (active === null && pages.length > 0) setActivePageId(pages[0].id);
