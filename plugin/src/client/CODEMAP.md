@@ -22,7 +22,7 @@
 | `skin/` | `theme.js`（`--dsw-alias-*` 覆盖）、`styles.js`（`--tomato-*` 变量/氛围 CSS/组件 CSS）、`ambient.js`（`#tomato-ambient` 地面层 + `#tomato-sky` 天空层/插画/微粒/时段）、`prefs.js`（氛围开关与手动时段）、`settings-row.js`（DSH 设置-通用的「番茄氛围」行） | 皮肤工作流 |
 | `app/` | `frame.js` 主视图框架（导航+页面容器）、`registry.js` 页面注册表、`navigation.js` 唯一导航入口（`navigate({page, reason})`、`shouldGrab` 判定表、`restore()`、`{panel, page}` 持久化与旧 key 迁移、项目筛选信号）、`attention.js` 到点音效的纯跃迁判定、`hud.js` 常驻 HUD（播音效，一轮结束才切页，提醒不抢对话）、`immersive.js` 沉浸层与结束确认、`sound.js` WebAudio 背景音与节点音效、`reminders.js` 提醒横幅、`dock.js` 输入框入口卡、`overlay.js` 宿主（启动判定）、`nav-copy.js` 导航文案、`persona.js` 看板娘浮层与角色切换列、`sidebar-progress.js` DSH 左侧导航入口、`assistant-prompt.js` 作业动作的学习助手草稿（带稳定记录 ID，引 `tomato_*` Host 工具） | lead（HUD/沉浸/音效属沉浸工作流） |
 | `pages/` | 九页：`focus` `tasks` `habits` `stats` `calendar` `education`（含共享库索引卡、项目资料目录浏览/预览/单条登记）`guard` `schedule` `preferences`，各自 `registerPage` 自注册；另有隐藏的 `project` 详情页（`project.js` 任务与白名单、`project-materials.js` 目录授权/索引导入/已登记导出、`project-binding.js` 应试绑定），从侧栏「我的项目」进入；对话框 `task-dialog` `search` `template-dialog` `print-dialog`；`stub.js` 占位工厂 | 页面工作流 |
-| `shared/` | `api.js` HTTP 数据面、`store.js` 快照/dispatch/轮询、`derive.js` 派生视图、`ui.js` 组件库、`ui.css.js` 状态样式、`icons.js` 线性图标、`copy.js` zh/en/ja 注册表（按 DSH locale 选语言并订阅切换）、`ja.js` 日语文案 | lead |
+| `shared/` | `api.js` HTTP 数据面、`store.js` 快照/dispatch/轮询、`derive.js` 派生视图、`ui.js` 组件库、`ui.css.js` 状态样式、`icons.js` 线性图标、`copy.js` zh/en/ja 注册表（按 DSH locale 选语言并订阅切换）、`ja.js` 日语文案、`file-preview.js` 统一预览对话框（图片/音视频/PDF/Markdown）、`markdown.js` Markdown 渲染 | lead |
 
 ## 约定
 
