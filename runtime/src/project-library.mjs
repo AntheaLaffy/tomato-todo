@@ -22,7 +22,7 @@ import {
   sep,
 } from "node:path";
 
-const PREVIEW_BYTES = 20 * 1024 * 1024;
+export const PREVIEW_BYTES = 20 * 1024 * 1024;
 /** 共享资料库授权文件名；与按项目的 project-grants.json 分开，语义不同。 */
 const LIBRARY_FILE = "library-grant.json";
 const MIME = {
@@ -32,6 +32,17 @@ const MIME = {
   jpeg: "image/jpeg",
   webp: "image/webp",
   gif: "image/gif",
+  bmp: "image/bmp",
+  // 不把 SVG/HTML 当可预览的 image/text：直接打开同源文件时脚本会以
+  // runtime 的 origin 运行，能读本地只读 API；这类文件只给下载。
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  flac: "audio/flac",
+  aac: "audio/aac",
+  mp4: "video/mp4",
+  webm: "video/webm",
   txt: "text/plain; charset=utf-8",
   log: "text/plain; charset=utf-8",
   md: "text/plain; charset=utf-8",
@@ -39,6 +50,13 @@ const MIME = {
   csv: "text/plain; charset=utf-8",
   json: "text/plain; charset=utf-8",
 };
+
+/** 扩展名 → MIME；未知类型一律 application/octet-stream（不冒充可预览）。 */
+export function mimeTypeFor(ext) {
+  return (
+    MIME[String(ext ?? "").toLocaleLowerCase()] ?? "application/octet-stream"
+  );
+}
 
 export class LibraryError extends Error {
   constructor(status, message) {
@@ -530,6 +548,52 @@ export class ProjectLibrary {
     if (!info.isFile()) fail(400, "资源路径不是普通文件");
     return { path: target, sizeBytes: info.size };
   }
+  /**
+   * 共享库里的相对路径：与项目资料共用 safeRelative/noSymlinks/inside 规则，
+   * 但不要求项目 ID——索引浏览的是整个共享库，不是某个项目的收窄目录。
+   */
+  resolveLibraryPath(path) {
+    const root = this.libraryRoot();
+    if (root === null) fail(403, "共享资料库尚未授权");
+    const target = join(root, ...safeRelative(path).split("/"));
+    try {
+      noSymlinks(target, true);
+    } catch (error) {
+      if (error instanceof LibraryError) throw error;
+      fail(403, "资料库路径不可访问");
+    }
+    if (!inside(target, root)) fail(400, "资料路径越出共享资料库");
+    return target;
+  }
+
+  resolveLibraryFile(path) {
+    const target = this.resolveLibraryPath(path);
+    let info;
+    try {
+      info = statSync(target);
+    } catch (error) {
+      if (error.code === "ENOENT") fail(404, "资料文件不存在");
+      throw error;
+    }
+    if (!info.isFile()) fail(400, "资料路径不是普通文件");
+    return { path: target, sizeBytes: info.size };
+  }
+
+  /** 共享库文件的预览元数据；预览上限与项目资源一致（20 MiB）。 */
+  libraryFileMetadata(path) {
+    const file = this.resolveLibraryFile(path);
+    const extension = basename(file.path).split(".").at(-1).toLowerCase();
+    const mimeType = mimeTypeFor(extension);
+    return {
+      ...file,
+      name: basename(file.path),
+      mimeType,
+      canPreview:
+        file.sizeBytes <= PREVIEW_BYTES &&
+        mimeType !== "application/octet-stream",
+    };
+  }
+
   resource(id) {
     if (!validId(id)) fail(400, "资源 ID 无效");
     const resource = this.engine.data.education.resources.find(
@@ -542,7 +606,7 @@ export class ProjectLibrary {
     const resource = this.resource(id);
     const file = this.resolveFile(resource.projectId, resource.path);
     const extension = basename(file.path).split(".").at(-1).toLowerCase();
-    const mimeType = MIME[extension] ?? "application/octet-stream";
+    const mimeType = mimeTypeFor(extension);
     return {
       ...file,
       name: basename(file.path),
