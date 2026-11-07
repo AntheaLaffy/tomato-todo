@@ -226,7 +226,8 @@ function stageDsh(stageRoot) {
     console.log(`内嵌本机 DSH：${dshDir}`);
     copyTree(dshDir, join(dshProject, "node_modules/@deepseek-ai/dsh"));
   } else {
-    if (dshVersion === "") fail("缺少 packaging/dsh-version，无法确定 DSH 版本");
+    if (dshVersion === "")
+      fail("缺少 packaging/dsh-version，无法确定 DSH 版本");
     write(
       join(dshProject, "package.json"),
       JSON.stringify(
@@ -253,10 +254,7 @@ function stageDsh(stageRoot) {
       { stdio: "inherit" },
     );
   }
-  const bin = join(
-    dshProject,
-    "node_modules/@deepseek-ai/dsh/lib/bin.js",
-  );
+  const bin = join(dshProject, "node_modules/@deepseek-ai/dsh/lib/bin.js");
   if (!existsSync(bin)) fail(`完整版缺少 DSH 入口：${bin}`);
 }
 
@@ -309,10 +307,7 @@ if (withFull) {
   stageDsh(stageRoot);
   writeDshLauncher(stageRoot);
   writeInstallText(stageRoot, { full: true });
-  tarball(
-    `tomato-todo-${version}-${arch}-linux-full.tar.gz`,
-    stageRoot,
-  );
+  tarball(`tomato-todo-${version}-${arch}-linux-full.tar.gz`, stageRoot);
 }
 
 rmSync(stage, { recursive: true, force: true });

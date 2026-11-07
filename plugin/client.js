@@ -6678,7 +6678,14 @@ ${JSON.stringify(refs, null, 2)}`;
       )
     );
   }
-  function AgendaDialog({ open, onClose, onOpenFull, state, atSecs, task }) {
+  function AgendaDialog({
+    open,
+    onClose,
+    onOpenFull,
+    state,
+    atSecs,
+    task
+  }) {
     if (!open) return null;
     const agenda = todayAgenda(state, atSecs);
     const nodes = [];

@@ -536,16 +536,12 @@ function AgendaRow({ item, active }) {
           width: 92,
           flex: "none",
           fontSize: 12,
-          color: active
-            ? "var(--tomato-brand-deep)"
-            : "var(--tomato-ink-2)",
+          color: active ? "var(--tomato-brand-deep)" : "var(--tomato-ink-2)",
           fontVariantNumeric: "tabular-nums",
           paddingTop: 1,
         },
       },
-      item.endLabel
-        ? `${item.startLabel}–${item.endLabel}`
-        : item.startLabel,
+      item.endLabel ? `${item.startLabel}–${item.endLabel}` : item.startLabel,
     ),
     h(
       "div",
@@ -555,9 +551,7 @@ function AgendaRow({ item, active }) {
         {
           style: {
             fontSize: 13,
-            color: item.completed
-              ? "var(--tomato-ink-3)"
-              : "var(--tomato-ink)",
+            color: item.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
             textDecoration: item.completed ? "line-through" : "none",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -593,7 +587,14 @@ function AgendaRow({ item, active }) {
 }
 
 /** 沉浸层内的今日日程弹层：不结束计时，只把今天剩下的安排摊开。 */
-export function AgendaDialog({ open, onClose, onOpenFull, state, atSecs, task }) {
+export function AgendaDialog({
+  open,
+  onClose,
+  onOpenFull,
+  state,
+  atSecs,
+  task,
+}) {
   if (!open) return null;
   const agenda = todayAgenda(state, atSecs);
   const nodes = [];

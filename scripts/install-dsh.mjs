@@ -53,9 +53,7 @@ if (!/^[a-z0-9][a-z0-9._-]*$/i.test(profile))
 const dshRoot = resolve(option("--dsh") || join(ROOT, "vendor/dsh"));
 const pluginDir = resolve(option("--plugin") || join(ROOT, "plugin"));
 const dshHome =
-  option("--dsh-home") ||
-  process.env.DSH_HOME ||
-  join(homedir(), ".dsh");
+  option("--dsh-home") || process.env.DSH_HOME || join(homedir(), ".dsh");
 const dryRun = has("--dry-run");
 
 const bin = join(dshRoot, "node_modules/@deepseek-ai/dsh/lib/bin.js");
@@ -78,8 +76,7 @@ function run(label, command, commandArgs, stdio) {
     stdio: stdio || "inherit",
   });
   if (result.error) fail(`${label}失败：${result.error.message}`);
-  if (result.status !== 0)
-    fail(`${label}失败（退出码 ${result.status}）`);
+  if (result.status !== 0) fail(`${label}失败（退出码 ${result.status}）`);
 }
 
 console.log(`DSH_HOME: ${dshHome}`);
@@ -89,14 +86,19 @@ console.log(`插件:     ${pluginDir}`);
 // 已存在的 profile 不重建：用户可能已经装了别的插件或改了 cordis 配置。
 if (!existsSync(profileDir)) {
   console.log(`\nprofile ${profile} 不存在，用 web 模板创建。`);
-  run("创建 profile", process.execPath, [
-    bin,
-    "--profile",
-    profile,
-    "--from-default-profile",
-    "web",
-    "--dump-config",
-  ], ["ignore", "ignore", "inherit"]);
+  run(
+    "创建 profile",
+    process.execPath,
+    [
+      bin,
+      "--profile",
+      profile,
+      "--from-default-profile",
+      "web",
+      "--dump-config",
+    ],
+    ["ignore", "ignore", "inherit"],
+  );
 } else {
   console.log(`\nprofile ${profile} 已存在，保留现有配置。`);
 }
