@@ -242,9 +242,7 @@ const expectedSlots = [
   "sidebar.brand.name",
   "conversation.hero.brand.mark",
   "settings.general.item",
-  "sidebar.panellist",
   "sidebar.footer.action",
-  "conversation.header.leading",
 ];
 const got = new Set(slotRegistrations.map((r) => r.key));
 for (const key of expectedSlots) {
@@ -455,9 +453,10 @@ for (const word of ["今日专注", "全部任务", "数据统计", "偏好设�
 
 // 提醒条只在该任务的「当前时段」内渲染；样例构造了提醒时刻=5 分钟前的任务。
 if (!process.env.SMOKE_LIVE) {
-  const header = renderedBy["conversation.header.leading"] || "";
-  if (!header.includes("408 真题")) failures.push("顶栏提醒条没有渲染");
-  if (!header.includes("开始专注")) failures.push("顶栏提醒条没有开始按钮");
+  const overlay = renderedBy["shell.overlay"] || "";
+  if (!overlay.includes("408 真题")) failures.push("顶栏居中的提醒条没有渲染");
+  if (!overlay.includes("开始专注")) failures.push("提醒条没有开始按钮");
+  if (overlay.includes("个番茄")) failures.push("提醒浮层里不该出现番茄计数");
   if ((renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
     failures.push("提醒又回到了浮层弹窗");
   }

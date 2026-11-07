@@ -239,9 +239,13 @@ export function Hud({ openPanel }) {
     "button",
     {
       type: "button",
-      onClick: () => (alive ? openImmersive() : setExpanded((v) => !v)),
-      title: alive ? t("hud.openImmersive") : t("hud.hint"),
-      "aria-label": alive ? t("hud.openImmersive") : t("hud.hint"),
+      // 所有番茄相关条目点击都进番茄面板；沉浸专注从展开菜单里进。
+      onClick: () => {
+        setExpanded(false);
+        openPanel?.();
+      },
+      title: t("hud.openApp"),
+      "aria-label": t("hud.openApp"),
       style: {
         display: "flex",
         alignItems: "center",

@@ -22,8 +22,8 @@ import {
 } from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
-import { TomatoHeaderCluster } from "./header-entry.js";
 import { SidebarTomatoProgress } from "./sidebar-progress.js";
+import { ReminderStrip } from "./reminders.js";
 import "./nav-copy.js";
 import "../pages/index.js";
 
@@ -37,14 +37,29 @@ function localeId(locale) {
   }
 }
 
-/** 面板列表里的番茄图标（挨着「工作区」上方的那一组，跟随选中态加深）。 */
-function PanelIcon({ size, active }) {
-  return h(Icon, {
-    name: "tomato",
-    size: size || 20,
-    stroke: active ? 1.8 : 1.5,
-    style: { color: active ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" },
-  });
+/**
+ * 顶部居中的提醒条：去掉番茄入口胶囊后，提醒单独在顶栏正中显示；
+ * 点整条进番茄面板，按钮各自执行（开始专注 / 稍后）。
+ */
+function TopReminder({ openPanel }) {
+  return h(
+    "div",
+    {
+      id: "tomato-top-reminder",
+      style: {
+        position: "fixed",
+        top: "calc(var(--dsh-frame-overlay-top, 48px) + 4px)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 44,
+        display: "flex",
+        justifyContent: "center",
+        pointerEvents: "auto",
+        maxWidth: "min(560px, calc(100vw - 40px))",
+      },
+    },
+    h(ReminderStrip, { variant: "inline", onOpen: openPanel }),
+  );
 }
 
 export function registerApp(ctx) {
@@ -143,15 +158,7 @@ export function registerApp(ctx) {
 
   safeInject("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
 
-  // 两处入口都保留：面板列表里挨着「工作区」的那一组有一枚番茄图标（DSH 的
-  // sidebar.panellist 槽位，位置在工作区上方），左下角还有一条「番茄 Todo · N/M →」
-  // 满宽条目（sidebar.footer.action，紧挨工作区列表下方）。用户明确要两处都在。
-  safeInject(
-    "sidebar.panellist",
-    { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
-    PanelIcon,
-  );
-
+  // 番茄入口只保留左下角那一条（面板列表里的顶部条目按用户要求移除）。
   safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-overlay", order: 900 }, () =>
     h(AppOverlay, { openPanel }),
   );
@@ -162,11 +169,9 @@ export function registerApp(ctx) {
     () => h(DockCard, { openPanel }),
   );
 
-  // 顶栏左端：番茄入口 + 到点提醒/开始专注（提醒不再出现在底部或浮层）。
-  safeInject(
-    "conversation.header.leading",
-    { name: "conversation.header.leading" },
-    () => h(TomatoHeaderCluster, { openPanel }),
+  // 顶栏正中：到点提醒（整条可点，进入番茄面板）。
+  safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-top-reminder", order: 850 }, () =>
+    h(TopReminder, { openPanel }),
   );
 
   // 左下角「栏目」：侧栏底部的番茄预计/实际进度（展开态显示 0 / 8，收起只留环）。

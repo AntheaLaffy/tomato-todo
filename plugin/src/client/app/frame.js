@@ -256,6 +256,13 @@ function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave 
 export function AppShell(props) {
   const state = useSnapshot();
 
+  // 标记「番茄页接管中」：顶部常驻提醒（对话用）在番茄页里隐藏，避免和页面内提醒重复。
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-tomato-takeover", "1");
+    return () => root.removeAttribute("data-tomato-takeover");
+  }, []);
+
   // 兜底：即使 fixed 接管受祖先裁剪影响，也把 DSH 侧栏收起来（离开时还原）。
   useEffect(() => {
     const collapse = props.collapseSidebar;

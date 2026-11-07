@@ -42,7 +42,8 @@ export function DockCard({ openPanel }) {
   const due = todayTasks(data, today).length;
   const focusMinutes = Math.round((Number(stats.todaySeconds) || 0) / 60);
 
-  const start = async () => {
+  const start = async (event) => {
+    event?.stopPropagation?.();
     setBusy(true);
     const res = await tryDispatch({ type: view.running ? "pauseTimer" : "startTimer" });
     setBusy(false);
@@ -57,12 +58,15 @@ export function DockCard({ openPanel }) {
     "div",
     {
       className: "t-root",
+      onClick: () => openPanel?.(),
+      title: t("dock.view"),
       style: {
         display: "flex",
         alignItems: "center",
         gap: 10,
         padding: "7px 10px 7px 12px",
         marginBottom: 6,
+        cursor: "pointer",
         borderRadius: 14,
         border: "1px solid var(--tomato-line)",
         background: "color-mix(in srgb, var(--tomato-surface) 72%, transparent)",
@@ -108,7 +112,10 @@ export function DockCard({ openPanel }) {
       {
         type: "button",
         className: "t-btn t-btn-plain",
-        onClick: () => openPanel?.(),
+        onClick: (e) => {
+          e.stopPropagation();
+          openPanel?.();
+        },
         style: { height: 27, padding: "0 10px", borderRadius: 9, fontFamily: "inherit", fontSize: 12 },
       },
       t("dock.view"),

@@ -117,7 +117,7 @@ export function currentReminders(state) {
  * variant = "page"（番茄主视图内）| "dock"（对话输入框上方）。
  * 只在有当前时段提醒时渲染，否则返回 null。
  */
-export function ReminderStrip({ variant = "page" }) {
+export function ReminderStrip({ variant = "page", onOpen }) {
   const state = useSnapshot();
   const [, force] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -138,7 +138,8 @@ export function ReminderStrip({ variant = "page" }) {
   const minutes = Number(task.focusMinutes ?? settings.focusMinutes) || 0;
   const rounds = Number(task.estimate) || 1;
 
-  const start = async () => {
+  const start = async (event) => {
+    event?.stopPropagation?.();
     setBusy(true);
     setError(null);
     const res = await tryDispatch({ type: "startReminder", id: task.id });
@@ -150,7 +151,8 @@ export function ReminderStrip({ variant = "page" }) {
     openImmersive();
   };
 
-  const later = () => {
+  const later = (event) => {
+    event?.stopPropagation?.();
     dismissed = { ...dismissed, [reminderKey(task)]: Date.now() };
     persistDismissed(dismissed);
     force((n) => n + 1);
@@ -163,6 +165,14 @@ export function ReminderStrip({ variant = "page" }) {
     "div",
     {
       className: "t-root",
+      onClick: onOpen
+        ? (e) => {
+            e.stopPropagation();
+            onOpen();
+          }
+        : undefined,
+      role: onOpen ? "button" : undefined,
+      title: onOpen ? t("side.open") : undefined,
       style: inline
         ? {
             display: "inline-flex",
@@ -176,6 +186,7 @@ export function ReminderStrip({ variant = "page" }) {
             maxWidth: 430,
             minWidth: 0,
             flex: "none",
+            cursor: onOpen ? "pointer" : undefined,
           }
         : {
             display: "flex",

@@ -3996,7 +3996,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const primary = due.length > 0 ? due[0].task : null;
     return { primary, extra: Math.max(0, due.length - 1) };
   }
-  function ReminderStrip({ variant = "page" }) {
+  function ReminderStrip({ variant = "page", onOpen }) {
     const state = useSnapshot();
     const [, force] = useState(0);
     const [busy, setBusy] = useState(false);
@@ -4012,7 +4012,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const project = (data.projects || []).find((p) => p.id === task.projectId) || null;
     const minutes = Number(task.focusMinutes ?? settings.focusMinutes) || 0;
     const rounds = Number(task.estimate) || 1;
-    const start = async () => {
+    const start = async (event) => {
+      event?.stopPropagation?.();
       setBusy(true);
       setError(null);
       const res = await tryDispatch({ type: "startReminder", id: task.id });
@@ -4023,7 +4024,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       }
       openImmersive();
     };
-    const later = () => {
+    const later = (event) => {
+      event?.stopPropagation?.();
       dismissed = { ...dismissed, [reminderKey(task)]: Date.now() };
       persistDismissed(dismissed);
       force((n) => n + 1);
@@ -4034,6 +4036,12 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       "div",
       {
         className: "t-root",
+        onClick: onOpen ? (e) => {
+          e.stopPropagation();
+          onOpen();
+        } : void 0,
+        role: onOpen ? "button" : void 0,
+        title: onOpen ? t("side.open") : void 0,
         style: inline ? {
           display: "inline-flex",
           alignItems: "center",
@@ -4045,7 +4053,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           background: "color-mix(in srgb, var(--tomato-brand-soft) 70%, var(--tomato-surface))",
           maxWidth: 430,
           minWidth: 0,
-          flex: "none"
+          flex: "none",
+          cursor: onOpen ? "pointer" : void 0
         } : {
           display: "flex",
           alignItems: "center",
@@ -4378,6 +4387,11 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   function AppShell(props) {
     const state = useSnapshot();
     useEffect(() => {
+      const root = document.documentElement;
+      root.setAttribute("data-tomato-takeover", "1");
+      return () => root.removeAttribute("data-tomato-takeover");
+    }, []);
+    useEffect(() => {
       const collapse = props.collapseSidebar;
       const restore = props.restoreSidebar;
       if (typeof collapse !== "function") return void 0;
@@ -4615,9 +4629,13 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       "button",
       {
         type: "button",
-        onClick: () => alive ? openImmersive() : setExpanded((v) => !v),
-        title: alive ? t("hud.openImmersive") : t("hud.hint"),
-        "aria-label": alive ? t("hud.openImmersive") : t("hud.hint"),
+        // 所有番茄相关条目点击都进番茄面板；沉浸专注从展开菜单里进。
+        onClick: () => {
+          setExpanded(false);
+          openPanel?.();
+        },
+        title: t("hud.openApp"),
+        "aria-label": t("hud.openApp"),
         style: {
           display: "flex",
           alignItems: "center",
@@ -4890,7 +4908,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const view = timerView(state);
     const due = todayTasks(data, today).length;
     const focusMinutes = Math.round((Number(stats.todaySeconds) || 0) / 60);
-    const start = async () => {
+    const start = async (event) => {
+      event?.stopPropagation?.();
       setBusy(true);
       const res = await tryDispatch({ type: view.running ? "pauseTimer" : "startTimer" });
       setBusy(false);
@@ -4904,12 +4923,15 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       "div",
       {
         className: "t-root",
+        onClick: () => openPanel?.(),
+        title: t("dock.view"),
         style: {
           display: "flex",
           alignItems: "center",
           gap: 10,
           padding: "7px 10px 7px 12px",
           marginBottom: 6,
+          cursor: "pointer",
           borderRadius: 14,
           border: "1px solid var(--tomato-line)",
           background: "color-mix(in srgb, var(--tomato-surface) 72%, transparent)",
@@ -4955,92 +4977,14 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         {
           type: "button",
           className: "t-btn t-btn-plain",
-          onClick: () => openPanel?.(),
+          onClick: (e) => {
+            e.stopPropagation();
+            openPanel?.();
+          },
           style: { height: 27, padding: "0 10px", borderRadius: 9, fontFamily: "inherit", fontSize: 12 }
         },
         t("dock.view"),
         h(Icon, { name: "chevronRight", size: 13 })
-      )
-    );
-  }
-
-  // plugin/src/client/app/header-entry.js
-  registerCopy("header", {
-    zh: { label: "番茄 Todo", today: "今日 {n}", running: "专注中", open: "进入番茄 Todo" },
-    en: { label: "Tomato Todo", today: "{n} today", running: "Focusing", open: "Open Tomato Todo" }
-  });
-  function TomatoHeaderCluster({ openPanel }) {
-    return h(
-      "div",
-      {
-        style: {
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          flex: "none",
-          minWidth: 0
-        }
-      },
-      h(TomatoHeaderButton, { openPanel }),
-      h(ReminderStrip, { variant: "inline" })
-    );
-  }
-  function TomatoHeaderButton({ openPanel }) {
-    const state = useSnapshot();
-    const data = state && state.data || {};
-    const today = state && state.today || todayKey(state && state.serverTime);
-    const view = timerView(state);
-    const count = todayTasks(data, today).length;
-    return h(
-      "button",
-      {
-        type: "button",
-        onClick: () => openPanel?.(),
-        title: t("header.open"),
-        className: "t-root",
-        style: {
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          height: 28,
-          padding: "0 10px 0 8px",
-          marginRight: 6,
-          borderRadius: 9,
-          border: "1px solid var(--tomato-line)",
-          background: "var(--tomato-brand-soft)",
-          color: "var(--tomato-accent-fg)",
-          cursor: "pointer",
-          fontFamily: "inherit",
-          fontSize: 12,
-          fontWeight: 600,
-          lineHeight: 1,
-          whiteSpace: "nowrap",
-          flex: "none"
-        }
-      },
-      h(Icon, { name: "tomato", size: 15, stroke: 1.6 }),
-      t("header.label"),
-      view.running ? h(
-        "span",
-        {
-          className: "t-mono",
-          style: { fontSize: 11, fontWeight: 600, padding: "1px 5px", borderRadius: 6, background: "#ffffff2e" }
-        },
-        fmtClock(view.remainingSecs)
-      ) : h(
-        "span",
-        {
-          className: "t-mono",
-          style: {
-            fontSize: 11,
-            fontWeight: 600,
-            padding: "1px 5px",
-            borderRadius: 6,
-            background: "var(--tomato-surface)",
-            color: "var(--tomato-ink-2)"
-          }
-        },
-        count
       )
     );
   }
@@ -18997,13 +18941,25 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       return "zh";
     }
   }
-  function PanelIcon({ size, active: active2 }) {
-    return h(Icon, {
-      name: "tomato",
-      size: size || 20,
-      stroke: active2 ? 1.8 : 1.5,
-      style: { color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" }
-    });
+  function TopReminder({ openPanel }) {
+    return h(
+      "div",
+      {
+        id: "tomato-top-reminder",
+        style: {
+          position: "fixed",
+          top: "calc(var(--dsh-frame-overlay-top, 48px) + 4px)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 44,
+          display: "flex",
+          justifyContent: "center",
+          pointerEvents: "auto",
+          maxWidth: "min(560px, calc(100vw - 40px))"
+        }
+      },
+      h(ReminderStrip, { variant: "inline", onOpen: openPanel })
+    );
   }
   function registerApp(ctx) {
     const locale = ctx.get ? ctx.get("locale") : null;
@@ -19081,11 +19037,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     };
     safeInject2("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
     safeInject2(
-      "sidebar.panellist",
-      { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
-      PanelIcon
-    );
-    safeInject2(
       "shell.overlay",
       { name: "shell.overlay", id: "tomato-overlay", order: 900 },
       () => h(AppOverlay, { openPanel })
@@ -19096,9 +19047,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       () => h(DockCard, { openPanel })
     );
     safeInject2(
-      "conversation.header.leading",
-      { name: "conversation.header.leading" },
-      () => h(TomatoHeaderCluster, { openPanel })
+      "shell.overlay",
+      { name: "shell.overlay", id: "tomato-top-reminder", order: 850 },
+      () => h(TopReminder, { openPanel })
     );
     safeInject2(
       "sidebar.footer.action",
