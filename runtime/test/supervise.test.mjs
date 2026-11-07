@@ -53,6 +53,8 @@ async function waitFor(predicate, timeoutMs, label) {
 test("guard 不可达时拉起，退出后重启", async () => {
   const { dir, bin } = setup();
   const logger = { error: () => {} };
+  // 必须在启动监督器之前设好：它可能立刻尝试拉起，晚一步就会去走候选二进制。
+  process.env.TOMATO_GUARD_BIN = bin;
   const sup = startGuardSupervisor({
     dataDir: dir,
     token: "t",
@@ -64,7 +66,6 @@ test("guard 不可达时拉起，退出后重启", async () => {
       timeoutMs: 500,
     }),
   });
-  process.env.TOMATO_GUARD_BIN = bin;
   try {
     await waitFor(async () => (await sup.status()) !== null, 5000, "首次拉起");
     let status = await sup.status();
