@@ -28,7 +28,7 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const pkgname = "tomato-todo-bin";
-const repo = "AntheaLaffy/tomato-todo";
+const repo = "AntheaLaffy/dsh-plugin-tomato-todo";
 const remote = `ssh://aur@aur.archlinux.org/${pkgname}.git`;
 const template = join(root, "packaging/aur/PKGBUILD.in");
 const license = join(root, "LICENSE");

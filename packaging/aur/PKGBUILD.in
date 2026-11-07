@@ -8,9 +8,9 @@
 pkgname=tomato-todo-bin
 pkgver=@PKGVER@
 pkgrel=1
-pkgdesc='任务与番茄钟，一个安静的专注空间'
+pkgdesc='DSH 番茄 Todo 插件：专注保护、任务与应试学习（runtime + guard）'
 arch=('x86_64')
-url='https://github.com/AntheaLaffy/tomato-todo'
+url='https://github.com/AntheaLaffy/dsh-plugin-tomato-todo'
 license=('MIT')
 # guard 可能链接的系统库：x11rb → libxcb（guard_x11.rs），gio → glib2
 # （guard_shell.rs 的 D-Bus 通知/托盘）；Wayland 路径（guard_wayland.rs）是
@@ -24,7 +24,7 @@ options=('!strip' '!debug')
 # tomato-todo-$pkgver-$CARCH-linux.tar.gz，内含 tomato-runtime、tomato-guard
 # 与 runtime 的 vendor/ 树（新产物布局由发布工作流并行决定，落定后复核此
 # 假设；若改为多产物，本模板与 scripts/publish-aur.mjs 需同步改）。
-source=("https://github.com/AntheaLaffy/tomato-todo/releases/download/v$pkgver/tomato-todo-$pkgver-$CARCH-linux.tar.gz"
+source=("https://github.com/AntheaLaffy/dsh-plugin-tomato-todo/releases/download/v$pkgver/tomato-todo-$pkgver-$CARCH-linux.tar.gz"
         'LICENSE')
 sha256sums=('@SHA256_TARBALL@'
             '@SHA256_LICENSE@')

@@ -1,7 +1,7 @@
 # 番茄 Todo
 
-[![CI](https://github.com/AntheaLaffy/tomato-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/AntheaLaffy/tomato-todo/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/AntheaLaffy/tomato-todo?include_prereleases)](https://github.com/AntheaLaffy/tomato-todo/releases)
+[![CI](https://github.com/AntheaLaffy/dsh-plugin-tomato-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/AntheaLaffy/dsh-plugin-tomato-todo/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/AntheaLaffy/dsh-plugin-tomato-todo?include_prereleases)](https://github.com/AntheaLaffy/dsh-plugin-tomato-todo/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Linux / Windows](https://img.shields.io/badge/platform-Linux%20%2F%20Windows-blue)
 
