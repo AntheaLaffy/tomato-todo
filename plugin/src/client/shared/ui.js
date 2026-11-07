@@ -550,12 +550,20 @@ export function Toggle({ checked, onChange, label, hint, style }) {
   );
 }
 
-export function Select({ value, options, onChange, style, width }) {
+export function Select({
+  value,
+  options,
+  onChange,
+  style,
+  width,
+  disabled = false,
+}) {
   return h(
     "select",
     {
       value: value ?? "",
       onChange: (e) => onChange?.(e.target.value),
+      disabled,
       className: "t-root t-select",
       style: { height: 32, fontSize: 13, width, ...style },
     },

@@ -2821,12 +2821,20 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       )
     );
   }
-  function Select2({ value, options, onChange, style, width }) {
+  function Select2({
+    value,
+    options,
+    onChange,
+    style,
+    width,
+    disabled = false
+  }) {
     return h(
       "select",
       {
         value: value ?? "",
         onChange: (e) => onChange?.(e.target.value),
+        disabled,
         className: "t-root t-select",
         style: { height: 32, fontSize: 13, width, ...style }
       },
