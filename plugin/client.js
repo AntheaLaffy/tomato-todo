@@ -4867,7 +4867,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     zh: {
       prefix: "现在",
       start: "开始专注",
-      later: "稍后",
       more: "另有 {n} 条到点",
       minutes: "{n} 分钟 · 第 {round} 轮",
       title: "该做这件事了"
@@ -4875,40 +4874,11 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     en: {
       prefix: "Now",
       start: "Start focus",
-      later: "Later",
       more: "{n} more due",
       minutes: "{n} min · round {round}",
       title: "Time for this one"
     }
   });
-  var DISMISS_KEY = "tomato-dsh.reminders-dismissed";
-  var DISMISS_TTL_MS = 48 * 3600 * 1e3;
-  function reminderKey(task) {
-    return `${task.id}|${task.dueDate}|${task.reminderTime}`;
-  }
-  function loadDismissed() {
-    const now = Date.now();
-    const out = {};
-    try {
-      const raw = localStorage.getItem(DISMISS_KEY);
-      if (!raw) return out;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return out;
-      for (const [key, at] of Object.entries(parsed)) {
-        if (typeof at === "number" && now - at < DISMISS_TTL_MS) out[key] = at;
-      }
-    } catch {
-      return out;
-    }
-    return out;
-  }
-  function persistDismissed(map) {
-    try {
-      localStorage.setItem(DISMISS_KEY, JSON.stringify(map));
-    } catch {
-    }
-  }
-  var dismissed = loadDismissed();
   function isIdle(state) {
     const data = state && state.data || {};
     const timer = data.timer || {};
@@ -4933,7 +4903,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       if (start === null) continue;
       const end = start + windowMinutes(task, settings) * 60;
       if (nowSecs < start || nowSecs >= end) continue;
-      if (dismissed[reminderKey(task)]) continue;
       due.push({ task, start });
     }
     due.sort((a, b) => a.start - b.start || String(a.task.id).localeCompare(String(b.task.id)));
@@ -4967,12 +4936,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         return;
       }
       openImmersive();
-    };
-    const later = (event) => {
-      event?.stopPropagation?.();
-      dismissed = { ...dismissed, [reminderKey(task)]: Date.now() };
-      persistDismissed(dismissed);
-      force((n) => n + 1);
     };
     const inline = variant === "inline";
     const compact = variant === "dock" || inline;
@@ -5086,11 +5049,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       h(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 6, flex: "none", marginLeft: "auto" } },
-        h(
-          Btn,
-          { size: "sm", variant: "plain", disabled: busy, onClick: later, style: { height: 24, fontSize: 11.5 } },
-          t("reminder.later")
-        ),
         h(
           Btn,
           {

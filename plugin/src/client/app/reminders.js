@@ -4,8 +4,8 @@
 // - 浮层卡片像广告，一定被关掉；提醒只在页面内以一行细条出现，与内容同层。
 // - 只提醒「当前时间段」的任务：计划块（提醒时刻 + 计划时长）还没结束才算当前；
 //   超过预设结尾的是待补/逾期，属于「全部任务」的事，不再打扰。
-// - 「稍后」要跨刷新持久：按 任务+日期+时刻 记到 localStorage，下次刷新不再冒出来；
-//   过期条目自动清理。开始专注走 core 的 startReminder（清 pending 并直接开始）。
+// - 提醒不提供「稍后」：到点就是该做这件事；点整条进番茄面板，点「开始专注」走 core 的
+//   startReminder（清 pending 并直接开始本轮），时段结束提醒自然消失。
 import { h, useState, useEffect } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
@@ -18,7 +18,6 @@ registerCopy("reminder", {
   zh: {
     prefix: "现在",
     start: "开始专注",
-    later: "稍后",
     more: "另有 {n} 条到点",
     minutes: "{n} 分钟 · 第 {round} 轮",
     title: "该做这件事了",
@@ -26,46 +25,11 @@ registerCopy("reminder", {
   en: {
     prefix: "Now",
     start: "Start focus",
-    later: "Later",
     more: "{n} more due",
     minutes: "{n} min · round {round}",
     title: "Time for this one",
   },
 });
-
-const DISMISS_KEY = "tomato-dsh.reminders-dismissed";
-const DISMISS_TTL_MS = 48 * 3600 * 1000;
-
-function reminderKey(task) {
-  return `${task.id}|${task.dueDate}|${task.reminderTime}`;
-}
-
-function loadDismissed() {
-  const now = Date.now();
-  const out = {};
-  try {
-    const raw = localStorage.getItem(DISMISS_KEY);
-    if (!raw) return out;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return out;
-    for (const [key, at] of Object.entries(parsed)) {
-      if (typeof at === "number" && now - at < DISMISS_TTL_MS) out[key] = at;
-    }
-  } catch {
-    return out;
-  }
-  return out;
-}
-
-function persistDismissed(map) {
-  try {
-    localStorage.setItem(DISMISS_KEY, JSON.stringify(map));
-  } catch {
-    /* 隐私模式：本次会话内仍生效 */
-  }
-}
-
-let dismissed = loadDismissed();
 
 // 与 core reminders.reminderIdle 等价：只有真正空闲时才提醒。
 function isIdle(state) {
@@ -104,7 +68,6 @@ export function currentReminders(state) {
     const end = start + windowMinutes(task, settings) * 60;
     // 只保留「当前时间段」：计划块尚未结束；超过结尾的交给待补/逾期视图。
     if (nowSecs < start || nowSecs >= end) continue;
-    if (dismissed[reminderKey(task)]) continue;
     due.push({ task, start });
   }
   due.sort((a, b) => a.start - b.start || String(a.task.id).localeCompare(String(b.task.id)));
@@ -149,13 +112,6 @@ export function ReminderStrip({ variant = "page", onOpen }) {
       return;
     }
     openImmersive();
-  };
-
-  const later = (event) => {
-    event?.stopPropagation?.();
-    dismissed = { ...dismissed, [reminderKey(task)]: Date.now() };
-    persistDismissed(dismissed);
-    force((n) => n + 1);
   };
 
   const inline = variant === "inline";
@@ -283,11 +239,6 @@ export function ReminderStrip({ variant = "page", onOpen }) {
     h(
       "div",
       { style: { display: "flex", alignItems: "center", gap: 6, flex: "none", marginLeft: "auto" } },
-      h(
-        Btn,
-        { size: "sm", variant: "plain", disabled: busy, onClick: later, style: { height: 24, fontSize: 11.5 } },
-        t("reminder.later"),
-      ),
       h(
         Btn,
         {
