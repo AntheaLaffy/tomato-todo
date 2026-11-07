@@ -1212,12 +1212,12 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     sun: { bg: "#d5a55326", fg: "#a87b2d", bd: "transparent" },
     danger: { bg: "#b8503f18", fg: "#b8503f", bd: "transparent" }
   };
-  function Chip({ children, tone = "neutral", color, icon, style, onClick, active: active2 = false }) {
+  function Chip({ children, tone = "neutral", color, icon, style, onClick, active: active2 = false, title }) {
     const palette = CHIP_TONES[tone] || CHIP_TONES.neutral;
     return h(
       onClick ? "button" : "span",
       {
-        ...onClick ? { type: "button", onClick, className: "t-chip t-btn" } : {},
+        ...onClick ? { type: "button", onClick, className: "t-chip t-btn", title } : { title },
         style: {
           display: "inline-flex",
           alignItems: "center",
@@ -1917,6 +1917,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   __export(api_exports, {
     API_BASE: () => API_BASE,
     ApiError: () => ApiError,
+    getApps: () => getApps,
     getExportBackup: () => getExportBackup,
     getExportPlan: () => getExportPlan,
     getHealth: () => getHealth,
@@ -1975,6 +1976,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
   function getExportBackup(opts) {
     return request("/api/export/backup", { timeoutMs: 3e4, ...opts });
+  }
+  function getApps(opts) {
+    return request("/api/apps", opts);
   }
   function getHealth(opts) {
     return request("/health", opts);
@@ -2841,6 +2845,42 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const parts = date.split("-").map(Number);
     if (parts.length !== 3) return date;
     return t("common.monthDay", { m: parts[1], d: parts[2] });
+  }
+  function educationGrading(data) {
+    const education = data && data.education || {};
+    const submissions = Array.isArray(education.submissions) ? education.submissions : [];
+    const grades = Array.isArray(education.grades) ? education.grades : [];
+    const assessments = Array.isArray(education.assessments) ? education.assessments : [];
+    const projects = Array.isArray(data && data.projects) ? data.projects : [];
+    const assessmentOf = new Map(assessments.map((item) => [item.id, item]));
+    const graded = new Set(grades.map((grade) => grade.submissionId));
+    const buckets = /* @__PURE__ */ new Map();
+    const bucket = (projectId) => {
+      const key = projectId || "";
+      if (!buckets.has(key)) {
+        const project = projects.find((item) => item.id === key) || null;
+        buckets.set(key, {
+          projectId: key || null,
+          name: project ? project.name : "",
+          grading: 0,
+          review: 0
+        });
+      }
+      return buckets.get(key);
+    };
+    for (const submission of submissions) {
+      const assessment = assessmentOf.get(submission.assessmentId) || null;
+      if (!graded.has(submission.id)) bucket(assessment && assessment.projectId).grading += 1;
+    }
+    for (const grade of grades) {
+      if (grade.needsReview !== true) continue;
+      const submission = submissions.find((item) => item.id === grade.submissionId) || null;
+      const assessment = submission ? assessmentOf.get(submission.assessmentId) : null;
+      bucket(assessment && assessment.projectId).review += 1;
+    }
+    const items = [...buckets.values()].filter((item) => item.grading > 0 || item.review > 0).sort((a, b) => b.grading + b.review - (a.grading + a.review));
+    const total = items.reduce((sum, item) => sum + item.grading + item.review, 0);
+    return { total, items };
   }
 
   // plugin/src/client/app/registry.js
@@ -6459,6 +6499,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   registerCopy("focus", {
     zh: {
       headline: "今天，也要慢慢向前。",
+      gradingBanner: "{name}：{n} 份作业已交，等着批改或订正",
+      gradingBannerAll: "{n} 份作业已交，等着批改或订正",
+      gradingBannerAction: "打开应试教育",
       sub: "专注当下，让每一小步都有回响。",
       newTask: "新建任务",
       statFocus: "今日专注",
@@ -7341,6 +7384,51 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       )
     );
   }
+  function GradingBanner({ items, total }) {
+    const first = items[0];
+    const label = items.length === 1 && first.name ? t("focus.gradingBanner", { name: first.name, n: total }) : t("focus.gradingBannerAll", { n: total });
+    return h(
+      "div",
+      { style: { marginTop: 14 } },
+      h(
+        Card,
+        {
+          pad: 14,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            border: "1px solid var(--tomato-line)",
+            background: "var(--tomato-brand-soft)"
+          }
+        },
+        h(Icon, { name: "bell", size: 15, color: "var(--tomato-brand-deep)" }),
+        h(
+          "div",
+          {
+            style: {
+              flex: "1 1 240px",
+              minWidth: 0,
+              fontSize: 12.5,
+              color: "var(--tomato-ink)"
+            }
+          },
+          label
+        ),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "arrowRight",
+            onClick: () => openPanelAt("education")
+          },
+          t("focus.gradingBannerAction")
+        )
+      )
+    );
+  }
   function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp }) {
     const pending = todayTasks(data, today);
     const overdue = overdueTasks(data, today);
@@ -7979,6 +8067,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const view = timerView(state);
     const pending = todayTasks(data, today);
+    const grading = educationGrading(data);
     const run = async (action, message) => {
       setBusy(true);
       const result = await tryDispatch(action);
@@ -8106,6 +8195,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       { className: "t-root", style: { width: "100%", minWidth: 0 } },
       header,
       h(StatRow, { stats, pendingCount: pending.length }),
+      grading.total > 0 ? h(GradingBanner, { items: grading.items, total: grading.total }) : null,
       h(
         "div",
         { style: { display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" } },
@@ -11737,7 +11827,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       time: "时间",
       focusMinutes: "专注时长（分钟）",
       focusMinutesHint: "留空使用默认 {n}",
-      extraSlots: "另有 {n} 个时段保持不变",
+      slotTitle: "时段 {n}",
+      addSlot: "添加时段",
+      removeSlot: "删除",
+      slotDuplicate: "有两个时段撞在同一天的同一时间了",
+      slotsLimit: "一个习惯最多 49 个时段",
       nameError: "名称需为 1–40 个字符",
       daysError: "请至少选择一天",
       timeError: "时间格式需为 HH:MM",
@@ -11800,7 +11894,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       time: "Time",
       focusMinutes: "Focus length (minutes)",
       focusMinutesHint: "Empty uses the default {n}",
-      extraSlots: "{n} more slot(s) stay unchanged",
+      slotTitle: "Slot {n}",
+      addSlot: "Add slot",
+      removeSlot: "Remove",
+      slotDuplicate: "Two slots land on the same day and time",
+      slotsLimit: "A habit holds at most 49 slots",
       nameError: "Name must be 1–40 characters",
       daysError: "Pick at least one day",
       timeError: "Time must be HH:MM",
@@ -12201,25 +12299,38 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const template = habitTemplate(templates, habitId);
     const shape = template && template.shape || {};
     const initialSlots = slotsOfTemplate(template);
-    const firstSlot = initialSlots[0] || null;
-    const extraSlots = initialSlots.slice(1).map((slot) => ({
-      days: slot.days.filter((day) => day >= 1 && day <= 7),
-      time: slot.time
-    }));
-    const initialDays = firstSlot && Array.isArray(firstSlot.days) && firstSlot.days.length > 0 ? Array.from(new Set(firstSlot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b) : [...ALL_DAYS];
+    const slotsFromTemplate = initialSlots.length > 0 ? initialSlots.map((slot) => ({
+      days: Array.isArray(slot.days) && slot.days.length > 0 ? Array.from(new Set(slot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b) : [...ALL_DAYS],
+      time: normalizeTime(slot.time)
+    })) : [{ days: [...ALL_DAYS], time: normalizeTime(null) }];
     const defaultFocus = Number((data.settings || {}).focusMinutes) || 45;
     const [name, setName] = useState(habit && typeof habit.name === "string" ? habit.name : "");
     const [projectId, setProjectId] = useState(shape.projectId || "");
-    const [frequency, setFrequency] = useState(initialDays.length === 7 ? "daily" : "weekly");
-    const [days, setDays] = useState(initialDays);
-    const [time, setTime] = useState(normalizeTime(firstSlot ? firstSlot.time : ""));
+    const [slots, setSlots] = useState(slotsFromTemplate);
     const [focus, setFocus] = useState(Number(shape.focusMinutes) >= 1 ? String(shape.focusMinutes) : "");
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
-    const toggleDay = (day) => {
-      setDays(
-        (previous) => previous.includes(day) ? previous.filter((item) => item !== day) : [...previous, day].sort((a, b) => a - b)
+    const patchSlot = (index, patch) => {
+      setSlots((previous) => previous.map((slot, at) => at === index ? { ...slot, ...patch } : slot));
+    };
+    const toggleSlotDay = (index, day) => {
+      setSlots(
+        (previous) => previous.map((slot, at) => {
+          if (at !== index) return slot;
+          const days = slot.days.includes(day) ? slot.days.filter((item) => item !== day) : [...slot.days, day].sort((a, b) => a - b);
+          return { ...slot, days };
+        })
       );
+    };
+    const addSlot = () => {
+      setSlots((previous) => {
+        const last = previous[previous.length - 1];
+        const next = { days: [...last ? last.days : ALL_DAYS], time: "20:00" };
+        return [...previous, next];
+      });
+    };
+    const removeSlot = (index) => {
+      setSlots((previous) => previous.filter((_, at) => at !== index));
     };
     const submit = async () => {
       if (busy) return;
@@ -12228,14 +12339,32 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         setError(t("habits.nameError"));
         return;
       }
-      const slotDays = frequency === "daily" ? [...ALL_DAYS] : days;
-      if (slotDays.length === 0) {
+      if (slots.length === 0) {
         setError(t("habits.daysError"));
         return;
       }
-      if (parseHHMM(time) === null) {
-        setError(t("habits.timeError"));
+      if (slots.length > 49) {
+        setError(t("habits.slotsLimit"));
         return;
+      }
+      const seen = /* @__PURE__ */ new Set();
+      for (const slot of slots) {
+        if (slot.days.length === 0) {
+          setError(t("habits.daysError"));
+          return;
+        }
+        if (parseHHMM(slot.time) === null) {
+          setError(t("habits.timeError"));
+          return;
+        }
+        for (const day of slot.days) {
+          const key = `${day}|${fmtHHMM(parseHHMM(slot.time))}`;
+          if (seen.has(key)) {
+            setError(t("habits.slotDuplicate"));
+            return;
+          }
+          seen.add(key);
+        }
       }
       const focusRaw = focus.trim();
       const focusMinutes = focusRaw === "" ? null : Number(focusRaw);
@@ -12251,7 +12380,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         name: trimmed,
         projectId: projectId ? projectId : null,
         focusMinutes,
-        slots: [{ days: slotDays, time: fmtHHMM(parseHHMM(time)) }, ...extraSlots]
+        slots: slots.map((slot) => ({
+          days: slot.days,
+          time: fmtHHMM(parseHHMM(slot.time))
+        }))
       });
       setBusy(false);
       if (!result.ok) {
@@ -12288,51 +12420,91 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       ),
       h(
         "div",
-        { style: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 } },
-        h(
-          "span",
-          { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
-          t("habits.schedule")
-        ),
+        { style: { display: "flex", flexDirection: "column", gap: 8, minWidth: 0 } },
         h(
           "div",
-          { style: { display: "flex", flexDirection: "column", gap: 9 } },
-          h(Segmented, {
-            items: [
-              { value: "daily", label: t("habits.everyDay") },
-              { value: "weekly", label: t("habits.weekly") }
-            ],
-            value: frequency,
-            onChange: setFrequency,
-            size: "sm"
-          }),
-          frequency === "weekly" ? h(
-            "div",
-            { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
-            ALL_DAYS.map(
-              (day) => h(
-                Chip,
-                {
-                  key: day,
-                  tone: "neutral",
-                  active: days.includes(day),
-                  onClick: () => toggleDay(day)
-                },
-                weekFull[day - 1] || String(day)
-              )
-            )
-          ) : null,
+          { style: { display: "flex", alignItems: "center", gap: 8 } },
           h(
-            "div",
-            { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" } },
-            h("span", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, t("habits.time")),
-            h(Input, { type: "time", value: time, onChange: setTime, style: { width: 150 } })
+            "span",
+            { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+            t("habits.schedule")
           ),
-          extraSlots.length > 0 ? h(
+          h("div", { style: { flex: 1 } }),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "plus",
+              disabled: slots.length >= 49,
+              onClick: addSlot
+            },
+            t("habits.addSlot")
+          )
+        ),
+        slots.map(
+          (slot, index) => h(
             "div",
-            { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-            t("habits.extraSlots", { n: extraSlots.length })
-          ) : null
+            {
+              key: index,
+              style: {
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid var(--tomato-line)",
+                background: "var(--tomato-surface-2)"
+              }
+            },
+            h(
+              "div",
+              { style: { display: "flex", alignItems: "center", gap: 8 } },
+              h(
+                "span",
+                { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+                t("habits.slotTitle", { n: index + 1 })
+              ),
+              h("div", { style: { flex: 1 } }),
+              slots.length > 1 ? h(
+                Btn,
+                {
+                  variant: "plain",
+                  size: "sm",
+                  icon: "trash",
+                  onClick: () => removeSlot(index)
+                },
+                t("habits.removeSlot")
+              ) : null
+            ),
+            h(
+              "div",
+              { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+              ALL_DAYS.map(
+                (day) => h(
+                  Chip,
+                  {
+                    key: day,
+                    tone: "neutral",
+                    active: slot.days.includes(day),
+                    onClick: () => toggleSlotDay(index, day)
+                  },
+                  weekFull[day - 1] || String(day)
+                )
+              )
+            ),
+            h(
+              "div",
+              { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" } },
+              h("span", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, t("habits.time")),
+              h(Input, {
+                type: "time",
+                value: slot.time,
+                onChange: (value) => patchSlot(index, { time: value }),
+                style: { width: 150 }
+              })
+            )
+          )
         )
       ),
       h(
@@ -16954,7 +17126,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       appRemoved: "已从白名单移除：{name}",
       suggestionsTitle: "建议应用",
       refreshApps: "刷新应用",
-      refreshNote: "运行时暂无应用枚举端点，已按当前配置刷新建议。",
+      refreshBusy: "正在枚举…",
+      refreshFound: "找到 {n} 个已安装应用。",
+      refreshEmpty: "没有找到可添加的已安装应用。",
+      refreshFailed: "读不到应用列表：{error}",
+      appsHint: "来自桌面入口（app_id 即 .desktop 文件名），未启动的应用也能选。",
       noSuggestions: "没有可添加的建议应用。",
       semanticsTitle: "白名单如何工作",
       semantics: [
@@ -17015,7 +17191,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       appRemoved: "Removed from whitelist: {name}",
       suggestionsTitle: "Suggested apps",
       refreshApps: "Refresh apps",
-      refreshNote: "The runtime has no app-enumeration endpoint yet; suggestions were rebuilt from the current configuration.",
+      refreshBusy: "Scanning…",
+      refreshFound: "{n} installed apps found.",
+      refreshEmpty: "No installed apps left to add.",
+      refreshFailed: "Could not read the app list: {error}",
+      appsHint: "Read from desktop entries — the app id is the .desktop file name, so apps that are not running can still be picked.",
       noSuggestions: "No suggested apps left to add.",
       semanticsTitle: "How the whitelist works",
       semantics: [
@@ -17266,6 +17446,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   function GuardPage({ refresh: refresh2 }) {
     const state = useSnapshot();
     const [draft, setDraft] = useState("");
+    const [apps, setApps] = useState(null);
+    const [appsBusy, setAppsBusy] = useState(false);
     if (state === null) return h(GuardSkeleton, null);
     const data = state.data || {};
     const settings = data.settings || {};
@@ -17277,7 +17459,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const active2 = !!view.active;
     const whitelist = protection.whitelist;
     const editable = protection.mode === "whitelist";
-    const suggestions = buildSuggestions(state, whitelist);
+    const suggestions = apps !== null ? apps.filter((app) => !whitelist.includes(app.id)).slice(0, 24) : buildSuggestions(state, whitelist).map((id) => ({ id, name: id }));
     const semantics = t("guard.semantics");
     const semanticItems = Array.isArray(semantics) ? semantics : [];
     const pid = guard.pid === null || guard.pid === void 0 ? t("guard.unknown") : String(guard.pid);
@@ -17331,9 +17513,27 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       const ok = await saveProtection({ whitelist: next });
       if (ok) notify(t("guard.appRemoved", { name: app }), "brand");
     }
-    function refreshApps() {
-      refresh2?.();
-      notify(t("guard.refreshNote"), "neutral");
+    async function refreshApps() {
+      if (appsBusy) return;
+      setAppsBusy(true);
+      try {
+        const result = await getApps();
+        const list = Array.isArray(result && result.apps) ? result.apps : [];
+        const known = new Set(buildSuggestions(state, []));
+        const ranked = list.map((app) => ({
+          id: String(app.id ?? ""),
+          name: String(app.name ?? app.id ?? ""),
+          known: known.has(app.id)
+        })).filter((app) => app.id !== "").sort((a, b) => Number(b.known) - Number(a.known) || a.name.localeCompare(b.name, "zh-Hans-CN"));
+        setApps(ranked);
+        if (ranked.length === 0) notify(t("guard.refreshEmpty"), "neutral");
+        else notify(t("guard.refreshFound", { n: ranked.length }), "brand");
+      } catch (error) {
+        const message = error && (error.userMessage || error.message) || "未知错误";
+        notify(t("guard.refreshFailed", { error: message }), "danger");
+      } finally {
+        setAppsBusy(false);
+      }
     }
     return h(
       "div",
@@ -17530,8 +17730,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             ),
             h(
               Btn,
-              { variant: "ghost", icon: "refresh", onClick: refreshApps },
-              t("guard.refreshApps")
+              {
+                variant: "ghost",
+                icon: "refresh",
+                disabled: appsBusy,
+                onClick: refreshApps
+              },
+              appsBusy ? t("guard.refreshBusy") : t("guard.refreshApps")
             )
           ),
           h(
@@ -17548,6 +17753,17 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
               },
               t("guard.suggestionsTitle")
             ),
+            apps !== null ? h(
+              "div",
+              {
+                style: {
+                  fontSize: 11,
+                  color: "var(--tomato-ink-3)",
+                  marginBottom: 8
+                }
+              },
+              t("guard.appsHint")
+            ) : null,
             suggestions.length === 0 ? h(
               "div",
               { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
@@ -17559,13 +17775,14 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
                 (app) => h(
                   Chip,
                   {
-                    key: app,
+                    key: app.id,
                     icon: "plus",
                     tone: "neutral",
+                    title: app.name === app.id ? void 0 : app.id,
                     style: editable ? void 0 : { opacity: 0.55 },
-                    onClick: editable ? () => addApp(app) : void 0
+                    onClick: editable ? () => addApp(app.id) : void 0
                   },
-                  app
+                  app.name
                 )
               )
             )

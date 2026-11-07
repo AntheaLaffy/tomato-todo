@@ -132,12 +132,12 @@ const CHIP_TONES = {
   danger: { bg: "#b8503f18", fg: "#b8503f", bd: "transparent" },
 };
 
-export function Chip({ children, tone = "neutral", color, icon, style, onClick, active = false }) {
+export function Chip({ children, tone = "neutral", color, icon, style, onClick, active = false, title }) {
   const palette = CHIP_TONES[tone] || CHIP_TONES.neutral;
   return h(
     onClick ? "button" : "span",
     {
-      ...(onClick ? { type: "button", onClick, className: "t-chip t-btn" } : {}),
+      ...(onClick ? { type: "button", onClick, className: "t-chip t-btn", title } : { title }),
       style: {
         display: "inline-flex",
         alignItems: "center",

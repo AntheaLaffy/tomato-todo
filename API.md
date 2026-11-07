@@ -26,6 +26,8 @@
 - `GET /api/today` — `{ "today": "YYYY-MM-DD", "dueCount": number, "focusMinutes": number }`
 - `GET /api/stats`、`GET /health` — health 附带可选 `guard` 摘要字段
   `{"ok":true,"runtime":{"pid":…},"guard":{"available":true,"backend":"x11","locked":false,"whitelist":[],"pid":1234}}`（guard 摘要在 guard 不可达时给 `{"available":false}`，不得整体报错）
+- `GET /api/apps` — 已安装桌面应用（专注保护白名单用）：`{"apps":[{"id":"code","name":"Visual Studio Code","exec":"code","icon":"vscode"}],"count":160,"cached":false}`。
+  `id` 是桌面入口文件名去掉 `.desktop`，与 guard 的白名单精确匹配同一个值；结果缓存 30 秒
 - `GET /api/state`、`GET /api/export/plan`、`GET /api/export/backup` — 见下节（UI 数据面与导出）
 
 浏览器写端点（同 Origin 白名单；写路径也必须经 @tomato/core 的校验与保护规则）：

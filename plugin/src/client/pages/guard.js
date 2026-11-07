@@ -23,6 +23,7 @@ import {
 } from "../shared/ui.js";
 import { Icon } from "../shared/icons.js";
 import { useSnapshot, tryDispatch, getSnapshot } from "../shared/store.js";
+import { getApps } from "../shared/api.js";
 import { protectionView } from "../shared/derive.js";
 import { registerPage } from "../app/registry.js";
 
@@ -63,7 +64,11 @@ registerCopy("guard", {
     appRemoved: "已从白名单移除：{name}",
     suggestionsTitle: "建议应用",
     refreshApps: "刷新应用",
-    refreshNote: "运行时暂无应用枚举端点，已按当前配置刷新建议。",
+    refreshBusy: "正在枚举…",
+    refreshFound: "找到 {n} 个已安装应用。",
+    refreshEmpty: "没有找到可添加的已安装应用。",
+    refreshFailed: "读不到应用列表：{error}",
+    appsHint: "来自桌面入口（app_id 即 .desktop 文件名），未启动的应用也能选。",
     noSuggestions: "没有可添加的建议应用。",
     semanticsTitle: "白名单如何工作",
     semantics: [
@@ -130,8 +135,12 @@ registerCopy("guard", {
     appRemoved: "Removed from whitelist: {name}",
     suggestionsTitle: "Suggested apps",
     refreshApps: "Refresh apps",
-    refreshNote:
-      "The runtime has no app-enumeration endpoint yet; suggestions were rebuilt from the current configuration.",
+    refreshBusy: "Scanning…",
+    refreshFound: "{n} installed apps found.",
+    refreshEmpty: "No installed apps left to add.",
+    refreshFailed: "Could not read the app list: {error}",
+    appsHint:
+      "Read from desktop entries — the app id is the .desktop file name, so apps that are not running can still be picked.",
     noSuggestions: "No suggested apps left to add.",
     semanticsTitle: "How the whitelist works",
     semantics: [
@@ -407,6 +416,10 @@ function GuardSkeleton() {
 export function GuardPage({ refresh }) {
   const state = useSnapshot();
   const [draft, setDraft] = useState("");
+  // 应用枚举是页面里唯一「按需拉一次」的数据：白名单要的是还没启动的应用，
+  // 所以不能靠快照推。null = 还没点过刷新。
+  const [apps, setApps] = useState(null);
+  const [appsBusy, setAppsBusy] = useState(false);
   if (state === null) return h(GuardSkeleton, null);
 
   const data = state.data || {};
@@ -420,7 +433,12 @@ export function GuardPage({ refresh }) {
   const active = !!view.active;
   const whitelist = protection.whitelist;
   const editable = protection.mode === "whitelist";
-  const suggestions = buildSuggestions(state, whitelist);
+  // 建议列表两种来源：还没刷新时用配置里出现过的 app id；刷新后用真实枚举，
+  // 名称给人看、id 写进白名单（两者在常见应用里不同，例如 文件 ↔ nautilus）。
+  const suggestions =
+    apps !== null
+      ? apps.filter((app) => !whitelist.includes(app.id)).slice(0, 24)
+      : buildSuggestions(state, whitelist).map((id) => ({ id, name: id }));
   const semantics = t("guard.semantics");
   const semanticItems = Array.isArray(semantics) ? semantics : [];
   const pid =
@@ -487,9 +505,30 @@ export function GuardPage({ refresh }) {
     if (ok) notify(t("guard.appRemoved", { name: app }), "brand");
   }
 
-  function refreshApps() {
-    refresh?.();
-    notify(t("guard.refreshNote"), "neutral");
+  async function refreshApps() {
+    if (appsBusy) return;
+    setAppsBusy(true);
+    try {
+      const result = await getApps();
+      const list = Array.isArray(result && result.apps) ? result.apps : [];
+      const known = new Set(buildSuggestions(state, []));
+      const ranked = list
+        .map((app) => ({
+          id: String(app.id ?? ""),
+          name: String(app.name ?? app.id ?? ""),
+          known: known.has(app.id),
+        }))
+        .filter((app) => app.id !== "")
+        .sort((a, b) => Number(b.known) - Number(a.known) || a.name.localeCompare(b.name, "zh-Hans-CN"));
+      setApps(ranked);
+      if (ranked.length === 0) notify(t("guard.refreshEmpty"), "neutral");
+      else notify(t("guard.refreshFound", { n: ranked.length }), "brand");
+    } catch (error) {
+      const message = (error && (error.userMessage || error.message)) || "未知错误";
+      notify(t("guard.refreshFailed", { error: message }), "danger");
+    } finally {
+      setAppsBusy(false);
+    }
   }
 
   return h(
@@ -698,8 +737,13 @@ export function GuardPage({ refresh }) {
           ),
           h(
             Btn,
-            { variant: "ghost", icon: "refresh", onClick: refreshApps },
-            t("guard.refreshApps"),
+            {
+              variant: "ghost",
+              icon: "refresh",
+              disabled: appsBusy,
+              onClick: refreshApps,
+            },
+            appsBusy ? t("guard.refreshBusy") : t("guard.refreshApps"),
           ),
         ),
         h(
@@ -716,6 +760,19 @@ export function GuardPage({ refresh }) {
             },
             t("guard.suggestionsTitle"),
           ),
+          apps !== null
+            ? h(
+                "div",
+                {
+                  style: {
+                    fontSize: 11,
+                    color: "var(--tomato-ink-3)",
+                    marginBottom: 8,
+                  },
+                },
+                t("guard.appsHint"),
+              )
+            : null,
           suggestions.length === 0
             ? h(
                 "div",
@@ -729,13 +786,14 @@ export function GuardPage({ refresh }) {
                   h(
                     Chip,
                     {
-                      key: app,
+                      key: app.id,
                       icon: "plus",
                       tone: "neutral",
+                      title: app.name === app.id ? undefined : app.id,
                       style: editable ? undefined : { opacity: 0.55 },
-                      onClick: editable ? () => addApp(app) : undefined,
+                      onClick: editable ? () => addApp(app.id) : undefined,
                     },
-                    app,
+                    app.name,
                   ),
                 ),
               ),

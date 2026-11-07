@@ -359,3 +359,52 @@ export function dayLabel(date, today) {
   if (parts.length !== 3) return date;
   return t("common.monthDay", { m: parts[1], d: parts[2] });
 }
+
+/**
+ * 「已交但还没批改 / 批改完还标了待复核」的作业统计，按项目分组。
+ *
+ * 为什么放 shared：今日专注只要一条横幅，应试教育页要完整清单；两边必须用同一个
+ * 判定，否则横幅说 2 项、页里列出 3 项。判定本身故意保守——只数**有答卷**的：
+ * 待交要按时间窗口算，属于课表逻辑，不在这里重复。
+ */
+export function educationGrading(data) {
+  const education = (data && data.education) || {};
+  const submissions = Array.isArray(education.submissions) ? education.submissions : [];
+  const grades = Array.isArray(education.grades) ? education.grades : [];
+  const assessments = Array.isArray(education.assessments) ? education.assessments : [];
+  const projects = Array.isArray(data && data.projects) ? data.projects : [];
+  const assessmentOf = new Map(assessments.map((item) => [item.id, item]));
+  const graded = new Set(grades.map((grade) => grade.submissionId));
+
+  const buckets = new Map();
+  const bucket = (projectId) => {
+    const key = projectId || "";
+    if (!buckets.has(key)) {
+      const project = projects.find((item) => item.id === key) || null;
+      buckets.set(key, {
+        projectId: key || null,
+        name: project ? project.name : "",
+        grading: 0,
+        review: 0,
+      });
+    }
+    return buckets.get(key);
+  };
+
+  for (const submission of submissions) {
+    const assessment = assessmentOf.get(submission.assessmentId) || null;
+    if (!graded.has(submission.id)) bucket(assessment && assessment.projectId).grading += 1;
+  }
+  for (const grade of grades) {
+    if (grade.needsReview !== true) continue;
+    const submission = submissions.find((item) => item.id === grade.submissionId) || null;
+    const assessment = submission ? assessmentOf.get(submission.assessmentId) : null;
+    bucket(assessment && assessment.projectId).review += 1;
+  }
+
+  const items = [...buckets.values()]
+    .filter((item) => item.grading > 0 || item.review > 0)
+    .sort((a, b) => b.grading + b.review - (a.grading + a.review));
+  const total = items.reduce((sum, item) => sum + item.grading + item.review, 0);
+  return { total, items };
+}

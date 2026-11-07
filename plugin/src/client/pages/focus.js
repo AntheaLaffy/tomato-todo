@@ -31,6 +31,7 @@ import {
   completedOn,
   dayLabel,
   dueTasks,
+  educationGrading,
   overdueTasks,
   todayTasks,
   fmtClock,
@@ -49,7 +50,7 @@ import {
   weekdayIndex,
 } from "../shared/derive.js";
 import { registerPage } from "../app/registry.js";
-import { setActivePageId } from "../app/navigation.js";
+import { openPanelAt, setActivePageId } from "../app/navigation.js";
 import { TaskDialog } from "./task-dialog.js";
 import { SearchDialog, useSearchHotkey } from "./search.js";
 import { AMBIENCE_KINDS, useAmbience } from "../app/sound.js";
@@ -58,6 +59,9 @@ import { openImmersive } from "../app/immersive.js";
 registerCopy("focus", {
   zh: {
     headline: "今天，也要慢慢向前。",
+    gradingBanner: "{name}：{n} 份作业已交，等着批改或订正",
+    gradingBannerAll: "{n} 份作业已交，等着批改或订正",
+    gradingBannerAction: "打开应试教育",
     sub: "专注当下，让每一小步都有回响。",
     newTask: "新建任务",
     statFocus: "今日专注",
@@ -1008,6 +1012,56 @@ function TaskGroup({ title, tasks, data, today, view, busy, actions, onHelp }) {
   );
 }
 
+/** 今日页顶部的「已交待批改」横幅：只提示，不改动作，点击进应试教育页。 */
+function GradingBanner({ items, total }) {
+  const first = items[0];
+  const label =
+    items.length === 1 && first.name
+      ? t("focus.gradingBanner", { name: first.name, n: total })
+      : t("focus.gradingBannerAll", { n: total });
+  return h(
+    "div",
+    { style: { marginTop: 14 } },
+    h(
+      Card,
+      {
+        pad: 14,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+          border: "1px solid var(--tomato-line)",
+          background: "var(--tomato-brand-soft)",
+        },
+      },
+      h(Icon, { name: "bell", size: 15, color: "var(--tomato-brand-deep)" }),
+      h(
+        "div",
+        {
+          style: {
+            flex: "1 1 240px",
+            minWidth: 0,
+            fontSize: 12.5,
+            color: "var(--tomato-ink)",
+          },
+        },
+        label,
+      ),
+      h(
+        Btn,
+        {
+          variant: "ghost",
+          size: "sm",
+          icon: "arrowRight",
+          onClick: () => openPanelAt("education"),
+        },
+        t("focus.gradingBannerAction"),
+      ),
+    ),
+  );
+}
+
 function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp }) {
   // 今日专注只呈现「今天计划」的任务；逾期任务在全部任务里单独处理。
   const pending = todayTasks(data, today);
@@ -1694,6 +1748,8 @@ export function FocusPage() {
   const projects = Array.isArray(data.projects) ? data.projects : [];
   const view = timerView(state);
   const pending = todayTasks(data, today);
+  // 已交未批改 / 待复核：旧版在今日页顶部放一条横幅，点进去处理。
+  const grading = educationGrading(data);
 
   const run = async (action, message) => {
     setBusy(true);
@@ -1838,6 +1894,9 @@ export function FocusPage() {
     { className: "t-root", style: { width: "100%", minWidth: 0 } },
     header,
     h(StatRow, { stats, pendingCount: pending.length }),
+    grading.total > 0
+      ? h(GradingBanner, { items: grading.items, total: grading.total })
+      : null,
     h(
       "div",
       { style: { display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" } },

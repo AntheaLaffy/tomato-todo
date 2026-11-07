@@ -72,6 +72,11 @@ export function getExportBackup(opts) {
   return request("/api/export/backup", { timeoutMs: 30000, ...opts });
 }
 
+/** 已安装桌面应用（GET /api/apps）→ {apps: [{id, name, icon, exec}], count}。 */
+export function getApps(opts) {
+  return request("/api/apps", opts);
+}
+
 /** guard 与 runtime 健康摘要（GET /health）。 */
 export function getHealth(opts) {
   return request("/health", opts);

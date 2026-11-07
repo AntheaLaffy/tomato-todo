@@ -14,6 +14,7 @@ import {
   desiredGuard,
   projectUiState,
 } from "../src/server.mjs";
+import { parseDesktopEntry } from "../src/apps.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "tomato-state-"));
 const TOKEN = "state-token";
@@ -555,4 +556,79 @@ test("desiredGuard：锁机优先、白名单专注按保护模式、空闲解�
     Object.assign(data.timer, original.timer);
     Object.assign(data.lock, original.lock);
   }
+});
+
+test("GET /api/apps：返回已安装应用（id=桌面入口文件名），并有解析单测", async () => {
+  const res = await fetch(`${base}/api/apps`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(Array.isArray(body.apps));
+  assert.equal(body.count, body.apps.length);
+  for (const app of body.apps) {
+    assert.equal(typeof app.id, "string");
+    // id 是桌面入口文件名去后缀；像 com.ccswitch.desktop.desktop 这种带点的
+    // 名字去掉后缀后仍然以 .desktop 结尾，属于合法 id，不能拿后缀当断言。
+    assert.ok(app.id.length > 0 && !app.id.startsWith("."));
+    assert.equal(typeof app.name, "string");
+    assert.ok(app.name.length > 0);
+  }
+});
+
+test("parseDesktopEntry：跳过 NoDisplay/Hidden/非 Application，优先中文名", () => {
+  const base = "[Desktop Entry]\nType=Application\nName=Files\nExec=nautilus %U\n";
+  assert.deepEqual(parseDesktopEntry(base), {
+    exec: "nautilus",
+    icon: "",
+    name: "Files",
+    comment: "",
+  });
+  assert.equal(parseDesktopEntry(`${base}NoDisplay=true\n`), null);
+  assert.equal(parseDesktopEntry(`${base}Hidden=true\n`), null);
+  assert.equal(parseDesktopEntry("[Desktop Entry]\nType=Link\nName=x\n"), null);
+  // 其它分组里的 Name 不算数
+  assert.equal(
+    parseDesktopEntry("[Desktop Action new]\nName=New window\n"),
+    null,
+  );
+});
+
+test("POST /api/dispatch：习惯可带多个时段，撞在同一 (day|time) 会被 core 拒绝", async () => {
+  const post = (action) =>
+    fetch(`${base}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    }).then(async (res) => ({ status: res.status, body: await res.json() }));
+
+  const saved = await post({
+    type: "saveHabit",
+    id: null,
+    name: "早晚各读一次",
+    projectId: null,
+    focusMinutes: null,
+    slots: [
+      { days: [1, 3, 5], time: "08:00" },
+      { days: [2, 4], time: "20:30" },
+    ],
+  });
+  assert.equal(saved.status, 200);
+  const data = saved.body.snapshot.data;
+  const habit = data.habits.find((item) => item.name === "早晚各读一次");
+  assert.ok(habit);
+  const template = data.templates.find((tpl) => tpl.shape.habitId === habit.id);
+  assert.equal(template.printing.slots.length, 2);
+  assert.deepEqual(template.printing.slots.map((s) => s.time), ["08:00", "20:30"]);
+
+  const clash = await post({
+    type: "saveHabit",
+    id: habit.id,
+    name: "早晚各读一次",
+    projectId: null,
+    focusMinutes: null,
+    slots: [
+      { days: [1], time: "08:00" },
+      { days: [1], time: "08:00" },
+    ],
+  });
+  assert.equal(clash.status, 400);
 });

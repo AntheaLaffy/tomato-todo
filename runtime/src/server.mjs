@@ -1,6 +1,6 @@
 // HTTP API（127.0.0.1:43987）：
 // - 只读端点 GET /health /api/snapshot /api/today /api/stats /api/state
-//   /api/export/{plan,backup}：允许 Origin http://127.0.0.1:3080 的 CORS，
+//   /api/apps /api/export/{plan,backup}：允许 Origin http://127.0.0.1:3080 的 CORS，
 //   供 DSH 插件 UI 直连。UI 数据面只认 /api/state（全量快照 + guard 摘要）。
 // - 写端点 POST /api/dispatch（UI 数据面，body {action}）与旧写端点
 //   POST/PATCH /api/tasks*、/api/focus*、/api/tasks/move：同 Origin 白名单
@@ -10,6 +10,7 @@
 import { createServer } from "node:http";
 import { gzipSync } from "node:zlib";
 import { mcpMethod, safeEqual } from "./mcp.mjs";
+import { listApps } from "./apps.mjs";
 import { GuardClient } from "./guard-client.ts";
 
 export const UI_ORIGIN = "http://127.0.0.1:3080";
@@ -345,6 +346,11 @@ async function handleApi(req, res, url, ctx) {
       return sendApi(res, 200, { ...view, dueCount, focusMinutes });
     }
     if (path === "/api/stats") return sendApi(res, 200, engine.stats(now()));
+    if (path === "/api/apps") {
+      // 白名单要填 app_id（.desktop 文件名），所以枚举的是已安装应用而不是窗口。
+      const { apps, cached } = listApps(now());
+      return sendApi(res, 200, { apps, count: apps.length, cached, asOf: now() });
+    }
     sendApi(res, 404, { error: "Not found" });
     return;
   }

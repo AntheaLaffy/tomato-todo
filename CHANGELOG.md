@@ -21,6 +21,10 @@
 - 学习助手不再内置：对话、审阅与教学全部交给 DSH，助手经 MCP（`--mcp` stdio 或 `/mcp` streamable HTTP）接管 tomato-runtime；MCP 工具语义沿用旧外部清单，实现全部重写。
 - runtime MCP 工具补齐教学面：新增 `education`（学期/课程/作业/考试/答卷/批改/订正/学情写入，`command.op`）、`get_education` / `get_study_progress` / `get_tasks`（分页读取）与 `apply_file`（导出文件按哈希应用）；`tomato_today` 改用 camelCase 的 `get_context` 形状并返回结构化对象。旧清单里已随内置助手移除的 `get_control_status` / `set_external_control` / `review_file` / `read_file` / `patch_file` 等不再暴露——文件读写、搜索、定时由 DSH 自带工具承担。
 - 存储改为计划 JSON 文件（`plan.json`）唯一数据源，原子写；旧 SQLite 提供一次性导出脚本。
+- 专注保护白名单补上应用枚举：`GET /api/apps` 扫 XDG 桌面入口（含 flatpak 导出），返回 `{id, name, exec, icon}`，`id` 就是 guard 精确匹配的 app_id；页面「刷新应用」把中文名摆出来、id 挂在提示上，未启动的应用也能选。结果按 30 秒缓存。
+- 桌面系统通知接上原生侧：runtime 每秒 tick 发现新提醒或一轮计时结束时，按 `settings.notifications` 调 guard 的 `notify` 发系统通知；浏览器失焦或没授权也能看到。抢焦与通知是同一次跃迁，失败只记一行日志、不重试。
+- 今日专注页补回「已交待批改」横幅：按项目聚合答卷未批改与批改后待复核的数量，点击切到应试教育页；判定与应试教育页共用 `shared/derive.js` 的 `educationGrading`，两处不会再各说一套。
+- 习惯对话框支持多时段：每个时段各带星期与时间，可增删（最多 49 个），同一天同一时间重复会被 core 拒绝；原来「另有 N 个时段保持不变」只读提示删除。
 
 ### 移除
 

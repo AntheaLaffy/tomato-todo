@@ -137,9 +137,28 @@ export async function main(argv) {
   };
   const pendingReminders = () =>
     engine.data.tasks.filter((task) => task && task.reminderPending).length;
+
+  // 桌面系统通知也走 guard：浏览器里的 Web Notification 在窗口失焦/权限未授予时
+  // 不可靠，而 guard 已经能调系统通知中心。只在设置开着时发；失败不重试——
+  // 到点这件事本身已经由前端提醒条与抢焦兜住了。
+  const notifyDesktop = (title, body) => {
+    if (!engine.data.settings.notifications) return;
+    void guard.notify({ title, body }).then((result) => {
+      if (!result.ok) {
+        console.error(`guard notify 失败：${result.error ?? `HTTP ${result.status}`}`);
+      }
+    });
+  };
+  const newlyPending = (beforeIds, afterIds) => {
+    const before = new Set(beforeIds);
+    return afterIds.filter((id) => !before.has(id));
+  };
+  const reminderIds = () =>
+    engine.data.tasks.filter((task) => task && task.reminderPending).map((task) => task.id);
   let prev = {
     serial: Number(engine.data.timer.completionSerial) || 0,
     reminders: pendingReminders(),
+    reminderIds: reminderIds(),
   };
 
   // 每秒 tick：计时到点、提醒送达、自动开工、锁机时段（都在 core.tick）+ guard
@@ -151,9 +170,20 @@ export async function main(argv) {
     const next = {
       serial: Number(engine.data.timer.completionSerial) || 0,
       reminders: pendingReminders(),
+      reminderIds: reminderIds(),
     };
-    // 首次 tick 只建立基线：启动时已有的 pending 提醒不抢焦点。
-    if (next.serial > prev.serial || next.reminders > prev.reminders) focusDsh();
+    // 首次 tick 只建立基线：启动时已有的 pending 提醒不抢焦点、也不补发通知。
+    const fresh = newlyPending(prev.reminderIds, next.reminderIds);
+    if (next.serial > prev.serial || fresh.length > 0) {
+      focusDsh();
+      if (next.serial > prev.serial) {
+        notifyDesktop("番茄 Todo", "这一轮专注结束了，起来动一动。");
+      }
+      for (const id of fresh) {
+        const task = engine.data.tasks.find((item) => item.id === id);
+        notifyDesktop("番茄 Todo", task ? `到点了：${task.title}` : "有一项任务到点了。");
+      }
+    }
     prev = next;
   }, 1000);
 

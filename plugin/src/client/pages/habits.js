@@ -78,7 +78,11 @@ registerCopy("habits", {
     time: "时间",
     focusMinutes: "专注时长（分钟）",
     focusMinutesHint: "留空使用默认 {n}",
-    extraSlots: "另有 {n} 个时段保持不变",
+    slotTitle: "时段 {n}",
+    addSlot: "添加时段",
+    removeSlot: "删除",
+    slotDuplicate: "有两个时段撞在同一天的同一时间了",
+    slotsLimit: "一个习惯最多 49 个时段",
     nameError: "名称需为 1–40 个字符",
     daysError: "请至少选择一天",
     timeError: "时间格式需为 HH:MM",
@@ -141,7 +145,11 @@ registerCopy("habits", {
     time: "Time",
     focusMinutes: "Focus length (minutes)",
     focusMinutesHint: "Empty uses the default {n}",
-    extraSlots: "{n} more slot(s) stay unchanged",
+    slotTitle: "Slot {n}",
+    addSlot: "Add slot",
+    removeSlot: "Remove",
+    slotDuplicate: "Two slots land on the same day and time",
+    slotsLimit: "A habit holds at most 49 slots",
     nameError: "Name must be 1–40 characters",
     daysError: "Pick at least one day",
     timeError: "Time must be HH:MM",
@@ -602,31 +610,54 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
   const habit = editing ? habits.find((item) => item && item.id === habitId) || null : null;
   const template = habitTemplate(templates, habitId);
   const shape = (template && template.shape) || {};
+  // 时段是「一天出现几次」的唯一描述：同一个习惯可以「周三 08:00」加「周日 20:00」，
+  // core 的每周循环校验按 (day|time) 去重，所以每个时段各自带星期与时间。
   const initialSlots = slotsOfTemplate(template);
-  const firstSlot = initialSlots[0] || null;
-  const extraSlots = initialSlots.slice(1).map((slot) => ({
-    days: slot.days.filter((day) => day >= 1 && day <= 7),
-    time: slot.time,
-  }));
-  const initialDays =
-    firstSlot && Array.isArray(firstSlot.days) && firstSlot.days.length > 0
-      ? Array.from(new Set(firstSlot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b)
-      : [...ALL_DAYS];
+  const slotsFromTemplate =
+    initialSlots.length > 0
+      ? initialSlots.map((slot) => ({
+          days:
+            Array.isArray(slot.days) && slot.days.length > 0
+              ? Array.from(new Set(slot.days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b)
+              : [...ALL_DAYS],
+          time: normalizeTime(slot.time),
+        }))
+      : [{ days: [...ALL_DAYS], time: normalizeTime(null) }];
   const defaultFocus = Number((data.settings || {}).focusMinutes) || 45;
 
   const [name, setName] = useState(habit && typeof habit.name === "string" ? habit.name : "");
   const [projectId, setProjectId] = useState(shape.projectId || "");
-  const [frequency, setFrequency] = useState(initialDays.length === 7 ? "daily" : "weekly");
-  const [days, setDays] = useState(initialDays);
-  const [time, setTime] = useState(normalizeTime(firstSlot ? firstSlot.time : ""));
+  const [slots, setSlots] = useState(slotsFromTemplate);
   const [focus, setFocus] = useState(Number(shape.focusMinutes) >= 1 ? String(shape.focusMinutes) : "");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const toggleDay = (day) => {
-    setDays((previous) =>
-      previous.includes(day) ? previous.filter((item) => item !== day) : [...previous, day].sort((a, b) => a - b),
+  const patchSlot = (index, patch) => {
+    setSlots((previous) => previous.map((slot, at) => (at === index ? { ...slot, ...patch } : slot)));
+  };
+
+  const toggleSlotDay = (index, day) => {
+    setSlots((previous) =>
+      previous.map((slot, at) => {
+        if (at !== index) return slot;
+        const days = slot.days.includes(day)
+          ? slot.days.filter((item) => item !== day)
+          : [...slot.days, day].sort((a, b) => a - b);
+        return { ...slot, days };
+      }),
     );
+  };
+
+  const addSlot = () => {
+    setSlots((previous) => {
+      const last = previous[previous.length - 1];
+      const next = { days: [...(last ? last.days : ALL_DAYS)], time: "20:00" };
+      return [...previous, next];
+    });
+  };
+
+  const removeSlot = (index) => {
+    setSlots((previous) => previous.filter((_, at) => at !== index));
   };
 
   const submit = async () => {
@@ -636,14 +667,32 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
       setError(t("habits.nameError"));
       return;
     }
-    const slotDays = frequency === "daily" ? [...ALL_DAYS] : days;
-    if (slotDays.length === 0) {
+    if (slots.length === 0) {
       setError(t("habits.daysError"));
       return;
     }
-    if (parseHHMM(time) === null) {
-      setError(t("habits.timeError"));
+    if (slots.length > 49) {
+      setError(t("habits.slotsLimit"));
       return;
+    }
+    const seen = new Set();
+    for (const slot of slots) {
+      if (slot.days.length === 0) {
+        setError(t("habits.daysError"));
+        return;
+      }
+      if (parseHHMM(slot.time) === null) {
+        setError(t("habits.timeError"));
+        return;
+      }
+      for (const day of slot.days) {
+        const key = `${day}|${fmtHHMM(parseHHMM(slot.time))}`;
+        if (seen.has(key)) {
+          setError(t("habits.slotDuplicate"));
+          return;
+        }
+        seen.add(key);
+      }
     }
     const focusRaw = focus.trim();
     const focusMinutes = focusRaw === "" ? null : Number(focusRaw);
@@ -659,7 +708,10 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
       name: trimmed,
       projectId: projectId ? projectId : null,
       focusMinutes,
-      slots: [{ days: slotDays, time: fmtHHMM(parseHHMM(time)) }, ...extraSlots],
+      slots: slots.map((slot) => ({
+        days: slot.days,
+        time: fmtHHMM(parseHHMM(slot.time)),
+      })),
     });
     setBusy(false);
     if (!result.ok) {
@@ -698,55 +750,93 @@ function HabitDialog({ mode, habitId, data, onClose, onRequestDelete }) {
     ),
     h(
       "div",
-      { style: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 } },
-      h(
-        "span",
-        { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
-        t("habits.schedule"),
-      ),
+      { style: { display: "flex", flexDirection: "column", gap: 8, minWidth: 0 } },
       h(
         "div",
-        { style: { display: "flex", flexDirection: "column", gap: 9 } },
-        h(Segmented, {
-          items: [
-            { value: "daily", label: t("habits.everyDay") },
-            { value: "weekly", label: t("habits.weekly") },
-          ],
-          value: frequency,
-          onChange: setFrequency,
-          size: "sm",
-        }),
-        frequency === "weekly"
-          ? h(
-              "div",
-              { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
-              ALL_DAYS.map((day) =>
-                h(
-                  Chip,
-                  {
-                    key: day,
-                    tone: "neutral",
-                    active: days.includes(day),
-                    onClick: () => toggleDay(day),
-                  },
-                  weekFull[day - 1] || String(day),
-                ),
-              ),
-            )
-          : null,
+        { style: { display: "flex", alignItems: "center", gap: 8 } },
+        h(
+          "span",
+          { style: { fontSize: 12, fontWeight: 550, color: "var(--tomato-ink-2)" } },
+          t("habits.schedule"),
+        ),
+        h("div", { style: { flex: 1 } }),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "plus",
+            disabled: slots.length >= 49,
+            onClick: addSlot,
+          },
+          t("habits.addSlot"),
+        ),
+      ),
+      slots.map((slot, index) =>
         h(
           "div",
-          { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" } },
-          h("span", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, t("habits.time")),
-          h(Input, { type: "time", value: time, onChange: setTime, style: { width: 150 } }),
-        ),
-        extraSlots.length > 0
-          ? h(
-              "div",
+          {
+            key: index,
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid var(--tomato-line)",
+              background: "var(--tomato-surface-2)",
+            },
+          },
+          h(
+            "div",
+            { style: { display: "flex", alignItems: "center", gap: 8 } },
+            h(
+              "span",
               { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-              t("habits.extraSlots", { n: extraSlots.length }),
-            )
-          : null,
+              t("habits.slotTitle", { n: index + 1 }),
+            ),
+            h("div", { style: { flex: 1 } }),
+            slots.length > 1
+              ? h(
+                  Btn,
+                  {
+                    variant: "plain",
+                    size: "sm",
+                    icon: "trash",
+                    onClick: () => removeSlot(index),
+                  },
+                  t("habits.removeSlot"),
+                )
+              : null,
+          ),
+          h(
+            "div",
+            { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+            ALL_DAYS.map((day) =>
+              h(
+                Chip,
+                {
+                  key: day,
+                  tone: "neutral",
+                  active: slot.days.includes(day),
+                  onClick: () => toggleSlotDay(index, day),
+                },
+                weekFull[day - 1] || String(day),
+              ),
+            ),
+          ),
+          h(
+            "div",
+            { style: { display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" } },
+            h("span", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, t("habits.time")),
+            h(Input, {
+              type: "time",
+              value: slot.time,
+              onChange: (value) => patchSlot(index, { time: value }),
+              style: { width: 150 },
+            }),
+          ),
+        ),
       ),
     ),
     h(
