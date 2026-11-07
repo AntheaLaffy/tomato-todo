@@ -242,6 +242,7 @@ const expectedSlots = [
   "sidebar.brand.name",
   "conversation.hero.brand.mark",
   "settings.general.item",
+  "sidebar.panellist",
   "sidebar.footer.action",
   "conversation.header.leading",
 ];

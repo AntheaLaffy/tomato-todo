@@ -37,6 +37,16 @@ function localeId(locale) {
   }
 }
 
+/** 面板列表里的番茄图标（挨着「工作区」上方的那一组，跟随选中态加深）。 */
+function PanelIcon({ size, active }) {
+  return h(Icon, {
+    name: "tomato",
+    size: size || 20,
+    stroke: active ? 1.8 : 1.5,
+    style: { color: active ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" },
+  });
+}
+
 export function registerApp(ctx) {
   const locale = ctx.get ? ctx.get("locale") : null;
   setLocale(localeId(locale));
@@ -133,8 +143,15 @@ export function registerApp(ctx) {
 
   safeInject("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
 
-  // 番茄入口只放在工作区列表下方（sidebar.footer.action）：左上角的面板列表图标
-  // 会重复，而且位置固定在工作区之上，无法下移。入口少而清晰。
+  // 两处入口都保留：面板列表里挨着「工作区」的那一组有一枚番茄图标（DSH 的
+  // sidebar.panellist 槽位，位置在工作区上方），左下角还有一条「番茄 Todo · N/M →」
+  // 满宽条目（sidebar.footer.action，紧挨工作区列表下方）。用户明确要两处都在。
+  safeInject(
+    "sidebar.panellist",
+    { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
+    PanelIcon,
+  );
+
   safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-overlay", order: 900 }, () =>
     h(AppOverlay, { openPanel }),
   );
