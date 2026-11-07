@@ -1196,6 +1196,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       guard: "フォーカスガード",
       schedule: "予定されたロック",
       preferences: "設定",
+      project: "プロジェクト",
       assistant: "学習アシスタント",
       assistantHint: "DSH会話に戻る（トマトビューは折りたたまれます）",
       space: "マイスペース",
@@ -3313,15 +3314,26 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     API_BASE: () => API_BASE,
     ApiError: () => ApiError,
     authorizeLibrary: () => authorizeLibrary,
+    authorizeProjectDirectory: () => authorizeProjectDirectory,
+    cleanupProjectResources: () => cleanupProjectResources,
     getApps: () => getApps,
     getExportBackup: () => getExportBackup,
     getExportPlan: () => getExportPlan,
+    getFileToken: () => getFileToken,
     getHealth: () => getHealth,
     getLibraryGrant: () => getLibraryGrant,
+    getLibraryItems: () => getLibraryItems,
+    getLibraryStats: () => getLibraryStats,
+    getProjectGrant: () => getProjectGrant,
+    getProjectResources: () => getProjectResources,
     getState: () => getState,
+    libraryFileUrl: () => libraryFileUrl,
     ping: () => ping,
     postDispatch: () => postDispatch,
+    registerProjectResource: () => registerProjectResource,
+    repairProjectResource: () => repairProjectResource,
     revokeLibraryGrant: () => revokeLibraryGrant,
+    scanLibrary: () => scanLibrary,
     scanProjectLibrary: () => scanProjectLibrary,
     setDesktopFullscreen: () => setDesktopFullscreen
   });
@@ -3393,6 +3405,87 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       "/api/projects/" + encodeURIComponent(id) + "/resources/scan",
       {
         timeoutMs: 3e4,
+        ...opts
+      }
+    );
+  }
+  function scanLibrary(opts) {
+    return request("/api/library/scan", {
+      method: "POST",
+      timeoutMs: 12e4,
+      ...opts
+    });
+  }
+  function getLibraryStats(opts) {
+    return request("/api/library/stats", { timeoutMs: 8e3, ...opts });
+  }
+  function getLibraryItems({ projectId, q = "", kind = "", offset = 0, limit = 40 } = {}, opts) {
+    const params = new URLSearchParams({
+      offset: String(offset),
+      limit: String(limit)
+    });
+    if (projectId) params.set("projectId", projectId);
+    if (q) params.set("q", q);
+    if (kind) params.set("kind", kind);
+    return request("/api/library/items?" + params.toString(), {
+      timeoutMs: 15e3,
+      ...opts
+    });
+  }
+  function getFileToken(opts) {
+    return request("/api/file-token", opts);
+  }
+  function libraryFileUrl(path, access, download = false) {
+    const params = new URLSearchParams({ path, access });
+    if (download) params.set("download", "1");
+    return API_BASE + "/api/library/file?" + params.toString();
+  }
+  function getProjectGrant(id, opts) {
+    return request("/api/projects/" + encodeURIComponent(id) + "/grant", opts);
+  }
+  function authorizeProjectDirectory(id, directory, opts) {
+    return request("/api/projects/" + encodeURIComponent(id) + "/authorize", {
+      method: "POST",
+      body: { directory },
+      ...opts
+    });
+  }
+  function getProjectResources(id, { q = "", kind = "", status = "", offset = 0, limit = 40 } = {}, opts) {
+    const params = new URLSearchParams({
+      offset: String(offset),
+      limit: String(limit)
+    });
+    if (q) params.set("q", q);
+    if (kind) params.set("kind", kind);
+    if (status) params.set("status", status);
+    return request(
+      "/api/projects/" + encodeURIComponent(id) + "/resources?" + params,
+      opts
+    );
+  }
+  function registerProjectResource(id, resource, opts) {
+    return request("/api/projects/" + encodeURIComponent(id) + "/resources", {
+      method: "POST",
+      body: { resource },
+      ...opts
+    });
+  }
+  function cleanupProjectResources(id, ids, opts) {
+    return request(
+      "/api/projects/" + encodeURIComponent(id) + "/resources/cleanup",
+      {
+        method: "POST",
+        body: ids === void 0 ? {} : { ids },
+        ...opts
+      }
+    );
+  }
+  function repairProjectResource(id, resourceId, path, opts) {
+    return request(
+      "/api/projects/" + encodeURIComponent(id) + "/resources/" + encodeURIComponent(resourceId) + "/repair",
+      {
+        method: "POST",
+        body: { path },
         ...opts
       }
     );
@@ -4447,6 +4540,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   var LEGACY_PAGE_KEY = "tomato-dsh.page";
   var BOOT_KEY = "tomato-dsh.booted";
   var activePageId = null;
+  var activeProjectId = null;
   var openPanelFn = null;
   var panelInfoObs = null;
   var coldStart = null;
@@ -4490,7 +4584,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         if (parsed && typeof parsed === "object") {
           return {
             panel: parsed.panel === "tomato" ? "tomato" : "conversation",
-            page: typeof parsed.page === "string" && parsed.page !== "" ? parsed.page : null
+            page: typeof parsed.page === "string" && parsed.page !== "" ? parsed.page : null,
+            projectId: typeof parsed.projectId === "string" && parsed.projectId !== "" ? parsed.projectId : null
           };
         }
       } catch {
@@ -4498,15 +4593,20 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     }
     const legacy = readLegacyPage();
     if (legacy === null || legacy === "") return null;
-    const migrated = { panel: "conversation", page: legacy };
+    const migrated = { panel: "conversation", page: legacy, projectId: null };
     writeNavState(migrated);
     return migrated;
   }
   function writeNavState(state) {
-    sessionSet(NAV_KEY, JSON.stringify(state));
+    const payload = { panel: state.panel, page: state.page };
+    if (typeof state.projectId === "string" && state.projectId !== "") {
+      payload.projectId = state.projectId;
+    }
+    sessionSet(NAV_KEY, JSON.stringify(payload));
   }
   function resetActivePageCache() {
     activePageId = null;
+    activeProjectId = null;
     coldStart = null;
     lastCompleteSerial = 0;
   }
@@ -4526,7 +4626,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const state = readNavState();
     writeNavState({
       panel: visible ? "tomato" : "conversation",
-      page: state && state.page || activePageId || readLegacyPage()
+      page: state && state.page || activePageId || readLegacyPage(),
+      projectId: activeProjectId ?? (state ? state.projectId : null)
     });
   }
   function dialogOpen() {
@@ -4543,21 +4644,37 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     }
     return activePageId;
   }
-  function setActivePageId(id) {
-    if (typeof id !== "string" || id === "") return;
+  function getActiveProjectId() {
+    if (activeProjectId === null) {
+      const state = readNavState();
+      activeProjectId = state && typeof state.projectId === "string" ? state.projectId : null;
+    }
+    return activeProjectId;
+  }
+  function applyPage(id, projectId) {
     activePageId = id;
+    activeProjectId = projectId ?? null;
     const state = readNavState();
     writeNavState({
       panel: state && state.panel ? state.panel : "conversation",
-      page: id
+      page: id,
+      projectId: activeProjectId
     });
     writeLegacyPage(id);
     for (const fn of Array.from(listeners5)) {
       try {
-        fn(id);
+        fn(id, activeProjectId);
       } catch {
       }
     }
+  }
+  function setActivePageId(id) {
+    if (typeof id !== "string" || id === "") return;
+    applyPage(id, id === "project" ? getActiveProjectId() : null);
+  }
+  function openProject(projectId) {
+    if (typeof projectId !== "string" || projectId === "") return;
+    applyPage("project", projectId);
   }
   function subscribe2(fn) {
     listeners5.add(fn);
@@ -4598,12 +4715,14 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     }
     if (!grab) return false;
     const target = targetPage(reason, page, state);
-    if (target && target !== activePageId) {
+    const projectId = target === "project" ? state && state.projectId || null : null;
+    if (target && (target !== activePageId || projectId !== activeProjectId)) {
       activePageId = target;
+      activeProjectId = projectId;
       writeLegacyPage(target);
       for (const fn of Array.from(listeners5)) {
         try {
-          fn(target);
+          fn(target, projectId);
         } catch {
         }
       }
@@ -4611,7 +4730,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     selectPanelWithRetry("tomato");
     writeNavState({
       panel: "tomato",
-      page: target || state && state.page || null
+      page: target || state && state.page || null,
+      projectId: target ? projectId : activeProjectId
     });
     return true;
   }
@@ -4620,33 +4740,25 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     if (currentPanelId() === "tomato") {
       const state = readNavState();
       const page = state && state.page || "focus";
-      if (page !== activePageId) {
+      const projectId = page === "project" ? state && state.projectId || null : null;
+      if (page !== activePageId || projectId !== activeProjectId) {
         activePageId = page;
+        activeProjectId = projectId;
         writeLegacyPage(page);
         for (const fn of Array.from(listeners5)) {
           try {
-            fn(page);
+            fn(page, projectId);
           } catch {
           }
         }
       }
-      writeNavState({ panel: "tomato", page });
+      writeNavState({ panel: "tomato", page, projectId });
       return false;
     }
     return navigate({ reason: "restore" });
   }
   var pendingTasksFilter = null;
   var filterListeners = /* @__PURE__ */ new Set();
-  function openTasksForProject(projectId = null) {
-    pendingTasksFilter = projectId;
-    for (const fn of Array.from(filterListeners)) {
-      try {
-        fn(projectId);
-      } catch {
-      }
-    }
-    setActivePageId("tasks");
-  }
   function takeTasksFilter() {
     const value = pendingTasksFilter;
     pendingTasksFilter = null;
@@ -4697,6 +4809,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const saved = getActivePageId();
     if (saved && pages.some((page) => page.id === saved)) return saved;
     return pages.length > 0 ? pages[0].id : null;
+  }
+  function navPagesOf(pages) {
+    return pages.filter((page) => page.hidden !== true);
   }
   function useViewportNarrow(threshold = 980) {
     const [narrow, setNarrow] = useState(
@@ -5004,7 +5119,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       )
     );
   }
-  function ProjectList({ projects, counts }) {
+  function ProjectList({ projects, counts, activeProjectId: activeProjectId2 }) {
     if (!projects || projects.length === 0) return null;
     return h(
       "div",
@@ -5017,8 +5132,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             key: project.id,
             type: "button",
             className: "t-navitem",
+            "data-active": activeProjectId2 === project.id,
             title: project.name,
-            onClick: () => openTasksForProject(project.id),
+            onClick: () => openProject(project.id),
             style: { padding: "8px 12px", fontSize: 13 }
           },
           h(Dot, { color: project.color || "var(--tomato-ink-3)", size: 8 }),
@@ -5050,6 +5166,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   function NavColumn({
     pages,
     activeId,
+    activeProjectId: activeProjectId2,
     onSelect,
     state,
     compact,
@@ -5064,7 +5181,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       if (!task || task.completed || !task.projectId) continue;
       counts.set(task.projectId, (counts.get(task.projectId) || 0) + 1);
     }
-    const navPages = compact ? pages : pages.filter((page) => page.id !== "preferences");
+    const publicPages = navPagesOf(pages);
+    const navPages = compact ? publicPages : publicPages.filter((page) => page.id !== "preferences");
     const items = [];
     for (const page of navPages) {
       items.push(
@@ -5123,7 +5241,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         style: { marginTop: 8 }
       }),
       items,
-      compact ? null : h(ProjectList, { projects, counts }),
+      compact ? null : h(ProjectList, {
+        projects,
+        counts,
+        activeProjectId: activeId === "project" ? activeProjectId2 : null
+      }),
       h(NavFooter, { state, compact, activeId, onSelect })
     );
   }
@@ -5154,9 +5276,18 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     }, []);
     const pages = pageList();
     const [activeId, setActiveId] = useState(() => loadActivePage(pages));
+    const [activeProjectId2, setActiveProjectId] = useState(
+      () => getActiveProjectId()
+    );
     const narrow = useViewportNarrow();
     const active2 = pages.find((page) => page.id === activeId) ?? pages[0] ?? null;
-    useEffect(() => subscribe2(setActiveId), []);
+    useEffect(
+      () => subscribe2((pageId, projectId) => {
+        setActiveId(pageId);
+        setActiveProjectId(projectId ?? null);
+      }),
+      []
+    );
     useEffect(() => {
       if (active2 === null && pages.length > 0) setActivePageId(pages[0].id);
     }, [pages.length]);
@@ -5187,6 +5318,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       h(NavColumn, {
         pages,
         activeId: active2 ? active2.id : null,
+        activeProjectId: activeProjectId2,
         onSelect: setActivePageId,
         state,
         compact: narrow,
@@ -5220,6 +5352,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           },
           active2 ? h(active2.Component, {
             state,
+            projectId: activeProjectId2,
             dispatch: props.dispatch,
             refresh,
             api: props.api,
@@ -7649,6 +7782,7 @@ ${JSON.stringify(refs, null, 2)}`;
       guard: "专注保护",
       schedule: "定时锁机",
       preferences: "偏好设置",
+      project: "项目",
       assistant: "学习助手",
       assistantHint: "回到 DSH 对话（番茄界面会收起）",
       space: "我的空间",
@@ -7668,6 +7802,7 @@ ${JSON.stringify(refs, null, 2)}`;
       guard: "Focus guard",
       schedule: "Scheduled lock",
       preferences: "Preferences",
+      project: "Project",
       assistant: "Learning assistant",
       assistantHint: "Back to the DSH conversation (Tomato view folds away)",
       space: "My space",
@@ -7808,12 +7943,12 @@ ${JSON.stringify(refs, null, 2)}`;
     const n = Number(text);
     return Number.isFinite(n) ? Math.round(n) : fallback;
   }
-  function blankTaskDraft(today, initialTitle = "") {
+  function blankTaskDraft(today, initialTitle = "", initialProjectId = "") {
     return {
       id: null,
       title: initialTitle ?? "",
       notes: "",
-      projectId: "",
+      projectId: initialProjectId ?? "",
       dueDate: today ?? "",
       reminderTime: "",
       focusMinutes: "",
@@ -7851,12 +7986,13 @@ ${JSON.stringify(refs, null, 2)}`;
     today = "",
     projects = [],
     settings = {},
-    initialTitle = ""
+    initialTitle = "",
+    initialProjectId = ""
   }) {
     const editing = task !== null && task !== void 0;
     const taskId = editing ? task.id : null;
     const [draft, setDraft] = useState(
-      () => editing ? taskToDraft(task) : blankTaskDraft(today, initialTitle)
+      () => editing ? taskToDraft(task) : blankTaskDraft(today, initialTitle, initialProjectId)
     );
     const [subInput, setSubInput] = useState("");
     const [error, setError] = useState(null);
@@ -7865,12 +8001,14 @@ ${JSON.stringify(refs, null, 2)}`;
     const subInputRef = useRef(null);
     useEffect(() => {
       if (!open) return;
-      setDraft(editing ? taskToDraft(task) : blankTaskDraft(today, initialTitle));
+      setDraft(
+        editing ? taskToDraft(task) : blankTaskDraft(today, initialTitle, initialProjectId)
+      );
       setSubInput("");
       setError(null);
       setBusy(false);
       setConfirmDelete(false);
-    }, [open, taskId, today, initialTitle]);
+    }, [open, taskId, today, initialTitle, initialProjectId]);
     if (!open) return null;
     const patch = (next) => setDraft((current4) => ({ ...current4, ...next }));
     const defaultFocus = Number(settings.focusMinutes) || 45;
@@ -14469,6 +14607,2238 @@ ${JSON.stringify(refs, null, 2)}`;
     }
   });
 
+  // plugin/src/client/shared/project-whitelist.js
+  registerCopy("pw", {
+    zh: {
+      title: "项目专属白名单",
+      hint: "替代通用清单（不是追加）；不设置时跟随通用。",
+      allHint: "每个项目可以覆盖通用白名单；不设置时跟随通用。",
+      follow: "跟随通用",
+      count: "{n} 个应用",
+      edit: "编辑",
+      clear: "跟随通用",
+      none: "还没有项目，先创建学习项目。",
+      empty: "还没有专属清单；从建议应用中选择，或手动输入 app id。",
+      dialogHint: "保存后只影响这个项目的专注；清空并保存等于跟随通用清单。",
+      saved: "已保存「{name}」的项目白名单",
+      followed: "「{name}」已改为跟随通用白名单",
+      manualTitle: "手动添加",
+      addApp: "添加",
+      appPlaceholder: "输入应用 id，如 code",
+      removeApp: "移除 {name}",
+      appRequired: "请先输入应用 id",
+      appNoSpace: "应用 id 不能包含空白",
+      appExists: "这个应用已经在清单里",
+      suggestionsTitle: "建议应用",
+      refreshApps: "刷新应用",
+      refreshBusy: "正在枚举…",
+      appsFailed: "读不到应用列表：{error}",
+      noSuggestions: "没有可添加的运行中应用。",
+      reset: "重置",
+      save: "保存"
+    },
+    en: {
+      title: "Project whitelist",
+      hint: "Replaces the general list (it does not add to it); follow the general one when unset.",
+      allHint: "Each project can override the general whitelist; unset means follow it.",
+      follow: "Follow general",
+      count: "{n} apps",
+      edit: "Edit",
+      clear: "Follow general",
+      none: "No projects yet; create a study project first.",
+      empty: "No project-specific list yet. Pick a running app or type an app id.",
+      dialogHint: "Saving only affects focus sessions for this project; saving an empty list means follow the general one.",
+      saved: "Saved the whitelist for “{name}”",
+      followed: "“{name}” now follows the general whitelist",
+      manualTitle: "Add manually",
+      addApp: "Add",
+      appPlaceholder: "App id, e.g. code",
+      removeApp: "Remove {name}",
+      appRequired: "Enter an app id first",
+      appNoSpace: "App ids cannot contain whitespace",
+      appExists: "That app is already on the list",
+      suggestionsTitle: "Suggested apps",
+      refreshApps: "Refresh apps",
+      refreshBusy: "Scanning…",
+      appsFailed: "Could not read the app list: {error}",
+      noSuggestions: "No running apps left to add.",
+      reset: "Reset",
+      save: "Save"
+    },
+    ja: {
+      title: "プロジェクト専用ホワイトリスト",
+      hint: "一般のリストを置き換えます（追加ではありません）。未設定なら一般に従います。",
+      allHint: "プロジェクトごとに一般のホワイトリストを上書きできます。未設定なら一般に従います。",
+      follow: "一般に従う",
+      count: "{n}件のアプリ",
+      edit: "編集",
+      clear: "一般に従う",
+      none: "プロジェクトがありません。先に学習プロジェクトを作成してください。",
+      empty: "専用リストはまだありません。実行中のアプリから選ぶか、アプリIDを入力してください。",
+      dialogHint: "保存はこのプロジェクトの集中だけに影響します。空のまま保存すると一般のリストに従います。",
+      saved: "「{name}」のプロジェクトホワイトリストを保存しました",
+      followed: "「{name}」は一般のホワイトリストに従うようになりました",
+      manualTitle: "手動で追加",
+      addApp: "追加",
+      appPlaceholder: "アプリID（例: code）",
+      removeApp: "{name} を削除",
+      appRequired: "先にアプリIDを入力してください",
+      appNoSpace: "アプリIDに空白は使用できません",
+      appExists: "そのアプリはすでにリストにあります",
+      suggestionsTitle: "推奨アプリ",
+      refreshApps: "アプリを更新",
+      refreshBusy: "スキャン中…",
+      appsFailed: "アプリ一覧を読み取れませんでした: {error}",
+      noSuggestions: "追加できる実行中のアプリはありません。",
+      reset: "リセット",
+      save: "保存"
+    }
+  });
+  function whitelistOf(project) {
+    return Array.isArray(project && project.appWhitelist) ? project.appWhitelist : null;
+  }
+  function sameList(a, b) {
+    return a.length === b.length && a.every((item, index) => item === b[index]);
+  }
+  function normalizeApps(result) {
+    const list = Array.isArray(result && result.apps) ? result.apps : [];
+    const seen = /* @__PURE__ */ new Set();
+    const apps = [];
+    for (const app of list) {
+      const id = String(app && app.id !== void 0 ? app.id : "").trim();
+      if (id === "" || seen.has(id)) continue;
+      seen.add(id);
+      apps.push({ id, name: String(app && app.name || id) });
+    }
+    apps.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+    return apps;
+  }
+  function WhitelistEditor({
+    selected,
+    draft,
+    onDraft,
+    onAdd,
+    onRemove,
+    apps,
+    appsBusy,
+    onRefreshApps,
+    disabled = false
+  }) {
+    const suggestions = [];
+    for (const app of apps ?? []) {
+      if (selected.includes(app.id)) continue;
+      suggestions.push(app);
+      if (suggestions.length >= 18) break;
+    }
+    return h(
+      "div",
+      null,
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            minHeight: 30
+          }
+        },
+        selected.length === 0 ? h(
+          "div",
+          { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+          t("pw.empty")
+        ) : selected.map(
+          (app) => h(
+            "span",
+            {
+              key: app,
+              style: {
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 2,
+                paddingLeft: 8,
+                paddingRight: 2,
+                borderRadius: 8,
+                background: "var(--tomato-brand-soft)",
+                flex: "none"
+              }
+            },
+            h(
+              Chip,
+              { tone: "brand", style: { background: "transparent" } },
+              app
+            ),
+            h(IconBtn, {
+              name: "x",
+              box: 18,
+              size: 11,
+              disabled,
+              title: t("pw.removeApp", { name: app }),
+              onClick: () => onRemove(app)
+            })
+          )
+        )
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            gap: 8,
+            alignItems: "flex-end",
+            marginTop: 12,
+            flexWrap: "wrap"
+          }
+        },
+        h(
+          Field,
+          {
+            label: t("pw.manualTitle"),
+            style: { flex: "1 1 220px", minWidth: 0 }
+          },
+          h(Input, {
+            value: draft,
+            disabled,
+            placeholder: t("pw.appPlaceholder"),
+            onChange: onDraft,
+            onKeyDown: (event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onAdd(draft);
+              }
+            }
+          })
+        ),
+        h(
+          Btn,
+          {
+            variant: "soft",
+            icon: "plus",
+            disabled,
+            onClick: () => onAdd(draft)
+          },
+          t("pw.addApp")
+        ),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            icon: "refresh",
+            disabled: disabled || appsBusy,
+            onClick: onRefreshApps
+          },
+          appsBusy ? t("pw.refreshBusy") : t("pw.refreshApps")
+        )
+      ),
+      apps === null ? null : h(
+        "div",
+        { style: { marginTop: 14 } },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              marginBottom: 7
+            }
+          },
+          t("pw.suggestionsTitle")
+        ),
+        suggestions.length === 0 ? h(
+          "div",
+          { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+          t("pw.noSuggestions")
+        ) : h(
+          "div",
+          { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+          suggestions.map(
+            (app) => h(
+              Chip,
+              {
+                key: app.id,
+                icon: "plus",
+                tone: "neutral",
+                title: app.name === app.id ? void 0 : app.id,
+                onClick: disabled ? void 0 : () => onAdd(app.id)
+              },
+              app.name
+            )
+          )
+        )
+      )
+    );
+  }
+  function ProjectWhitelistCard({ projects = [], project = null }) {
+    const single = project !== null && project !== void 0;
+    const [apps, setApps] = useState(null);
+    const [appsBusy, setAppsBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [draft, setDraft] = useState("");
+    const [selected, setSelected] = useState(
+      () => single ? whitelistOf(project) ?? [] : []
+    );
+    const [dirty, setDirty] = useState(false);
+    const [editing, setEditing] = useState(null);
+    const savedList = single ? whitelistOf(project) : null;
+    const savedKey = JSON.stringify(savedList);
+    const projectId = single ? project.id : null;
+    useEffect(() => {
+      if (!single || dirty) return;
+      setSelected(savedList ?? []);
+    }, [projectId, savedKey, dirty]);
+    const suggestionsLoaded = apps !== null;
+    async function loadApps() {
+      if (appsBusy) return;
+      setAppsBusy(true);
+      try {
+        setApps(normalizeApps(await getApps()));
+      } catch (e) {
+        setApps([]);
+        notify(
+          t("pw.appsFailed", {
+            error: e && (e.userMessage || e.message) || "unknown"
+          }),
+          "danger"
+        );
+      } finally {
+        setAppsBusy(false);
+      }
+    }
+    function checkApp(raw, list) {
+      const app = String(raw ?? "").trim();
+      if (app === "") {
+        setError(t("pw.appRequired"));
+        return null;
+      }
+      if (/\s/.test(app)) {
+        setError(t("pw.appNoSpace"));
+        return null;
+      }
+      if (list.includes(app)) {
+        setError(t("pw.appExists"));
+        return null;
+      }
+      setError(null);
+      return app;
+    }
+    function addSingle(raw) {
+      const app = checkApp(raw, selected);
+      if (app === null) return;
+      setSelected([...selected, app]);
+      setDraft("");
+      setDirty(true);
+    }
+    function removeSingle(app) {
+      setSelected(selected.filter((item) => item !== app));
+      setDirty(true);
+    }
+    async function saveSingle(list) {
+      if (busy || !single) return;
+      setBusy(true);
+      setError(null);
+      const next = list.length > 0 ? list : null;
+      const result = await tryDispatch({
+        type: "setProjectWhitelist",
+        id: project.id,
+        whitelist: next
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error || t("common.writeFailed"));
+        return false;
+      }
+      setDirty(false);
+      notify(
+        next === null ? t("pw.followed", { name: project.name }) : t("pw.saved", { name: project.name }),
+        "brand"
+      );
+      return true;
+    }
+    function openEditor(target) {
+      setEditing({
+        id: target.id,
+        name: target.name,
+        selected: whitelistOf(target) ? [...whitelistOf(target)] : []
+      });
+      setDraft("");
+      setError(null);
+      if (apps === null && !appsBusy) void loadApps();
+    }
+    function addEditing(raw) {
+      if (editing === null) return;
+      const app = checkApp(raw, editing.selected);
+      if (app === null) return;
+      setEditing({ ...editing, selected: [...editing.selected, app] });
+      setDraft("");
+    }
+    function removeEditing(app) {
+      if (editing === null) return;
+      setEditing({
+        ...editing,
+        selected: editing.selected.filter((item) => item !== app)
+      });
+    }
+    async function saveEditing() {
+      if (editing === null || busy) return;
+      setBusy(true);
+      setError(null);
+      const next = editing.selected.length > 0 ? editing.selected : null;
+      const result = await tryDispatch({
+        type: "setProjectWhitelist",
+        id: editing.id,
+        whitelist: next
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error || t("common.writeFailed"));
+        return;
+      }
+      notify(
+        next === null ? t("pw.followed", { name: editing.name }) : t("pw.saved", { name: editing.name }),
+        "brand"
+      );
+      setEditing(null);
+    }
+    async function followGeneral(target) {
+      if (busy) return;
+      setBusy(true);
+      const result = await tryDispatch({
+        type: "setProjectWhitelist",
+        id: target.id,
+        whitelist: null
+      });
+      setBusy(false);
+      if (!result.ok) {
+        notify(result.error || t("common.writeFailed"), "danger");
+        return;
+      }
+      setEditing(null);
+      notify(t("pw.followed", { name: target.name }), "brand");
+    }
+    const singleList = whitelistOf(project);
+    const changed = single && dirty && !sameList(selected, singleList ?? []);
+    const singleSuggestions = selected;
+    const singleBody = single ? h(
+      "div",
+      { style: { marginTop: 12 } },
+      h(WhitelistEditor, {
+        selected: singleSuggestions,
+        draft,
+        onDraft: setDraft,
+        onAdd: addSingle,
+        onRemove: removeSingle,
+        apps,
+        appsBusy,
+        onRefreshApps: loadApps
+      }),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginTop: 14,
+            flexWrap: "wrap"
+          }
+        },
+        h(
+          Btn,
+          {
+            variant: "primary",
+            size: "sm",
+            icon: "check",
+            disabled: busy,
+            onClick: () => saveSingle(selected)
+          },
+          t("pw.save")
+        ),
+        changed ? h(
+          Btn,
+          {
+            variant: "plain",
+            size: "sm",
+            disabled: busy,
+            onClick: () => {
+              setSelected(singleList ?? []);
+              setDirty(false);
+              setError(null);
+            }
+          },
+          t("pw.reset")
+        ) : null,
+        h("div", { style: { flex: 1 } }),
+        singleList === null ? h(
+          "span",
+          { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          t("pw.follow")
+        ) : h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            disabled: busy,
+            onClick: () => saveSingle([])
+          },
+          t("pw.follow")
+        )
+      ),
+      error ? h(
+        "div",
+        {
+          role: "alert",
+          style: {
+            marginTop: 10,
+            padding: "9px 12px",
+            borderRadius: 10,
+            background: "var(--tomato-brand-soft)",
+            color: "var(--tomato-brand-deep)",
+            fontSize: 12.5,
+            lineHeight: 1.5
+          }
+        },
+        error
+      ) : null
+    ) : null;
+    const allBody = !single ? h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 2 } },
+      projects.length === 0 ? h(
+        "div",
+        { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
+        t("pw.none")
+      ) : projects.map((item) => {
+        const list = whitelistOf(item);
+        return h(
+          "div",
+          {
+            key: item.id,
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "9px 2px",
+              borderBottom: "1px solid var(--tomato-line)",
+              flexWrap: "wrap"
+            }
+          },
+          h(Dot, { color: item.color || "var(--tomato-ink-3)" }),
+          h(
+            "span",
+            { style: { fontSize: 12.5, color: "var(--tomato-ink)" } },
+            item.name
+          ),
+          h(
+            "span",
+            { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+            list === null ? t("pw.follow") : t("pw.count", { n: list.length })
+          ),
+          h("div", { style: { flex: 1 } }),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              onClick: () => openEditor(item)
+            },
+            t("pw.edit")
+          ),
+          list === null ? null : h(
+            Btn,
+            {
+              variant: "plain",
+              size: "sm",
+              disabled: busy,
+              onClick: () => followGeneral(item)
+            },
+            t("pw.clear")
+          )
+        );
+      })
+    ) : null;
+    return h(
+      "div",
+      null,
+      h(
+        Card,
+        null,
+        h(SectionTitle, {
+          icon: "lock",
+          title: t("pw.title"),
+          hint: single ? t("pw.hint") : t("pw.allHint")
+        }),
+        single ? singleBody : allBody
+      ),
+      !single && editing !== null ? h(
+        Modal,
+        {
+          open: true,
+          onClose: () => busy ? null : setEditing(null),
+          icon: "lock",
+          title: t("pw.title"),
+          subtitle: t("pw.dialogHint"),
+          footer: h(
+            "div",
+            { style: { display: "flex", gap: 9, width: "100%" } },
+            h("div", { style: { flex: 1 } }),
+            h(
+              Btn,
+              {
+                variant: "plain",
+                size: "sm",
+                disabled: busy,
+                onClick: () => setEditing(null)
+              },
+              t("common.cancel")
+            ),
+            h(
+              Btn,
+              {
+                variant: "primary",
+                size: "sm",
+                icon: "check",
+                disabled: busy,
+                onClick: saveEditing
+              },
+              t("common.save")
+            )
+          )
+        },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--tomato-ink)",
+              marginBottom: 10
+            }
+          },
+          editing.name
+        ),
+        h(WhitelistEditor, {
+          selected: editing.selected,
+          draft,
+          onDraft: setDraft,
+          onAdd: addEditing,
+          onRemove: removeEditing,
+          apps,
+          appsBusy,
+          onRefreshApps: loadApps
+        }),
+        error ? h(
+          "div",
+          {
+            role: "alert",
+            style: {
+              marginTop: 10,
+              padding: "9px 12px",
+              borderRadius: 10,
+              background: "var(--tomato-brand-soft)",
+              color: "var(--tomato-brand-deep)",
+              fontSize: 12.5,
+              lineHeight: 1.5
+            }
+          },
+          error
+        ) : null
+      ) : null
+    );
+  }
+
+  // plugin/src/client/pages/project.js
+  registerCopy("project", {
+    zh: {
+      eyebrow: "项目",
+      back: "全部任务",
+      countLine: "未完成 {a} / 已完成 {b}",
+      newTask: "新建任务",
+      editProject: "编辑项目",
+      deleteProject: "删除项目",
+      activeTab: "未完成 {n}",
+      completedTab: "已完成 {n}",
+      activeEmpty: "这个项目还没有未完成任务",
+      activeEmptyHint: "从「新建任务」开始，任务会自动归到这个项目。",
+      completedEmpty: "还没有完成的任务",
+      completedEmptyHint: "完成的任务会出现在这里。",
+      tasksTitle: "任务",
+      newTaskHint: "新建的任务默认属于这个项目",
+      startFocus: "开始专注",
+      pauseFocus: "暂停专注",
+      focusOn: "专注于 {title}",
+      timerBusy: "请先结束当前计时",
+      completeTask: "完成任务 {title}",
+      reopenTask: "重新打开任务 {title}",
+      untitled: "未命名任务",
+      perSession: "{n} 分钟/次",
+      overdue: "已逾期",
+      editTitle: "编辑项目",
+      editHint: "只改这个项目的名称与颜色；资料目录在应试教育页维护。",
+      nameLabel: "项目名称",
+      colorLabel: "颜色",
+      nameRequired: "项目名称不能为空",
+      saved: "项目已更新",
+      deleteTitle: "删除这个项目？",
+      deleteBody: "项目里的任务会保留，但不再归属这个项目；已有教学历史的项目不能删除。",
+      deleteConfirm: "确认删除",
+      deleted: "项目已删除",
+      notFound: "项目不存在或已删除",
+      notFoundHint: "它可能已经被删除；回到全部任务继续。",
+      noProject: "还没有选择项目",
+      noProjectHint: "从左侧「我的项目」点一个项目进来。",
+      libraryTitle: "项目资料",
+      libraryHint: "来自共享资料库索引，按项目目录过滤。",
+      libraryMissing: "资料库尚未建索引",
+      libraryMissingHint: "先在应试教育页授权资料目录，然后扫描一次；这里会列出该项目目录下的文件。",
+      libraryUnauthorized: "共享资料库尚未授权",
+      libraryUnauthorizedHint: "到应试教育页授权整个资料目录后即可扫描。",
+      libraryScan: "扫描资料库",
+      libraryScanning: "正在扫描…",
+      libraryScanDone: "已索引 {n} 个文件",
+      libraryScanFailed: "扫描失败：{error}",
+      libraryRefresh: "刷新",
+      librarySearch: "搜索资料名或路径",
+      libraryKindAll: "全部类型",
+      libraryKindPdf: "PDF",
+      libraryKindImage: "图片",
+      libraryKindDoc: "文档",
+      libraryKindAudio: "音频",
+      libraryKindVideo: "视频",
+      libraryKindOther: "其他",
+      libraryEmpty: "这个项目还没有资料",
+      libraryEmptyHint: "资料来自项目绑定的目录；换个关键词或扫描后再看。",
+      libraryError: "读不到资料：{error}",
+      libraryRange: "{a}–{b} / {total}",
+      libraryPrev: "上一页",
+      libraryNext: "下一页",
+      libraryCount: "{n} 个文件",
+      preview: "预览",
+      previewUnsupported: "此类型或大小不支持预览，可下载原件。",
+      previewLoading: "正在读取…",
+      previewFailed: "读取失败：{error}",
+      previewOpen: "在新标签页打开",
+      previewDownload: "下载",
+      previewSize: "大小",
+      previewModified: "修改时间",
+      previewPath: "路径"
+    },
+    en: {
+      eyebrow: "PROJECT",
+      back: "All tasks",
+      countLine: "{a} to do / {b} done",
+      newTask: "New task",
+      editProject: "Edit project",
+      deleteProject: "Delete project",
+      activeTab: "To do {n}",
+      completedTab: "Done {n}",
+      activeEmpty: "No open tasks in this project",
+      activeEmptyHint: "Start with “New task”; it will belong to this project.",
+      completedEmpty: "Nothing completed yet",
+      completedEmptyHint: "Completed tasks show up here.",
+      tasksTitle: "Tasks",
+      newTaskHint: "New tasks belong to this project by default",
+      startFocus: "Start focus",
+      pauseFocus: "Pause focus",
+      focusOn: "Focus on {title}",
+      timerBusy: "Finish the current timer first",
+      completeTask: "Complete {title}",
+      reopenTask: "Reopen {title}",
+      untitled: "Untitled task",
+      perSession: "{n} min per session",
+      overdue: "Overdue",
+      editTitle: "Edit project",
+      editHint: "Only the name and color change here; the folder lives on the study page.",
+      nameLabel: "Project name",
+      colorLabel: "Color",
+      nameRequired: "Project name is required",
+      saved: "Project updated",
+      deleteTitle: "Delete this project?",
+      deleteBody: "Its tasks stay but lose the project; projects with teaching history cannot be deleted.",
+      deleteConfirm: "Delete",
+      deleted: "Project deleted",
+      notFound: "Project not found or deleted",
+      notFoundHint: "It may have been deleted; go back to all tasks.",
+      noProject: "No project selected",
+      noProjectHint: "Pick one from “My projects” in the sidebar.",
+      libraryTitle: "Project materials",
+      libraryHint: "From the shared library index, filtered to this project folder.",
+      libraryMissing: "The library has no index yet",
+      libraryMissingHint: "Authorize the folder on the study page, then scan once; files under this project folder will show up here.",
+      libraryUnauthorized: "Shared library not authorized",
+      libraryUnauthorizedHint: "Authorize the whole materials folder on the study page to scan.",
+      libraryScan: "Scan library",
+      libraryScanning: "Scanning…",
+      libraryScanDone: "Indexed {n} files",
+      libraryScanFailed: "Scan failed: {error}",
+      libraryRefresh: "Refresh",
+      librarySearch: "Search names or paths",
+      libraryKindAll: "All types",
+      libraryKindPdf: "PDF",
+      libraryKindImage: "Images",
+      libraryKindDoc: "Documents",
+      libraryKindAudio: "Audio",
+      libraryKindVideo: "Video",
+      libraryKindOther: "Other",
+      libraryEmpty: "No materials in this project yet",
+      libraryEmptyHint: "Materials come from the project folder; try another keyword or scan again.",
+      libraryError: "Could not read materials: {error}",
+      libraryRange: "{a}–{b} / {total}",
+      libraryPrev: "Previous",
+      libraryNext: "Next",
+      libraryCount: "{n} files",
+      preview: "Preview",
+      previewUnsupported: "This type or size cannot be previewed; download it.",
+      previewLoading: "Reading…",
+      previewFailed: "Could not read: {error}",
+      previewOpen: "Open in a new tab",
+      previewDownload: "Download",
+      previewSize: "Size",
+      previewModified: "Modified",
+      previewPath: "Path"
+    },
+    ja: {
+      eyebrow: "プロジェクト",
+      back: "すべてのタスク",
+      countLine: "未完了 {a} / 完了 {b}",
+      newTask: "タスク作成",
+      editProject: "プロジェクトを編集",
+      deleteProject: "プロジェクトを削除",
+      activeTab: "未完了 {n}",
+      completedTab: "完了 {n}",
+      activeEmpty: "このプロジェクトに未完了のタスクはありません",
+      activeEmptyHint: "「タスク作成」から始めると、このプロジェクトに属します。",
+      completedEmpty: "完了したタスクはまだありません",
+      completedEmptyHint: "完了したタスクはここに表示されます。",
+      tasksTitle: "タスク",
+      newTaskHint: "新しいタスクはこのプロジェクトに属します",
+      startFocus: "集中開始",
+      pauseFocus: "一時停止",
+      focusOn: "{title} に集中",
+      timerBusy: "先に現在のタイマーを終了してください",
+      completeTask: "{title} を完了",
+      reopenTask: "{title} を再開",
+      untitled: "無題のタスク",
+      perSession: "{n}分/回",
+      overdue: "期限切れ",
+      editTitle: "プロジェクトを編集",
+      editHint: "ここでは名前と色だけを変更します。資料フォルダは学習ページで管理します。",
+      nameLabel: "プロジェクト名",
+      colorLabel: "色",
+      nameRequired: "プロジェクト名を入力してください",
+      saved: "プロジェクトを更新しました",
+      deleteTitle: "このプロジェクトを削除しますか？",
+      deleteBody: "タスクは残りますが、プロジェクトには属さなくなります。教学履歴のあるプロジェクトは削除できません。",
+      deleteConfirm: "削除する",
+      deleted: "プロジェクトを削除しました",
+      notFound: "プロジェクトが存在しないか削除されました",
+      notFoundHint: "削除された可能性があります。すべてのタスクに戻ってください。",
+      noProject: "プロジェクトが選択されていません",
+      noProjectHint: "左の「マイプロジェクト」から選んでください。",
+      libraryTitle: "プロジェクト資料",
+      libraryHint: "共有ライブラリの索引から、このプロジェクトのフォルダで絞り込みます。",
+      libraryMissing: "ライブラリの索引がまだありません",
+      libraryMissingHint: "学習ページで資料フォルダを認可してから一度スキャンしてください。このプロジェクトのフォルダ内のファイルがここに表示されます。",
+      libraryUnauthorized: "共有ライブラリが認可されていません",
+      libraryUnauthorizedHint: "学習ページで資料フォルダ全体を認可するとスキャンできます。",
+      libraryScan: "ライブラリをスキャン",
+      libraryScanning: "スキャン中…",
+      libraryScanDone: "{n}件のファイルを索引しました",
+      libraryScanFailed: "スキャンに失敗しました: {error}",
+      libraryRefresh: "更新",
+      librarySearch: "名前またはパスを検索",
+      libraryKindAll: "すべての種類",
+      libraryKindPdf: "PDF",
+      libraryKindImage: "画像",
+      libraryKindDoc: "文書",
+      libraryKindAudio: "音声",
+      libraryKindVideo: "動画",
+      libraryKindOther: "その他",
+      libraryEmpty: "このプロジェクトにはまだ資料がありません",
+      libraryEmptyHint: "資料はプロジェクトのフォルダから取得します。キーワードを変えるか再スキャンしてください。",
+      libraryError: "資料を読み取れません: {error}",
+      libraryRange: "{a}–{b} / {total}",
+      libraryPrev: "前へ",
+      libraryNext: "次へ",
+      libraryCount: "{n}件のファイル",
+      preview: "プレビュー",
+      previewUnsupported: "この種類またはサイズはプレビューできません。ダウンロードしてください。",
+      previewLoading: "読み込み中…",
+      previewFailed: "読み込みに失敗しました: {error}",
+      previewOpen: "新しいタブで開く",
+      previewDownload: "ダウンロード",
+      previewSize: "サイズ",
+      previewModified: "更新日時",
+      previewPath: "パス"
+    }
+  });
+  var LIBRARY_PAGE = 30;
+  var KINDS2 = ["pdf", "image", "doc", "audio", "video", "other"];
+  var PROJECT_COLORS = [
+    "#df7561",
+    "#d5a553",
+    "#7e9a6e",
+    "#75aabb",
+    "#a97c8f",
+    "#b08a5a",
+    "#8b8fc7",
+    "#6fa8a0"
+  ];
+  function fmtSize(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return "";
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  function fmtMtime(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return "";
+    const d = new Date(n > 1e12 ? n : n * 1e3);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad3 = (v) => String(v).padStart(2, "0");
+    return `${d.getFullYear()}-${pad3(d.getMonth() + 1)}-${pad3(d.getDate())}`;
+  }
+  function normalizeItem(raw) {
+    const path = String(raw && raw.path || "");
+    const name = String(raw && raw.name || path.split("/").pop() || path);
+    const ext = String(
+      raw && raw.ext || (name.includes(".") ? name.split(".").pop() : "")
+    ).toLowerCase();
+    return {
+      path,
+      name,
+      ext,
+      sizeBytes: Number(raw && raw.sizeBytes) || 0,
+      mtime: raw && raw.mtime,
+      kind: String(raw && raw.kind || ""),
+      mimeType: String(raw && raw.mimeType || ""),
+      previewable: raw && raw.previewable !== false
+    };
+  }
+  function kindLabel(kind) {
+    const key = `project.libraryKind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
+    return t(key);
+  }
+  function ProjectTaskRow({
+    task,
+    today,
+    data,
+    timer,
+    last,
+    onToggle,
+    onEdit,
+    onPlay
+  }) {
+    const completed = !!task.completed;
+    const estimate = Math.max(1, Number(task.estimate) || 1);
+    const rounds = taskRounds(data, task.id);
+    const achieved = rounds >= estimate;
+    const overdue = isOverdue(task, today);
+    const running = !!timer.running && timer.taskId === task.id;
+    const displayTitle = task.title || t("project.untitled");
+    return h(
+      "div",
+      {
+        className: "t-row",
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 11,
+          minHeight: 56,
+          padding: "7px 8px",
+          borderRadius: 12,
+          borderBottom: last ? "none" : "1px solid var(--tomato-line)"
+        }
+      },
+      h(Check, {
+        checked: completed,
+        label: completed ? t("project.reopenTask", { title: displayTitle }) : t("project.completeTask", { title: displayTitle }),
+        onChange: () => onToggle(task)
+      }),
+      h(
+        "button",
+        {
+          type: "button",
+          onClick: () => onEdit(task),
+          style: {
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 2,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+            fontFamily: "inherit",
+            textAlign: "left",
+            color: "inherit",
+            cursor: "pointer"
+          }
+        },
+        h(
+          "span",
+          {
+            style: {
+              maxWidth: "100%",
+              fontSize: 13.5,
+              fontWeight: completed ? 450 : 560,
+              color: completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+              textDecoration: completed ? "line-through" : "none",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }
+          },
+          displayTitle
+        ),
+        h(
+          "span",
+          {
+            style: {
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "4px 10px",
+              marginTop: 3,
+              fontSize: 11.5,
+              lineHeight: 1.5,
+              color: "var(--tomato-ink-3)"
+            }
+          },
+          task.reminderTime ? h(
+            "span",
+            {
+              style: { display: "inline-flex", alignItems: "center", gap: 4 }
+            },
+            h(Icon, { name: "clock", size: 12 }),
+            task.reminderTime
+          ) : null,
+          task.focusMinutes != null ? h("span", null, t("project.perSession", { n: task.focusMinutes })) : null,
+          task.dueDate ? h(
+            "span",
+            {
+              style: { display: "inline-flex", alignItems: "center", gap: 4 }
+            },
+            h(Icon, { name: "calendar", size: 12 }),
+            dayLabel(task.dueDate, today)
+          ) : null,
+          overdue ? h(Chip, { tone: "danger" }, t("project.overdue")) : null
+        )
+      ),
+      h(
+        "div",
+        {
+          style: { display: "flex", alignItems: "center", gap: 4, flex: "none" }
+        },
+        h(
+          "span",
+          {
+            className: "t-mono",
+            style: {
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              color: achieved ? "var(--tomato-leaf)" : "var(--tomato-ink-3)"
+            }
+          },
+          h(Icon, { name: "tomato", size: 13 }),
+          `${rounds}/${estimate}`
+        ),
+        !completed ? h(IconBtn, {
+          name: running ? "pause" : "play",
+          size: 16,
+          box: 32,
+          title: running ? t("project.pauseFocus") : t("project.focusOn", { title: displayTitle }),
+          onClick: () => onPlay(task)
+        }) : null
+      )
+    );
+  }
+  var fileTokenPromise = null;
+  function cachedFileToken() {
+    if (fileTokenPromise === null) {
+      fileTokenPromise = getFileToken().then((result) => result && result.access || "").catch((error) => {
+        fileTokenPromise = null;
+        throw error;
+      });
+    }
+    return fileTokenPromise;
+  }
+  function isTextItem(item) {
+    const mime = String(item.mimeType || "").toLowerCase();
+    if (mime.startsWith("text/")) return true;
+    return ["txt", "md", "markdown", "csv", "json", "log"].includes(item.ext);
+  }
+  function LibraryPreview({ item, onClose }) {
+    const [state, setState] = useState({
+      status: "loading",
+      text: "",
+      url: "",
+      access: "",
+      error: null
+    });
+    useEffect(() => {
+      if (!item) return void 0;
+      let cancelled = false;
+      setState({ status: "loading", text: "", url: "", access: "", error: null });
+      (async () => {
+        try {
+          const access = await cachedFileToken();
+          const url = libraryFileUrl(item.path, access);
+          const base = { text: "", url, access, error: null };
+          if (!item.previewable) {
+            if (!cancelled) setState({ ...base, status: "unsupported" });
+            return;
+          }
+          if (item.kind === "image") {
+            if (!cancelled) setState({ ...base, status: "image" });
+            return;
+          }
+          if (!isTextItem(item)) {
+            if (!cancelled) setState({ ...base, status: "unsupported" });
+            return;
+          }
+          const response = await fetch(url);
+          if (!response || !response.ok || typeof response.text !== "function")
+            throw new Error(`HTTP ${response ? response.status : "?"}`);
+          const text = await response.text();
+          if (!cancelled)
+            setState({
+              ...base,
+              status: "text",
+              text: text.length > 2e4 ? `${text.slice(0, 2e4)}…` : text
+            });
+        } catch (error) {
+          if (!cancelled)
+            setState({
+              status: "error",
+              text: "",
+              url: "",
+              access: "",
+              error: error && (error.userMessage || error.message) || String(error)
+            });
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [item && item.path]);
+    if (!item) return null;
+    const body = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h(
+        "div",
+        {
+          className: "t-mono",
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            wordBreak: "break-all",
+            lineHeight: 1.6
+          }
+        },
+        item.path
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 12,
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)"
+          }
+        },
+        item.sizeBytes ? h(
+          "span",
+          null,
+          `${t("project.previewSize")} ${fmtSize(item.sizeBytes)}`
+        ) : null,
+        item.mtime ? h(
+          "span",
+          null,
+          `${t("project.previewModified")} ${fmtMtime(item.mtime)}`
+        ) : null,
+        item.ext ? h(Chip, { tone: "neutral" }, item.ext.toUpperCase()) : null
+      ),
+      state.status === "loading" ? h(
+        "div",
+        { style: { fontSize: 12.5, color: "var(--tomato-ink-3)" } },
+        t("project.previewLoading")
+      ) : null,
+      state.status === "error" ? h(
+        "div",
+        {
+          role: "alert",
+          style: {
+            padding: "9px 12px",
+            borderRadius: 10,
+            background: "var(--tomato-brand-soft)",
+            color: "var(--tomato-brand-deep)",
+            fontSize: 12.5
+          }
+        },
+        t("project.previewFailed", { error: state.error })
+      ) : null,
+      state.status === "unsupported" ? h(
+        "div",
+        { style: { fontSize: 12.5, color: "var(--tomato-ink-2)" } },
+        t("project.previewUnsupported")
+      ) : null,
+      state.status === "image" ? h("img", {
+        src: state.url,
+        alt: item.name,
+        style: {
+          maxWidth: "100%",
+          maxHeight: "60vh",
+          borderRadius: 10,
+          border: "1px solid var(--tomato-line)",
+          objectFit: "contain"
+        }
+      }) : null,
+      state.status === "text" ? h(
+        "pre",
+        {
+          className: "t-scroll",
+          style: {
+            margin: 0,
+            padding: "12px 14px",
+            maxHeight: "52vh",
+            overflow: "auto",
+            borderRadius: 10,
+            background: "var(--tomato-surface-2)",
+            color: "var(--tomato-ink-2)",
+            fontSize: 12,
+            lineHeight: 1.6,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word"
+          }
+        },
+        state.text
+      ) : null
+    );
+    return h(
+      Modal,
+      {
+        open: true,
+        onClose,
+        icon: "eye",
+        title: item.name,
+        subtitle: item.kind ? kindLabel(item.kind) : void 0,
+        width: 760,
+        footer: h(
+          "div",
+          { style: { display: "flex", gap: 8, width: "100%", flexWrap: "wrap" } },
+          state.url ? h(
+            "a",
+            {
+              href: state.url,
+              target: "_blank",
+              rel: "noreferrer",
+              style: {
+                fontSize: 12.5,
+                color: "var(--tomato-brand-deep)",
+                alignSelf: "center"
+              }
+            },
+            t("project.previewOpen")
+          ) : null,
+          state.access ? h(
+            "a",
+            {
+              href: libraryFileUrl(item.path, state.access, true),
+              style: {
+                fontSize: 12.5,
+                color: "var(--tomato-ink-2)",
+                alignSelf: "center"
+              }
+            },
+            t("project.previewDownload")
+          ) : null,
+          h("div", { style: { flex: 1 } }),
+          h(
+            Btn,
+            { variant: "plain", size: "sm", onClick: onClose },
+            t("common.close")
+          )
+        )
+      },
+      body
+    );
+  }
+  function ProjectLibraryCard({ project }) {
+    const projectId = project.id;
+    const [stats, setStats] = useState(null);
+    const [statsError, setStatsError] = useState(null);
+    const [missing, setMissing] = useState(false);
+    const [items, setItems] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [offset, setOffset] = useState(0);
+    const [query, setQuery] = useState("");
+    const [appliedQuery, setAppliedQuery] = useState("");
+    const [kind, setKind] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState(null);
+    const [scanning, setScanning] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
+    const [preview, setPreview] = useState(null);
+    useEffect(() => {
+      setOffset(0);
+      setQuery("");
+      setAppliedQuery("");
+      setKind("");
+      setMissing(false);
+      setStats(null);
+      setStatsError(null);
+      setItems([]);
+      setTotal(0);
+      setPreview(null);
+    }, [projectId]);
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setAppliedQuery(query.trim());
+        setOffset(0);
+      }, 350);
+      return () => clearTimeout(timer);
+    }, [query]);
+    useEffect(() => {
+      let cancelled = false;
+      getLibraryStats().then((result) => {
+        if (cancelled) return;
+        setStats(result);
+        setStatsError(null);
+        if (result && result.hasIndex === false) setMissing(true);
+      }).catch((error) => {
+        if (cancelled) return;
+        if (error && error.status === 404) setMissing(true);
+        else
+          setStatsError(
+            error && (error.userMessage || error.message) || String(error)
+          );
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, reloadKey]);
+    useEffect(() => {
+      if (missing) return void 0;
+      let cancelled = false;
+      setLoading(true);
+      setLoadError(null);
+      getLibraryItems({
+        projectId,
+        q: appliedQuery,
+        kind,
+        offset,
+        limit: LIBRARY_PAGE
+      }).then((result) => {
+        if (cancelled) return;
+        if (result && result.hasIndex === false) {
+          setMissing(true);
+          setItems([]);
+          setTotal(0);
+          return;
+        }
+        const list = Array.isArray(result && result.items) ? result.items : [];
+        setItems(list.map(normalizeItem));
+        setTotal(Math.max(0, Number(result && result.total) || 0));
+      }).catch((error) => {
+        if (cancelled) return;
+        if (error && error.status === 404) setMissing(true);
+        else
+          setLoadError(
+            error && (error.userMessage || error.message) || String(error)
+          );
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, appliedQuery, kind, offset, missing, reloadKey]);
+    async function scan() {
+      if (scanning) return;
+      setScanning(true);
+      try {
+        const result = await scanLibrary();
+        notify(
+          t("project.libraryScanDone", {
+            n: Number(result && result.count) || 0
+          }),
+          "brand"
+        );
+        setMissing(false);
+        setReloadKey((value) => value + 1);
+      } catch (error) {
+        notify(
+          t("project.libraryScanFailed", {
+            error: error && (error.userMessage || error.message) || String(error)
+          }),
+          "danger"
+        );
+      } finally {
+        setScanning(false);
+      }
+    }
+    const unauthorized = stats !== null && stats.authorized === false;
+    const kindOptions = [
+      { value: "", label: t("project.libraryKindAll") },
+      ...KINDS2.map((value) => ({
+        value,
+        label: kindLabel(value)
+      }))
+    ];
+    const pageStart = total === 0 ? 0 : offset + 1;
+    const pageEnd = Math.min(offset + LIBRARY_PAGE, total);
+    const missingBlock = h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          padding: "14px 16px",
+          borderRadius: 12,
+          background: "var(--tomato-surface-2)"
+        }
+      },
+      h(
+        "div",
+        {
+          style: { fontSize: 13, fontWeight: 600, color: "var(--tomato-ink)" }
+        },
+        unauthorized ? t("project.libraryUnauthorized") : t("project.libraryMissing")
+      ),
+      h(
+        "div",
+        {
+          style: { fontSize: 12, color: "var(--tomato-ink-2)", lineHeight: 1.65 }
+        },
+        unauthorized ? t("project.libraryUnauthorizedHint") : t("project.libraryMissingHint")
+      ),
+      h(
+        "div",
+        { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+        h(
+          Btn,
+          {
+            variant: "soft",
+            size: "sm",
+            icon: "refresh",
+            disabled: scanning,
+            onClick: scan
+          },
+          scanning ? t("project.libraryScanning") : t("project.libraryScan")
+        )
+      )
+    );
+    const listBlock = h(
+      "div",
+      null,
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBottom: 10
+          }
+        },
+        h(
+          "div",
+          { style: { position: "relative", flex: "1 1 220px", minWidth: 0 } },
+          h(Icon, {
+            name: "search",
+            size: 14,
+            style: {
+              position: "absolute",
+              left: 11,
+              top: 10,
+              color: "var(--tomato-ink-3)",
+              pointerEvents: "none"
+            }
+          }),
+          h(Input, {
+            value: query,
+            onChange: setQuery,
+            placeholder: t("project.librarySearch"),
+            maxLength: 120,
+            style: { paddingLeft: 32, height: 34, fontSize: 12.5 }
+          })
+        ),
+        h(Select, {
+          value: kind,
+          options: kindOptions,
+          onChange: (value) => {
+            setKind(value);
+            setOffset(0);
+          },
+          width: 132
+        }),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "refresh",
+            disabled: loading,
+            onClick: () => setReloadKey((value) => value + 1)
+          },
+          t("project.libraryRefresh")
+        )
+      ),
+      loadError ? h(
+        "div",
+        {
+          role: "alert",
+          style: {
+            padding: "9px 12px",
+            borderRadius: 10,
+            background: "var(--tomato-brand-soft)",
+            color: "var(--tomato-brand-deep)",
+            fontSize: 12.5
+          }
+        },
+        t("project.libraryError", { error: loadError })
+      ) : null,
+      items.length === 0 ? h(
+        "div",
+        { style: { padding: "16px 4px" } },
+        loading ? h(Skeleton, { w: "52%", h: 13 }) : h(Empty, {
+          icon: "folder",
+          title: t("project.libraryEmpty"),
+          hint: t("project.libraryEmptyHint")
+        })
+      ) : h(
+        "div",
+        null,
+        items.map(
+          (item, index) => h(
+            "div",
+            {
+              key: item.path || index,
+              className: "t-row",
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                minHeight: 44,
+                padding: "6px 6px",
+                borderBottom: index === items.length - 1 ? "none" : "1px solid var(--tomato-line)"
+              }
+            },
+            h(Icon, {
+              name: "folder",
+              size: 15,
+              style: { color: "var(--tomato-ink-3)", flex: "none" }
+            }),
+            h(
+              "button",
+              {
+                type: "button",
+                onClick: () => setPreview(item),
+                style: {
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 2,
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                  color: "inherit",
+                  cursor: "pointer"
+                }
+              },
+              h(
+                "span",
+                {
+                  style: {
+                    maxWidth: "100%",
+                    fontSize: 12.5,
+                    color: "var(--tomato-ink)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                item.name
+              ),
+              h(
+                "span",
+                {
+                  className: "t-mono",
+                  style: {
+                    maxWidth: "100%",
+                    fontSize: 10.5,
+                    color: "var(--tomato-ink-3)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                item.path
+              )
+            ),
+            item.sizeBytes ? h(
+              "span",
+              {
+                className: "t-mono",
+                style: {
+                  fontSize: 10.5,
+                  color: "var(--tomato-ink-3)",
+                  flex: "none"
+                }
+              },
+              fmtSize(item.sizeBytes)
+            ) : null,
+            h(IconBtn, {
+              name: "eye",
+              size: 15,
+              box: 28,
+              title: t("project.preview"),
+              onClick: () => setPreview(item)
+            })
+          )
+        ),
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 10,
+              flexWrap: "wrap"
+            }
+          },
+          h(
+            "span",
+            {
+              className: "t-mono",
+              style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+            },
+            total > 0 ? t("project.libraryRange", {
+              a: pageStart,
+              b: pageEnd,
+              total
+            }) : t("project.libraryCount", { n: 0 })
+          ),
+          h("div", { style: { flex: 1 } }),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "arrowLeft",
+              disabled: offset <= 0 || loading,
+              onClick: () => setOffset(Math.max(0, offset - LIBRARY_PAGE))
+            },
+            t("project.libraryPrev")
+          ),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              iconRight: "arrowRight",
+              disabled: offset + LIBRARY_PAGE >= total || loading,
+              onClick: () => setOffset(offset + LIBRARY_PAGE)
+            },
+            t("project.libraryNext")
+          )
+        )
+      )
+    );
+    return h(
+      Card,
+      null,
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "baseline",
+            gap: 10,
+            marginBottom: 12,
+            flexWrap: "wrap"
+          }
+        },
+        h(Icon, {
+          name: "folder",
+          size: 17,
+          style: { color: "var(--tomato-ink-3)" }
+        }),
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 14,
+              fontWeight: 620,
+              color: "var(--tomato-ink)",
+              marginRight: "auto"
+            }
+          },
+          t("project.libraryTitle")
+        ),
+        h(
+          "div",
+          { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          stats && stats.hasIndex ? t("project.libraryCount", { n: total }) : null
+        )
+      ),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            marginBottom: 12,
+            lineHeight: 1.6
+          }
+        },
+        t("project.libraryHint")
+      ),
+      statsError ? h(
+        "div",
+        {
+          role: "alert",
+          style: {
+            padding: "9px 12px",
+            borderRadius: 10,
+            background: "var(--tomato-brand-soft)",
+            color: "var(--tomato-brand-deep)",
+            fontSize: 12.5
+          }
+        },
+        statsError
+      ) : missing ? missingBlock : listBlock,
+      h(LibraryPreview, { item: preview, onClose: () => setPreview(null) })
+    );
+  }
+  function ProjectPage({ state, projectId }) {
+    const snapshotProjectId = getActiveProjectId();
+    const currentId = projectId ?? snapshotProjectId;
+    const data = state && state.data || {};
+    const projects = Array.isArray(data.projects) ? data.projects : [];
+    const project = projects.find((item) => item.id === currentId) || null;
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    const settings = data.settings || {};
+    const today = state && state.today || todayKey(state && state.serverTime);
+    const viewData = { ...data, taskKinds: state && state.taskKinds || {} };
+    const timer = timerView(state);
+    const [tab, setTab] = useState("active");
+    const [editor, setEditor] = useState(null);
+    const [editProjectOpen, setEditProjectOpen] = useState(false);
+    const [editName, setEditName] = useState("");
+    const [editColor, setEditColor] = useState(PROJECT_COLORS[0]);
+    const [editError, setEditError] = useState(null);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteError, setDeleteError] = useState(null);
+    const [busy, setBusy] = useState(false);
+    useEffect(() => {
+      setTab("active");
+      setEditor(null);
+      setEditProjectOpen(false);
+      setDeleteOpen(false);
+      setDeleteError(null);
+    }, [currentId]);
+    const projectTasks = project ? tasks.filter((task) => task.projectId === project.id) : [];
+    const counts = {
+      active: projectTasks.filter((task) => !task.completed).length,
+      completed: projectTasks.filter((task) => task.completed).length
+    };
+    const visible = sortTasks(
+      projectTasks.filter(
+        (task) => tab === "completed" ? task.completed : !task.completed
+      ),
+      "time"
+    );
+    const editingTask = editor && editor.id ? projectTasks.find((task) => task.id === editor.id) || null : null;
+    const taskDialogOpen = !!editor && (!editor.id || !!editingTask);
+    function showError(error) {
+      notify(error || t("common.writeFailed"), "danger");
+    }
+    async function toggleComplete(task) {
+      const result = await tryDispatch({ type: "toggleTask", id: task.id });
+      if (!result.ok) showError(result.error);
+    }
+    async function playTask(task) {
+      if (!task || task.completed) return;
+      if (timer.running && timer.taskId === task.id) {
+        const result = await tryDispatch({ type: "pauseTimer" });
+        if (!result.ok) showError(result.error);
+        return;
+      }
+      if (timer.running || timer.remainingSecs < timer.totalSecs) {
+        notify(t("project.timerBusy"), "brand");
+        return;
+      }
+      const steps = [
+        { type: "selectTask", id: task.id },
+        { type: "setMode", mode: "focus" },
+        { type: "startTimer" }
+      ];
+      for (const action of steps) {
+        const result = await tryDispatch(action);
+        if (!result.ok) {
+          showError(result.error);
+          return;
+        }
+      }
+      openImmersive();
+    }
+    function openEditProject() {
+      if (!project) return;
+      setEditName(project.name);
+      setEditColor(project.color || PROJECT_COLORS[0]);
+      setEditError(null);
+      setEditProjectOpen(true);
+    }
+    async function saveProject(event) {
+      event?.preventDefault?.();
+      if (!project || busy) return;
+      const name = editName.trim();
+      if (name === "") {
+        setEditError(t("project.nameRequired"));
+        return;
+      }
+      setBusy(true);
+      setEditError(null);
+      const result = await tryDispatch({
+        type: "saveProject",
+        id: project.id,
+        name,
+        color: editColor || PROJECT_COLORS[0],
+        directory: null
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setEditError(result.error || t("common.writeFailed"));
+        return;
+      }
+      setEditProjectOpen(false);
+      notify(t("project.saved"), "brand");
+    }
+    async function confirmDeleteProject() {
+      if (!project || busy) return;
+      setBusy(true);
+      setDeleteError(null);
+      const result = await tryDispatch({ type: "deleteProject", id: project.id });
+      setBusy(false);
+      if (!result.ok) {
+        setDeleteError(result.error || t("common.writeFailed"));
+        return;
+      }
+      setDeleteOpen(false);
+      notify(t("project.deleted"), "neutral");
+      setActivePageId("tasks");
+    }
+    const back = h(
+      Btn,
+      {
+        variant: "plain",
+        size: "sm",
+        icon: "arrowLeft",
+        onClick: () => setActivePageId("tasks"),
+        style: { marginBottom: 14, paddingLeft: 4 }
+      },
+      t("project.back")
+    );
+    if (!state) {
+      return h(
+        "div",
+        { className: "t-root" },
+        back,
+        h(
+          Card,
+          null,
+          h(
+            "div",
+            { style: { display: "flex", flexDirection: "column", gap: 12 } },
+            h(Skeleton, { w: "30%", h: 22 }),
+            h(Skeleton, { w: "52%", h: 13 }),
+            h(Skeleton, { w: "68%", h: 13 })
+          )
+        )
+      );
+    }
+    if (!currentId) {
+      return h(
+        "div",
+        { className: "t-root" },
+        back,
+        h(Empty, {
+          icon: "folder",
+          title: t("project.noProject"),
+          hint: t("project.noProjectHint"),
+          action: h(
+            Btn,
+            {
+              variant: "soft",
+              icon: "arrowLeft",
+              onClick: () => setActivePageId("tasks")
+            },
+            t("project.back")
+          )
+        })
+      );
+    }
+    if (project === null) {
+      return h(
+        "div",
+        { className: "t-root" },
+        back,
+        h(Empty, {
+          icon: "folder",
+          title: t("project.notFound"),
+          hint: t("project.notFoundHint"),
+          action: h(
+            Btn,
+            {
+              variant: "soft",
+              icon: "arrowLeft",
+              onClick: () => setActivePageId("tasks")
+            },
+            t("project.back")
+          )
+        })
+      );
+    }
+    const header = h(PageHeader, {
+      eyebrow: t("project.eyebrow"),
+      title: h(
+        "span",
+        { style: { display: "inline-flex", alignItems: "center", gap: 10 } },
+        h(Dot, { color: projectColor(data, project.id), size: 11 }),
+        project.name
+      ),
+      subtitle: t("project.countLine", {
+        a: counts.active,
+        b: counts.completed
+      }),
+      actions: h(
+        "div",
+        { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+        h(
+          Btn,
+          {
+            variant: "primary",
+            icon: "plus",
+            onClick: () => setEditor({})
+          },
+          t("project.newTask")
+        ),
+        h(
+          Btn,
+          { variant: "ghost", icon: "edit", onClick: openEditProject },
+          t("project.editProject")
+        ),
+        h(
+          Btn,
+          {
+            variant: "danger",
+            icon: "trash",
+            onClick: () => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }
+          },
+          t("project.deleteProject")
+        )
+      )
+    });
+    return h(
+      "div",
+      { className: "t-root" },
+      back,
+      header,
+      h(
+        Card,
+        { pad: 12, style: { marginBottom: 16 } },
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginBottom: 10
+            }
+          },
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 13.5,
+                fontWeight: 620,
+                color: "var(--tomato-ink)",
+                marginRight: "auto"
+              }
+            },
+            t("project.tasksTitle")
+          ),
+          h(Segmented, {
+            items: [
+              {
+                value: "active",
+                label: t("project.activeTab", { n: counts.active })
+              },
+              {
+                value: "completed",
+                label: t("project.completedTab", { n: counts.completed })
+              }
+            ],
+            value: tab,
+            onChange: setTab,
+            size: "sm"
+          })
+        ),
+        visible.length === 0 ? h(Empty, {
+          icon: tab === "completed" ? "check" : "leaf",
+          title: tab === "completed" ? t("project.completedEmpty") : t("project.activeEmpty"),
+          hint: tab === "completed" ? t("project.completedEmptyHint") : t("project.activeEmptyHint"),
+          action: tab === "completed" ? null : h(
+            Btn,
+            {
+              variant: "soft",
+              icon: "plus",
+              onClick: () => setEditor({})
+            },
+            t("project.newTask")
+          )
+        }) : visible.map(
+          (task, index) => h(ProjectTaskRow, {
+            key: task.id,
+            task,
+            today,
+            data: viewData,
+            timer,
+            last: index === visible.length - 1,
+            onToggle: toggleComplete,
+            onEdit: (target) => setEditor({ id: target.id }),
+            onPlay: playTask
+          })
+        )
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 16
+          }
+        },
+        h(ProjectWhitelistCard, { project }),
+        h(ProjectLibraryCard, { project })
+      ),
+      h(TaskDialog, {
+        open: taskDialogOpen,
+        task: editingTask,
+        today,
+        projects,
+        settings,
+        initialTitle: editor && editor.title ? editor.title : "",
+        initialProjectId: project.id,
+        onClose: () => setEditor(null)
+      }),
+      h(
+        Modal,
+        {
+          open: editProjectOpen,
+          onClose: () => busy ? null : setEditProjectOpen(false),
+          icon: "edit",
+          title: t("project.editTitle"),
+          subtitle: t("project.editHint"),
+          width: 460,
+          footer: h(
+            "div",
+            { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+            h(
+              Btn,
+              {
+                variant: "plain",
+                disabled: busy,
+                onClick: () => setEditProjectOpen(false)
+              },
+              t("common.cancel")
+            ),
+            h(
+              Btn,
+              {
+                variant: "primary",
+                icon: "check",
+                disabled: busy,
+                onClick: saveProject
+              },
+              t("common.save")
+            )
+          )
+        },
+        h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 14 } },
+          h(
+            Field,
+            { label: t("project.nameLabel") },
+            h(Input, {
+              value: editName,
+              onChange: setEditName,
+              maxLength: 80,
+              autoFocus: true,
+              onKeyDown: (event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  saveProject(event);
+                }
+              }
+            })
+          ),
+          h(
+            Field,
+            { label: t("project.colorLabel") },
+            h(
+              "div",
+              { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+              PROJECT_COLORS.map(
+                (color) => h("button", {
+                  key: color,
+                  type: "button",
+                  "aria-label": color,
+                  onClick: () => setEditColor(color),
+                  style: {
+                    width: 26,
+                    height: 26,
+                    borderRadius: 9,
+                    background: color,
+                    border: editColor === color ? "2px solid var(--tomato-ink)" : "2px solid transparent",
+                    cursor: "pointer",
+                    padding: 0
+                  }
+                })
+              ),
+              h(Input, {
+                type: "color",
+                value: editColor,
+                onChange: setEditColor,
+                style: { width: 42, padding: "2px 4px" }
+              })
+            )
+          ),
+          editError ? h(
+            "div",
+            {
+              role: "alert",
+              style: {
+                padding: "9px 12px",
+                borderRadius: 10,
+                background: "var(--tomato-brand-soft)",
+                color: "var(--tomato-brand-deep)",
+                fontSize: 12.5
+              }
+            },
+            editError
+          ) : null
+        )
+      ),
+      h(
+        Modal,
+        {
+          open: deleteOpen,
+          onClose: () => busy ? null : setDeleteOpen(false),
+          icon: "trash",
+          title: t("project.deleteTitle"),
+          width: 460,
+          footer: h(
+            "div",
+            { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                disabled: busy,
+                onClick: () => setDeleteOpen(false)
+              },
+              t("common.cancel")
+            ),
+            h(
+              Btn,
+              {
+                variant: "danger",
+                icon: "trash",
+                disabled: busy,
+                onClick: confirmDeleteProject
+              },
+              t("project.deleteConfirm")
+            )
+          )
+        },
+        h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 10 } },
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 13,
+                color: "var(--tomato-ink-2)",
+                lineHeight: 1.7
+              }
+            },
+            t("project.deleteBody")
+          ),
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 13.5,
+                fontWeight: 550,
+                color: "var(--tomato-ink)"
+              }
+            },
+            project.name
+          ),
+          deleteError ? h(
+            "div",
+            {
+              role: "alert",
+              style: {
+                padding: "9px 12px",
+                borderRadius: 10,
+                background: "var(--tomato-brand-soft)",
+                color: "var(--tomato-brand-deep)",
+                fontSize: 12.5,
+                lineHeight: 1.6
+              }
+            },
+            deleteError
+          ) : null
+        )
+      )
+    );
+  }
+  registerPage({
+    id: "project",
+    order: 25,
+    icon: "folder",
+    titleKey: "nav.project",
+    Component: ProjectPage,
+    // 侧栏九页导航不直接列出项目页：它只从项目列表（openProject）或面包屑进入。
+    hidden: true
+  });
+
   // plugin/src/client/pages/habits.js
   registerCopy("habits", {
     zh: {
@@ -17076,14 +19446,14 @@ ${JSON.stringify(refs, null, 2)}`;
                 const position = gridPosition(item.startMin, item.endMin);
                 const project = projectById(week.data, item.projectId);
                 const color = project && project.color || "var(--tomato-accent)";
-                const kindLabel = item.kind === "exam" ? t("calendar.exam") : t("calendar.lesson");
+                const kindLabel2 = item.kind === "exam" ? t("calendar.exam") : t("calendar.lesson");
                 const timeLabel = `${fmtHHMM(item.startMin * 60)}–${fmtHHMM(item.endMin * 60)}`;
                 return h(
                   GridBand,
                   {
                     key: `teaching:${item.raw.id}`,
                     position,
-                    title: `${kindLabel} · ${item.title} · ${timeLabel}`,
+                    title: `${kindLabel2} · ${item.title} · ${timeLabel}`,
                     onClick: () => onSelect({ kind: "teaching", item }),
                     style: {
                       borderLeft: `3px solid ${color}`,
@@ -17091,7 +19461,7 @@ ${JSON.stringify(refs, null, 2)}`;
                     }
                   },
                   h(BandText, {
-                    lead: `${kindLabel} · ${fmtHHMM(item.startMin * 60)}`,
+                    lead: `${kindLabel2} · ${fmtHHMM(item.startMin * 60)}`,
                     title: item.title,
                     color: "var(--tomato-ink)"
                   })
@@ -18874,7 +21244,7 @@ ${JSON.stringify(refs, null, 2)}`;
       ) : null
     );
   }
-  function ProjectTaskRow({ task, onToggle }) {
+  function ProjectTaskRow2({ task, onToggle }) {
     return h(
       "div",
       { style: ROW },
@@ -20020,7 +22390,7 @@ ${JSON.stringify(refs, null, 2)}`;
         },
         openTasks.length > 0 ? subHeading(t("education.openTasks"), openTasks.length) : null,
         openTasks.map(
-          (task, taskIndex) => h(ProjectTaskRow, {
+          (task, taskIndex) => h(ProjectTaskRow2, {
             key: task.id || `open-${taskIndex}`,
             task,
             onToggle
@@ -20028,7 +22398,7 @@ ${JSON.stringify(refs, null, 2)}`;
         ),
         doneTasks.length > 0 ? subHeading(t("education.doneTasks"), doneTasks.length) : null,
         doneTasks.map(
-          (task, taskIndex) => h(ProjectTaskRow, {
+          (task, taskIndex) => h(ProjectTaskRow2, {
             key: task.id || `done-${taskIndex}`,
             task,
             onToggle
@@ -21693,329 +24063,6 @@ ${JSON.stringify(refs, null, 2)}`;
     titleKey: "nav.guard",
     Component: GuardPage
   });
-  function ProjectWhitelistCard({ projects }) {
-    const [editing, setEditing] = useState(null);
-    const [draft, setDraft] = useState("");
-    const [apps, setApps] = useState(null);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState(null);
-    const whitelistOf = (project) => Array.isArray(project && project.appWhitelist) ? project.appWhitelist : null;
-    async function open(project) {
-      setEditing({
-        id: project.id,
-        name: project.name,
-        selected: whitelistOf(project) ? [...whitelistOf(project)] : []
-      });
-      setDraft("");
-      setError(null);
-      if (apps !== null) return;
-      try {
-        const result = await getApps();
-        const list = Array.isArray(result && result.apps) ? result.apps : [];
-        setApps(
-          list.map((app) => ({
-            id: String(app.id ?? ""),
-            name: String(app.name ?? app.id ?? "")
-          })).filter((app) => app.id !== "").sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"))
-        );
-      } catch {
-        setApps([]);
-      }
-    }
-    const add = (value) => {
-      const app = String(value ?? "").trim();
-      if (app === "") {
-        setError(t("guard.appRequired"));
-        return;
-      }
-      if (/\s/.test(app)) {
-        setError(t("guard.appNoSpace"));
-        return;
-      }
-      setError(null);
-      setEditing(
-        (current4) => current4 === null || current4.selected.includes(app) ? current4 : { ...current4, selected: [...current4.selected, app] }
-      );
-      setDraft("");
-    };
-    const remove = (app) => {
-      setEditing(
-        (current4) => current4 === null ? current4 : { ...current4, selected: current4.selected.filter((x) => x !== app) }
-      );
-    };
-    async function save() {
-      if (editing === null || busy) return;
-      if (editing.selected.length === 0) {
-        setError(t("guard.projectEmpty"));
-        return;
-      }
-      setBusy(true);
-      const result = await tryDispatch({
-        type: "setProjectWhitelist",
-        id: editing.id,
-        whitelist: editing.selected
-      });
-      setBusy(false);
-      if (!result.ok) {
-        setError(result.error || t("common.writeFailed"));
-        return;
-      }
-      notify(t("guard.projectSaved", { name: editing.name }), "brand");
-      setEditing(null);
-    }
-    async function clear(project) {
-      setBusy(true);
-      const result = await tryDispatch({
-        type: "setProjectWhitelist",
-        id: project.id,
-        whitelist: null
-      });
-      setBusy(false);
-      if (!result.ok) {
-        notify(result.error || t("common.writeFailed"), "danger");
-        return;
-      }
-      notify(t("guard.projectCleared", { name: project.name }), "brand");
-      setEditing(null);
-    }
-    const selected = editing ? editing.selected : [];
-    const suggestions = [];
-    const seen = new Set(selected);
-    for (const app of apps ?? []) {
-      if (seen.has(app.id)) continue;
-      seen.add(app.id);
-      suggestions.push(app);
-      if (suggestions.length >= 18) break;
-    }
-    return h(
-      Card,
-      null,
-      h(SectionTitle, {
-        icon: "lock",
-        title: t("guard.projectTitle"),
-        hint: t("guard.projectHint")
-      }),
-      projects.length === 0 ? h(
-        "div",
-        { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
-        t("guard.projectNone")
-      ) : h(
-        "div",
-        { style: { display: "flex", flexDirection: "column", gap: 2 } },
-        projects.map((project) => {
-          const list = whitelistOf(project);
-          return h(
-            "div",
-            {
-              key: project.id,
-              style: {
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "9px 2px",
-                borderBottom: "1px solid var(--tomato-line)",
-                flexWrap: "wrap"
-              }
-            },
-            h(Dot, { color: project.color || "var(--tomato-ink-3)" }),
-            h(
-              "span",
-              { style: { fontSize: 12.5, color: "var(--tomato-ink)" } },
-              project.name
-            ),
-            h(
-              "span",
-              { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-              list === null ? t("guard.projectFollow") : t("guard.projectCount", { n: list.length })
-            ),
-            h("div", { style: { flex: 1 } }),
-            h(
-              Btn,
-              { variant: "ghost", size: "sm", onClick: () => open(project) },
-              list === null ? t("guard.projectEdit") : t("guard.projectEdit")
-            ),
-            list === null ? null : h(
-              Btn,
-              {
-                variant: "plain",
-                size: "sm",
-                disabled: busy,
-                onClick: () => clear(project)
-              },
-              t("guard.projectClear")
-            )
-          );
-        })
-      ),
-      editing === null ? null : h(
-        Modal,
-        {
-          open: true,
-          onClose: () => busy ? null : setEditing(null),
-          icon: "lock",
-          title: t("guard.projectDialogTitle", { name: editing.name }),
-          subtitle: t("guard.projectDialogHint"),
-          footer: h(
-            "div",
-            { style: { display: "flex", gap: 9, width: "100%" } },
-            h("div", { style: { flex: 1 } }),
-            h(
-              Btn,
-              {
-                variant: "plain",
-                size: "sm",
-                onClick: () => setEditing(null)
-              },
-              t("common.cancel")
-            ),
-            h(
-              Btn,
-              {
-                variant: "primary",
-                size: "sm",
-                icon: "check",
-                disabled: busy,
-                onClick: save
-              },
-              t("common.save")
-            )
-          )
-        },
-        h(
-          "div",
-          {
-            style: {
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-              minHeight: 30
-            }
-          },
-          selected.length === 0 ? h(
-            "div",
-            { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
-            t("guard.whitelistEmpty")
-          ) : selected.map(
-            (app) => h(
-              "span",
-              {
-                key: app,
-                style: {
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 2,
-                  paddingLeft: 8,
-                  paddingRight: 2,
-                  borderRadius: 8,
-                  background: "var(--tomato-brand-soft)",
-                  flex: "none"
-                }
-              },
-              h(
-                Chip,
-                { tone: "brand", style: { background: "transparent" } },
-                app
-              ),
-              h(IconBtn, {
-                name: "x",
-                box: 18,
-                size: 11,
-                title: t("guard.removeApp", { name: app }),
-                onClick: () => remove(app)
-              })
-            )
-          )
-        ),
-        h(
-          "div",
-          {
-            style: {
-              display: "flex",
-              gap: 8,
-              alignItems: "flex-end",
-              marginTop: 12,
-              flexWrap: "wrap"
-            }
-          },
-          h(
-            Field,
-            {
-              label: t("guard.manualTitle"),
-              style: { flex: "1 1 220px", minWidth: 0 }
-            },
-            h(Input, {
-              value: draft,
-              placeholder: t("guard.appPlaceholder"),
-              onChange: setDraft,
-              onKeyDown: (event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  add(draft);
-                }
-              }
-            })
-          ),
-          h(
-            Btn,
-            { variant: "soft", icon: "plus", onClick: () => add(draft) },
-            t("guard.addApp")
-          )
-        ),
-        suggestions.length > 0 ? h(
-          "div",
-          { style: { marginTop: 14 } },
-          h(
-            "div",
-            {
-              style: {
-                fontSize: 11.5,
-                color: "var(--tomato-ink-3)",
-                marginBottom: 7
-              }
-            },
-            t("guard.suggestionsTitle")
-          ),
-          h(
-            "div",
-            { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
-            suggestions.map(
-              (app) => h(
-                Chip,
-                {
-                  key: app.id,
-                  icon: "plus",
-                  tone: "neutral",
-                  title: app.name === app.id ? void 0 : app.id,
-                  onClick: () => add(app.id)
-                },
-                app.name
-              )
-            )
-          )
-        ) : null,
-        error ? h(InlineError2, { text: error }) : null
-      )
-    );
-  }
-  function InlineError2({ text }) {
-    if (!text) return null;
-    return h(
-      "div",
-      {
-        role: "alert",
-        style: {
-          marginTop: 10,
-          padding: "9px 12px",
-          borderRadius: 10,
-          background: "var(--tomato-brand-soft)",
-          color: "var(--tomato-brand-deep)",
-          fontSize: 12.5,
-          lineHeight: 1.5
-        }
-      },
-      text
-    );
-  }
 
   // plugin/src/client/pages/schedule.js
   registerCopy("schedule", {
@@ -24044,6 +26091,8 @@ ${JSON.stringify(refs, null, 2)}`;
         window.__tomatoDsh = {
           setActivePageId,
           getActivePageId,
+          getActiveProjectId,
+          openProject,
           resetActivePageCache,
           openAssistant: (...args) => openAssistant(...args)
         };

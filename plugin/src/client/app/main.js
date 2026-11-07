@@ -19,7 +19,9 @@ import {
   bindPanelInfo,
   bindPanelOpener,
   getActivePageId,
+  getActiveProjectId,
   navigate,
+  openProject,
   resetActivePageCache,
   setActivePageId,
   setPanelVisible,
@@ -139,6 +141,8 @@ export function registerApp(ctx) {
       window.__tomatoDsh = {
         setActivePageId,
         getActivePageId,
+        getActiveProjectId,
+        openProject,
         resetActivePageCache,
         openAssistant: (...args) => openAssistant(...args),
       };

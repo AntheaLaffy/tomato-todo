@@ -749,6 +749,30 @@ for (const pageId of PAGE_IDS) {
     );
   }
 }
+// 项目详情页不在九页导航里：用侧栏的进入方式 openProject 渲染，验证它确实
+// 能打开（而不是只能靠全部任务的项目筛选）。样例项目 p1 = 数学一。
+if (typeof nav?.openProject === "function") {
+  try {
+    nav.openProject("p1");
+    const markup = ReactDOMServer.renderToStaticMarkup(
+      React.createElement(mainRegistration.registration.Component, {}),
+    );
+    renderedBy["page:project"] = markup;
+    if (!markup || markup.length < 500) failures.push("项目页渲染为空");
+    if (!process.env.SMOKE_LIVE) {
+      for (const marker of ["数学一", "未完成", "项目专属白名单", "项目资料"])
+        if (!markup.includes(marker))
+          failures.push(`项目页缺少「${marker}」（侧栏项目点击可能又跳回全部任务）`);
+    }
+  } catch (e) {
+    failures.push(
+      `渲染项目页失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`,
+    );
+  }
+} else {
+  failures.push("没有暴露测试导航钩子 window.__tomatoDsh.openProject");
+}
+
 if (!process.env.SMOKE_LIVE) {
   const education = renderedBy["page:education"] || "";
   for (const label of ["布置作业", "提交作业", "批改作业"]) {
@@ -814,6 +838,19 @@ for (const pageId of PAGE_IDS) {
       failures.push(`页面 ${pageId} 的日语文案没有显示`);
   } catch (error) {
     failures.push(`日语页面 ${pageId} 渲染失败：${error.message}`);
+  }
+}
+if (!process.env.SMOKE_LIVE && typeof nav?.openProject === "function") {
+  try {
+    nav.openProject("p1");
+    const markup = ReactDOMServer.renderToStaticMarkup(
+      React.createElement(mainRegistration.registration.Component, {}),
+    );
+    for (const marker of ["プロジェクト専用ホワイトリスト", "未完了"])
+      if (!markup.includes(marker))
+        failures.push(`项目页的日语文案没有显示（缺「${marker}」）`);
+  } catch (error) {
+    failures.push(`日语项目页渲染失败：${error.message}`);
   }
 }
 if (!process.env.SMOKE_LIVE) {

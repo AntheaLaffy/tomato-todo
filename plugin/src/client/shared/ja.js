@@ -119,6 +119,7 @@ export const japaneseCopy = {
     guard: "フォーカスガード",
     schedule: "予定されたロック",
     preferences: "設定",
+    project: "プロジェクト",
     assistant: "学習アシスタント",
     assistantHint: "DSH会話に戻る（トマトビューは折りたたまれます）",
     space: "マイスペース",

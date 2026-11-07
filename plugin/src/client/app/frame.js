@@ -11,7 +11,8 @@ import { todayKey, timerView, greeting } from "../shared/derive.js";
 import { pageList } from "./registry.js";
 import {
   getActivePageId,
-  openTasksForProject,
+  getActiveProjectId,
+  openProject,
   setActivePageId,
   setPanelVisible,
   hasPanelInfo,
@@ -22,6 +23,11 @@ function loadActivePage(pages) {
   const saved = getActivePageId();
   if (saved && pages.some((page) => page.id === saved)) return saved;
   return pages.length > 0 ? pages[0].id : null;
+}
+
+/** 侧栏导航只列公开页；项目页（hidden）从项目列表进入。 */
+function navPagesOf(pages) {
+  return pages.filter((page) => page.hidden !== true);
 }
 
 function useViewportNarrow(threshold = 980) {
@@ -343,7 +349,7 @@ function NavFooter({ state, compact, activeId, onSelect }) {
   );
 }
 
-function ProjectList({ projects, counts }) {
+function ProjectList({ projects, counts, activeProjectId }) {
   if (!projects || projects.length === 0) return null;
   return h(
     "div",
@@ -356,8 +362,9 @@ function ProjectList({ projects, counts }) {
           key: project.id,
           type: "button",
           className: "t-navitem",
+          "data-active": activeProjectId === project.id,
           title: project.name,
-          onClick: () => openTasksForProject(project.id),
+          onClick: () => openProject(project.id),
           style: { padding: "8px 12px", fontSize: 13 },
         },
         h(Dot, { color: project.color || "var(--tomato-ink-3)", size: 8 }),
@@ -390,6 +397,7 @@ function ProjectList({ projects, counts }) {
 function NavColumn({
   pages,
   activeId,
+  activeProjectId,
   onSelect,
   state,
   compact,
@@ -404,10 +412,12 @@ function NavColumn({
     if (!task || task.completed || !task.projectId) continue;
     counts.set(task.projectId, (counts.get(task.projectId) || 0) + 1);
   }
-  // 偏好设置从导航列表移到页脚（旧版位置）；窄屏保持扁平列表。
+  // 偏好设置从导航列表移到页脚（旧版位置）；项目页（hidden）不进程侧栏；
+  // 窄屏保持扁平列表。
+  const publicPages = navPagesOf(pages);
   const navPages = compact
-    ? pages
-    : pages.filter((page) => page.id !== "preferences");
+    ? publicPages
+    : publicPages.filter((page) => page.id !== "preferences");
   const items = [];
   for (const page of navPages) {
     items.push(
@@ -473,7 +483,13 @@ function NavColumn({
           style: { marginTop: 8 },
         }),
     items,
-    compact ? null : h(ProjectList, { projects, counts }),
+    compact
+      ? null
+      : h(ProjectList, {
+          projects,
+          counts,
+          activeProjectId: activeId === "project" ? activeProjectId : null,
+        }),
     h(NavFooter, { state, compact, activeId, onSelect }),
   );
 }
@@ -520,11 +536,22 @@ export function AppShell(props) {
   }, []);
   const pages = pageList();
   const [activeId, setActiveId] = useState(() => loadActivePage(pages));
+  const [activeProjectId, setActiveProjectId] = useState(() =>
+    getActiveProjectId(),
+  );
   const narrow = useViewportNarrow();
   const active = pages.find((page) => page.id === activeId) ?? pages[0] ?? null;
 
-  // 跨模块导航：沉浸层等外部入口经 navigation.js 切页。
-  useEffect(() => subscribe(setActiveId), []);
+  // 跨模块导航：沉浸层等外部入口经 navigation.js 切页；同一页换项目时
+  // page id 不变，靠第二参 projectId 让页面重渲染。
+  useEffect(
+    () =>
+      subscribe((pageId, projectId) => {
+        setActiveId(pageId);
+        setActiveProjectId(projectId ?? null);
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (active === null && pages.length > 0) setActivePageId(pages[0].id);
@@ -558,6 +585,7 @@ export function AppShell(props) {
     h(NavColumn, {
       pages,
       activeId: active ? active.id : null,
+      activeProjectId,
       onSelect: setActivePageId,
       state,
       compact: narrow,
@@ -592,6 +620,7 @@ export function AppShell(props) {
         active
           ? h(active.Component, {
               state,
+              projectId: activeProjectId,
               dispatch: props.dispatch,
               refresh: refreshStore,
               api: props.api,

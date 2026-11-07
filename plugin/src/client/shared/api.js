@@ -97,6 +97,120 @@ export function scanProjectLibrary(id, opts) {
   );
 }
 
+// 共享资料库索引：扫描只把文件清单写进数据目录的 library-index.json，不写
+// 计划、不写备份，也不等于 education.resources；浏览/搜索都走这组端点。
+// 端点由 feat-library-index 落地；还没上线的 runtime 会 404，项目页按
+// 「资料库尚未建索引」降级，不把 404 当页面故障。
+export function scanLibrary(opts) {
+  return request("/api/library/scan", {
+    method: "POST",
+    timeoutMs: 120000,
+    ...opts,
+  });
+}
+
+export function getLibraryStats(opts) {
+  return request("/api/library/stats", { timeoutMs: 8000, ...opts });
+}
+
+export function getLibraryItems(
+  { projectId, q = "", kind = "", offset = 0, limit = 40 } = {},
+  opts,
+) {
+  const params = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit),
+  });
+  if (projectId) params.set("projectId", projectId);
+  if (q) params.set("q", q);
+  if (kind) params.set("kind", kind);
+  return request("/api/library/items?" + params.toString(), {
+    timeoutMs: 15000,
+    ...opts,
+  });
+}
+
+/** 文件读取令牌（进程内生成，只用于本机 ?access= 查询参数）。 */
+export function getFileToken(opts) {
+  return request("/api/file-token", opts);
+}
+
+/** 索引文件的直链；预览与下载共用，令牌随 URL 过期于 runtime 退出。 */
+export function libraryFileUrl(path, access, download = false) {
+  const params = new URLSearchParams({ path, access });
+  if (download) params.set("download", "1");
+  return API_BASE + "/api/library/file?" + params.toString();
+}
+
+// 项目资料目录授权与已登记资源的维护。授权/取消都只改 grant 文件，不移动、
+// 不复制用户磁盘上的文件；路径解析与越界校验在 runtime 的 project-library 里。
+export function getProjectGrant(id, opts) {
+  return request("/api/projects/" + encodeURIComponent(id) + "/grant", opts);
+}
+
+export function authorizeProjectDirectory(id, directory, opts) {
+  return request("/api/projects/" + encodeURIComponent(id) + "/authorize", {
+    method: "POST",
+    body: { directory },
+    ...opts,
+  });
+}
+
+export function getProjectResources(
+  id,
+  { q = "", kind = "", status = "", offset = 0, limit = 40 } = {},
+  opts,
+) {
+  const params = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit),
+  });
+  if (q) params.set("q", q);
+  if (kind) params.set("kind", kind);
+  if (status) params.set("status", status);
+  return request(
+    "/api/projects/" + encodeURIComponent(id) + "/resources?" + params,
+    opts,
+  );
+}
+
+/** 登记一条已存在于授权目录内的资料（POST /api/projects/:id/resources）。 */
+export function registerProjectResource(id, resource, opts) {
+  return request("/api/projects/" + encodeURIComponent(id) + "/resources", {
+    method: "POST",
+    body: { resource },
+    ...opts,
+  });
+}
+
+/** 清理失效登记；省略 ids 时清理所有「仍缺失且无教学引用」的条目。 */
+export function cleanupProjectResources(id, ids, opts) {
+  return request(
+    "/api/projects/" + encodeURIComponent(id) + "/resources/cleanup",
+    {
+      method: "POST",
+      body: ids === undefined ? {} : { ids },
+      ...opts,
+    },
+  );
+}
+
+/** 保留资源 ID，把路径改到移动/改名后的新位置。 */
+export function repairProjectResource(id, resourceId, path, opts) {
+  return request(
+    "/api/projects/" +
+      encodeURIComponent(id) +
+      "/resources/" +
+      encodeURIComponent(resourceId) +
+      "/repair",
+    {
+      method: "POST",
+      body: { path },
+      ...opts,
+    },
+  );
+}
+
 /**
  * 导出计划 v6 / 备份 v4（JSON，浏览器端由页面负责 Blob 下载）。
  * 端点在 data-runtime 落地前会 404，页面用 typeof fn === "function" + 错误行降级。
