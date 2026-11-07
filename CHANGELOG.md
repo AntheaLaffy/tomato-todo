@@ -6,6 +6,7 @@
 
 ### 变更
 
+- 应试任务从「普通任务编辑框」改为作业/考试/课程工作台（`plugin/src/client/pages/assignment-dialog.js`）：项目页、今日专注、应试教育页的任务行点击即打开，普通任务仍走 TaskDialog。资料区列出题目 `sourceIds` 去重后的资料与项目考纲/真题/模拟题，按需读 `/api/state?education=lite` 与 `/api/resources/:id/info`，预览复用 `shared/file-preview.js`、下载取原件；作业可提交答案文本（50000 上限）/未完成标记/项目答卷，缺答卷时可直接从共享库索引登记为 `answerSheet`；考试提供开始/停笔，停笔后才允许上传答题卡；课程显示并记录 `lesson.progress`（仅课表时间窗内）。教学任务不再提供勾选完成与编辑/删除。
 - 应试教育新增「共享资料库」：在页面一次授权整个资料目录（如 `/home/fuurin/exam`）后，所有学习项目默认共用，不再要求逐个项目绑定；项目单独授权保留，但只能收窄到共享库内的子目录。新增 `GET /api/library/grant`、`POST /api/library/authorize`、`DELETE /api/library/grant`，授权只给界面用户操作，不新增 MCP/助手入口；取消共享授权只删除 `library-grant.json`，按项目的授权保留。安全校验（绝对路径、无符号链接、非根/主目录/应用数据目录、读取不越界）对共享库同样生效。
 - 共享资料库改为「索引 vs 登记」两层：新增 `runtime/src/library-index.mjs`，扫描授权目录得到独立索引 `dataDir/library-index.json`（0600 原子写，不进计划/备份），新增 `POST /api/library/scan`、`GET /api/library/items`、`GET /api/library/stats`、`GET /api/library/file`；项目详情可直接浏览/搜索/预览共享库文件并按顶层目录映射到项目，只有真正要写进教学记录时才登记单份资料。这样近五千个文件不必逐份 `education.saveResource`（避免每次写盘重写整份计划、每份快照序列化），也不再需要按扩展名猜固定的 `Resource.kind`；授权成功后自动异步扫描，并发扫描等待同一份结果。
 - 应用白名单建议改为只列当前有窗口的运行中应用，自动刷新并最多显示 8 项；DSH 自身不列入建议，手动输入仍可添加其他 app id。桌面入口只用于名称，guard 不可达时不回退为全部已安装应用。
