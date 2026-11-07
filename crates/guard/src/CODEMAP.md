@@ -1,3 +1,8 @@
+---
+mode: maintenance
+generated_at: 2026-11-07
+---
+
 # Native Guard
 
 | File | Responsibility |
@@ -6,6 +11,7 @@
 | guard.rs | 桌面选择、DSH 窗口发现、激活与白名单纯决策 |
 | state.rs | 保护线程、niri DSH 全屏/回焦、其他桌面锁窗生命周期、沉浸全屏请求、运行中应用枚举 |
 | protocol.rs | lock/unlock/focus/fullscreen/notify 协议与状态 DTO |
+| notify.rs | 桌面系统通知（notify-rust），由 HTTP 的 notify 命令调用 |
 | http.rs | Bearer 鉴权、HTTP 解析、命令路由与只读运行中应用端点 |
 | token.rs | 用户数据目录与 token 文件 |
 | wayland.rs | niri/Sway/Hyprland 窗口 IPC 与激活确认 |

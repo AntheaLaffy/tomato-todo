@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Linux / Windows](https://img.shields.io/badge/platform-Linux%20%2F%20Windows-blue)
 
-番茄 Todo 是 DeepSeek Harness（DSH）的专注插件：今日专注、任务与统计的界面住在 DSH 里，一个 Node 本地 runtime 管数据与番茄计时，一个 Rust 原生守卫做专注保护、通知与托盘。奶油白与番茄红，数据留在本机，不依赖账号或联网。
+番茄 Todo 是 DeepSeek Harness（DSH）的专注插件：今日专注、任务与统计的界面住在 DSH 里，一个 Node 本地 runtime 管数据与番茄计时，一个 Rust 原生守卫做专注保护、窗口激活与通知。奶油白与番茄红，数据留在本机，不依赖账号或联网。
 
 > **不靠意志力，靠环境**：白名单把分心挡在外面，AI 帮你把环境调成你的样子。
 
@@ -28,7 +28,7 @@
 
 - **环境胜过意志力。** 专注时，不在白名单里的应用会被自动切回专注界面；你不必每次都战胜自己，只需提前把环境设好。
 - **日常只有两件事。** 当下（今日专注：选一件最重要的事开一个番茄）和对话（学习助手）。愿景、习惯、课表和模板用于记录方向与安排，给助手落笔用，不是每天的功课；统计只用来回看，不是绩效评估。规划半天不动手是最常见的失败方式，所以第一次打开时会直接把这两件事说清楚。
-- **让 AI 维护你的环境。** 学习助手就是 DSH 的对话：说一句「英语任务需要词典和浏览器」，它经 MCP 直接改好计划、白名单与模板，或先给一份待审阅文件。过去几乎不值得维护的个性化配置，现在是一句话的事。
+- **让 AI 维护你的环境。** 学习助手就是 DSH 的对话：说一句「英语任务需要词典和浏览器」，它经插件自带的 `tomato_*` 工具直接改好计划、白名单与模板，或先给一份待审阅文件。过去几乎不值得维护的个性化配置，现在是一句话的事。
 - **桌面级、躲不掉。** runtime 与守卫随登录自启（systemd user service），DSH 没开时番茄计时、专注保护与到点通知也照常工作。
 - **只属于你。** 任务、统计和设置都在本机的计划 JSON 里，不联网、不要账号（模型对话走 DSH 自己的配置）。
 - **开源，可以接着改。** 核心是 TypeScript 加上一个小的 Rust 守卫，计划格式与文档公开；欢迎用智能体按自己的需求继续扩展。
@@ -50,22 +50,22 @@
 
 ```
 DSH（你的对话与界面）
- ├─ composer.dock 入口卡 → shell.overlay 面板：今日专注 / 任务 / 统计 / 设置
- ├─ 学习助手 = DSH 对话，经 MCP 工具读写计划
- └─ MCP 行：stdio → tomato-runtime --mcp
+ ├─ 番茄主视图（九页）+ composer.dock 入口卡 + 常驻 HUD / 沉浸层
+ ├─ 学习助手 = DSH 对话，经插件自带的 tomato_* Host 工具读写计划
+ └─ Host 工具每次调用：一次性 tomato-runtime --mcp → 运行中实例
 tomato-runtime（Node，随插件分发，本机常驻）
  ├─ 领域核心 @tomato/core：任务/习惯/模板/课表/诊断/统计（plan.json，原子写）
- ├─ 番茄计时与到点提醒调度
- └─ HTTP API（127.0.0.1:43987）：面板直连只读端点 + /mcp（streamable HTTP）
+ ├─ 番茄计时与到点提醒调度、项目资料库授权
+ └─ HTTP API（127.0.0.1:43987）：面板数据面 + /api/* + /mcp（streamable HTTP，供外部客户端）
 tomato-guard（Rust 原生守卫，被 runtime 指挥）
- ├─ 专注保护：白名单 + 全屏锁（X11 / Wayland / Windows）
- ├─ 通知、托盘
+ ├─ 专注保护：白名单 + 全屏（niri 用实际 DSH 窗口，其他后端自建锁窗）
+ ├─ 窗口激活与系统通知
  └─ 随登录自启（systemd user service）
 ```
 
-- **插件**（`@local/tomato-dsh`）负责 DSH 内的界面与工具：入口卡、面板，以及把 runtime 挂成对话可用的 MCP 工具。
-- **runtime** 负责所有领域逻辑与数据：任务规则、模板印刷、诊断、统计、计时与提醒。面板只读数据直连它的本地 API；助手的一切写操作都经过它，规则与保护在它这里执行。
-- **守卫** 只做浏览器做不到的事：锁住屏幕、把非白名单应用切走、发通知、挂托盘。它没有领域逻辑，只被 runtime 指挥。
+- **插件**（`@local/tomato-dsh`）负责 DSH 内的界面与工具：九页主视图、入口卡、HUD、`tomato_*` Host 工具与随包教学技能。
+- **runtime** 负责所有领域逻辑与数据：任务规则、模板印刷、诊断、统计、计时与提醒。面板数据直连它的本地 API；助手的一切写操作都经过它，规则与保护在它这里执行。
+- **守卫** 只做浏览器做不到的事：锁住屏幕、把非白名单应用切走、发通知、激活窗口。它没有领域逻辑，只被 runtime 指挥。
 
 ## 安装
 
@@ -75,7 +75,7 @@ tomato-guard（Rust 原生守卫，被 runtime 指挥）
 
 ### 插件（@local/tomato-dsh）
 
-在 DSH 的 `plugin_manager` 里安装 `@local/tomato-dsh`（本地构建时指向仓库的 `plugin/` 目录，发行时用随包插件包）。启用后，composer.dock 出现番茄入口卡，对话获得番茄 Todo 的 MCP 工具。
+在 DSH 的 `plugin_manager` 里安装 `@local/tomato-dsh`（本地构建时指向仓库的 `plugin/` 目录，发行时用随包插件包）。启用后，composer.dock 出现番茄入口卡，对话获得番茄 Todo 的 `tomato_*` 工具；外部客户端仍可单独接 MCP。
 
 ### runtime 与守卫
 
@@ -89,7 +89,7 @@ node scripts/install.mjs
 systemctl --user enable --now tomato-runtime
 ```
 
-登录后 runtime 与守卫随会话自启；守卫的专注保护、通知与托盘不依赖 DSH 是否打开。具体的安装选项（自启、数据目录、桌面集成）以 `scripts/install.mjs --help` 与安装输出为准。
+登录后 runtime 与守卫随会话自启；守卫的专注保护与通知不依赖 DSH 是否打开。具体的安装选项（自启、数据目录、桌面集成）以 `scripts/install.mjs --help` 与安装输出为准。
 
 ### 从源码构建
 
@@ -130,7 +130,7 @@ node scripts/install.mjs
 
 ### 专注保护与定时锁机
 
-原生守卫通过各桌面接口提供全屏锁定与应用白名单（各桌面配置与验证范围见下方适配表）；每个项目可选配专属白名单，专注该项目的任务时替代通用白名单。独立的「小憩 / 定时锁机」支持 1–720 分钟快速锁机、跨午夜的每周重复时段，到点从托盘唤回全屏休息界面，睡眠不计入学习时长。
+原生守卫通过各桌面接口提供全屏锁定与应用白名单（各桌面配置与验证范围见下方适配表）；每个项目可选配专属白名单，专注该项目的任务时替代通用白名单。独立的「小憩 / 定时锁机」支持 1–720 分钟快速锁机、跨午夜的每周重复时段，到点发系统通知并在 HUD 提示休息，睡眠不计入学习时长。
 
 ### 设置
 
@@ -154,7 +154,7 @@ node scripts/install.mjs
 - **GNOME 扩展**：源码目录运行 `python3 scripts/install-desktop-integration.py`；首次安装后注销并重新登录，再运行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器只复制文件，不自动启用扩展或保护。
 - **KDE Plasma**：直接使用当前会话的 KWin 脚本接口，无需安装额外扩展；脚本执行完或发生错误后卸载，不修改用户的 KWin 插件设置。
 - **应用白名单**：各后端的应用标识可能不同，切换桌面后请从真实窗口列表重新选择；GNOME 通常返回 `.desktop` ID，KWin 优先桌面文件 ID，Sway/Hyprland 使用应用类或原生 app ID。
-- **托盘**：需要 AppIndicator 运行库（Arch 的 `libappindicator-gtk3`，Debian 的 `libayatana-appindicator3-1`）及桌面上的 StatusNotifier 组件。没有托盘时通知与锁机照常工作。
+- **系统通知**：守卫把提醒交给桌面通知中心；通知服务不可用时只影响提醒，不影响锁机与计时。
 - **自启动**：由 `scripts/install.mjs` 注册 systemd user service；niri 会话需启用 XDG 自启动目标。仅在本机保存的桌面偏好为 `$XDG_CONFIG_HOME/studio.tomato.todo/desktop.json`，不随任务备份导入到其他电脑。
 - **系统运行库**：依赖 `pactl`（专注时抑制其他应用提示音；Arch 由 `libpulse` 提供，Debian / Ubuntu 为 `pulseaudio-utils`）。
 

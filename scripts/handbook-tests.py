@@ -50,6 +50,7 @@ DOMAINS = [
             "runtime/test/engine.test.mjs",
             "runtime/test/http.test.mjs",
             "runtime/test/mcp-stdio.test.mjs",
+            "runtime/test/connection.test.mjs",
         ],
         "`cd runtime && node --test`",
     ),
@@ -79,6 +80,7 @@ DOMAINS = [
             "scripts/export-sqlite.test.mjs",
             "scripts/import-backup.test.mjs",
             "scripts/install.test.mjs",
+            "scripts/plugin-host.test.mjs",
         ],
         "`pnpm test:tools`",
     ),
@@ -123,8 +125,10 @@ CHAPTER_TESTS = {
     "22-架构与工程": [
         "runtime/test/engine.test.mjs",
         "runtime/test/http.test.mjs",
+        "runtime/test/connection.test.mjs",
         "packages/core/test/engine-store.test.ts",
         "runtime/test/supervise.test.mjs",
+        "scripts/plugin-host.test.mjs",
     ],
     "24-界面手感与音效": [
         "scripts/attention.test.mjs",

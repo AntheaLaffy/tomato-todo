@@ -13,18 +13,21 @@
 - 客户端改为模块化 + esbuild 构建（`plugin/src/client/` → `plugin/client.js`，`pnpm build:client`），新增无浏览器冒烟 `pnpm check:client`（假 DOM + 真 React 逐页渲染）与 `SMOKE_LIVE=1` 实时数据联调；视觉基准见 `docs/SKIN.md`。
 - UI 数据面改为「全量状态 + Action」：`GET /api/state`（engine 快照 + guard/education 摘要）与 `POST /api/dispatch`（`@tomato/core` 的 Action union，返回新快照），页面不再按功能堆端点；新增 `GET /api/export/plan`、`GET /api/export/backup` 供偏好设置导出。
 - 今日专注页对齐旧版：番茄钟卡补回标题/沉浸入口、三段模式切换、整圈计时环与居中按钮组，背景音改为卡片底部通栏；今日待办改成下划线 tab（待完成/已完成）+ 细线分行 + 虚线快速添加（N 快捷键）；「这一周的专注节奏」移到整行并补回左侧刻度与虚线网格、数值行、周日…今天。
-- 注意力切换：一轮计时自然结束或新提醒到点时，常驻 HUD 把 DSH 面板切到「番茄 → 今日专注」并保留提示音；有对话框打开时不抢页面。runtime 同时调用 guard 的 `focus` 命令，由原生后端（niri/Sway/Hyprland/GNOME/KWin/X11、Windows、macOS）把 DSH 窗口切到前台；锁机期间不抢。
+- 注意力切换只保留提示音与系统通知：一轮计时自然结束或新提醒到点时，常驻 HUD 播提示音、runtime 按设置发系统通知，不切走用户当前对话、也不把 DSH 窗口置前；`focus` 命令保留给显式调用，niri 锁机时保护目标仍是 DSH 本身。
 - 本周日程按旧版区分「任务 / 课程 / 固定占用」：任务是不透明纸面圆角块（项目色左边 + 时间 + 按预计番茄估高，点击直接编辑任务）；课程/考试是项目色与纸面混合的实心块；固定占用改为通栏斜纹带（需专心=品牌斜纹 + 实线左杆，水课=素面 + 虚线左杆），休息锁机保持紫色条纹带；课程生成的专注任务不再重复成任务块。
 - 侧栏补回旧版结构：「我的空间 / PERSONAL」分区标题、学习助手回到列表内、我的项目（色点 + 未完成数，点击进全部任务并预设项目筛选）、页脚「每日番茄目标」进度卡与偏好设置入口；内容列改为左对齐、宽 1270。
 - 勾选框改为 20px 圆角方形、任务标签改为浅底 chip，与旧版一致。
 - 恢复旧版「角色背景板」：内置立绘随插件分发（`plugin/assets/personas/`，ATRI 官方立绘，按原 README 保留权利说明），在 DSH 每个界面右下角显示，四角色可选、受 `settings.personaBackdrop` 开关控制，沉浸与专注保护时隐藏。指针靠近立绘时左侧浮出 Q 版头像列可直接换人，触摸设备点立绘开合；与设置里的下拉框共用 `localStorage` 偏好。
-- 整体重写为 DSH 插件架构：TypeScript 领域核心（`packages/core`，唯一权威实现）+ Node 本地 runtime（`runtime/`，计划 JSON 原子写、计时与提醒、HTTP API 与 MCP）+ Rust 原生守卫（`crates/guard`，专注保护/通知/托盘）。
-- 界面迁入 DSH：composer.dock 入口卡与 shell.overlay 面板提供今日专注、任务、统计与设置，数据直连 runtime 只读 API；沿用奶油白 + 番茄红设计语言。
-- 学习助手不再内置：对话、审阅与教学全部交给 DSH，助手经 MCP（`--mcp` stdio 或 `/mcp` streamable HTTP）接管 tomato-runtime；MCP 工具语义沿用旧外部清单，实现全部重写。
+- 整体重写为 DSH 插件架构：TypeScript 领域核心（`packages/core`，唯一权威实现）+ Node 本地 runtime（`runtime/`，计划 JSON 原子写、计时与提醒、HTTP API 与 MCP）+ Rust 原生守卫（`crates/guard`，专注保护/窗口激活/通知）。
+- 界面迁入 DSH：composer.dock 入口卡与 shell.overlay 的常驻专注 HUD/沉浸层，数据直连 runtime；沿用奶油白 + 番茄红设计语言。
+- 学习助手不再内置：对话、审阅与教学全部交给 DSH；DSH 经插件自带的 `tomato_*` Host 工具（底层一次性 `--mcp` 转发）操作 tomato-runtime，独立客户端仍可用 MCP（`--mcp` stdio 或 `/mcp` streamable HTTP）。工具语义沿用旧外部清单，实现全部重写。
 - runtime MCP 工具补齐教学面：新增 `education`（学期/课程/作业/考试/答卷/批改/订正/学情写入，`command.op`）、`get_education` / `get_study_progress` / `get_tasks`（分页读取）与 `apply_file`（导出文件按哈希应用）；`tomato_today` 改用 camelCase 的 `get_context` 形状并返回结构化对象。旧清单里已随内置助手移除的 `get_control_status` / `set_external_control` / `review_file` / `read_file` / `patch_file` 等不再暴露——文件读写、搜索、定时由 DSH 自带工具承担。
+- DSH 对话改用插件自带的 15 个 `tomato_*` Host 工具（13 个 runtime 操作 + 今日摘要 + 保护状态），不再依赖 DSH 的 MCP 客户端连接，读写仍落到同一运行实例；插件装载补丁只插入插件本身，不再注册独立的 `tomato-mcp` 客户端。
+- 界面补日文：DSH locale 为 `ja` 时客户端文案切成日文，偏好页语言可选中文 / English / 日本語；随包技能和插件展示文案（`plugin/locale/ja.json`）也补上日文。
 - 存储改为计划 JSON 文件（`plan.json`）唯一数据源，原子写；旧 SQLite 提供一次性导出脚本。
+- 项目资料库接入本机授权：新建或授权项目必须选已存在的专用绝对目录，不同项目的授权目录不能重叠；`education.saveResource` 在进 core 前核对绑定目录、相对路径、符号链接与普通文件。文件端点用一次性令牌流式读取、支持 Range，预览上限 20 MiB；清理只移除缺失且无教学引用的登记，不删磁盘文件。
 - 专注保护白名单建议由 guard 枚举当前有窗口的 app_id；`GET /api/apps` 用 XDG 桌面入口补充名称，不再推荐未启动应用。名称缓存 30 秒，候选 ID 每次实时读取。
-- 桌面系统通知接上原生侧：runtime 每秒 tick 发现新提醒或一轮计时结束时，按 `settings.notifications` 调 guard 的 `notify` 发系统通知；浏览器失焦或没授权也能看到。抢焦与通知是同一次跃迁，失败只记一行日志、不重试。
+- 桌面系统通知接上原生侧：runtime 每秒 tick 发现新提醒或一轮计时结束时，按 `settings.notifications` 调 guard 的 `notify` 发系统通知；浏览器失焦或没授权也能看到；通知失败只记一行日志、不重试。
 - 今日专注页补回「已交待批改」横幅：按项目聚合答卷未批改与批改后待复核的数量，点击切到应试教育页；判定与应试教育页共用 `shared/derive.js` 的 `educationGrading`，两处不会再各说一套。
 - 习惯对话框支持多时段：每个时段各带星期与时间，可增删（最多 49 个），同一天同一时间重复会被 core 拒绝；原来「另有 N 个时段保持不变」只读提示删除。
 - 教学技能（`tomato-todo`、`exam-teaching`、`exam-authoring`、`study-planning`、`study-diagnosis`、`study-memory`）收进 `plugin/skills/`：插件挂载时由 `plugin/skills.js` 注册成技能提供者（rank 350，高于用户目录、低于项目目录），插件更新即技能更新；挂载时还把 `skills/` 软链进已存在的 agent 技能根（优先 `~/.agents/skills`，否则 `~/.codex`、`~/.claude`、`~/.gemini`、opencode），Codex 等非 DSH agent 读到同一份文件、随插件更新；`linkSkills` 配置可关闭或指定目录，`plugin/link-skills.mjs` 提供检查、撤销与指定目录。

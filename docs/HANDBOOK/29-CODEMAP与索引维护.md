@@ -23,7 +23,7 @@
 | 12 | 地图与手册都有生成/校验脚本兜底：手册侧是 `scripts/check-handbook.py`（含「04 附录里的文件必须存在」），地图侧是维护者技能与人工核对 | `scripts/check-handbook.py` |
 | 13 | `.analysis.md` **没有生成脚本**：规则写在 codemap 技能里（只对超过 1000 行的文件配一份），刷新由维护者或编码智能体手工完成 | `.agents/skills/codemap/SKILL.md` 的 references |
 | 14 | 地图类文件在维护报告里**单列**，且「记录文件自身不进入指纹」——它们是被跟踪的索引资产，不是源码 | `.agents/skills/project-maintenance/references/verification.md`（第 46 行） |
-| 15 | 目前共 **10 个 `CODEMAP.md`**：根 1、`.github` 2（含 releases）、`crates` 1、`docs` 1、`scripts` 1、`packages/core` 1、`plugin/src/client` 1、`desktop-integrations` 2（含 gnome） | 仓库现状（`find -name CODEMAP.md`） |
+| 15 | 目前共 **13 个 `CODEMAP.md`**：根 1、`.github` 2（含 releases）、`crates` 2（含 guard/src）、`docs` 1、`scripts` 1、`packages/core` 1、`plugin` 2（包根与 src/client）、`runtime` 1、`desktop-integrations` 2（含 gnome） | 仓库现状（`find -name CODEMAP.md`） |
 | 16 | CI 里**只有手册侧校验**（`python3 scripts/check-handbook.py`），没有地图一致性兜底：文件移动后地图是否同步，目前靠维护流程与评审把关 | `.github/workflows/ci.yml` 的 `check-handbook.py` 一步 |
 
 ## B. 可讲的细节
@@ -57,5 +57,5 @@
 ## F. 待补与更新点
 
 - [x] 已核对（见 A 表第 13–14 条）：没有生成脚本，规则由 codemap 技能规定（>1000 行的文件配套一份），刷新靠人工；维护报告里地图类文件单列、且不计入指纹。
-- [x] 已统计（见 A 表第 15 条）：10 个文件，逐目录一份（根、`.github` 与 releases、`crates`、`docs`、`scripts`、`packages/core`、`plugin/src/client`、`desktop-integrations` 与 gnome）。
+- [x] 已统计（见 A 表第 15 条）：13 个文件，逐目录一份（根、`.github` 与 releases、`crates` 与 guard/src、`docs`、`scripts`、`packages/core`、`plugin` 与 src/client、`runtime`、`desktop-integrations` 与 gnome）。
 - [x] 已确认（见 A 表第 16 条）：**没有兜底**。CI 只跑手册校验；地图一致性依赖维护流程（`project-maintenance` 技能）与评审。若要把这条变成自动化，需要先给地图定义可机检的不变量（例如「文件表里不存在幽灵路径」）。

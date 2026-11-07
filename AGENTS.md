@@ -45,9 +45,18 @@ Mode: maintenance. 从 [CODEMAP.md](CODEMAP.md) 开始导航。
 
 ## 助手与 MCP 实现规范
 
-学习助手的界面与能力完全在 DSH 侧；本仓库提供插件自带的 `tomato_*` Host 工具作为 DSH 对话入口，runtime 的 MCP 工具（stdio `--mcp` 与 `/mcp` streamable HTTP）供其他客户端使用。两条入口都连接同一运行实例，语义以 [API.md](API.md) 与 [docs/MCP.md](docs/MCP.md) 为准，实现时遵守：
+学习助手的界面与能力完全在 DSH 侧；本仓库提供插件自带的 `tomato_*` Host 工具作为 DSH 对话入口，runtime 的 MCP 工具（stdio `--mcp` 与 `/mcp` streamable HTTP）供其他客户端使用。两条入口都连接**同一运行实例**，语义以 [API.md](API.md) 与 [docs/MCP.md](docs/MCP.md) 为准。
+
+Host 工具清单（`plugin/index.js` 注册，schema 由 `scripts/build-host-tools.mjs` 从 `runtime/src/tools.mjs` 生成到 `plugin/host-tool-specs.js`）：
+
+- 转发 runtime 的 13 个 MCP 操作：`tomato_get_context`、`tomato_create_task`、`tomato_update_task`、`tomato_move_tasks`、`tomato_complete_task`、`tomato_dispatch`、`tomato_export_plan`、`tomato_export_backup`、`tomato_education`、`tomato_get_education`、`tomato_get_study_progress`、`tomato_get_tasks`、`tomato_apply_file`。
+- 插件自有：`tomato_today`（读 `get_context` 并整理成今日摘要）与 `tomato_guard_status`（一次性 `--guard-status` 探测 guard）。
+- 每个转发工具调用一次 `tomato-runtime --mcp` 子进程，stdin 只写一行 `tools/call`；stdio 入口每次重读数据目录的 `agent/connection.json`，再转发到运行中 runtime 的 `/mcp`。因此 Host 工具与外部 MCP 客户端用的是同一份 `plan.json`、同一套 Action 校验，插件不另开数据库、也不负责拉起或保活 runtime。
+- 随包技能（`plugin/skills/`）在 DSH 里把模型引到这些 `tomato_*` 工具，不要求 DSH 另接一个 Tomato MCP 客户端；被软链到 Codex 等外部 agent 时按 `agents/openai.yaml` 走 MCP。`cordis.patch.yml` 不再插入 `tomato-mcp` 行。
+
+实现时遵守：
 
 - **不给长任务设人为上限**：工具调用跑到完成，只有传输层/调用方超时才结束；不要加 wall-clock 截止、轮次上限这类"保险"。
-- **错误按 MCP 语义报告**：工具失败返回 `isError: true` 与可读信息，不把用户停止等正常中止描述成故障。
+- **错误按 MCP 语义报告**：工具失败返回 `isError: true` 与可读信息，不把用户停止等正常中止描述成故障。Host 工具把 runtime 的 `isError`/`error` 转成带「番茄 Todo：」前缀的可读错误。
 - **保护规则不可绕开**：工具必须走 @tomato/core 的校验与保护规则（严格模式、来源与文件校验），不能通过 MCP 紧急解锁或伪造专注记录。
-- **验证走本地**：`node --test runtime/test/`、`pnpm --filter @tomato/core test`；真实桌面行为（guard 锁定）只在隔离嵌套桌面由用户自测，写清怎么复现。
+- **验证走本地**：`node --test runtime/test/`、`pnpm --filter @tomato/core test`、`pnpm test:tools`；真实桌面行为（guard 锁定）只在隔离嵌套桌面由用户自测，写清怎么复现。
