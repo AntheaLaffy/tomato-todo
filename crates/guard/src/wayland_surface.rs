@@ -75,7 +75,10 @@ pub fn lock_surface() -> AppResult<WaylandLockSurface> {
         .spawn(move || run(thread_stop, ready_tx))
         .map_err(|e| e.to_string())?;
     match ready_rx.recv_timeout(SETUP_TIMEOUT) {
-        Ok(Ok(())) => Ok(WaylandLockSurface { stop, thread: Some(thread) }),
+        Ok(Ok(())) => Ok(WaylandLockSurface {
+            stop,
+            thread: Some(thread),
+        }),
         Ok(Err(error)) => Err(error),
         // 线程提前退出（channel 断开）或初始化超时，统一报未就绪。
         Err(_) => Err("Wayland 锁面初始化未完成（compositor 无响应或线程提前退出）".into()),
@@ -111,7 +114,13 @@ fn run_inner(stop: &Arc<AtomicBool>, ready_tx: &mpsc::Sender<AppResult<()>>) -> 
     let wm_base = globals
         .bind::<xdg_wm_base::XdgWmBase, _, _>(&qh, 1..=1, ())
         .map_err(|e| e.to_string())?;
-    let mut state = State { surface: None, buffer: None, pool: None, map: None, attached: false };
+    let mut state = State {
+        surface: None,
+        buffer: None,
+        pool: None,
+        map: None,
+        attached: false,
+    };
     queue.roundtrip(&mut state).map_err(|e| e.to_string())?;
 
     let surface = compositor.create_surface(&qh, ());
@@ -128,14 +137,20 @@ fn run_inner(stop: &Arc<AtomicBool>, ready_tx: &mpsc::Sender<AppResult<()>>) -> 
     state.surface = Some(surface);
     state.buffer = Some(buffer);
     // 初始化完成，向调用方报就绪（此后进入事件循环）。
-    ready_tx.send(Ok(())).map_err(|_| "锁面调用方已退出".to_string())?;
+    ready_tx
+        .send(Ok(()))
+        .map_err(|_| "锁面调用方已退出".to_string())?;
 
     while !stop.load(Ordering::Relaxed) {
         connection.flush().map_err(|e| e.to_string())?;
         match connection.prepare_read() {
             Some(guard) => {
                 let fd = guard.connection_fd().as_raw_fd();
-                let mut pollfd = libc::pollfd { fd, events: libc::POLLIN, revents: 0 };
+                let mut pollfd = libc::pollfd {
+                    fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
                 match unsafe { libc::poll(&mut pollfd, 1, 100) } {
                     ret if ret < 0 => {
                         let error = std::io::Error::last_os_error();
@@ -157,7 +172,9 @@ fn run_inner(stop: &Arc<AtomicBool>, ready_tx: &mpsc::Sender<AppResult<()>>) -> 
             // 已有事件排队：跳过 poll，直接派发。
             None => {}
         }
-        queue.dispatch_pending(&mut state).map_err(|e| e.to_string())?;
+        queue
+            .dispatch_pending(&mut state)
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -167,7 +184,11 @@ fn run_inner(stop: &Arc<AtomicBool>, ready_tx: &mpsc::Sender<AppResult<()>>) -> 
 fn shm_buffer(
     shm: &wl_shm::WlShm,
     qh: &QueueHandle<State>,
-) -> AppResult<(wl_shm_pool::WlShmPool, wl_buffer::WlBuffer, memmap2::MmapMut)> {
+) -> AppResult<(
+    wl_shm_pool::WlShmPool,
+    wl_buffer::WlBuffer,
+    memmap2::MmapMut,
+)> {
     let size = (STRIDE * HEIGHT) as usize;
     let fd = Fd::memfd(size)?;
     let mut map = unsafe { memmap2::MmapMut::map_mut(&fd) }.map_err(|e| e.to_string())?;
@@ -187,11 +208,13 @@ struct Fd(RawFd);
 impl Fd {
     fn memfd(size: usize) -> AppResult<Self> {
         let name = b"tomato-guard-lock\0";
-        let raw =
-            unsafe { libc::syscall(libc::SYS_memfd_create, name.as_ptr(), libc::MFD_CLOEXEC) }
-                as RawFd;
+        let raw = unsafe { libc::syscall(libc::SYS_memfd_create, name.as_ptr(), libc::MFD_CLOEXEC) }
+            as RawFd;
         if raw < 0 {
-            return Err(format!("memfd_create 失败：{}", std::io::Error::last_os_error()));
+            return Err(format!(
+                "memfd_create 失败：{}",
+                std::io::Error::last_os_error()
+            ));
         }
         if unsafe { libc::ftruncate(raw, size as libc::off_t) } != 0 {
             let error = std::io::Error::last_os_error();
@@ -267,7 +290,8 @@ impl Dispatch<xdg_surface::XdgSurface, ()> for State {
             // 首次 configure 时 attach 缓冲：attach+damage+commit 一次即可，
             // 后续 configure 只 ack（缓冲已挂载，compositor 自行缩放）。
             if !state.attached {
-                if let (Some(surface), Some(buffer)) = (state.surface.as_ref(), state.buffer.as_ref())
+                if let (Some(surface), Some(buffer)) =
+                    (state.surface.as_ref(), state.buffer.as_ref())
                 {
                     surface.attach(Some(buffer), 0, 0);
                     surface.damage(0, 0, WIDTH, HEIGHT);

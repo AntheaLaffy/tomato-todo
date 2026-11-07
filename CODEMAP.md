@@ -35,7 +35,7 @@ generated_at: 2026-11-07
 | GNOME Shell 桥接扩展 | 桌面集成 | desktop-integrations/ | crates/guard/src/shell.rs |
 | 数据迁移（旧 sqlite → plan.json） | 工具 | scripts/export-sqlite.mjs | scripts/export-sqlite.test.mjs |
 | 安装与自启 | 工具 | scripts/install.mjs | scripts/install.test.mjs |
-| 发布与 CI | 构建 | .github/workflows/ci.yml、packaging/aur/ | scripts/publish-aur.mjs |
+| 发布与 CI | 构建 | .github/workflows/ci.yml、release.yml、scripts/package-release.mjs、packaging/aur/ | scripts/publish-aur.mjs、scripts/install.mjs |
 | 手册自查 | 文档 | scripts/check-handbook.py、handbook-paths.py | docs/HANDBOOK/README.md |
 
 ## 子目录

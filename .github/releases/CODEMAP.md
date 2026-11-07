@@ -3,7 +3,7 @@ mode: maintenance
 generated_at: 2026-10-11
 ---
 
-标签发布说明，由 release.yml 的 body_path 读取。
+历史标签的发布说明（release.yml 现在用 generate_release_notes，不再读 body_path）。
 
 | File | Domain | Function |
 | --- | --- | --- |

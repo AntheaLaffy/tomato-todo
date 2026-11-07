@@ -75,7 +75,9 @@ fn random_token() -> String {
 
 /// 恒时风格比较：先比长度，再逐字节异或累加，避免短路泄露前缀。
 pub fn matches(supplied: Option<&str>, expected: &str) -> bool {
-    let Some(supplied) = supplied else { return false };
+    let Some(supplied) = supplied else {
+        return false;
+    };
     let (a, b) = (supplied.as_bytes(), expected.as_bytes());
     if a.len() != b.len() {
         return false;
@@ -94,11 +96,19 @@ mod tests {
         assert_eq!(token.len(), 64);
         // 再次读取返回同一 token，不重写。
         assert_eq!(load_or_create(dir.path()).unwrap(), token);
-        assert_eq!(std::fs::read_to_string(token_file(dir.path())).unwrap().trim(), token);
+        assert_eq!(
+            std::fs::read_to_string(token_file(dir.path()))
+                .unwrap()
+                .trim(),
+            token
+        );
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mode = std::fs::metadata(token_file(dir.path())).unwrap().permissions().mode();
+            let mode = std::fs::metadata(token_file(dir.path()))
+                .unwrap()
+                .permissions()
+                .mode();
             assert_eq!(mode & 0o777, 0o600);
         }
     }

@@ -33,6 +33,9 @@
 - 习惯对话框支持多时段：每个时段各带星期与时间，可增删（最多 49 个），同一天同一时间重复会被 core 拒绝；原来「另有 N 个时段保持不变」只读提示删除。
 - 教学技能（`tomato-todo`、`exam-teaching`、`exam-authoring`、`study-planning`、`study-diagnosis`、`study-memory`）收进 `plugin/skills/`：插件挂载时由 `plugin/skills.js` 注册成技能提供者（rank 350，高于用户目录、低于项目目录），插件更新即技能更新；挂载时还把 `skills/` 软链进已存在的 agent 技能根（优先 `~/.agents/skills`，否则 `~/.codex`、`~/.claude`、`~/.gemini`、opencode），Codex 等非 DSH agent 读到同一份文件、随插件更新；`linkSkills` 配置可关闭或指定目录，`plugin/link-skills.mjs` 提供检查、撤销与指定目录。
 
+- CI/发布改成 DSH 插件形态：质量门分「Node（核心/runtime/插件/手册）」「guard Linux 构建与单测」「guard 跨平台类型检查」「打包」四块，新增 `scripts/package-release.mjs` 打出 runtime + guard + plugin 的 Linux tarball，并用 `install.mjs --dry-run` 在 CI 里验证解包后的目录布局真能装上；`release.yml` 改为标签发布两个架构的 tarball 与校验和，AUR 改为可选（有 `AUR_SSH_KEY` 才推）。旧的 Tauri 构建、`.deb`/NSIS 与桌面图标流程删除。
+- 全仓按 prettier 统一格式化一次（52 个文件），CI 的格式检查从此只检查、不改写；guard 侧补 `cargo fmt` 检查。
+
 ### 移除
 
 - 删除内置学习助手（Pi SDK）及其界面、Canvas、ImageGen 与作者模式；删除旧 Tauri 壳与预览服务。

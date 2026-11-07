@@ -10,7 +10,7 @@ GitHub 持续集成与标签发布。
 | 任务             | Domain | Target                | Also Check                                                                                        |
 | ---------------- | ------ | --------------------- | ------------------------------------------------------------------------------------------------- |
 | 调整 CI 验证范围 | 构建   | workflows/ci.yml      | package.json 的 core:test/runtime:test/format、scripts/check-handbook.py、crates/guard/Cargo.toml |
-| 调整发布产物     | 构建   | workflows/release.yml | scripts/install.mjs、packaging/aur/PKGBUILD.in、README.md（release.yml 仍是 Tauri 旧流程，待重写） |
+| 调整发布产物     | 构建   | workflows/release.yml、scripts/package-release.mjs | scripts/install.mjs、packaging/aur/PKGBUILD.in、README.md |
 
 ## 子目录
 
@@ -24,4 +24,4 @@ GitHub 持续集成与标签发布。
 | File                  | Domain | Function                                                                                                                      |
 | --------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | workflows/ci.yml      | 构建   | Linux 上跑 core/runtime 测试、prettier 只检查、迁移自测、客户端构建冒烟与手册结构，并完整构建 guard；Windows/macOS 矩阵对 guard 做类型检查 |
-| workflows/release.yml | 构建   | **仍是 Tauri 旧流程（待重写）**：调用 `agent:build`、`tests/agent-runtime.mjs`、`tauri build` 与 `src-tauri/icons`，当前仓库已无这些目录/脚本，标签发布不会产出 runtime/guard 安装包 |
+| workflows/release.yml | 构建   | 打 DSH 插件形态的 Linux tarball（runtime bin/src/vendor + guard + plugin + 安装脚本，x86_64/aarch64），发布 Release；可选推 AUR -bin |

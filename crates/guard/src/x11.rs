@@ -24,15 +24,25 @@ fn connect() -> AppResult<(RustConnection, u32)> {
     }
     let (connection, screen) = x11rb::connect(None).map_err(|e| format!("无法连接 X11：{e}"))?;
     let root = connection.setup().roots[screen].root;
-    let owner = property(&connection, root, "_NET_SUPPORTING_WM_CHECK", AtomEnum::WINDOW)?
-        .value32()
-        .and_then(|mut values| values.next())
-        .filter(|id| *id != 0)
-        .ok_or("X11 窗口管理器未运行")?;
+    let owner = property(
+        &connection,
+        root,
+        "_NET_SUPPORTING_WM_CHECK",
+        AtomEnum::WINDOW,
+    )?
+    .value32()
+    .and_then(|mut values| values.next())
+    .filter(|id| *id != 0)
+    .ok_or("X11 窗口管理器未运行")?;
     // EWMH 要求所有者窗口存活且自引用；仅根窗口能力可能在 WM 崩溃后残留。
-    if property(&connection, owner, "_NET_SUPPORTING_WM_CHECK", AtomEnum::WINDOW)?
-        .value32()
-        .and_then(|mut values| values.next())
+    if property(
+        &connection,
+        owner,
+        "_NET_SUPPORTING_WM_CHECK",
+        AtomEnum::WINDOW,
+    )?
+    .value32()
+    .and_then(|mut values| values.next())
         != Some(owner)
     {
         return Err("X11 窗口管理器的 EWMH 所有者无效".into());
@@ -267,8 +277,14 @@ mod tests {
 
     #[test]
     fn wm_class_parses_second_null_separated_field() {
-        assert_eq!(class_from_wm_class(b"instance\0Code\0"), Some("Code".into()));
-        assert_eq!(class_from_wm_class(b"org.tomato.Todo\0tomato-todo\0"), Some("tomato-todo".into()));
+        assert_eq!(
+            class_from_wm_class(b"instance\0Code\0"),
+            Some("Code".into())
+        );
+        assert_eq!(
+            class_from_wm_class(b"org.tomato.Todo\0tomato-todo\0"),
+            Some("tomato-todo".into())
+        );
         assert_eq!(class_from_wm_class(b""), None);
         assert_eq!(class_from_wm_class(b"only-instance\0"), None);
         assert_eq!(class_from_wm_class(b"a\0\0"), None);

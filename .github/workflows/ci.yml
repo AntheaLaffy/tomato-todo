@@ -1,7 +1,9 @@
 name: CI
 
-# Documentation-only changes do not need a build; docs/*.json schemas and
-# examples are read by tests, so only Markdown and the license are ignored.
+# 这个仓库的产物是「DSH 插件 + 随包 runtime + Rust guard」三件套，不是桌面应用：
+# 质量门因此分成三块——Node 侧（领域核心、runtime、插件客户端与构建产物）、
+# Rust 侧（guard 的构建与单测）、打包侧（能否真的打出一个装得上 tarball）。
+# 旧的 Tauri 桌面构建、Android 任务与浏览器端到端测试随旧栈一起删除。
 on:
   push:
     branches: [main]
@@ -26,13 +28,9 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
 
-# 重写后的验证范围：TS 核心与 runtime 测试、prettier 只检查、手册结构、
-# guard 的 Linux 构建与 Windows/macOS 类型检查。旧壳与 agent 栈已在重写中删除
-# （MIGRATION.md 阶段 5），原四平台桌面构建、隔离桌面回归、Playwright 浏览器
-# 测试与 Android 任务全部随栈移除。
 jobs:
-  test:
-    name: Check and test
+  quality:
+    name: 质量门（核心 / runtime / 插件）
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -44,20 +42,27 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          # runtime 目标 node24（scripts/build-runtime.mjs），CI 用同一主版本跑测试。
+          # runtime 与插件都按 node24 打（scripts/build-runtime.mjs 的 target）。
           node-version: "24"
           cache: pnpm
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # CI 只检查、不改写：格式不符直接报错，避免把无关 PR 变红。
+      # glob 与根 package.json 的 format 脚本保持一致。
+      - name: Prettier check
+        run: >-
+          pnpm exec prettier --check
+          "packages/**/*.ts"
+          "runtime/**/*.{ts,mjs}"
+          "plugin/**/*.{js,json,yml}"
+          "scripts/**/*.{mjs,js}"
+
+      # Host 工具的 schema 由 runtime/src/tools.mjs 生成；漂移会让 DSH 里的工具
+      # 参数与 runtime 实际接受的参数不一致，必须在 CI 拦住。
+      - name: Host tool schema is in sync
+        run: pnpm check:host-tools
 
       - name: Core tests
         run: pnpm core:test
@@ -65,36 +70,61 @@ jobs:
       - name: Runtime tests
         run: pnpm runtime:test
 
-      # CI 只检查、不改写：格式不符直接报错。glob 与根 package.json 的 format 一致；
-      # runtime/ 与 plugin/ 不存在时跳过对应检查。
-      - name: Prettier check
-        run: |
-          pnpm exec prettier --check "packages/**/*.ts" "scripts/**/*.{mjs,js}"
-          if [ -d runtime ]; then pnpm exec prettier --check "runtime/**/*.{ts,mjs}"; fi
-          if [ -d plugin ]; then pnpm exec prettier --check "plugin/**/*.{js,json,yml}"; fi
-
-      # 迁移/导入/安装自测：防止数据导出、旧备份导入与安装布局语义漂移。
+      # 迁移/导入/安装自测：防止导出格式、旧备份导入与安装布局语义漂移。
       - name: Tooling tests
         run: pnpm test:tools
 
-      # 客户端构建 + 无浏览器冒烟（假 DOM + 真 React 渲染七个 slot 与九个页面）。
+      # 构建客户端产物 + 假 DOM/真 React 冒烟（九页与全部 slot 组件）。
       - name: Build client and smoke
         run: pnpm check:client
 
-      # 只做校验，不跑会重写文件的三条生成器：行数会随每次代码改动变化，
-      # 让它们在 CI 里改文件既没意义也会把无关 PR 变红。
+      # 手册只做结构校验；三条生成器会改文件，放进 CI 既没意义也不该由 CI 提交。
       - name: Handbook structure check
         run: python3 scripts/check-handbook.py
 
-      # guard 是独立 Cargo 工作区（根目录没有 Cargo.toml），--locked 使用
-      # crates/guard/Cargo.lock。Linux 上做完整构建：guard 是唯一在真实 Linux 桌面运行的原生目标。
-      - name: Build guard (Linux)
-        run: cargo build --locked --manifest-path crates/guard/Cargo.toml
+  guard:
+    name: Guard（Linux 构建与单测）
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
-  # Windows/macOS 只做类型检查、不做构建：guard 的 X11/Wayland 绑定只在 Linux 完整构建，
-  # 矩阵的价值是尽早暴露跨平台编译错误。
-  guard-check:
-    name: Guard / ${{ matrix.runner }}
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/guard
+
+      # gio 需要一个能链接的 glib；X11/Wayland/notify 其余依赖都是纯 Rust。
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libglib2.0-dev pkg-config
+
+      - name: Rustfmt
+        run: cargo fmt --check --manifest-path crates/guard/Cargo.toml
+
+      - name: Guard tests
+        run: cargo test --locked --manifest-path crates/guard/Cargo.toml
+
+      - name: Build guard
+        run: cargo build --release --locked --manifest-path crates/guard/Cargo.toml
+
+      - name: Upload guard binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tomato-guard-linux
+          path: crates/guard/target/release/tomato-guard
+          if-no-files-found: error
+
+  # Windows/macOS 只做类型检查：guard 的 X11/Wayland 绑定只在 Linux 完整构建，
+  # 这两个平台的价值是尽早暴露条件编译错误，而不是产出安装包。
+  guard-cross:
+    name: Guard 类型检查 / ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -111,6 +141,62 @@ jobs:
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/guard
 
-      - name: Check guard (type check only)
+      - name: Check guard
         run: cargo check --locked --manifest-path crates/guard/Cargo.toml
+
+  # 出包才是这个项目「能发版」的证明：tarball 里的目录布局必须能被
+  # scripts/install.mjs 直接安装，否则 AUR 与用户手工安装都会在解包后失败。
+  package:
+    name: 打包（Linux tarball）
+    needs: [quality, guard]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download guard binary
+        uses: actions/download-artifact@v4
+        with:
+          name: tomato-guard-linux
+          path: build/guard
+
+      - name: Build runtime and client
+        run: |
+          pnpm build:runtime
+          pnpm build:client
+
+      - name: Package tarball
+        run: node scripts/package-release.mjs --guard build/guard/tomato-guard
+
+      # 用真实安装脚本校验布局（--dry-run 不写用户目录，也不碰 systemd）。
+      - name: Verify layout installs
+        run: |
+          mkdir -p build/verify
+          tar -xzf dist/release/tomato-todo-*-linux.tar.gz -C build/verify
+          cd build/verify/tomato-todo-*
+          node scripts/install.mjs --dry-run --home build/verify/home \
+            --runtime runtime/bin/tomato-runtime --guard guard/tomato-guard
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x86_64
+          path: |
+            dist/release/*.tar.gz
+            dist/release/*.sha256
+          if-no-files-found: error
