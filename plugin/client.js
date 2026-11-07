@@ -5051,12 +5051,16 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       label: "番茄 Todo",
       pomodoro: "今日番茄 {done} / {goal}",
       running: "专注中 {time}",
+      sub: "今日 {done} / {goal} 颗番茄",
+      subRunning: "专注中 · 第 {round} 轮",
       open: "打开番茄 Todo 主视图"
     },
     en: {
       label: "Tomato Todo",
       pomodoro: "Today {done} / {goal} pomodoros",
       running: "Focusing {time}",
+      sub: "Today {done} / {goal} pomodoros",
+      subRunning: "Focusing · round {round}",
       open: "Open the Tomato Todo view"
     }
   });
@@ -5077,50 +5081,93 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         title: `${title} · ${t("side.open")}`,
         "aria-label": t("side.label"),
         className: "t-root",
-        style: {
+        style: wide ? {
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          height: 34,
-          padding: wide ? "0 10px" : 0,
-          width: wide ? "100%" : 30,
-          justifyContent: wide ? "flex-start" : "center",
-          border: "none",
-          borderTop: wide ? "1px solid var(--tomato-line)" : "none",
-          borderRadius: wide ? "0 0 9px 9px" : 9,
-          background: "transparent",
-          color: "var(--tomato-ink-2)",
+          gap: 10,
+          width: "calc(100% - 16px)",
+          margin: "6px 8px 4px",
+          padding: "8px 10px",
+          borderRadius: 13,
+          border: "1px solid color-mix(in srgb, var(--tomato-brand) 28%, transparent)",
+          background: "linear-gradient(135deg, color-mix(in srgb, var(--tomato-brand-soft) 82%, var(--tomato-surface)) 0%, var(--tomato-surface) 100%)",
+          boxShadow: "0 10px 22px -16px color-mix(in srgb, var(--tomato-brand-deep) 65%, transparent)",
+          color: "var(--tomato-ink)",
           cursor: "pointer",
           fontFamily: "inherit",
-          fontSize: 12.5,
+          textAlign: "left",
           minWidth: 0,
-          flex: wide ? "1 1 auto" : "none",
-          textAlign: "left"
+          flex: "1 1 100%",
+          transition: "transform .18s ease, box-shadow .18s ease"
+        } : {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 34,
+          height: 34,
+          padding: 0,
+          border: "none",
+          borderRadius: 10,
+          background: "color-mix(in srgb, var(--tomato-brand-soft) 75%, transparent)",
+          color: "var(--tomato-brand-deep)",
+          cursor: "pointer",
+          flex: "none"
         },
         onMouseEnter: (e) => {
-          e.currentTarget.style.background = "var(--tomato-surface-2)";
-          e.currentTarget.style.color = "var(--tomato-ink)";
+          e.currentTarget.style.transform = "translateY(-1px)";
+          e.currentTarget.style.boxShadow = "0 14px 26px -16px color-mix(in srgb, var(--tomato-brand-deep) 75%, transparent)";
         },
         onMouseLeave: (e) => {
-          e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.color = "var(--tomato-ink-2)";
+          e.currentTarget.style.transform = "none";
+          e.currentTarget.style.boxShadow = wide ? "0 10px 22px -16px color-mix(in srgb, var(--tomato-brand-deep) 65%, transparent)" : "none";
         }
       },
-      h(Icon, { name: "tomato", size: 17, stroke: 1.5, style: { color: "var(--tomato-brand)", flex: "none" } }),
       wide ? h(
         "span",
         {
           style: {
-            flex: 1,
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            fontWeight: 550,
-            fontSize: 13
+            width: 27,
+            height: 27,
+            borderRadius: 9,
+            background: "var(--tomato-brand-soft)",
+            display: "grid",
+            placeItems: "center",
+            flex: "none"
           }
         },
-        t("side.label")
+        h(Icon, { name: "tomato", size: 16, stroke: 1.6, style: { color: "var(--tomato-brand-deep)" } })
+      ) : h(Icon, { name: "tomato", size: 18, stroke: 1.6 }),
+      wide ? h(
+        "span",
+        { style: { display: "flex", flexDirection: "column", gap: 1, flex: 1, minWidth: 0 } },
+        h(
+          "span",
+          {
+            style: {
+              fontSize: 13.5,
+              fontWeight: 650,
+              color: "var(--tomato-ink)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              letterSpacing: ".01em"
+            }
+          },
+          t("side.label")
+        ),
+        h(
+          "span",
+          {
+            style: {
+              fontSize: 10.5,
+              color: "var(--tomato-ink-3)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis"
+            }
+          },
+          view.running ? t("side.subRunning", { round: view.cycle || 1 }) : t("side.sub", { done, goal })
+        )
       ) : null,
       h(
         "span",
@@ -5130,23 +5177,24 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            height: 18,
-            padding: wide ? "0 6px" : 0,
-            minWidth: wide ? 30 : 0,
-            borderRadius: 6,
-            fontSize: wide ? 10.5 : 9.5,
-            fontWeight: 600,
-            color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-ink-2)",
-            background: view.running ? "var(--tomato-brand-soft)" : "var(--tomato-surface-2)",
-            flex: "none"
+            height: wide ? 21 : 0,
+            minWidth: wide ? 40 : 0,
+            padding: wide ? "0 7px" : 0,
+            borderRadius: 7,
+            fontSize: wide ? 11 : 0,
+            fontWeight: 700,
+            flex: "none",
+            color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-on-brand)",
+            background: view.running ? "var(--tomato-brand-soft)" : "var(--tomato-btn-fill)",
+            border: view.running ? "1px solid color-mix(in srgb, var(--tomato-brand) 35%, transparent)" : "none"
           }
         },
-        view.running ? fmtClock(view.remainingSecs) : `${done}/${goal}`
+        wide ? view.running ? fmtClock(view.remainingSecs) : `${done} / ${goal}` : null
       ),
       wide ? h(Icon, {
         name: "arrowRight",
-        size: 13,
-        style: { opacity: 0.45, flex: "none" }
+        size: 14,
+        style: { color: "var(--tomato-brand-deep)", opacity: 0.6, flex: "none" }
       }) : null
     );
   }

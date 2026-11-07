@@ -465,7 +465,7 @@ if (!process.env.SMOKE_LIVE) {
   if (/[0-9]+ \/ 8 番茄/.test(dock)) failures.push("番茄预计/实际又回到了最下面那条面板");
   const sidebarFoot = renderedBy["sidebar.footer.action"] || "";
   if (!sidebarFoot.includes("番茄 Todo")) failures.push("侧栏底部缺少番茄入口文案");
-  if (!/[0-9]+\/8/.test(sidebarFoot)) failures.push("左下角侧栏没有番茄预计/实际进度");
+  if (!/[0-9]+\s*\/\s*8/.test(sidebarFoot)) failures.push("左下角侧栏没有番茄预计/实际进度");
 }
 if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注")) failures.push("入口卡没有渲染开始专注按钮");
 if ((renderedBy["shell.overlay"] || "").includes("个番茄")) {
