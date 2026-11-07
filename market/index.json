@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "title": {
+    "zh": "番茄 Todo 插件源",
+    "en": "Tomato Todo plugins"
+  },
+  "description": {
+    "zh": "DSH 番茄 Todo 的发行索引（作者自建）。",
+    "en": "Release index for the Tomato Todo DSH plugin."
+  },
+  "metadata": {
+    "categories": {
+      "focus": {
+        "title": {
+          "zh": "专注",
+          "en": "Focus"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-plugin-tomato-todo",
+      "title": {
+        "zh": "番茄 Todo",
+        "en": "Tomato Todo"
+      },
+      "description": {
+        "zh": "整站番茄皮肤 + 番茄钟与专注保护 + 任务/课表/应试教育 + 本地资料库索引，数据全在本机。",
+        "en": "A full DSH tomato skin with pomodoro, focus guard, tasks, schedule and exam study, all local-first."
+      },
+      "icon": "icons/tomato-todo.svg",
+      "author": "AntheaLaffy",
+      "homepage": "https://github.com/AntheaLaffy/dsh-plugin-tomato-todo#readme",
+      "repository": {
+        "url": "https://github.com/AntheaLaffy/dsh-plugin-tomato-todo",
+        "directory": "plugin"
+      },
+      "metadata": {
+        "category": "focus",
+        "labels": []
+      },
+      "versions": [
+        {
+          "version": "0.13.0",
+          "publishTimestamp": 1794053196,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1"
+          }
+        }
+      ]
+    }
+  ]
+}

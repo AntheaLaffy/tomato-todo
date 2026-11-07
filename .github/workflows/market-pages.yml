@@ -1,0 +1,37 @@
+name: Market Index (Pages)
+
+# 插件市场就是一份静态 JSON + 图标。这个工作流把 market/ 发布到 GitHub Pages，
+# 于是索引地址是 https://<owner>.github.io/<repo>/index.json，可以加进 DSH 的
+# 「发现 → 添加索引源」。索引内容随每次 push 更新；版本条目由
+# scripts/update-market-index.mjs 从 npm registry 拉取。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "market/**"
+      - ".github/workflows/market-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: market-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: market
+      - id: deployment
+        uses: actions/deploy-pages@v4
