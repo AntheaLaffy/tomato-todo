@@ -61,7 +61,7 @@ export const PERSONAS = [
 
 const KEY = "tomato-dsh.persona";
 const DEFAULT_ID = "atri";
-const ASSET_BASE = "/plugins/@local/tomato-dsh/assets/personas/";
+const ASSET_BASE = "/plugins/dsh-plugin-tomato-todo/assets/personas/";
 
 function load() {
   try {

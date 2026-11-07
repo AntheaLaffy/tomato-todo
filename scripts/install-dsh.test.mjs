@@ -49,7 +49,7 @@ async function fixture() {
   await mkdir(plugin, { recursive: true });
   await writeFile(
     join(plugin, "package.json"),
-    JSON.stringify({ name: "@local/tomato-dsh" }),
+    JSON.stringify({ name: "dsh-plugin-tomato-todo" }),
   );
   return { root, dshRoot, plugin, home: join(root, "dsh-home") };
 }

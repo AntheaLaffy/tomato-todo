@@ -171,8 +171,8 @@ function writeInstallText(stageRoot, { full }) {
      node scripts/install.mjs --runtime runtime/bin/tomato-runtime --guard guard/tomato-guard
 
 2. 挂进已安装的 DSH：在 DSH profile 的 package.json 里加
-     "@local/tomato-dsh": "link:<解包目录>/plugin"
-   再在 profile 的 dsh.profile.bundles 列表里加入 "@local/tomato-dsh"；
+     "dsh-plugin-tomato-todo": "link:<解包目录>/plugin"
+   再在 profile 的 dsh.profile.bundles 列表里加入 "dsh-plugin-tomato-todo"；
    或直接用 DSH 的 plugin_manager 安装本目录的 plugin/。
 
 3. 重启 DSH 桌面窗口（或 dsh web），番茄面板与 tomato_* 工具随之出现。
@@ -288,8 +288,8 @@ if (withPluginOnly) {
 
 已有 DSH 与 tomato-runtime 时，用 DSH plugin_manager 安装本目录的 plugin/，
 或在 profile 的 package.json 加：
-  "@local/tomato-dsh": "link:<解包目录>/plugin"
-并把 "@local/tomato-dsh" 加入 dsh.profile.bundles。
+  "dsh-plugin-tomato-todo": "link:<解包目录>/plugin"
+并把 "dsh-plugin-tomato-todo" 加入 dsh.profile.bundles。
 
 需要 runtime/guard（以及可选的完整版 DSH）请下载
 tomato-todo-${version}-<arch>-linux.tar.gz 或 -full.tar.gz。

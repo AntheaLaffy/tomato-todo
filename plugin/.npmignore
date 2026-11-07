@@ -1,0 +1,4 @@
+# 本机专用文件：技能里的私有导航（含本机资料目录）不随包分发。
+skills/*/references/local-*.md
+node_modules
+*.log

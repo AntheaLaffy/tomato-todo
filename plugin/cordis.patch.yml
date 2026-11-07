@@ -4,6 +4,6 @@
 # tomatoBin 是 Host 工具的一次性 runtime 入口。
 - insert:
     - id: tomato-dsh
-      name: "@local/tomato-dsh"
+      name: "dsh-plugin-tomato-todo"
       config:
         tomatoBin: /home/fuurin/.local/bin/tomato-runtime

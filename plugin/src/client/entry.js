@@ -6,7 +6,7 @@
 import { createPlugin } from "./plugin.js";
 
 window.__ModuleLoader__.load({
-  id: "@local/tomato-dsh",
+  id: "dsh-plugin-tomato-todo",
   factory(require) {
     return createPlugin(require);
   },
