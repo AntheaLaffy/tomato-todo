@@ -1,6 +1,6 @@
 ## 项目速览与入口
 
-番茄 Todo 是 DSH 插件（@local/tomato-dsh）+ TypeScript 领域核心（packages/core）+ 随包 Node runtime + Rust 原生守卫（crates/guard）的专注工具；学习助手的界面与能力完全由 DSH 对话提供。工作从 [CODEMAP.md](CODEMAP.md) 开始：先匹配任务指南的 Target，再沿 Domain 与子目录地图定向读取。
+番茄 Todo 是 DSH 插件（dsh-plugin-tomato-todo）+ TypeScript 领域核心（packages/core）+ 随包 Node runtime + Rust 原生守卫（crates/guard）的专注工具；学习助手的界面与能力完全由 DSH 对话提供。工作从 [CODEMAP.md](CODEMAP.md) 开始：先匹配任务指南的 Target，再沿 Domain 与子目录地图定向读取。
 
 | 需要什么 | 去哪里 |
 | --- | --- |

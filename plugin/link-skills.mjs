@@ -20,7 +20,7 @@
 import { homedir } from "node:os";
 import { AGENT_SKILL_DIRS, SHARED_SKILL_DIR, expandHome, isDirectory, linkSkills } from "./link-skills.js";
 
-const LABEL = "@local/tomato-dsh";
+const LABEL = "dsh-plugin-tomato-todo";
 
 const options = {
   dirs: [],

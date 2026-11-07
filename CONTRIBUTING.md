@@ -43,7 +43,7 @@ git worktree add ../tomato-ts-<workflow> -b tomato-ts-<workflow>
 - **`packages/core/`**：TypeScript 领域核心——状态机、任务规则、模板印刷、诊断、统计、数据校验。零依赖、vitest 全覆盖；对外 JSON 形状 camelCase，是唯一权威实现。
 - **`runtime/`**：Node runtime（`tomato-runtime`），随插件分发。用 @tomato/core 持域与数据（`plan.json` 原子写）、番茄计时与提醒调度、项目资料库授权、127.0.0.1 HTTP API（面板数据面 + `/mcp` streamable HTTP）与 `--mcp` stdio 入口。
 - **`crates/guard/`**：Rust 原生守卫（`tomato-guard`）。专注保护（X11/Wayland/Windows 白名单与锁屏；niri 直接全屏 DSH）、窗口激活、通知、自启。无域无状态，由 runtime 经 HTTP 指挥。
-- **`plugin/`**：DSH 插件包 `@local/tomato-dsh` 源码。host 半：15 个 `tomato_*` Host 工具（每次一次性 `tomato-runtime --mcp`，经连接文件转发到运行中实例）、随包技能提供者与跨 agent 软链；client 半：九页主视图、composer.dock 入口卡、常驻 HUD/沉浸层，数据直连 runtime。DSH 插件配置不再注册 `tomato-mcp` 客户端。
+- **`plugin/`**：DSH 插件包 `dsh-plugin-tomato-todo` 源码。host 半：15 个 `tomato_*` Host 工具（每次一次性 `tomato-runtime --mcp`，经连接文件转发到运行中实例）、随包技能提供者与跨 agent 软链；client 半：九页主视图、composer.dock 入口卡、常驻 HUD/沉浸层，数据直连 runtime。DSH 插件配置不再注册 `tomato-mcp` 客户端。
 - **`desktop-integrations/`**：GNOME Shell 桥接扩展（保留原实现）。
 - **`packaging/` 与 `scripts/`**：安装与发布（systemd user service / autostart、AUR 模板、安装脚本）。
 
@@ -70,6 +70,7 @@ git worktree add ../tomato-ts-<workflow> -b tomato-ts-<workflow>
 - 读代码前的参考手册：[docs/HANDBOOK/](docs/HANDBOOK/README.md)——按域记录事实、取舍理由、机制与语义规则，**面向人读**；改哪动哪、文件与符号在哪看 [CODEMAP](CODEMAP.md)。改动某章涉及的实现后，同步那一章并跑 `python3 scripts/check-handbook.py`（结构、页眉版本、出处、对外措辞与隐私红线）；规模数字、测试索引与待补清单是生成物（`scripts/handbook-stats.py` / `handbook-tests.py` / `handbook-backlog.py`），不要手改；CI 只跑校验脚本。
 - 用户提供的课表与私人备考分析放在忽略版本管理的 `artifacts/planning/`，**不要**写进默认种子、安装包或示例文件。
 - 维护者技能在 [.agents/skills/](.agents/skills/README.md)：编码智能体从仓库根自动发现，覆盖导航、维护收尾、提交与文档、测试与性能、Git/Shell、智能体上下文与 CI/CD。
+- **发布到 npm 与插件市场**：先改 `plugin/package.json` 的版本，`cd plugin && npm publish --access public --otp=<验证码>`（账号开了 2FA，或换一个 bypass 2FA 的 granular token）；然后 `node scripts/update-market-index.mjs && git add -A && git commit && git push`，`market-pages.yml` 会把 `market/index.json` 重新部署到 Pages。索引里只收声明了 `dsh.bundle` 且未被弃用的版本，发布前的占位版本不会混进去。
 - **发布到 AUR**：`v*` 标签触发 Release 工作流产出 runtime+guard 的发行包后，用 `node scripts/publish-aur.mjs --push` 生成并推送 `tomato-todo-bin`。校验和由脚本从发行包**动态计算**，模板在 [packaging/aur/](packaging/aur/PKGBUILD.in)；不要把生成的 PKGBUILD 当手写文件改。
 
 ## 许可

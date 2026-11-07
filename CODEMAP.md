@@ -36,7 +36,8 @@ generated_at: 2026-11-07
 | GNOME Shell 桥接扩展 | 桌面集成 | desktop-integrations/ | crates/guard/src/shell.rs |
 | 数据迁移（旧 sqlite → plan.json） | 工具 | scripts/export-sqlite.mjs | scripts/export-sqlite.test.mjs |
 | 安装与自启 | 工具 | scripts/install.mjs、scripts/install-dsh.mjs（完整版把插件挂进 DSH profile） | scripts/install.test.mjs |
-| 发布与 CI | 构建 | .github/workflows/ci.yml、release.yml、scripts/package-release.mjs、packaging/aur/ | scripts/publish-aur.mjs、scripts/install.mjs |
+| 发布与 CI | 构建 | .github/workflows/ci.yml、release.yml、market-pages.yml、scripts/package-release.mjs、packaging/aur/ | scripts/publish-aur.mjs、scripts/install.mjs |
+| 发布插件到 npm 与插件市场 | 构建 | plugin/package.json（dsh.bundle 声明、engines.dsh）、market/index.json、scripts/update-market-index.mjs、.github/workflows/market-pages.yml | README「从插件市场安装」、docs/HANDBOOK/22-架构与工程.md |
 | 手册自查 | 文档 | scripts/check-handbook.py、handbook-paths.py | docs/HANDBOOK/README.md |
 
 ## 子目录

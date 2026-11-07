@@ -1,7 +1,7 @@
 # 番茄 Todo → DSH 插件重写（最终方向：全插件化）
 
 分支：`tomato-ts-rewrite`。目标：番茄 Todo 整体变成 DeepSeek Harness 的插件
-`@local/tomato-dsh`；学习助手的界面与能力 100% 交给 DSH；UI 在 DSH 内重做
+`dsh-plugin-tomato-todo`；学习助手的界面与能力 100% 交给 DSH；UI 在 DSH 内重做
 （沿用奶油白 + 番茄红设计语言），原生只留浏览器做不到的专注保护、通知与托盘。
 
 ## 用户决策记录
@@ -28,7 +28,7 @@ runtime/            tomato-runtime（Node，随插件分发，由插件 host 经
 crates/guard/       tomato-guard（Rust，小）：专注保护（X11/Wayland/Windows 白名单与锁屏）、
                     通知、托盘、自启。无域无状态，由 runtime 经 HTTP 指挥。
 desktop-integrations/  GNOME Shell 桥接扩展（保留原实现）
-plugin/             DSH 插件包 @local/tomato-dsh 的源码（与 /home/fuurin/code/tomato-dsh 同步）
+plugin/             DSH 插件包 dsh-plugin-tomato-todo 的源码（与 /home/fuurin/code/tomato-dsh 同步）
                     —— host 半：MCP 行（stdio → runtime --mcp）、tomato_today 等工具、
                       通过 subprocess 常驻 runtime 子进程、UI 数据的宿主代理
                     —— client 半：composer.dock 入口卡片 + shell.overlay 全屏面板
@@ -83,7 +83,7 @@ crates/agent/src/external.rs 的工具清单，语义保留、实现全部重写
 
 ### 阶段 3 进度（tomato-ts-plugin 分支，2026-11-07）
 
-- `plugin/` 骨架已入库：package.json（@local/tomato-dsh v2）、cordis.patch.yml
+- `plugin/` 骨架已入库：package.json（dsh-plugin-tomato-todo v2）、cordis.patch.yml
   （tomato-mcp MCP 行 + 插件行）、host index.js（tomato_today / tomato_guard_status
   工具，经 `tomato-runtime --mcp` / `--guard-status` 一次性子进程探询，不常驻）、
   client.js 单入口（composer.dock 入口卡 + shell.overlay 四页签面板）、

@@ -1,6 +1,6 @@
 # plugin — DSH 插件包（host + client + 随包技能）
 
-`@local/tomato-dsh` 的包根。host 半在 Node 里注册 `tomato_*` 工具与技能提供者，
+`dsh-plugin-tomato-todo` 的包根。host 半在 Node 里注册 `tomato_*` 工具与技能提供者，
 client 半由 esbuild 打成 `client.js`。契约见 [API.md](../API.md)「插件契约」与
 [docs/MCP.md](../docs/MCP.md)；使用说明见 [README](README.md)。
 

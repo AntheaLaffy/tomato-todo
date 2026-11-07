@@ -24,4 +24,5 @@ GitHub 持续集成与标签发布。
 | File                  | Domain | Function                                                                                                                      |
 | --------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | workflows/ci.yml      | 构建   | Linux 上跑 core/runtime 测试、prettier 只检查、迁移自测、客户端构建冒烟与手册结构，并完整构建 guard；Windows/macOS 矩阵对 guard 做类型检查 |
+| workflows/market-pages.yml | 构建   | 把 `market/`（插件市场索引 + 图标）发布到 GitHub Pages；索引地址 `https://<owner>.github.io/<repo>/index.json` |
 | workflows/release.yml | 构建   | 打 DSH 插件形态的 Linux tarball（runtime bin/src/vendor + guard + plugin + 安装脚本，x86_64/aarch64），发布 Release；可选推 AUR -bin |

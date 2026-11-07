@@ -1,4 +1,4 @@
-// Host half of @local/tomato-dsh (v2).
+// Host half of dsh-plugin-tomato-todo (v2).
 //
 // Why subprocess instead of fetch: the host plugin context has no HTTP client,
 // and the runtime exposes itself only on 127.0.0.1. Every probe therefore runs

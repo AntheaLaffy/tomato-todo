@@ -6,6 +6,9 @@
 
 ### 变更
 
+- 仓库更名为 `dsh-plugin-tomato-todo`，插件包也改为同名并发布到 npm（声明 `dsh.bundle` 与 `engines.dsh`），配套一份插件市场索引 `market/index.json`（格式 1）经 GitHub Pages 发布；`scripts/update-market-index.mjs` 从 registry 同步版本，只收声明了 bundle 且未弃用的版本。客户端注册 id、看板娘素材路径、`cordis.patch.yml` 的 name 与安装说明同步改名。
+- 资料预览按类型渲染：新增 `shared/markdown.js`（标题/GFM 表格/列表/代码/引用与行内语法，不解析原始 HTML）与 `shared/file-preview.js`（图片/音视频内联、PDF iframe、md/txt 读取后渲染，2 MiB 上限，失败可重试并保留下载），替换原先「把 .md 丢进 iframe」的预览。
+- 刷新不再把「在番茄面板」改写成「在对话」：`bindPanelInfo` 首次同步只建立基线，面板真的切换时才写存储；刷新恢复只看 `{panel, page}` 记录，冷启动才主动进今日专注。
 - 沉浸专注里的「查看今天日程」不再退出沉浸去跳「本周日程」页：改为在沉浸层内弹出今日日程（固定占用、课程/考试、带提醒任务，标出现在与当前专注任务），计时不中断；只有用户在弹层里明确点「打开完整本周日程」才离开专注。
 - 发行包分三档：`tomato-todo-<版本>-<arch>-linux-full.tar.gz` 内嵌一份 DSH（含 `node_modules`，版本固定在 `packaging/dsh-version`）与 `dsh` 启动器，`node scripts/install-dsh.mjs --profile tomato` 会自动创建/复用 DSH profile 并把随包插件 `link:` 进去；原 `-linux.tar.gz` 作为轻量版（runtime + 守卫 + 插件）；新增 `tomato-todo-plugin-<版本>.tar.gz` 只含插件，供已有 DSH 与 runtime 的用户单独更新。`scripts/package-release.mjs --full` 在 CI 里按 runner 架构安装 DSH，Release 会把三种产物一起上传。
 - 项目详情页补齐资料四件事：**目录授权**三态（共享库/专属目录/未授权，支持授权、更换、使用共享库，并说明授权只读、不移动文件）、**资料导入**（索引多选 + 整目录导入，显示 registered/skipped，服务端错误原样展示）、**清单导出**（已登记资源的 id/title/kind/path/state 与当前目录索引，浏览器端 Blob 下载 JSON/CSV，不导出文件内容）、**应试绑定**（从已登记资料按 kind 选考纲/真题/模拟题与 `examMode`，保存前回读 `education.projects` 再合并，不覆盖 directory/visionId/target/examDate，core 的完整性错误原样显示）。资料预览改用 `shared/file-preview.js`；已登记列表补「移除失效」，只清仍缺失且无教学引用的登记，不删磁盘文件。

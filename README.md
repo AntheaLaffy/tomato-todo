@@ -63,19 +63,37 @@ tomato-guard（Rust 原生守卫，被 runtime 指挥）
  └─ 随登录自启（systemd user service）
 ```
 
-- **插件**（`@local/tomato-dsh`）负责 DSH 内的界面与工具：九页主视图、入口卡、HUD、`tomato_*` Host 工具与随包教学技能。
+- **插件**（`dsh-plugin-tomato-todo`）负责 DSH 内的界面与工具：九页主视图、入口卡、HUD、`tomato_*` Host 工具与随包教学技能。
 - **runtime** 负责所有领域逻辑与数据：任务规则、模板印刷、诊断、统计、计时与提醒。面板数据直连它的本地 API；助手的一切写操作都经过它，规则与保护在它这里执行。
 - **守卫** 只做浏览器做不到的事：锁住屏幕、把非白名单应用切走、发通知、激活窗口。它没有领域逻辑，只被 runtime 指挥。
 
 ## 安装
 
-发行页提供三种包，按「有没有 DSH」选一个即可：
+### 从插件市场安装（已有 DSH）
 
-| 包 | 内容 | 适合 |
-| --- | --- | --- |
-| `tomato-todo-<版本>-<arch>-linux-full.tar.gz` | 内嵌 DSH（含依赖）+ runtime + 守卫 + 插件 + `dsh` 启动器 | 从零开始，不想另外安装 DSH |
-| `tomato-todo-<版本>-<arch>-linux.tar.gz` | runtime + 守卫 + 插件 | 已经装好 DSH，只要番茄 |
-| `tomato-todo-plugin-<版本>.tar.gz` | 只有 `plugin/` | 已有 DSH 与 runtime，只更新插件 |
+插件已发布到 npm：`dsh-plugin-tomato-todo`。添加作者索引源后可直接在 **插件 → 发现** 里搜索安装：
+
+```
+https://anthealaffy.github.io/dsh-plugin-tomato-todo/index.json
+```
+
+打开方式：**插件 → 实验性插件 → 自定义插件索引**，然后 **发现 → 添加索引源**，粘贴上面的 URL，搜索「番茄 Todo」。也可以跳过市场直接装包：
+
+```sh
+npm install -g dsh-plugin-tomato-todo
+```
+
+装完仍需 runtime 与守卫（面板要连 `127.0.0.1:43987`，专注保护要 `tomato-guard`），见下面的「runtime 与守卫」。插件本身只含界面、Host 工具与随包技能。
+
+### 发行页的三种包
+
+发行页另外提供三种离线包，按「有没有 DSH」选一个即可：
+
+| 包                                            | 内容                                                     | 适合                            |
+| --------------------------------------------- | -------------------------------------------------------- | ------------------------------- |
+| `tomato-todo-<版本>-<arch>-linux-full.tar.gz` | 内嵌 DSH（含依赖）+ runtime + 守卫 + 插件 + `dsh` 启动器 | 从零开始，不想另外安装 DSH      |
+| `tomato-todo-<版本>-<arch>-linux.tar.gz`      | runtime + 守卫 + 插件                                    | 已经装好 DSH，只要番茄          |
+| `tomato-todo-plugin-<版本>.tar.gz`            | 只有 `plugin/`                                           | 已有 DSH 与 runtime，只更新插件 |
 
 前置：Linux；Node ≥ 24.9（完整版内嵌的 DSH 要求；只装 runtime 时 ≥ 20.11 即可）。安装都在用户目录，不需要 root。
 
@@ -112,10 +130,10 @@ node scripts/install.mjs --runtime runtime/bin/tomato-runtime --guard guard/toma
 然后在 DSH 的 `plugin_manager` 里安装本目录的 `plugin/`；或手动在 profile 的 `package.json` 加：
 
 ```json
-"@local/tomato-dsh": "link:<解包目录>/plugin"
+"dsh-plugin-tomato-todo": "link:<解包目录>/plugin"
 ```
 
-并把 `@local/tomato-dsh` 加入 `dsh.profile.bundles`。重启 DSH 后，composer.dock 出现番茄入口卡，对话获得 `tomato_*` 工具。
+并把 `dsh-plugin-tomato-todo` 加入 `dsh.profile.bundles`。重启 DSH 后，composer.dock 出现番茄入口卡，对话获得 `tomato_*` 工具。
 
 ### 只装/更新插件
 
@@ -182,15 +200,15 @@ node scripts/install.mjs
 
 任务、计时、统计与备份共用同一份实现（@tomato/core）。专注保护和定时锁机按桌面选择原生窗口接口；接口不可用时明确提示，普通计时仍可使用。各桌面的实现与实际会话验收分开记录：
 
-| 桌面 / 会话 | 窗口保护后端 | 当前验证 |
-| --- | --- | --- |
-| niri / Wayland | niri IPC | 隔离整应用通过 |
-| Sway / Wayland | 原生 i3 IPC | headless 真实 GTK 窗口与白名单/聚焦通过 |
-| Hyprland / Wayland | 原生 Hyprland socket | 协议回归通过；本机缺少 GPU，真实嵌套会话待验收 |
-| GNOME / Wayland | 随包 Shell 扩展（45–50） | 扩展逻辑与私有 D-Bus 通过；真实 Shell 会话待验收 |
-| KDE Plasma / Wayland | KWin 脚本接口（5.27 / 6） | 两代接口的私有 D-Bus/脚本回归通过；真实 KWin 会话待验收 |
-| GNOME、KDE、Xfce、Cinnamon、MATE、LXQt 等的 X11 会话 | EWMH | Openbox 核心及整应用通过；各桌面实际会话待验收 |
-| 其他 Wayland 合成器 | 尚无原生后端 | 普通计时可用，保护显示不可用 |
+| 桌面 / 会话                                          | 窗口保护后端              | 当前验证                                                |
+| ---------------------------------------------------- | ------------------------- | ------------------------------------------------------- |
+| niri / Wayland                                       | niri IPC                  | 隔离整应用通过                                          |
+| Sway / Wayland                                       | 原生 i3 IPC               | headless 真实 GTK 窗口与白名单/聚焦通过                 |
+| Hyprland / Wayland                                   | 原生 Hyprland socket      | 协议回归通过；本机缺少 GPU，真实嵌套会话待验收          |
+| GNOME / Wayland                                      | 随包 Shell 扩展（45–50）  | 扩展逻辑与私有 D-Bus 通过；真实 Shell 会话待验收        |
+| KDE Plasma / Wayland                                 | KWin 脚本接口（5.27 / 6） | 两代接口的私有 D-Bus/脚本回归通过；真实 KWin 会话待验收 |
+| GNOME、KDE、Xfce、Cinnamon、MATE、LXQt 等的 X11 会话 | EWMH                      | Openbox 核心及整应用通过；各桌面实际会话待验收          |
+| 其他 Wayland 合成器                                  | 尚无原生后端              | 普通计时可用，保护显示不可用                            |
 
 - **Wayland 原生窗口**：守卫优先使用原生 Wayland，让窗口 PID 和应用标识能被正确识别。后端故障不会退回只包含部分窗口的 Xwayland 列表。
 - **GNOME 扩展**：源码目录运行 `python3 scripts/install-desktop-integration.py`；首次安装后注销并重新登录，再运行 `gnome-extensions enable tomato-guard@studio.tomato.todo`。安装器只复制文件，不自动启用扩展或保护。
@@ -221,13 +239,13 @@ Windows 桌面层与跨平台 CI 的当前证据和剩余验收项见 [跨平台
 
 ## 文档
 
-| 文档                                             | 内容                                                       |
-| ------------------------------------------------ | ---------------------------------------------------------- |
-| [设计理念](docs/DESIGN.md)                        | 任务、习惯、项目与愿景为什么这样分；模板印刷的取舍          |
-| [学习计划格式](docs/PLAN_FORMAT.md)               | v6 计划文件字段语义、Schema 与通用示例                      |
-| [完整备份格式](docs/BACKUP_FORMAT.md)             | v4 备份字段语义、Schema 与示例                              |
-| [MCP 接入指南](docs/MCP.md)                       | 把 tomato-runtime 的 MCP 接入任意客户端                     |
-| [CODEMAP.md](CODEMAP.md)                          | 按任务与目录的代码导航地图                                  |
+| 文档                                  | 内容                                               |
+| ------------------------------------- | -------------------------------------------------- |
+| [设计理念](docs/DESIGN.md)            | 任务、习惯、项目与愿景为什么这样分；模板印刷的取舍 |
+| [学习计划格式](docs/PLAN_FORMAT.md)   | v6 计划文件字段语义、Schema 与通用示例             |
+| [完整备份格式](docs/BACKUP_FORMAT.md) | v4 备份字段语义、Schema 与示例                     |
+| [MCP 接入指南](docs/MCP.md)           | 把 tomato-runtime 的 MCP 接入任意客户端            |
+| [CODEMAP.md](CODEMAP.md)              | 按任务与目录的代码导航地图                         |
 
 ## 开发与贡献
 

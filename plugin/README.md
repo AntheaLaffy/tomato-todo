@@ -1,4 +1,4 @@
-# @local/tomato-dsh — 番茄 Todo 的 DeepSeek Harness 插件包
+# dsh-plugin-tomato-todo — 番茄 Todo 的 DeepSeek Harness 插件包
 
 番茄 Todo 整体插件化的 DSH 插件包。源码就在本仓库的 `plugin/` 目录，版本随仓库
 （根 `package.json` 与 CHANGELOG 的 `0.x`）一起走；不再对应独立的 tomato-dsh 仓库。
@@ -31,7 +31,7 @@
 1. 确保 `tomato-runtime` 已构建，并软链到 `/home/fuurin/.local/bin/tomato-runtime`
    （默认路径）。换机器时改 `cordis.patch.yml` 的 `config.tomatoBin`。
 2. 用 DSH 的 `plugin_manager` → `install_bundle` 安装本目录（绝对路径）。
-   补丁会插入 `@local/tomato-dsh` 插件行。更新 Host 工具后
+   补丁会插入 `dsh-plugin-tomato-todo` 插件行。更新 Host 工具后
    重启 DSH Web 服务，让现有进程重新注册工具。
 3. 其他 agent 的技能目录**不用手动处理**：插件挂载时会自动软链（见上）。
    想指定目录或先看看结果，再用命令：
@@ -43,6 +43,7 @@
    ```
 
    不想要自动链接就在补丁里设 `linkSkills: false`（或给一个目录数组）。
+
 4. 面板 UI 需要 runtime 的 HTTP 服务在运行（见下）；host 工具与 MCP 用
    一次性子进程，也需要 runtime 可执行（失败时按返回文案引导用户）。
 
