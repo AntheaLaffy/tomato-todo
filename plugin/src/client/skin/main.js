@@ -1,9 +1,8 @@
 // 皮肤装配：主题令牌 + 样式表 + 氛围层 + 品牌位替换（整个 DSH 的番茄皮肤）。
 //
 // 这里不注册 main panel / HUD——那是 app/main.js 的事；皮肤只改「长相」。
-import { h, useEffect } from "../runtime.js";
+import { h } from "../runtime.js";
 import { Icon } from "../shared/icons.js";
-import { useSnapshot } from "../shared/store.js";
 import { injectStyles } from "./styles.js";
 import { injectAmbient, SKY_INNER } from "./ambient.js";
 import { SKIN_SOURCE, SKIN_TOKENS } from "./theme.js";
@@ -80,17 +79,6 @@ function SkinSky() {
  * 把 core Settings 的品牌背景板开关同步成 html 属性：
  * 偏好页与设置行都写同一个字段，插画显示始终跟随数据。
  */
-function SkinSync() {
-  const state = useSnapshot();
-  const backdrop = state && state.data && state.data.settings ? state.data.settings.personaBackdrop : undefined;
-  useEffect(() => {
-    const root = document.documentElement;
-    if (backdrop === false) root.setAttribute("data-tomato-backdrop", "off");
-    else root.removeAttribute("data-tomato-backdrop");
-  }, [backdrop]);
-  return null;
-}
-
 function safeInject(ctx, key, options, Component) {
   try {
     ctx.slots.inject(key, () => ctx.slots.register(options, Component));
@@ -134,12 +122,6 @@ export function registerSkin(ctx) {
     "conversation.hero.brand.mark",
     { name: "conversation.hero.brand.mark" },
     HeroMark,
-  );
-  safeInject(
-    ctx,
-    "shell.overlay",
-    { name: "shell.overlay", id: "tomato-sky-sync", order: -998 },
-    SkinSync,
   );
   safeInject(
     ctx,

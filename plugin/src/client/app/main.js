@@ -24,6 +24,7 @@ import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
 import { SidebarTomatoProgress } from "./sidebar-progress.js";
 import { ReminderStrip } from "./reminders.js";
+import { PersonaBackdrop } from "./persona.js";
 import "./nav-copy.js";
 import "../pages/index.js";
 
@@ -168,6 +169,9 @@ export function registerApp(ctx) {
     { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
     () => h(DockCard, { openPanel }),
   );
+
+  // 看板娘：DSH 的每个界面右下角都显示（沉浸层 z70 会盖住它）。
+  safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-persona", order: -990 }, PersonaBackdrop);
 
   // 顶栏正中：到点提醒（整条可点，进入番茄面板）。
   safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-top-reminder", order: 850 }, () =>

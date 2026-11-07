@@ -219,10 +219,7 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
 /* 氛围总开关与插画开关：设置行的偏好直接写 html 属性，CSS 即时生效。 */
 html[data-tomato-skin=off] #tomato-sky,
 html[data-tomato-skin=off] #tomato-ambient{display:none!important}
-html[data-tomato-backdrop=off] #tomato-sky .t-amb-art,
-html[data-tomato-backdrop=off] #tomato-ambient .t-amb-art,
-html[data-tomato-backdrop=off] #tomato-sky .t-amb-enso,
-html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!important}
+
 
 /* ---------- reduced motion：停漂移与摇摆，保留 0–120ms 的必要过渡 ---------- */
 @media (prefers-reduced-motion:reduce){

@@ -457,6 +457,7 @@ if (!process.env.SMOKE_LIVE) {
   if (!overlay.includes("408 真题")) failures.push("顶栏居中的提醒条没有渲染");
   if (!overlay.includes("开始专注")) failures.push("提醒条没有开始按钮");
   if (overlay.includes("个番茄")) failures.push("提醒浮层里不该出现番茄计数");
+  if (!overlay.includes("assets/personas/")) failures.push("看板娘立绘没有渲染");
   if ((renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
     failures.push("提醒又回到了浮层弹窗");
   }

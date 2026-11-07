@@ -132,210 +132,6 @@
     );
   }
 
-  // plugin/src/client/shared/api.js
-  var api_exports = {};
-  __export(api_exports, {
-    API_BASE: () => API_BASE,
-    ApiError: () => ApiError,
-    getExportBackup: () => getExportBackup,
-    getExportPlan: () => getExportPlan,
-    getHealth: () => getHealth,
-    getState: () => getState,
-    ping: () => ping,
-    postDispatch: () => postDispatch
-  });
-  var API_BASE = "http://127.0.0.1:43987";
-  var ApiError = class extends Error {
-    constructor(message, status) {
-      super(message);
-      this.name = "ApiError";
-      this.status = status;
-      this.userMessage = message;
-    }
-  };
-  async function request(path, { method = "GET", body, timeoutMs = 5e3 } = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let res;
-    try {
-      res = await fetch(API_BASE + path, {
-        method,
-        headers: body === void 0 ? void 0 : { "Content-Type": "application/json" },
-        body: body === void 0 ? void 0 : JSON.stringify(body),
-        signal: controller.signal
-      });
-    } catch (e) {
-      throw new ApiError(
-        e && e.name === "AbortError" ? "runtime 响应超时" : "无法连接番茄 runtime（127.0.0.1:43987）",
-        0
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-    let payload = null;
-    try {
-      payload = await res.json();
-    } catch {
-      payload = null;
-    }
-    if (!res.ok) {
-      const message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : `请求失败（HTTP ${res.status}）`;
-      throw new ApiError(message, res.status);
-    }
-    return payload;
-  }
-  function getState(opts) {
-    return request("/api/state", opts);
-  }
-  function postDispatch(action, opts) {
-    return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
-  }
-  function getExportPlan(opts) {
-    return request("/api/export/plan", { timeoutMs: 15e3, ...opts });
-  }
-  function getExportBackup(opts) {
-    return request("/api/export/backup", { timeoutMs: 3e4, ...opts });
-  }
-  function getHealth(opts) {
-    return request("/health", opts);
-  }
-  async function ping(opts) {
-    try {
-      const health = await getHealth({ timeoutMs: 2e3, ...opts });
-      return health && health.ok === true;
-    } catch {
-      return false;
-    }
-  }
-
-  // plugin/src/client/shared/store.js
-  var snapshot = null;
-  var readError = null;
-  var inflightRead = null;
-  var pollTimer = null;
-  var beatTimer = null;
-  var disposed = false;
-  var listeners = /* @__PURE__ */ new Set();
-  function emit() {
-    for (const fn of Array.from(listeners)) {
-      try {
-        fn(snapshot, readError);
-      } catch {
-      }
-    }
-  }
-  function subscribe(fn) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-  }
-  function getSnapshot() {
-    return snapshot;
-  }
-  function useSnapshot() {
-    const [tick, setTick] = useState(0);
-    useEffect(() => {
-      const off = subscribe(() => setTick((n) => n + 1));
-      return off;
-    }, []);
-    return snapshot;
-  }
-  function apply(next) {
-    snapshot = next;
-    readError = null;
-    emit();
-  }
-  function refresh() {
-    if (disposed) return Promise.resolve(snapshot);
-    if (inflightRead !== null) return inflightRead;
-    inflightRead = getState({ timeoutMs: 4e3 }).then((next) => {
-      apply(next);
-      return next;
-    }).catch((e) => {
-      readError = e instanceof ApiError ? e.userMessage : String(e);
-      emit();
-      return snapshot;
-    }).finally(() => {
-      inflightRead = null;
-    });
-    return inflightRead;
-  }
-  var MUTATING = /* @__PURE__ */ new Set();
-  async function dispatch(action) {
-    const key = action && action.type ? action.type : "unknown";
-    MUTATING.add(key);
-    try {
-      const res = await postDispatch(action, { timeoutMs: 8e3 });
-      if (res && res.snapshot) {
-        apply(res.snapshot);
-      } else {
-        await refresh();
-      }
-      return res;
-    } catch (e) {
-      const err = e instanceof ApiError ? e : new ApiError(String(e), 0);
-      err.actionType = key;
-      throw err;
-    } finally {
-      MUTATING.delete(key);
-    }
-  }
-  async function tryDispatch(action) {
-    try {
-      await dispatch(action);
-      return { ok: true, error: null };
-    } catch (e) {
-      return { ok: false, error: e && e.userMessage ? e.userMessage : String(e) };
-    }
-  }
-  function nextDelay() {
-    const data = snapshot && snapshot.data;
-    const timer = data && data.timer;
-    const running = !!(timer && timer.running);
-    return running ? 5e3 : 8e3;
-  }
-  function startHeartbeat() {
-    stopHeartbeat();
-    beatTimer = setInterval(() => {
-      if (disposed) return;
-      const data = snapshot && snapshot.data;
-      const timer = data && data.timer;
-      if (timer && timer.running) emit();
-    }, 1e3);
-  }
-  function stopHeartbeat() {
-    if (beatTimer !== null) {
-      clearInterval(beatTimer);
-      beatTimer = null;
-    }
-  }
-  function startPolling() {
-    stopPolling();
-    disposed = false;
-    const tick = () => {
-      if (disposed) return;
-      refresh().finally(() => {
-        if (disposed) return;
-        pollTimer = setTimeout(tick, nextDelay());
-      });
-    };
-    refresh();
-    startHeartbeat();
-    pollTimer = setTimeout(tick, nextDelay());
-    return stopPolling;
-  }
-  function stopPolling() {
-    if (pollTimer !== null) {
-      clearTimeout(pollTimer);
-      pollTimer = null;
-    }
-    stopHeartbeat();
-  }
-  function dispose() {
-    disposed = true;
-    stopPolling();
-    listeners.clear();
-  }
-
   // plugin/src/client/shared/ui.css.js
   var UI_CSS = `
 .t-root{color:var(--tomato-ink);font-variant-numeric:tabular-nums;
@@ -681,10 +477,7 @@ html[data-tomato-daypart=night] [data-tomato-ambient=sky] .t-amb-art{opacity:cal
 /* 氛围总开关与插画开关：设置行的偏好直接写 html 属性，CSS 即时生效。 */
 html[data-tomato-skin=off] #tomato-sky,
 html[data-tomato-skin=off] #tomato-ambient{display:none!important}
-html[data-tomato-backdrop=off] #tomato-sky .t-amb-art,
-html[data-tomato-backdrop=off] #tomato-ambient .t-amb-art,
-html[data-tomato-backdrop=off] #tomato-sky .t-amb-enso,
-html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!important}
+
 
 /* ---------- reduced motion：停漂移与摇摆，保留 0–120ms 的必要过渡 ---------- */
 @media (prefers-reduced-motion:reduce){
@@ -723,7 +516,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   var KEY = "tomato-dsh.skin";
   var DEFAULTS = { ambience: true, daypart: "auto" };
   var current = load();
-  var listeners2 = /* @__PURE__ */ new Set();
+  var listeners = /* @__PURE__ */ new Set();
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
@@ -760,7 +553,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     current = { ...current, ...patch };
     persist();
     applySkinPrefs();
-    for (const fn of Array.from(listeners2)) {
+    for (const fn of Array.from(listeners)) {
       try {
         fn(current);
       } catch {
@@ -768,8 +561,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     }
   }
   function subscribeSkinPrefs(fn) {
-    listeners2.add(fn);
-    return () => listeners2.delete(fn);
+    listeners.add(fn);
+    return () => listeners.delete(fn);
   }
 
   // plugin/src/client/skin/ambient.js
@@ -1995,6 +1788,308 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     );
   }
 
+  // plugin/src/client/shared/api.js
+  var api_exports = {};
+  __export(api_exports, {
+    API_BASE: () => API_BASE,
+    ApiError: () => ApiError,
+    getExportBackup: () => getExportBackup,
+    getExportPlan: () => getExportPlan,
+    getHealth: () => getHealth,
+    getState: () => getState,
+    ping: () => ping,
+    postDispatch: () => postDispatch
+  });
+  var API_BASE = "http://127.0.0.1:43987";
+  var ApiError = class extends Error {
+    constructor(message, status) {
+      super(message);
+      this.name = "ApiError";
+      this.status = status;
+      this.userMessage = message;
+    }
+  };
+  async function request(path, { method = "GET", body, timeoutMs = 5e3 } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(API_BASE + path, {
+        method,
+        headers: body === void 0 ? void 0 : { "Content-Type": "application/json" },
+        body: body === void 0 ? void 0 : JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch (e) {
+      throw new ApiError(
+        e && e.name === "AbortError" ? "runtime 响应超时" : "无法连接番茄 runtime（127.0.0.1:43987）",
+        0
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+    if (!res.ok) {
+      const message = payload && typeof payload.error === "string" && payload.error !== "" ? payload.error : `请求失败（HTTP ${res.status}）`;
+      throw new ApiError(message, res.status);
+    }
+    return payload;
+  }
+  function getState(opts) {
+    return request("/api/state", opts);
+  }
+  function postDispatch(action, opts) {
+    return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
+  }
+  function getExportPlan(opts) {
+    return request("/api/export/plan", { timeoutMs: 15e3, ...opts });
+  }
+  function getExportBackup(opts) {
+    return request("/api/export/backup", { timeoutMs: 3e4, ...opts });
+  }
+  function getHealth(opts) {
+    return request("/health", opts);
+  }
+  async function ping(opts) {
+    try {
+      const health = await getHealth({ timeoutMs: 2e3, ...opts });
+      return health && health.ok === true;
+    } catch {
+      return false;
+    }
+  }
+
+  // plugin/src/client/shared/store.js
+  var snapshot = null;
+  var readError = null;
+  var inflightRead = null;
+  var pollTimer = null;
+  var beatTimer = null;
+  var disposed = false;
+  var listeners2 = /* @__PURE__ */ new Set();
+  function emit() {
+    for (const fn of Array.from(listeners2)) {
+      try {
+        fn(snapshot, readError);
+      } catch {
+      }
+    }
+  }
+  function subscribe(fn) {
+    listeners2.add(fn);
+    return () => listeners2.delete(fn);
+  }
+  function getSnapshot() {
+    return snapshot;
+  }
+  function useSnapshot() {
+    const [tick, setTick] = useState(0);
+    useEffect(() => {
+      const off = subscribe(() => setTick((n) => n + 1));
+      return off;
+    }, []);
+    return snapshot;
+  }
+  function apply(next) {
+    snapshot = next;
+    readError = null;
+    emit();
+  }
+  function refresh() {
+    if (disposed) return Promise.resolve(snapshot);
+    if (inflightRead !== null) return inflightRead;
+    inflightRead = getState({ timeoutMs: 4e3 }).then((next) => {
+      apply(next);
+      return next;
+    }).catch((e) => {
+      readError = e instanceof ApiError ? e.userMessage : String(e);
+      emit();
+      return snapshot;
+    }).finally(() => {
+      inflightRead = null;
+    });
+    return inflightRead;
+  }
+  var MUTATING = /* @__PURE__ */ new Set();
+  async function dispatch(action) {
+    const key = action && action.type ? action.type : "unknown";
+    MUTATING.add(key);
+    try {
+      const res = await postDispatch(action, { timeoutMs: 8e3 });
+      if (res && res.snapshot) {
+        apply(res.snapshot);
+      } else {
+        await refresh();
+      }
+      return res;
+    } catch (e) {
+      const err = e instanceof ApiError ? e : new ApiError(String(e), 0);
+      err.actionType = key;
+      throw err;
+    } finally {
+      MUTATING.delete(key);
+    }
+  }
+  async function tryDispatch(action) {
+    try {
+      await dispatch(action);
+      return { ok: true, error: null };
+    } catch (e) {
+      return { ok: false, error: e && e.userMessage ? e.userMessage : String(e) };
+    }
+  }
+  function nextDelay() {
+    const data = snapshot && snapshot.data;
+    const timer = data && data.timer;
+    const running = !!(timer && timer.running);
+    return running ? 5e3 : 8e3;
+  }
+  function startHeartbeat() {
+    stopHeartbeat();
+    beatTimer = setInterval(() => {
+      if (disposed) return;
+      const data = snapshot && snapshot.data;
+      const timer = data && data.timer;
+      if (timer && timer.running) emit();
+    }, 1e3);
+  }
+  function stopHeartbeat() {
+    if (beatTimer !== null) {
+      clearInterval(beatTimer);
+      beatTimer = null;
+    }
+  }
+  function startPolling() {
+    stopPolling();
+    disposed = false;
+    const tick = () => {
+      if (disposed) return;
+      refresh().finally(() => {
+        if (disposed) return;
+        pollTimer = setTimeout(tick, nextDelay());
+      });
+    };
+    refresh();
+    startHeartbeat();
+    pollTimer = setTimeout(tick, nextDelay());
+    return stopPolling;
+  }
+  function stopPolling() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    stopHeartbeat();
+  }
+  function dispose() {
+    disposed = true;
+    stopPolling();
+    listeners2.clear();
+  }
+
+  // plugin/src/client/app/persona.js
+  registerCopy("persona", {
+    zh: {
+      atri: "小迷妹",
+      natsuki: "冷静学伴",
+      ryuji: "严格教练",
+      minamo: "温柔学姐",
+      label: "看板娘",
+      hint: "选择陪你学习的角色（显示在页面右下角）"
+    },
+    en: {
+      atri: "Little fangirl",
+      natsuki: "Calm study buddy",
+      ryuji: "Strict coach",
+      minamo: "Gentle senior",
+      label: "Backdrop character",
+      hint: "The character standing at the lower right while you study"
+    }
+  });
+  var PERSONAS = [
+    { id: "atri", file: "atri.png", nameKey: "persona.atri" },
+    { id: "natsuki", file: "natsuki.png", nameKey: "persona.natsuki" },
+    { id: "ryuji", file: "ryuji.png", nameKey: "persona.ryuji" },
+    { id: "minamo", file: "minamo.png", nameKey: "persona.minamo" }
+  ];
+  var KEY2 = "tomato-dsh.persona";
+  var DEFAULT_ID = "atri";
+  var ASSET_BASE = "/plugins/@local/tomato-dsh/assets/personas/";
+  function load2() {
+    try {
+      const raw = localStorage.getItem(KEY2);
+      if (raw && PERSONAS.some((p) => p.id === raw)) return raw;
+    } catch {
+    }
+    return DEFAULT_ID;
+  }
+  var current3 = load2();
+  var listeners3 = /* @__PURE__ */ new Set();
+  function getPersonaId() {
+    return current3;
+  }
+  function setPersonaId(id) {
+    if (!PERSONAS.some((p) => p.id === id)) return;
+    current3 = id;
+    try {
+      localStorage.setItem(KEY2, id);
+    } catch {
+    }
+    for (const fn of Array.from(listeners3)) fn(current3);
+  }
+  function subscribePersona(fn) {
+    listeners3.add(fn);
+    return () => listeners3.delete(fn);
+  }
+  function personaFile(id = current3) {
+    const found = PERSONAS.find((p) => p.id === id) ?? PERSONAS[0];
+    return found.file;
+  }
+  function PersonaBackdrop() {
+    const state = useSnapshot();
+    const [id, setId] = useState(getPersonaId());
+    useEffect(() => subscribePersona(setId), []);
+    const enabled = !!(state && state.data && state.data.settings && state.data.settings.personaBackdrop);
+    useEffect(() => {
+      const root = document.documentElement;
+      if (enabled) root.setAttribute("data-tomato-persona", "on");
+      else root.removeAttribute("data-tomato-persona");
+      return () => root.removeAttribute("data-tomato-persona");
+    }, [enabled]);
+    if (!enabled) return null;
+    return h("img", {
+      id: "tomato-persona",
+      src: ASSET_BASE + personaFile(id),
+      alt: "",
+      "aria-hidden": "true",
+      draggable: false,
+      style: {
+        position: "fixed",
+        right: "max(10px, 1.4vw)",
+        bottom: 0,
+        height: "min(64vh, 620px)",
+        width: "auto",
+        maxWidth: "30vw",
+        objectFit: "contain",
+        objectPosition: "bottom right",
+        pointerEvents: "none",
+        userSelect: "none",
+        zIndex: 1,
+        opacity: 0.96,
+        filter: "drop-shadow(0 18px 30px #3a24151f)",
+        WebkitMaskImage: "linear-gradient(to top, transparent 0%, #000 9%), linear-gradient(to left, #000 55%, transparent 100%)",
+        WebkitMaskComposite: "source-in",
+        maskImage: "linear-gradient(to top, transparent 0%, #000 9%), linear-gradient(to left, #000 55%, transparent 100%)",
+        maskComposite: "intersect"
+      }
+    });
+  }
+
   // plugin/src/client/skin/settings-row.js
   registerCopy("skinprefs", {
     zh: {
@@ -2007,7 +2102,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       day: "白天",
       dusk: "黄昏",
       night: "夜读",
-      backdrop: "角色背景板",
+      backdrop: "看板娘背景板",
+      persona: "看板娘",
+      personaHint: "页面上陪伴你的角色立绘（右下角，沉浸专注时隐藏）",
       backdropOff: "已隐藏插画，只留窗光",
       backdropUnavailable: "运行时未连接，暂时无法修改背景板",
       saveFailed: "保存失败：{error}"
@@ -2022,7 +2119,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       day: "Daylight",
       dusk: "Dusk",
       night: "Night reading",
-      backdrop: "Illustration",
+      backdrop: "Backdrop character",
+      persona: "Character",
+      personaHint: "The standing character at the lower right (hidden while focusing)",
       backdropOff: "Illustration hidden; window light remains",
       backdropUnavailable: "Runtime offline — illustration can't be changed now",
       saveFailed: "Couldn't save: {error}"
@@ -2075,9 +2174,11 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   function TomatoSkinSettingsRow() {
     const state = useSnapshot();
     const [prefs, setPrefs] = useState(getSkinPrefs());
+    const [persona, setPersona] = useState(getPersonaId());
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
     useEffect(() => subscribeSkinPrefs(setPrefs), []);
+    useEffect(() => subscribePersona(setPersona), []);
     const settings = state && state.data && state.data.settings || null;
     const backdrop = settings ? !!settings.personaBackdrop : true;
     const toggleBackdrop = async (next) => {
@@ -2141,6 +2242,16 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
             { value: "night", label: t("skinprefs.night") }
           ],
           onChange: (next) => setSkinPrefs({ daypart: next })
+        })
+      ),
+      h(
+        Row,
+        { label: t("skinprefs.persona"), hint: t("skinprefs.personaHint"), dim: !settings },
+        h(Select, {
+          value: persona,
+          width: 140,
+          options: PERSONAS.map((p) => ({ value: p.id, label: t(p.nameKey) })),
+          onChange: (next) => setPersonaId(next)
         })
       ),
       h(
@@ -2227,16 +2338,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       dangerouslySetInnerHTML: { __html: SKY_INNER }
     });
   }
-  function SkinSync() {
-    const state = useSnapshot();
-    const backdrop = state && state.data && state.data.settings ? state.data.settings.personaBackdrop : void 0;
-    useEffect(() => {
-      const root = document.documentElement;
-      if (backdrop === false) root.setAttribute("data-tomato-backdrop", "off");
-      else root.removeAttribute("data-tomato-backdrop");
-    }, [backdrop]);
-    return null;
-  }
   function safeInject(ctx, key, options, Component) {
     try {
       ctx.slots.inject(key, () => ctx.slots.register(options, Component));
@@ -2272,12 +2373,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       "conversation.hero.brand.mark",
       { name: "conversation.hero.brand.mark" },
       HeroMark
-    );
-    safeInject(
-      ctx,
-      "shell.overlay",
-      { name: "shell.overlay", id: "tomato-sky-sync", order: -998 },
-      SkinSync
     );
     safeInject(
       ctx,
@@ -2546,7 +2641,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   var PAGE_KEY = "tomato-dsh.page";
   var activePageId = null;
   var openPanelFn = null;
-  var listeners3 = /* @__PURE__ */ new Set();
+  var listeners4 = /* @__PURE__ */ new Set();
   function readStored() {
     try {
       return localStorage.getItem(PAGE_KEY);
@@ -2568,7 +2663,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       localStorage.setItem(PAGE_KEY, id);
     } catch {
     }
-    for (const fn of Array.from(listeners3)) {
+    for (const fn of Array.from(listeners4)) {
       try {
         fn(id);
       } catch {
@@ -2576,8 +2671,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     }
   }
   function subscribeActivePage(fn) {
-    listeners3.add(fn);
-    return () => listeners3.delete(fn);
+    listeners4.add(fn);
+    return () => listeners4.delete(fn);
   }
   function bindPanelOpener(fn) {
     openPanelFn = typeof fn === "function" ? fn : null;
@@ -2996,8 +3091,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       if (!settings) return;
       const target = pendingVolume !== null ? pendingVolume : settingsVolume;
       const soundVolume = Math.round(Math.min(1, Math.max(0, target)) * 100);
-      const current3 = normalizeVolume(settings.soundVolume);
-      if (current3 !== null && Math.round(current3 * 100) === soundVolume) {
+      const current4 = normalizeVolume(settings.soundVolume);
+      if (current4 !== null && Math.round(current4 * 100) === soundVolume) {
         pendingVolume = null;
         return;
       }
@@ -3620,9 +3715,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   });
   var openState = false;
   var endTick = 0;
-  var listeners4 = /* @__PURE__ */ new Set();
+  var listeners5 = /* @__PURE__ */ new Set();
   function emit2() {
-    for (const fn of Array.from(listeners4)) {
+    for (const fn of Array.from(listeners5)) {
       try {
         fn();
       } catch {
@@ -3648,9 +3743,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const [open, setOpen] = useState(openState);
     useEffect(() => {
       const fn = () => setOpen(openState);
-      listeners4.add(fn);
+      listeners5.add(fn);
       fn();
-      return () => listeners4.delete(fn);
+      return () => listeners5.delete(fn);
     }, []);
     return open;
   }
@@ -3658,8 +3753,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const [tick, setTick] = useState(endTick);
     useEffect(() => {
       const fn = () => setTick(endTick);
-      listeners4.add(fn);
-      return () => listeners4.delete(fn);
+      listeners5.add(fn);
+      return () => listeners5.delete(fn);
     }, []);
     return tick;
   }
@@ -5279,7 +5374,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       setConfirmDelete(false);
     }, [open, taskId, today, initialTitle]);
     if (!open) return null;
-    const patch = (next) => setDraft((current3) => ({ ...current3, ...next }));
+    const patch = (next) => setDraft((current4) => ({ ...current4, ...next }));
     const defaultFocus = Number(settings.focusMinutes) || 45;
     const focusValue = intOf(draft.focusMinutes, defaultFocus);
     const estimateValue = intOf(draft.estimate, 1);
@@ -7838,7 +7933,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     }, [open, templateId, today]);
     if (!open) return null;
     const editing = templateId !== null;
-    const patch = (next) => setDraft((current3) => ({ ...current3, ...next }));
+    const patch = (next) => setDraft((current4) => ({ ...current4, ...next }));
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const defaultFocus = Number(settings.focusMinutes) || 45;
     const weekFull = t("common.weekFull");
@@ -9061,9 +9156,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const list = templateList(templates);
     const fallbackTemplateId = list.some((item) => item.id === initialTemplateId) ? initialTemplateId : list.length > 0 ? list[0].id : "";
     const activeTemplateId = list.some((item) => item.id === templateId) ? templateId : fallbackTemplateId;
-    const current3 = list.find((item) => item.id === activeTemplateId) || null;
-    const printing = current3 ? printingOf(current3) : null;
-    const autoOn = !!(current3 && current3.automatic);
+    const current4 = list.find((item) => item.id === activeTemplateId) || null;
+    const printing = current4 ? printingOf(current4) : null;
+    const autoOn = !!(current4 && current4.automatic);
     useEffect(() => {
       if (!open) return;
       setTemplateId(fallbackTemplateId);
@@ -9075,8 +9170,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     }, [open, fallbackTemplateId]);
     if (!open) return null;
     const autoChecked = autoBusy ? autoDraft : autoOn;
-    const autoAhead = current3 ? Math.max(0, Math.round(Number(current3.printAheadDays) || 0)) : 0;
-    const printedDates = printedDatesOf(prints, current3 && current3.id);
+    const autoAhead = current4 ? Math.max(0, Math.round(Number(current4.printAheadDays) || 0)) : 0;
+    const printedDates = printedDatesOf(prints, current4 && current4.id);
     const pickedSorted = uniqueSorted(picked);
     const { rows, skippedPrinted, skippedNotInRule, submitDates, taskCount } = buildPreview(printing, pickedSorted, printedDates);
     const addDates = (values) => {
@@ -9105,16 +9200,16 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       setError(null);
     };
     const toggleAutomatic = async (next) => {
-      if (autoBusy || busy || !current3 || !printing) return;
+      if (autoBusy || busy || !current4 || !printing) return;
       setAutoDraft(!!next);
       setAutoBusy(true);
       setError(null);
       const result = await tryDispatch({
         type: "saveTemplate",
         template: {
-          ...current3,
+          ...current4,
           automatic: next,
-          printAheadDays: current3.printAheadDays
+          printAheadDays: current4.printAheadDays
         },
         printDates: []
       });
@@ -9127,7 +9222,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     };
     const submit = async () => {
       if (busy) return;
-      if (!current3 || !printing) {
+      if (!current4 || !printing) {
         setError(t("print.noPrinting"));
         return;
       }
@@ -9139,7 +9234,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       setError(null);
       const result = await tryDispatch({
         type: "printTemplate",
-        id: current3.id,
+        id: current4.id,
         dates: submitDates
       });
       setBusy(false);
@@ -9385,7 +9480,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
             width: "100%"
           })
         ),
-        current3 ? h(
+        current4 ? h(
           "div",
           { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
           h(
@@ -9395,7 +9490,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
               icon: "calendarClock",
               style: { fontVariantNumeric: "tabular-nums" }
             },
-            ruleSummary(current3, baseToday)
+            ruleSummary(current4, baseToday)
           )
         ) : null,
         printing ? h(Toggle, {
@@ -10613,7 +10708,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     };
     const pickTask = (task) => {
       setPicked(
-        (current3) => current3.includes(task.id) ? current3.filter((id) => id !== task.id) : [...current3, task.id]
+        (current4) => current4.includes(task.id) ? current4.filter((id) => id !== task.id) : [...current4, task.id]
       );
     };
     const toggleComplete = async (task) => {
@@ -10703,7 +10798,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         clearSelection();
         notify(t("tasks.batchDeleted", { n: ids.length }), "neutral");
       } else {
-        setPicked((current3) => current3.filter((id) => !ids.includes(id)));
+        setPicked((current4) => current4.filter((id) => !ids.includes(id)));
         notify(t("tasks.deleted"), "neutral");
       }
     };
@@ -12786,8 +12881,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       const rangeOfBlock = (block) => bandRange(block.start, block.end);
       const rangeOfRest = (rest) => bandRange(rest.start, rest.end);
       for (let i = 0; i < day.teaching.length; i += 1) {
-        const current3 = day.teaching[i];
-        const currentRange = { start: current3.startMin, end: current3.endMin };
+        const current4 = day.teaching[i];
+        const currentRange = { start: current4.startMin, end: current4.endMin };
         for (let j = i + 1; j < day.teaching.length; j += 1) {
           const next = day.teaching[j];
           const minutes = overlapOf(currentRange, { start: next.startMin, end: next.endMin });
@@ -12796,11 +12891,11 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
               dayIndex,
               "danger",
               t("calendar.conflictTeachingTeaching", {
-                a: teachingLabel(current3),
+                a: teachingLabel(current4),
                 b: teachingLabel(next),
                 minutes
               }),
-              `tt:${current3.raw.id}:${next.raw.id}`
+              `tt:${current4.raw.id}:${next.raw.id}`
             );
           }
         }
@@ -12811,11 +12906,11 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
               dayIndex,
               "danger",
               t("calendar.conflictTeachingBlock", {
-                a: teachingLabel(current3),
+                a: teachingLabel(current4),
                 b: block.title || t("calendar.untitled"),
                 minutes
               }),
-              `tb:${current3.raw.id}:${block.id}`
+              `tb:${current4.raw.id}:${block.id}`
             );
           }
         }
@@ -12827,10 +12922,10 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
               "danger",
               t("calendar.conflictRest", {
                 a: rest.name || t("calendar.rest"),
-                b: teachingLabel(current3),
+                b: teachingLabel(current4),
                 minutes
               }),
-              `tr:${current3.raw.id}:${rest.id}`
+              `tr:${current4.raw.id}:${rest.id}`
             );
           }
         }
@@ -12842,9 +12937,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
               "leaf",
               t("calendar.parallel", {
                 a: block.title || t("calendar.untitled"),
-                b: teachingLabel(current3)
+                b: teachingLabel(current4)
               }),
-              `lt:${block.id}:${current3.raw.id}`
+              `lt:${block.id}:${current4.raw.id}`
             );
           }
         }
@@ -16533,20 +16628,20 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         notify(t("guard.appNoSpace"), "danger");
         return;
       }
-      const current3 = latestWhitelist();
-      if (current3.includes(value)) {
+      const current4 = latestWhitelist();
+      if (current4.includes(value)) {
         notify(t("guard.appExists"), "danger");
         return;
       }
-      const ok = await saveProtection({ whitelist: [...current3, value] });
+      const ok = await saveProtection({ whitelist: [...current4, value] });
       if (ok) {
         setDraft("");
         notify(t("guard.appAdded", { name: value }), "brand");
       }
     }
     async function removeApp(app) {
-      const current3 = latestWhitelist();
-      const next = current3.filter((item) => item !== app);
+      const current4 = latestWhitelist();
+      const next = current4.filter((item) => item !== app);
       const ok = await saveProtection({ whitelist: next });
       if (ok) notify(t("guard.appRemoved", { name: app }), "brand");
     }
@@ -19004,6 +19099,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
       () => h(DockCard, { openPanel })
     );
+    safeInject2("shell.overlay", { name: "shell.overlay", id: "tomato-persona", order: -990 }, PersonaBackdrop);
     safeInject2(
       "shell.overlay",
       { name: "shell.overlay", id: "tomato-top-reminder", order: 850 },

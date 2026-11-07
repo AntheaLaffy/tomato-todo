@@ -7,7 +7,8 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./icon": "./icon.svg",
+    "./assets/*": "./assets/*"
   },
   "files": [
     "index.js",
@@ -15,7 +16,8 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "assets/personas/*"
   ],
   "dsh": {
     "bundle": {

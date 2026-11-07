@@ -10,6 +10,12 @@ import { t, registerCopy } from "../shared/copy.js";
 import { Toggle, Select, Dot } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
 import { getSkinPrefs, setSkinPrefs, subscribeSkinPrefs } from "./prefs.js";
+import {
+  PERSONAS,
+  getPersonaId,
+  setPersonaId,
+  subscribePersona,
+} from "../app/persona.js";
 
 registerCopy("skinprefs", {
   zh: {
@@ -22,7 +28,9 @@ registerCopy("skinprefs", {
     day: "白天",
     dusk: "黄昏",
     night: "夜读",
-    backdrop: "角色背景板",
+    backdrop: "看板娘背景板",
+    persona: "看板娘",
+    personaHint: "页面上陪伴你的角色立绘（右下角，沉浸专注时隐藏）",
     backdropOff: "已隐藏插画，只留窗光",
     backdropUnavailable: "运行时未连接，暂时无法修改背景板",
     saveFailed: "保存失败：{error}",
@@ -37,7 +45,9 @@ registerCopy("skinprefs", {
     day: "Daylight",
     dusk: "Dusk",
     night: "Night reading",
-    backdrop: "Illustration",
+    backdrop: "Backdrop character",
+    persona: "Character",
+    personaHint: "The standing character at the lower right (hidden while focusing)",
     backdropOff: "Illustration hidden; window light remains",
     backdropUnavailable: "Runtime offline — illustration can't be changed now",
     saveFailed: "Couldn't save: {error}",
@@ -94,10 +104,12 @@ function Row({ label, hint, children, dim = false }) {
 export function TomatoSkinSettingsRow() {
   const state = useSnapshot();
   const [prefs, setPrefs] = useState(getSkinPrefs());
+  const [persona, setPersona] = useState(getPersonaId());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => subscribeSkinPrefs(setPrefs), []);
+  useEffect(() => subscribePersona(setPersona), []);
 
   const settings = (state && state.data && state.data.settings) || null;
   const backdrop = settings ? !!settings.personaBackdrop : true;
@@ -164,6 +176,16 @@ export function TomatoSkinSettingsRow() {
           { value: "night", label: t("skinprefs.night") },
         ],
         onChange: (next) => setSkinPrefs({ daypart: next }),
+      }),
+    ),
+    h(
+      Row,
+      { label: t("skinprefs.persona"), hint: t("skinprefs.personaHint"), dim: !settings },
+      h(Select, {
+        value: persona,
+        width: 140,
+        options: PERSONAS.map((p) => ({ value: p.id, label: t(p.nameKey) })),
+        onChange: (next) => setPersonaId(next),
       }),
     ),
     h(

@@ -117,7 +117,11 @@
    `animation: tomato-drift` 24–48s 线性无限、错开延时，向上缓慢漂移并轻微左右摆动。
 4. **内容栏**：DSH 三栏照常，背景用 `--dsw-alias-bg-base`（已换成纸色），
    中心栏不透明以保证对话可读；侧栏 `--dsw-specific-sidebar-fill` 偏暖。
-5. **窗光洗层**（`shell.overlay`，order -1000，pointer-events:none）：一层
+5. **看板娘背景板**（`shell.overlay`，order -990，pointer-events:none）：`settings.personaBackdrop`
+   为真时，**每个界面**右下角显示旧版内置立绘（ATRI 官方立绘，权利归原权利方，见
+   `plugin/assets/personas/README.md`；四角色可选，DSH 设置-通用「番茄氛围」里切换）。
+   开启时线描书桌插画退场；沉浸专注层（z70）会盖住它，专注保护界面同样不显示。
+6. **窗光洗层**（`shell.overlay`，order -1000，pointer-events:none）：一层
    `linear-gradient(160deg, #fff2dbb3, transparent 42%, #e7b98f14)`，mix-blend-mode
    `soft-light`，「光落在屏幕上」的细微层次；深色改为 `#ffd9a712` 的左上暖光。
 
