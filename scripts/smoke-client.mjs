@@ -243,6 +243,8 @@ const expectedSlots = [
   "sidebar.brand.name",
   "conversation.hero.brand.mark",
   "settings.general.item",
+  "sidebar.footer.action",
+  "conversation.header.leading",
 ];
 const got = new Set(slotRegistrations.map((r) => r.key));
 for (const key of expectedSlots) {
@@ -453,16 +455,18 @@ for (const word of ["今日专注", "全部任务", "数据统计", "偏好设�
 
 // 提醒条只在该任务的「当前时段」内渲染；样例构造了提醒时刻=5 分钟前的任务。
 if (!process.env.SMOKE_LIVE) {
-  const dock = renderedBy["conversation.composer.dock"] || "";
-  if (!dock.includes("408 真题")) failures.push("输入框上方的提醒条没有渲染");
+  const header = renderedBy["conversation.header.leading"] || "";
+  if (!header.includes("408 真题")) failures.push("顶栏提醒条没有渲染");
+  if (!header.includes("开始专注")) failures.push("顶栏提醒条没有开始按钮");
   if ((renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
     failures.push("提醒又回到了浮层弹窗");
   }
+  const dock = renderedBy["conversation.composer.dock"] || "";
+  if (/[0-9]+ \/ 8 番茄/.test(dock)) failures.push("番茄预计/实际又回到了最下面那条面板");
+  const sidebarFoot = renderedBy["sidebar.footer.action"] || "";
+  if (!/[0-9]+ \/ 8/.test(sidebarFoot)) failures.push("左下角侧栏没有番茄预计/实际进度");
 }
 if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注")) failures.push("入口卡没有渲染开始专注按钮");
-if (!/[0-9]+ \/ 8 番茄/.test(renderedBy["conversation.composer.dock"] || "")) {
-  failures.push("左下角入口面板没有番茄预计/实际计数");
-}
 if ((renderedBy["shell.overlay"] || "").includes("个番茄")) {
   failures.push("右上角 HUD 空闲时仍在显示番茄计数");
 }

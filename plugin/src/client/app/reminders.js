@@ -156,24 +156,39 @@ export function ReminderStrip({ variant = "page" }) {
     force((n) => n + 1);
   };
 
-  const compact = variant === "dock";
+  const inline = variant === "inline";
+  const compact = variant === "dock" || inline;
 
   return h(
     "div",
     {
       className: "t-root",
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: compact ? "7px 10px" : "9px 12px",
-        marginBottom: compact ? 6 : 18,
-        borderRadius: 12,
-        border: "1px solid var(--tomato-line)",
-        background: "color-mix(in srgb, var(--tomato-brand-soft) 62%, var(--tomato-surface))",
-        flexWrap: "wrap",
-        minWidth: 0,
-      },
+      style: inline
+        ? {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            height: 28,
+            padding: "0 6px 0 9px",
+            borderRadius: 9,
+            border: "1px solid var(--tomato-line)",
+            background: "color-mix(in srgb, var(--tomato-brand-soft) 70%, var(--tomato-surface))",
+            maxWidth: 430,
+            minWidth: 0,
+            flex: "none",
+          }
+        : {
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: compact ? "7px 10px" : "9px 12px",
+            marginBottom: compact ? 6 : 18,
+            borderRadius: 12,
+            border: "1px solid var(--tomato-line)",
+            background: "color-mix(in srgb, var(--tomato-brand-soft) 62%, var(--tomato-surface))",
+            flexWrap: "wrap",
+            minWidth: 0,
+          },
     },
     h(Icon, { name: "bell", size: 14, style: { color: "var(--tomato-accent-fg)" } }),
     h(
@@ -218,9 +233,11 @@ export function ReminderStrip({ variant = "page" }) {
     h(
       "span",
       {
+        title: task.title,
         style: {
           flex: 1,
-          minWidth: 120,
+          minWidth: inline ? 40 : 120,
+          maxWidth: inline ? 156 : undefined,
           fontSize: 12.5,
           fontWeight: 550,
           color: "var(--tomato-ink)",
@@ -231,12 +248,20 @@ export function ReminderStrip({ variant = "page" }) {
       },
       task.title,
     ),
-    h(
-      "span",
-      { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
-      t("reminder.minutes", { n: minutes, round: rounds }),
-      extra > 0 ? ` · ${t("reminder.more", { n: extra })}` : "",
-    ),
+    inline
+      ? extra > 0
+        ? h(
+            "span",
+            { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+            t("reminder.more", { n: extra }),
+          )
+        : null
+      : h(
+          "span",
+          { style: { fontSize: 11, color: "var(--tomato-ink-3)", flex: "none" } },
+          t("reminder.minutes", { n: minutes, round: rounds }),
+          extra > 0 ? ` · ${t("reminder.more", { n: extra })}` : "",
+        ),
     error
       ? h(
           "span",

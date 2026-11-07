@@ -5,7 +5,7 @@
 import { h, useState } from "../runtime.js";
 import { t } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
-import { Chip, Ring, notify } from "../shared/ui.js";
+import { Chip, notify } from "../shared/ui.js";
 import { registerCopy } from "../shared/copy.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
 import { timerView, fmtClock, todayTasks, todayKey } from "../shared/derive.js";
@@ -39,11 +39,8 @@ export function DockCard({ openPanel }) {
   const stats = (state && state.stats) || {};
   const today = todayKey(state && state.serverTime);
   const view = timerView(state);
-  const settings = data.settings || {};
   const due = todayTasks(data, today).length;
   const focusMinutes = Math.round((Number(stats.todaySeconds) || 0) / 60);
-  const goal = Number(settings.dailyGoal) || 8;
-  const done = Number(stats.todayPomodoros) || 0;
 
   const start = async () => {
     setBusy(true);
@@ -75,20 +72,7 @@ export function DockCard({ openPanel }) {
         flexWrap: "wrap",
       },
     },
-    // 番茄预计/实际：放在左下角这条面板里（不再占右上角 HUD）。
-    h(
-      "div",
-      {
-        style: { display: "flex", alignItems: "center", gap: 6, flex: "none" },
-        title: t("dock.pomodoro", { done, goal }),
-      },
-      h(Ring, { value: goal > 0 ? Math.min(1, done / goal) : 0, size: 20, stroke: 3, color: "var(--tomato-brand)" }),
-      h(
-        "span",
-        { className: "t-mono", style: { fontSize: 11.5, color: "var(--tomato-ink-2)", fontWeight: 600 } },
-        t("dock.pomodoro", { done, goal }),
-      ),
-    ),
+    h(Icon, { name: "tomato", size: 15, style: { color: "var(--tomato-brand)", flex: "none" } }),
     h(
       "div",
       { style: { display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, flexWrap: "wrap" } },

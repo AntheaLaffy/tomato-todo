@@ -22,8 +22,8 @@ import {
 } from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
-import { TomatoHeaderButton } from "./header-entry.js";
-import { ReminderStrip } from "./reminders.js";
+import { TomatoHeaderCluster } from "./header-entry.js";
+import { SidebarTomatoProgress } from "./sidebar-progress.js";
 import "./nav-copy.js";
 import "../pages/index.js";
 
@@ -155,19 +155,21 @@ export function registerApp(ctx) {
 
   safeInject(
     "conversation.composer.dock",
-    { name: "conversation.composer.dock", id: "tomato-reminder", order: 4 },
-    () => h(ReminderStrip, { variant: "dock" }),
-  );
-
-  safeInject(
-    "conversation.composer.dock",
     { name: "conversation.composer.dock", id: "tomato-dock", order: 5 },
     () => h(DockCard, { openPanel }),
   );
 
+  // 顶栏左端：番茄入口 + 到点提醒/开始专注（提醒不再出现在底部或浮层）。
   safeInject(
     "conversation.header.leading",
     { name: "conversation.header.leading" },
-    () => h(TomatoHeaderButton, { openPanel }),
+    () => h(TomatoHeaderCluster, { openPanel }),
+  );
+
+  // 左下角「栏目」：侧栏底部的番茄预计/实际进度（展开态显示 0 / 8，收起只留环）。
+  safeInject(
+    "sidebar.footer.action",
+    { name: "sidebar.footer.action", id: "tomato-progress", order: 5 },
+    (props) => h(SidebarTomatoProgress, { ...props, openPanel }),
   );
 }

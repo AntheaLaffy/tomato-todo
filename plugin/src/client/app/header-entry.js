@@ -7,11 +7,30 @@ import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import { useSnapshot } from "../shared/store.js";
 import { fmtClock, timerView, todayTasks, todayKey } from "../shared/derive.js";
+import { ReminderStrip } from "./reminders.js";
 
 registerCopy("header", {
   zh: { label: "番茄 Todo", today: "今日 {n}", running: "专注中", open: "进入番茄 Todo" },
   en: { label: "Tomato Todo", today: "{n} today", running: "Focusing", open: "Open Tomato Todo" },
 });
+
+/** 对话顶部左端的番茄簇：入口胶囊 +（到点时）提醒与「开始专注」。 */
+export function TomatoHeaderCluster({ openPanel }) {
+  return h(
+    "div",
+    {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        flex: "none",
+        minWidth: 0,
+      },
+    },
+    h(TomatoHeaderButton, { openPanel }),
+    h(ReminderStrip, { variant: "inline" }),
+  );
+}
 
 export function TomatoHeaderButton({ openPanel }) {
   const state = useSnapshot();
