@@ -795,10 +795,23 @@ if (typeof nav?.openProject === "function") {
   if (!parts) {
     failures.push("项目页没有暴露资料区测试钩子 __tomatoProjectParts");
   } else {
-    const project = sampleState.data.projects.find((item) => item.id === "p1");
+    // 实时数据不一定有样例项目 p1；资料区各块按稳定形状渲染即可。
+    const project = sampleState.data.projects.find(
+      (item) => item.id === "p1",
+    ) || { id: "p1", name: "数学一", color: "#df7561" };
     const profile = sampleState.data.education.projects.find(
-      (item) => item.projectId === "p1",
-    );
+      (item) => item.projectId === project.id,
+    ) || {
+      projectId: project.id,
+      directory: "/tmp/smoke-materials",
+      examMode: false,
+      visionId: null,
+      target: "",
+      examDate: null,
+      syllabusId: null,
+      pastPaperIds: [],
+      mockPaperIds: [],
+    };
     const renders = [
       [
         "project:materials",
