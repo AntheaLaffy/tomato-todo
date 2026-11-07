@@ -1,8 +1,20 @@
 # 把 tomato-runtime 的 MCP 接入任意客户端
 
-`tomato-runtime` 自带一个 MCP 服务器。DSH 插件自带的 `tomato_*` Host 工具经一次性 `--mcp` 调用它，作为 DSH 对话入口；独立 MCP 客户端（Claude Desktop、Codex 等）也能接入。两条路径都连接**正在运行的 runtime**，共享同一份计划数据，不另开数据库；runtime 关闭后不可操作。初始化返回 `serverInfo.name = tomato-todo`，`instructions` 简述接管入口。
+`tomato-runtime` 自带一个 MCP 服务器。DSH 对话**不直接接**这个 MCP 服务器：插件自带 `tomato_*` Host 工具，每次调用起一个一次性 `tomato-runtime --mcp` 子进程，把单条 `tools/call` 转到运行中 runtime 的 `/mcp`。独立 MCP 客户端（Claude Desktop、Codex 等）仍可接入 MCP 入口。Host 工具与 MCP 客户端连接的是**同一运行实例**：同一份 `plan.json`、同一套 Action 校验、同一个 token，不另开数据库；runtime 关闭后两者都不可操作。
 
-两条入口，同一份工具：
+## Host 工具与 MCP 的分工
+
+| 入口 | 给谁用 | 传输与认证 | 断线影响 |
+| --- | --- | --- | --- |
+| 插件 Host 工具 `tomato_*` | DSH 对话（学习助手） | 每次调用一次性 `tomato-runtime --mcp` 子进程；stdio JSON-RPC 经 `agent/connection.json` 转发到 `/mcp` | DSH 的 MCP 客户端断开不影响；只依赖 runtime 在运行 |
+| MCP stdio | 外部客户端（Claude Desktop、Codex 等） | `tomato-runtime --mcp` 长驻 stdin/stdout 代理到 `/mcp`，每次调用重读连接文件 | 客户端断开只影响自己 |
+| MCP streamable HTTP | 外部客户端与自定义集成 | `http://127.0.0.1:43987/mcp`，Bearer token，拒绝浏览器 Origin | 同上 |
+
+- 工具语义只有一份：`runtime/src/tools.mjs` 定义 13 个工具；Host 工具名统一加 `tomato_` 前缀（如 `tomato_get_context`），MCP 客户端看到的是不带前缀的原名（`get_context`）。schema 由 `scripts/build-host-tools.mjs` 生成到 `plugin/host-tool-specs.js`，`pnpm check:host-tools` 防止两边漂移。
+- 插件额外提供两个不走 MCP 的 Host 工具：`tomato_today`（调 `get_context` 后整理今日摘要）与 `tomato_guard_status`（一次性 `tomato-runtime --guard-status`，不需要 MCP 会话）。
+- 随包教学技能在 DSH 里优先调用 `tomato_*` Host 工具；同一个技能被软链到 Codex 等外部 agent 时，由 `plugin/skills/*/agents/openai.yaml` 声明 `tomato` MCP 依赖、走上面的 MCP 入口。DSH 因此不需要另配一个 Tomato MCP 客户端，`cordis.patch.yml` 只插入 `@local/tomato-dsh` 一行。
+
+MCP 的两条传输：
 
 - **stdio**：`tomato-runtime --mcp`——spawn 即代理到运行中 runtime 的 `/mcp`，换行分隔 JSON-RPC，每次调用重读连接文件。
 - **streamable HTTP**：`http://127.0.0.1:43987/mcp`，Bearer token 认证，拒绝浏览器 Origin；无会话的 JSON 响应实现，通知返回 202，不提供 SSE，GET 返回 405。
@@ -64,7 +76,8 @@ streamable HTTP：从连接文件读出 `mcpUrl` 与令牌后：
 ## 安全与边界
 
 - 传输只在本机：127.0.0.1 + token + 拒绝浏览器 Origin。
-- 所有写入仍经 @tomato/core 的校验与保护规则（严格模式、来源与文件哈希校验），客户端绕不开。
+- 所有写入仍经 @tomato/core 的校验与保护规则（严格模式、来源与文件哈希校验），客户端绕不开；Host 工具与 MCP 客户端落到同一个 `/mcp` 与同一个引擎，不存在第二套校验。
+- 项目资料的 `saveResource` 还会在进 core 前核对项目目录的本机授权与文件路径（见 [API.md](../API.md)「项目资料库」）。
 - 外部客户端不能紧急解锁或提前完成番茄：紧急退出与提前完成由用户在界面操作。
 - 客户端以你的本机身份执行写操作，只接你信任的客户端。
 

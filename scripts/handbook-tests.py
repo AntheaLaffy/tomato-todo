@@ -72,6 +72,7 @@ DOMAINS = [
             "scripts/modal-ssr.test.mjs",
             "scripts/navigation-filter.test.mjs",
             "scripts/persona-switch.test.mjs",
+            "scripts/refresh-navigation.test.mjs",
         ],
         "`pnpm test:tools`",
     ),

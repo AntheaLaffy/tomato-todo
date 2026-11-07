@@ -41,9 +41,9 @@ git worktree add ../tomato-ts-<workflow> -b tomato-ts-<workflow>
 ## 架构
 
 - **`packages/core/`**：TypeScript 领域核心——状态机、任务规则、模板印刷、诊断、统计、数据校验。零依赖、vitest 全覆盖；对外 JSON 形状 camelCase，是唯一权威实现。
-- **`runtime/`**：Node runtime（`tomato-runtime`），随插件分发。用 @tomato/core 持域与数据（`plan.json` 原子写）、番茄计时与提醒调度、127.0.0.1 HTTP API（面板只读端点 + `/mcp` streamable HTTP）与 `--mcp` stdio 入口。
-- **`crates/guard/`**：Rust 原生守卫（`tomato-guard`）。专注保护（X11/Wayland/Windows 白名单与锁屏）、通知、托盘、自启。无域无状态，由 runtime 经 HTTP 指挥。
-- **`plugin/`**：DSH 插件包 `@local/tomato-dsh` 源码。host 半：MCP 行（stdio → runtime `--mcp`）、agent 工具、subprocess 保活 runtime；client 半：composer.dock 入口卡 + shell.overlay 面板（今日专注/任务/统计/设置），数据直连 runtime 只读 API。
+- **`runtime/`**：Node runtime（`tomato-runtime`），随插件分发。用 @tomato/core 持域与数据（`plan.json` 原子写）、番茄计时与提醒调度、项目资料库授权、127.0.0.1 HTTP API（面板数据面 + `/mcp` streamable HTTP）与 `--mcp` stdio 入口。
+- **`crates/guard/`**：Rust 原生守卫（`tomato-guard`）。专注保护（X11/Wayland/Windows 白名单与锁屏；niri 直接全屏 DSH）、窗口激活、通知、自启。无域无状态，由 runtime 经 HTTP 指挥。
+- **`plugin/`**：DSH 插件包 `@local/tomato-dsh` 源码。host 半：15 个 `tomato_*` Host 工具（每次一次性 `tomato-runtime --mcp`，经连接文件转发到运行中实例）、随包技能提供者与跨 agent 软链；client 半：九页主视图、composer.dock 入口卡、常驻 HUD/沉浸层，数据直连 runtime。DSH 插件配置不再注册 `tomato-mcp` 客户端。
 - **`desktop-integrations/`**：GNOME Shell 桥接扩展（保留原实现）。
 - **`packaging/` 与 `scripts/`**：安装与发布（systemd user service / autostart、AUR 模板、安装脚本）。
 
@@ -53,8 +53,8 @@ git worktree add ../tomato-ts-<workflow> -b tomato-ts-<workflow>
 
 - **领域核心**：旧 Rust 核心（crates/core）的测试逐条移植为 vitest，语义以旧测试为基准，不做缩水；旧栈已删除，移植口径见 [MIGRATION.md](MIGRATION.md) 阶段 1。
 - **runtime**：`node --test runtime/test/` 覆盖计划文件读写、域引擎接线、计时/提醒、HTTP API 与 MCP 契约；端到端使用独立临时数据目录，不碰用户数据。
-- **守卫**：构建后用独立嵌套桌面验证——白名单放行、非白名单回焦、全屏锁定、托盘与通知。安装脚本验证同样使用临时用户目录。
-- **学习助手 = DSH 对话**：验证走 MCP 工具集成（`--mcp` stdio 与 `/mcp` 两种传输），不花用户模型额度；真实账号、联网与桌面行为由你自测，写清怎么复现。
+- **守卫**：构建后用独立嵌套桌面验证——白名单放行、非白名单回焦、全屏锁定与通知。安装脚本验证同样使用临时用户目录。
+- **学习助手 = DSH 对话**：验证走插件 `tomato_*` Host 工具（每次一次性 `--mcp`）与外部 MCP 两种入口，不花用户模型额度；真实账号、联网与桌面行为由你自测，写清怎么复现。
 
 > **专注保护测试必须在独立的嵌套桌面里跑，不得在用户当前桌面自动启用保护**——它会真锁屏、真切窗口。运行前确认测试脚本自建的 niri/Xvfb 会话与你的桌面是隔离的。
 
