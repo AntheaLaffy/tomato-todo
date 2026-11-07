@@ -119,8 +119,14 @@
    中心栏不透明以保证对话可读；侧栏 `--dsw-specific-sidebar-fill` 偏暖。
 5. **看板娘背景板**（`shell.overlay`，order -990，pointer-events:none）：`settings.personaBackdrop`
    为真时，**每个界面**右下角显示旧版内置立绘（ATRI 官方立绘，权利归原权利方，见
-   `plugin/assets/personas/README.md`；四角色可选，DSH 设置-通用「番茄氛围」里切换）。
-   开启时线描书桌插画退场；沉浸专注层（z70）会盖住它，专注保护界面同样不显示。
+   `plugin/assets/personas/README.md`）。开启时线描书桌插画退场；沉浸专注层（z70）会盖住它，
+   专注保护界面同样不显示。
+   换人不必进设置：指针靠近立绘（外扩 16px）时，左侧浮出一列 42px Q 版头像
+   （`default/calm/coach/senpai.webp`），点选即换；离开约 420ms 收起，路过中间的 12px 缝隙
+   不会闪断。切列 `#tomato-persona-switch` 是 `pointer-events:auto` 的玻璃片，立绘本身仍是
+   `pointer-events:none`（页面点击照常穿过，画布贴边的滚动条也不被挡）。触摸设备没有 hover：
+   `@media (hover:none)` 才把立绘放开成可点，点立绘开合。偏好写 localStorage
+   `tomato-dsh.persona`，与 DSH 设置-通用「番茄氛围」的下拉框共用同一份状态。
 6. **窗光洗层**（`shell.overlay`，order -1000，pointer-events:none）：一层
    `linear-gradient(160deg, #fff2dbb3, transparent 42%, #e7b98f14)`，mix-blend-mode
    `soft-light`，「光落在屏幕上」的细微层次；深色改为 `#ffd9a712` 的左上暖光。

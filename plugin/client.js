@@ -263,25 +263,91 @@ body[data-ds-dark-theme] .t-mask{background:#00000073}
 @media (prefers-reduced-motion:reduce){
   .t-btn,.t-row,.t-navitem,.t-tab,.t-check,.t-input,.t-textarea,.t-iconbtn,
   .t-ring-progress{transition:none!important}
-  .t-mask,.t-modal,.t-fadein,.t-pulse{animation:none!important}
+  .t-mask,.t-modal,.t-fadein,.t-pulse,
+  #tomato-persona,#tomato-persona-switch{animation:none!important}
 }
 
 /* 番茄页接管时，顶部悬浮提醒上移到页面最顶端（没有 DSH 头部了）。 */
 html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
-/* 窄屏不显示看板娘，避免压住正文。 */
+/* ---------- 看板娘 + 角色切换 ----------
+   外层 #tomato-persona-wrap 负责定位（右下角、竖排：切换列在左、立绘在右），
+   立绘本身 pointer-events:none，所以页面点击照常穿过；切换列单独放开点击。
+   桌面靠 pointermove 命中几何区域唤出（见 app/persona.js），触摸设备没有 hover，
+   这里在 hover:none 时放开立绘的 pointer-events，点一下开合。 */
+#tomato-persona-wrap{
+  position:fixed;
+  right:max(10px, 1.6vw);
+  bottom:5vh;
+  display:flex;
+  align-items:flex-end;
+  gap:12px;
+  z-index:30;
+  pointer-events:none;
+  font-family:inherit;
+}
+#tomato-persona{animation:t-persona-in .42s ease both}
+@keyframes t-persona-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+#tomato-persona-switch{
+  pointer-events:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:7px;
+  padding:9px 7px 10px;
+  border-radius:20px;
+  background:var(--tomato-glass, #fffdf7c7);
+  border:1px solid var(--tomato-line);
+  box-shadow:var(--tomato-shadow);
+  backdrop-filter:blur(16px) saturate(1.08);
+  -webkit-backdrop-filter:blur(16px) saturate(1.08);
+  animation:t-persona-pop .2s ease both;
+}
+@keyframes t-persona-pop{from{opacity:0;transform:translate(6px,4px) scale(.96)}to{opacity:1;transform:none}}
+#tomato-persona-switch .t-persona-cap{
+  font-size:10.5px;
+  line-height:1.35;
+  letter-spacing:.06em;
+  color:var(--tomato-ink-3);
+  white-space:nowrap;
+}
+.t-persona-pick{
+  width:42px;height:42px;padding:0;flex:none;
+  border-radius:50%;border:2px solid transparent;
+  background:var(--tomato-surface-2);
+  overflow:hidden;cursor:pointer;
+  transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease;
+}
+.t-persona-pick img{width:100%;height:100%;object-fit:cover;object-position:50% 16%;display:block;
+  transform:scale(1.04)}
+.t-persona-pick:hover{border-color:var(--tomato-line-strong);transform:translateY(-1px)}
+.t-persona-pick[data-active=true]{
+  border-color:var(--tomato-brand);
+  box-shadow:0 0 0 3px var(--tomato-brand-soft);
+}
+.t-persona-pick:focus-visible{outline:2px solid var(--tomato-brand);outline-offset:2px}
+@media (hover:none){
+  #tomato-persona{pointer-events:auto;cursor:pointer}
+  #tomato-persona-wrap{gap:8px}
+}
+
 /* 竖屏/窄窗口：看板娘照样显示，只按窗口收紧尺寸并往右下角让位。 */
 @media (max-width:1500px){
-  #tomato-persona{height:min(36vh, 320px)!important;max-width:26vw!important;bottom:4vh!important}
+  #tomato-persona{height:min(36vh, 320px)!important;max-width:26vw!important}
+  #tomato-persona-wrap{bottom:4vh!important}
 }
 @media (max-width:1100px){
-  #tomato-persona{height:min(28vh, 240px)!important;max-width:32vw!important;right:6px!important;bottom:2vh!important}
+  #tomato-persona{height:min(28vh, 240px)!important;max-width:32vw!important}
+  #tomato-persona-wrap{right:6px!important;bottom:2vh!important}
 }
 @media (max-width:760px){
   #tomato-persona{height:min(21vh, 170px)!important;max-width:38vw!important}
+  .t-persona-pick{width:34px;height:34px}
+  #tomato-persona-switch{padding:6px 5px 7px;gap:5px;border-radius:16px}
+  #tomato-persona-switch .t-persona-cap{font-size:9.5px}
 }
 @media (max-width:520px){
-  #tomato-persona{display:none!important}
+  #tomato-persona-wrap{display:none!important}
 }
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
@@ -2032,6 +2098,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       ryuji: "严格教练",
       minamo: "温柔学姐",
       label: "看板娘",
+      switch: "换一位",
       hint: "选择陪你学习的角色（显示在页面右下角）"
     },
     en: {
@@ -2040,14 +2107,15 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       ryuji: "Strict coach",
       minamo: "Gentle senior",
       label: "Backdrop character",
+      switch: "Switch",
       hint: "The character standing at the lower right while you study"
     }
   });
   var PERSONAS = [
-    { id: "atri", file: "atri.png", nameKey: "persona.atri" },
-    { id: "natsuki", file: "natsuki.png", nameKey: "persona.natsuki" },
-    { id: "ryuji", file: "ryuji.png", nameKey: "persona.ryuji" },
-    { id: "minamo", file: "minamo.png", nameKey: "persona.minamo" }
+    { id: "atri", file: "atri.png", avatar: "default.webp", nameKey: "persona.atri" },
+    { id: "natsuki", file: "natsuki.png", avatar: "calm.webp", nameKey: "persona.natsuki" },
+    { id: "ryuji", file: "ryuji.png", avatar: "coach.webp", nameKey: "persona.ryuji" },
+    { id: "minamo", file: "minamo.png", avatar: "senpai.webp", nameKey: "persona.minamo" }
   ];
   var KEY2 = "tomato-dsh.persona";
   var DEFAULT_ID = "atri";
@@ -2067,6 +2135,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
   function setPersonaId(id) {
     if (!PERSONAS.some((p) => p.id === id)) return;
+    if (id === current3) return;
     current3 = id;
     try {
       localStorage.setItem(KEY2, id);
@@ -2082,6 +2151,47 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const found = PERSONAS.find((p) => p.id === id) ?? PERSONAS[0];
     return found.file;
   }
+  function hit(el, x, y, pad3) {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return false;
+    return x >= r.left - pad3 && x <= r.right + pad3 && y >= r.top - pad3 && y <= r.bottom + pad3;
+  }
+  function PersonaSwitch({ currentId, onPick, panelRef }) {
+    return h(
+      "div",
+      {
+        id: "tomato-persona-switch",
+        ref: panelRef,
+        role: "group",
+        "aria-label": t("persona.label"),
+        onPointerDown: (e) => e.stopPropagation(),
+        onClick: (e) => e.stopPropagation()
+      },
+      h("div", { className: "t-persona-cap" }, t("persona.switch")),
+      PERSONAS.map(
+        (p) => h(
+          "button",
+          {
+            key: p.id,
+            type: "button",
+            className: "t-persona-pick",
+            "data-active": p.id === currentId ? "true" : "false",
+            title: t(p.nameKey),
+            "aria-label": t(p.nameKey),
+            "aria-pressed": p.id === currentId,
+            onClick: () => onPick(p.id)
+          },
+          h("img", {
+            src: ASSET_BASE + p.avatar,
+            alt: "",
+            "aria-hidden": "true",
+            draggable: false
+          })
+        )
+      )
+    );
+  }
   function usePersonaEnabled() {
     const state = useSnapshot();
     const [id, setId] = useState(getPersonaId());
@@ -2095,11 +2205,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     }, [enabled]);
     return enabled ? id : null;
   }
-  function personaStyle(position, opacity = 1) {
+  function personaStyle() {
     return {
-      position,
-      right: "max(10px, 1.6vw)",
-      bottom: "5vh",
+      display: "block",
       height: "min(42vh, 380px)",
       width: "auto",
       maxWidth: "22vw",
@@ -2107,8 +2215,6 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       objectPosition: "bottom right",
       pointerEvents: "none",
       userSelect: "none",
-      zIndex: 1,
-      opacity,
       filter: "drop-shadow(0 16px 26px #3a241524)",
       // 只有左缘（压到卡片的那一段）渐隐，主体完全实心：
       // 0-18% 从透明升到 ~35%，34% 到 85%，44% 之后完全不透明。
@@ -2120,15 +2226,66 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
   function PersonaBackdrop() {
     const id = usePersonaEnabled();
+    const [open, setOpen] = useState(false);
+    const imgRef = useRef(null);
+    const panelRef = useRef(null);
+    const timer = useRef(0);
+    useEffect(() => {
+      if (id === null) {
+        setOpen(false);
+        return void 0;
+      }
+      const onMove = (e) => {
+        if (e.pointerType === "touch") return;
+        const hot = hit(imgRef.current, e.clientX, e.clientY, 16) || hit(panelRef.current, e.clientX, e.clientY, 10);
+        if (hot) {
+          if (timer.current) {
+            window.clearTimeout(timer.current);
+            timer.current = 0;
+          }
+          setOpen(true);
+        } else if (!timer.current) {
+          timer.current = window.setTimeout(() => {
+            timer.current = 0;
+            setOpen(false);
+          }, 420);
+        }
+      };
+      const onKey = (e) => {
+        if (e.key === "Escape") setOpen(false);
+      };
+      window.addEventListener("pointermove", onMove, { passive: true });
+      window.addEventListener("keydown", onKey);
+      return () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("keydown", onKey);
+        if (timer.current) {
+          window.clearTimeout(timer.current);
+          timer.current = 0;
+        }
+      };
+    }, [id]);
     if (id === null) return null;
-    return h("img", {
-      id: "tomato-persona",
-      src: ASSET_BASE + personaFile(id),
-      alt: "",
-      "aria-hidden": "true",
-      draggable: false,
-      style: personaStyle("fixed", 1)
-    });
+    return h(
+      "div",
+      { id: "tomato-persona-wrap" },
+      open ? h(PersonaSwitch, {
+        currentId: id,
+        panelRef,
+        onPick: (next) => setPersonaId(next)
+      }) : null,
+      h("img", {
+        id: "tomato-persona",
+        key: id,
+        ref: imgRef,
+        src: ASSET_BASE + personaFile(id),
+        alt: "",
+        "aria-hidden": "true",
+        draggable: false,
+        onClick: () => setOpen((v) => !v),
+        style: personaStyle()
+      })
+    );
   }
 
   // plugin/src/client/skin/settings-row.js

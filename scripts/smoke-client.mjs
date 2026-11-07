@@ -458,6 +458,11 @@ if (!process.env.SMOKE_LIVE) {
   if (!overlay.includes("开始专注")) failures.push("提醒条没有开始按钮");
   if (overlay.includes("个番茄")) failures.push("提醒浮层里不该出现番茄计数");
   if (!overlay.includes("assets/personas/")) failures.push("看板娘立绘没有渲染");
+  if (!overlay.includes('id="tomato-persona-wrap"')) failures.push("看板娘缺少外层容器（切换列没地方挂）");
+  if (overlay.includes("tomato-persona-board")) failures.push("已删除的页内看板娘又回来了");
+  if ((head.children.find((n) => n.id === "tomato-skin-style") || {}).textContent?.includes?.("#tomato-persona-switch") === false) {
+    failures.push("皮肤样式缺少看板娘切换列");
+  }
   if ((renderedBy["shell.overlay"] || "").includes("该做这件事了")) {
     failures.push("提醒又回到了浮层弹窗");
   }

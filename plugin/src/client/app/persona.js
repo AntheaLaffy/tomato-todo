@@ -2,8 +2,12 @@
 // 见 plugin/assets/personas/README.md）。显示在 DSH 页面右下角，不拦截点击。
 //
 // 与旧版一致：受 settings.personaBackdrop 开关控制（默认关闭；本机数据里是打开的）。
-// 番茄 Todo 全屏接管页与沉浸专注页不显示（那边是线描书桌氛围，避免两套画风打架）。
-import { h, useState, useEffect } from "../runtime.js";
+// 沉浸专注层（z70）盖住它；番茄页接管时仍然显示。
+//
+// 切换：鼠标移到立绘附近，左侧浮出一列 Q 版头像（default/calm/coach/senpai.webp），
+// 点一下就换人——不用进设置。触摸设备没有 hover，直接点立绘开合同一列。
+// 选择存在 localStorage；DSH 设置-通用「番茄氛围」里的下拉框改的是同一个值。
+import { h, useState, useEffect, useRef } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import { useSnapshot } from "../shared/store.js";
 
@@ -14,6 +18,7 @@ registerCopy("persona", {
     ryuji: "严格教练",
     minamo: "温柔学姐",
     label: "看板娘",
+    switch: "换一位",
     hint: "选择陪你学习的角色（显示在页面右下角）",
   },
   en: {
@@ -22,15 +27,16 @@ registerCopy("persona", {
     ryuji: "Strict coach",
     minamo: "Gentle senior",
     label: "Backdrop character",
+    switch: "Switch",
     hint: "The character standing at the lower right while you study",
   },
 });
 
 export const PERSONAS = [
-  { id: "atri", file: "atri.png", nameKey: "persona.atri" },
-  { id: "natsuki", file: "natsuki.png", nameKey: "persona.natsuki" },
-  { id: "ryuji", file: "ryuji.png", nameKey: "persona.ryuji" },
-  { id: "minamo", file: "minamo.png", nameKey: "persona.minamo" },
+  { id: "atri", file: "atri.png", avatar: "default.webp", nameKey: "persona.atri" },
+  { id: "natsuki", file: "natsuki.png", avatar: "calm.webp", nameKey: "persona.natsuki" },
+  { id: "ryuji", file: "ryuji.png", avatar: "coach.webp", nameKey: "persona.ryuji" },
+  { id: "minamo", file: "minamo.png", avatar: "senpai.webp", nameKey: "persona.minamo" },
 ];
 
 const KEY = "tomato-dsh.persona";
@@ -56,6 +62,7 @@ export function getPersonaId() {
 
 export function setPersonaId(id) {
   if (!PERSONAS.some((p) => p.id === id)) return;
+  if (id === current) return;
   current = id;
   try {
     localStorage.setItem(KEY, id);
@@ -73,6 +80,55 @@ export function subscribePersona(fn) {
 export function personaFile(id = current) {
   const found = PERSONAS.find((p) => p.id === id) ?? PERSONAS[0];
   return found.file;
+}
+
+export function personaAvatar(id = current) {
+  const found = PERSONAS.find((p) => p.id === id) ?? PERSONAS[0];
+  return found.avatar;
+}
+
+/** 在矩形内、外扩 pad 像素（看板娘没有可点区域，用几何命中代替 hover 命不中的问题）。 */
+function hit(el, x, y, pad) {
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return false;
+  return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+}
+
+export function PersonaSwitch({ currentId, onPick, panelRef }) {
+  return h(
+    "div",
+    {
+      id: "tomato-persona-switch",
+      ref: panelRef,
+      role: "group",
+      "aria-label": t("persona.label"),
+      onPointerDown: (e) => e.stopPropagation(),
+      onClick: (e) => e.stopPropagation(),
+    },
+    h("div", { className: "t-persona-cap" }, t("persona.switch")),
+    PERSONAS.map((p) =>
+      h(
+        "button",
+        {
+          key: p.id,
+          type: "button",
+          className: "t-persona-pick",
+          "data-active": p.id === currentId ? "true" : "false",
+          title: t(p.nameKey),
+          "aria-label": t(p.nameKey),
+          "aria-pressed": p.id === currentId,
+          onClick: () => onPick(p.id),
+        },
+        h("img", {
+          src: ASSET_BASE + p.avatar,
+          alt: "",
+          "aria-hidden": "true",
+          draggable: false,
+        }),
+      ),
+    ),
+  );
 }
 
 function usePersonaEnabled() {
@@ -94,16 +150,10 @@ function usePersonaEnabled() {
   return enabled ? id : null;
 }
 
-/**
- * 立绘样式。
- * - 番茄页（absolute，卡片后面）：实心，被卡片挡住的地方自然不可见。
- * - DSH 页面（fixed，浮在内容上）：整体半透明，像水印一样不挡内容。
- */
-function personaStyle(position, opacity = 1) {
+/** 立绘样式（位置由外层 #tomato-persona-wrap 决定，方便在它左边挂切换列）。 */
+function personaStyle() {
   return {
-    position,
-    right: "max(10px, 1.6vw)",
-    bottom: "5vh",
+    display: "block",
     height: "min(42vh, 380px)",
     width: "auto",
     maxWidth: "22vw",
@@ -111,8 +161,6 @@ function personaStyle(position, opacity = 1) {
     objectPosition: "bottom right",
     pointerEvents: "none",
     userSelect: "none",
-    zIndex: 1,
-    opacity,
     filter: "drop-shadow(0 16px 26px #3a241524)",
     // 只有左缘（压到卡片的那一段）渐隐，主体完全实心：
     // 0-18% 从透明升到 ~35%，34% 到 85%，44% 之后完全不透明。
@@ -126,36 +174,80 @@ function personaStyle(position, opacity = 1) {
 }
 
 /**
- * DSH 页面（对话/插件页等）的看板娘：挂在 shell.overlay 上，右下方、不拦点击。
- * 番茄页接管时由 CSS 隐藏——那边用页面内的 PersonaBoard（在卡片后面）。
+ * DSH 所有界面（含番茄接管页）右下角的看板娘 + 角色切换。
+ *
+ * 交互：
+ * - 桌面：指针靠近立绘（外扩 16px）或切换列时，列淡入；离开约 420ms 后收起，
+ *   中途路过那 12px 缝隙不会闪断。
+ * - 触摸：立绘可点（CSS 在 hover:none 时才放开 pointer-events），点开/点收。
+ * - Esc 收起。
  */
 export function PersonaBackdrop() {
   const id = usePersonaEnabled();
-  if (id === null) return null;
-  return h("img", {
-    id: "tomato-persona",
-    src: ASSET_BASE + personaFile(id),
-    alt: "",
-    "aria-hidden": "true",
-    draggable: false,
-    style: personaStyle("fixed", 1),
-  });
-}
+  const [open, setOpen] = useState(false);
+  const imgRef = useRef(null);
+  const panelRef = useRef(null);
+  const timer = useRef(0);
 
-/**
- * 番茄主视图内的看板娘：作为页面最底层（z-index 0）的 img 绝对定位在右下角，
- * 卡片（z-index 1，纸色不透明）自然把它盖住——于是「碰到卡片」的地方看不见，
- * 没被盖住的部分完全实心。这就是旧版背景板的真实行为。
- */
-export function PersonaBoard() {
-  const id = usePersonaEnabled();
+  useEffect(() => {
+    if (id === null) {
+      setOpen(false);
+      return undefined;
+    }
+    const onMove = (e) => {
+      if (e.pointerType === "touch") return;
+      const hot = hit(imgRef.current, e.clientX, e.clientY, 16) ||
+        hit(panelRef.current, e.clientX, e.clientY, 10);
+      if (hot) {
+        if (timer.current) {
+          window.clearTimeout(timer.current);
+          timer.current = 0;
+        }
+        setOpen(true);
+      } else if (!timer.current) {
+        timer.current = window.setTimeout(() => {
+          timer.current = 0;
+          setOpen(false);
+        }, 420);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("keydown", onKey);
+      if (timer.current) {
+        window.clearTimeout(timer.current);
+        timer.current = 0;
+      }
+    };
+  }, [id]);
+
   if (id === null) return null;
-  return h("img", {
-    id: "tomato-persona-board",
-    src: ASSET_BASE + personaFile(id),
-    alt: "",
-    "aria-hidden": "true",
-    draggable: false,
-    style: { ...personaStyle("absolute", 1), zIndex: 0 },
-  });
+
+  return h(
+    "div",
+    { id: "tomato-persona-wrap" },
+    open
+      ? h(PersonaSwitch, {
+          currentId: id,
+          panelRef,
+          onPick: (next) => setPersonaId(next),
+        })
+      : null,
+    h("img", {
+      id: "tomato-persona",
+      key: id,
+      ref: imgRef,
+      src: ASSET_BASE + personaFile(id),
+      alt: "",
+      "aria-hidden": "true",
+      draggable: false,
+      onClick: () => setOpen((v) => !v),
+      style: personaStyle(),
+    }),
+  );
 }

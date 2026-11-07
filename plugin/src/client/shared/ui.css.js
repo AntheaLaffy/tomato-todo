@@ -132,25 +132,91 @@ body[data-ds-dark-theme] .t-mask{background:#00000073}
 @media (prefers-reduced-motion:reduce){
   .t-btn,.t-row,.t-navitem,.t-tab,.t-check,.t-input,.t-textarea,.t-iconbtn,
   .t-ring-progress{transition:none!important}
-  .t-mask,.t-modal,.t-fadein,.t-pulse{animation:none!important}
+  .t-mask,.t-modal,.t-fadein,.t-pulse,
+  #tomato-persona,#tomato-persona-switch{animation:none!important}
 }
 
 /* 番茄页接管时，顶部悬浮提醒上移到页面最顶端（没有 DSH 头部了）。 */
 html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
-/* 窄屏不显示看板娘，避免压住正文。 */
+/* ---------- 看板娘 + 角色切换 ----------
+   外层 #tomato-persona-wrap 负责定位（右下角、竖排：切换列在左、立绘在右），
+   立绘本身 pointer-events:none，所以页面点击照常穿过；切换列单独放开点击。
+   桌面靠 pointermove 命中几何区域唤出（见 app/persona.js），触摸设备没有 hover，
+   这里在 hover:none 时放开立绘的 pointer-events，点一下开合。 */
+#tomato-persona-wrap{
+  position:fixed;
+  right:max(10px, 1.6vw);
+  bottom:5vh;
+  display:flex;
+  align-items:flex-end;
+  gap:12px;
+  z-index:30;
+  pointer-events:none;
+  font-family:inherit;
+}
+#tomato-persona{animation:t-persona-in .42s ease both}
+@keyframes t-persona-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+#tomato-persona-switch{
+  pointer-events:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:7px;
+  padding:9px 7px 10px;
+  border-radius:20px;
+  background:var(--tomato-glass, #fffdf7c7);
+  border:1px solid var(--tomato-line);
+  box-shadow:var(--tomato-shadow);
+  backdrop-filter:blur(16px) saturate(1.08);
+  -webkit-backdrop-filter:blur(16px) saturate(1.08);
+  animation:t-persona-pop .2s ease both;
+}
+@keyframes t-persona-pop{from{opacity:0;transform:translate(6px,4px) scale(.96)}to{opacity:1;transform:none}}
+#tomato-persona-switch .t-persona-cap{
+  font-size:10.5px;
+  line-height:1.35;
+  letter-spacing:.06em;
+  color:var(--tomato-ink-3);
+  white-space:nowrap;
+}
+.t-persona-pick{
+  width:42px;height:42px;padding:0;flex:none;
+  border-radius:50%;border:2px solid transparent;
+  background:var(--tomato-surface-2);
+  overflow:hidden;cursor:pointer;
+  transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease;
+}
+.t-persona-pick img{width:100%;height:100%;object-fit:cover;object-position:50% 16%;display:block;
+  transform:scale(1.04)}
+.t-persona-pick:hover{border-color:var(--tomato-line-strong);transform:translateY(-1px)}
+.t-persona-pick[data-active=true]{
+  border-color:var(--tomato-brand);
+  box-shadow:0 0 0 3px var(--tomato-brand-soft);
+}
+.t-persona-pick:focus-visible{outline:2px solid var(--tomato-brand);outline-offset:2px}
+@media (hover:none){
+  #tomato-persona{pointer-events:auto;cursor:pointer}
+  #tomato-persona-wrap{gap:8px}
+}
+
 /* 竖屏/窄窗口：看板娘照样显示，只按窗口收紧尺寸并往右下角让位。 */
 @media (max-width:1500px){
-  #tomato-persona{height:min(36vh, 320px)!important;max-width:26vw!important;bottom:4vh!important}
+  #tomato-persona{height:min(36vh, 320px)!important;max-width:26vw!important}
+  #tomato-persona-wrap{bottom:4vh!important}
 }
 @media (max-width:1100px){
-  #tomato-persona{height:min(28vh, 240px)!important;max-width:32vw!important;right:6px!important;bottom:2vh!important}
+  #tomato-persona{height:min(28vh, 240px)!important;max-width:32vw!important}
+  #tomato-persona-wrap{right:6px!important;bottom:2vh!important}
 }
 @media (max-width:760px){
   #tomato-persona{height:min(21vh, 170px)!important;max-width:38vw!important}
+  .t-persona-pick{width:34px;height:34px}
+  #tomato-persona-switch{padding:6px 5px 7px;gap:5px;border-radius:16px}
+  #tomato-persona-switch .t-persona-cap{font-size:9.5px}
 }
 @media (max-width:520px){
-  #tomato-persona{display:none!important}
+  #tomato-persona-wrap{display:none!important}
 }
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
