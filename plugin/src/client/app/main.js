@@ -37,6 +37,16 @@ function localeId(locale) {
   }
 }
 
+/** 侧栏面板图标：面板列表槽位里的番茄徽记（跟随选中态加深）。 */
+function PanelIcon({ size, active }) {
+  return h(Icon, {
+    name: "tomato",
+    size: size || 20,
+    stroke: active ? 1.8 : 1.5,
+    style: { color: active ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" },
+  });
+}
+
 export function registerApp(ctx) {
   const locale = ctx.get ? ctx.get("locale") : null;
   setLocale(localeId(locale));
@@ -132,6 +142,14 @@ export function registerApp(ctx) {
   };
 
   safeInject("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
+
+  // 面板列表里保留番茄图标（DSH 的 sidebar.panellist 只渲染在左上那一组，
+  // 无法挪到列表底部）；底部的「番茄 Todo · N/M →」是另一个槽位，见下方 footer。
+  safeInject(
+    "sidebar.panellist",
+    { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
+    PanelIcon,
+  );
 
   safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-overlay", order: 900 }, () =>
     h(AppOverlay, { openPanel }),

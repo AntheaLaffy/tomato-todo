@@ -18984,6 +18984,14 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       return "zh";
     }
   }
+  function PanelIcon({ size, active: active2 }) {
+    return h(Icon, {
+      name: "tomato",
+      size: size || 20,
+      stroke: active2 ? 1.8 : 1.5,
+      style: { color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" }
+    });
+  }
   function registerApp(ctx) {
     const locale = ctx.get ? ctx.get("locale") : null;
     setLocale(localeId(locale));
@@ -19059,6 +19067,11 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       }
     };
     safeInject2("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
+    safeInject2(
+      "sidebar.panellist",
+      { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
+      PanelIcon
+    );
     safeInject2(
       "shell.overlay",
       { name: "shell.overlay", id: "tomato-overlay", order: 900 },
