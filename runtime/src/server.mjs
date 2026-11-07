@@ -15,6 +15,7 @@
 //   agent/connection.json），拒绝任何带 Origin 的请求；GET/SSE 未实现。
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
+import { relative, sep } from "node:path";
 import {
   createReadStream,
   fstatSync,
@@ -572,16 +573,37 @@ async function handleApi(req, res, url, ctx) {
       const current = currentLibraryIndex(library);
       const projectId = url.searchParams.get("projectId");
       let tops = null;
+      let prefix = "";
       let matchedDirs = [];
       if (projectId !== null && projectId !== "") {
         const project = library.project(projectId);
-        const topLevels = [
-          ...new Set(
-            (current.index?.items ?? []).map((item) => topLevelOf(item.path)),
-          ),
-        ];
-        matchedDirs = topLevelsForProject(project, topLevels) ?? [];
-        if (matchedDirs.length > 0) tops = matchedDirs;
+        // 优先用「项目挂载点相对库根的前缀」；这才是导入时真正使用的范围。
+        // 只有项目目录不在共享库内（或没有共享库）时才退回按名称匹配顶层目录。
+        const mounted = library.grantStatus(projectId);
+        const libraryRoot = library.libraryStatus().directory;
+        if (
+          mounted.authorized &&
+          libraryRoot &&
+          mounted.directory !== libraryRoot
+        ) {
+          try {
+            const rel = relative(libraryRoot, mounted.directory);
+            if (!rel.startsWith("..")) prefix = rel.split(sep).join("/");
+          } catch {
+            prefix = "";
+          }
+        }
+        if (prefix === "") {
+          const topLevels = [
+            ...new Set(
+              (current.index?.items ?? []).map((item) => topLevelOf(item.path)),
+            ),
+          ];
+          matchedDirs = topLevelsForProject(project, topLevels) ?? [];
+          if (matchedDirs.length > 0) tops = matchedDirs;
+        } else {
+          matchedDirs = prefix.split("/").filter(Boolean).slice(0, 1);
+        }
       }
       const result = searchIndex(current.index, {
         q: url.searchParams.get("q") ?? "",
@@ -589,12 +611,13 @@ async function handleApi(req, res, url, ctx) {
         offset: Number(url.searchParams.get("offset") ?? 0),
         limit: Number(url.searchParams.get("limit") ?? 40),
         tops,
+        prefix,
       });
       return sendApi(res, 200, {
         authorized: current.authorized === true,
         hasIndex: current.index !== null,
         ...(current.stale ? { stale: true } : {}),
-        filtered: tops !== null,
+        filtered: tops !== null || prefix !== "",
         matchedDirs,
         total: result.total,
         offset: result.offset,

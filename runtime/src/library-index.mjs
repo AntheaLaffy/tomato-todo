@@ -419,7 +419,7 @@ export function summarize(index) {
  */
 export function searchIndex(
   index,
-  { q = "", kind = "", offset = 0, limit = 40, tops = null } = {},
+  { q = "", kind = "", offset = 0, limit = 40, tops = null, prefix = "" } = {},
 ) {
   if (
     !Number.isInteger(offset) ||
@@ -434,8 +434,19 @@ export function searchIndex(
   const wanted = String(kind).trim().toLocaleLowerCase();
   const topSet = Array.isArray(tops) ? new Set(tops) : null;
   const matched = [];
+  const prefixBase = String(prefix ?? "")
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "");
   for (const item of Array.isArray(index?.items) ? index.items : []) {
     if (topSet !== null && !topSet.has(topLevelOf(item.path))) continue;
+    // 项目只授权库内子目录时，列表必须和导入用同一个前缀判据，否则会出现
+    // 「列表显示整库、导入只进子目录」这种自相矛盾的计数。
+    if (
+      prefixBase !== "" &&
+      item.path !== prefixBase &&
+      !item.path.startsWith(prefixBase + "/")
+    )
+      continue;
     if (wanted !== "") {
       if (INDEX_KINDS.includes(wanted)) {
         if (groupForExtension(item.ext) !== wanted) continue;

@@ -196,6 +196,22 @@ export function registerProjectResource(id, resource, opts) {
   });
 }
 
+/**
+ * 按资料库索引整批登记；`paths` 省略时由 runtime 取该项目目录内全部。
+ * 返回 {registered, skipped, considered}：skipped 是按 path 已登记过的条目。
+ */
+export function importProjectResources(id, { paths } = {}, opts) {
+  return request(
+    "/api/projects/" + encodeURIComponent(id) + "/resources/import",
+    {
+      method: "POST",
+      body: Array.isArray(paths) ? { paths } : {},
+      timeoutMs: 60000,
+      ...opts,
+    },
+  );
+}
+
 /** 清理失效登记；省略 ids 时清理所有「仍缺失且无教学引用」的条目。 */
 export function cleanupProjectResources(id, ids, opts) {
   return request(
