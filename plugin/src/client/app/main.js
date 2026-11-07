@@ -27,16 +27,6 @@ import { SidebarTomatoProgress } from "./sidebar-progress.js";
 import "./nav-copy.js";
 import "../pages/index.js";
 
-/** 侧栏面板图标：跟随选中态改成品牌色。 */
-function PanelIcon({ size, active }) {
-  return h(Icon, {
-    name: "tomato",
-    size: size || 20,
-    stroke: active ? 1.8 : 1.5,
-    style: { color: active ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" },
-  });
-}
-
 function localeId(locale) {
   try {
     const snapshot = locale && typeof locale.getLocale === "function" ? locale.getLocale() : null;
@@ -142,12 +132,6 @@ export function registerApp(ctx) {
   };
 
   safeInject("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
-
-  safeInject(
-    "sidebar.panellist",
-    { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
-    PanelIcon,
-  );
 
   safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-overlay", order: 900 }, () =>
     h(AppOverlay, { openPanel }),

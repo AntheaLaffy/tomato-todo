@@ -5081,7 +5081,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           display: "flex",
           alignItems: "center",
           gap: 8,
-          height: 30,
+          height: 32,
           padding: wide ? "0 8px" : 0,
           width: wide ? "100%" : 30,
           justifyContent: wide ? "flex-start" : "center",
@@ -5105,7 +5105,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           e.currentTarget.style.color = "var(--tomato-ink-2)";
         }
       },
-      h(Icon, { name: "tomato", size: 16, stroke: 1.5, style: { color: "var(--tomato-brand)", flex: "none" } }),
+      h(Icon, { name: "tomato", size: 17, stroke: 1.5, style: { color: "var(--tomato-brand)", flex: "none" } }),
       wide ? h(
         "span",
         {
@@ -5115,7 +5115,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            fontWeight: 550
+            fontWeight: 550,
+            fontSize: 13
           }
         },
         t("side.label")
@@ -5140,7 +5141,12 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           }
         },
         view.running ? fmtClock(view.remainingSecs) : `${done}/${goal}`
-      )
+      ),
+      wide ? h(Icon, {
+        name: "arrowRight",
+        size: 13,
+        style: { opacity: 0.45, flex: "none" }
+      }) : null
     );
   }
 
@@ -18969,14 +18975,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   });
 
   // plugin/src/client/app/main.js
-  function PanelIcon({ size, active: active2 }) {
-    return h(Icon, {
-      name: "tomato",
-      size: size || 20,
-      stroke: active2 ? 1.8 : 1.5,
-      style: { color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-brand)" }
-    });
-  }
   function localeId(locale) {
     try {
       const snapshot2 = locale && typeof locale.getLocale === "function" ? locale.getLocale() : null;
@@ -19061,11 +19059,6 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       }
     };
     safeInject2("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
-    safeInject2(
-      "sidebar.panellist",
-      { name: "sidebar.panellist", id: "tomato", order: 5, label: () => "番茄 Todo" },
-      PanelIcon
-    );
     safeInject2(
       "shell.overlay",
       { name: "shell.overlay", id: "tomato-overlay", order: 900 },

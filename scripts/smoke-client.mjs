@@ -236,7 +236,6 @@ try {
 
 const expectedSlots = [
   "main",
-  "sidebar.panellist",
   "shell.overlay",
   "conversation.composer.dock",
   "sidebar.brand.mark",
