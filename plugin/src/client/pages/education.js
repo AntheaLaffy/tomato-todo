@@ -1091,6 +1091,7 @@ function TeachingTaskRow({
     h(
       "div",
       {
+        key: "title",
         style: {
           fontSize: 13.5,
           color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
@@ -1104,7 +1105,7 @@ function TeachingTaskRow({
     ),
     h(
       "div",
-      { style: META },
+      { key: "meta", style: META },
       h(
         Chip,
         { tone: "neutral" },
@@ -1179,6 +1180,7 @@ function AssessmentRow({ assessment, index, at, onAssistant, onOpen }) {
     h(
       "div",
       {
+        key: "title",
         style: {
           fontSize: 13,
           color: "var(--tomato-ink)",
@@ -1191,7 +1193,7 @@ function AssessmentRow({ assessment, index, at, onAssistant, onOpen }) {
     ),
     h(
       "div",
-      { style: META },
+      { key: "meta", style: META },
       h(Chip, { tone: "neutral" }, assessmentKindLabel(assessment.kind)),
       h("span", null, fmtRange(assessment.startsAt, assessment.endsAt)),
       h(
@@ -1253,6 +1255,7 @@ function ProjectTaskRow({ task, onToggle, target = null, onOpen }) {
     h(
       "div",
       {
+        key: "title",
         style: {
           fontSize: 13,
           color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
@@ -1266,7 +1269,7 @@ function ProjectTaskRow({ task, onToggle, target = null, onOpen }) {
     ),
     h(
       "div",
-      { style: META },
+      { key: "meta", style: META },
       task.dueDate ? h("span", null, String(task.dueDate)) : null,
       strOr(task.reminderTime)
         ? h(

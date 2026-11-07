@@ -52,6 +52,7 @@ import {
 import { registerPage } from "../app/registry.js";
 import { setActivePageId } from "../app/navigation.js";
 import { TaskDialog } from "./task-dialog.js";
+import { AssignmentDialog, teachingTargetOf } from "./assignment-dialog.js";
 import { SearchDialog, useSearchHotkey } from "./search.js";
 import { AMBIENCE_KINDS, useAmbience } from "../app/sound.js";
 import { openImmersive } from "../app/immersive.js";
@@ -931,6 +932,9 @@ function TaskRow({ task, data, today, view, busy, actions }) {
   const catchUpFlag = isCatchUp(data, task, today);
   const activeTimer = !!view.running && view.taskId === task.id;
   const done = !!task.completed;
+  // 教学任务（作业/课程）点开工作台，普通任务仍点开编辑。
+  const target = teachingTargetOf(data, task);
+  const teaching = target !== null;
 
   return h(
     "div",
@@ -954,19 +958,27 @@ function TaskRow({ task, data, today, view, busy, actions }) {
             : undefined,
       },
     },
-    h(Check, {
-      checked: done,
-      label: done
-        ? t("focus.taskUncheck", { title: task.title || t("focus.untitled") })
-        : t("focus.taskCheck", { title: task.title || t("focus.untitled") }),
-      disabled: busy,
-      onChange: () => actions.toggle(task),
-    }),
+    teaching
+      ? null
+      : h(Check, {
+          checked: done,
+          label: done
+            ? t("focus.taskUncheck", {
+                title: task.title || t("focus.untitled"),
+              })
+            : t("focus.taskCheck", {
+                title: task.title || t("focus.untitled"),
+              }),
+          disabled: busy,
+          onChange: () => actions.toggle(task),
+        }),
     h(
       "button",
       {
         type: "button",
-        onClick: () => actions.edit(task),
+        title: teaching ? t("education.openWorkbench") : undefined,
+        onClick: () =>
+          teaching ? actions.openAssignment(target) : actions.edit(task),
         style: {
           flex: 1,
           minWidth: 0,
@@ -1055,47 +1067,52 @@ function TaskRow({ task, data, today, view, busy, actions }) {
                 }),
             onClick: () => actions.play(task),
           }),
-      h(IconBtn, {
-        name: "more",
-        size: 16,
-        box: 28,
-        title: t("focus.taskMore", {
-          title: task.title || t("focus.untitled"),
-        }),
-        onClick: () => setMenuOpen((open) => !open),
-      }),
-      h(Dropdown, {
-        open: menuOpen,
-        align: "right",
-        width: 188,
-        onClose: () => setMenuOpen(false),
-        items: [
-          {
-            id: "edit",
-            label: t("common.edit"),
-            icon: "edit",
-            onClick: () => actions.edit(task),
-          },
-          ...(done
-            ? []
-            : [
-                {
-                  id: "focus",
-                  label: t("focus.menuFocus"),
-                  icon: "play",
-                  onClick: () => actions.play(task),
-                },
-              ]),
-          { divider: true },
-          {
-            id: "delete",
-            label: t("common.delete"),
-            icon: "trash",
-            danger: true,
-            onClick: () => actions.remove(task),
-          },
-        ],
-      }),
+      // 应试任务不提供编辑/删除：它们由助手发布，改了也不会写回教学记录。
+      teaching
+        ? null
+        : h(IconBtn, {
+            name: "more",
+            size: 16,
+            box: 28,
+            title: t("focus.taskMore", {
+              title: task.title || t("focus.untitled"),
+            }),
+            onClick: () => setMenuOpen((open) => !open),
+          }),
+      teaching
+        ? null
+        : h(Dropdown, {
+            open: menuOpen,
+            align: "right",
+            width: 188,
+            onClose: () => setMenuOpen(false),
+            items: [
+              {
+                id: "edit",
+                label: t("common.edit"),
+                icon: "edit",
+                onClick: () => actions.edit(task),
+              },
+              ...(done
+                ? []
+                : [
+                    {
+                      id: "focus",
+                      label: t("focus.menuFocus"),
+                      icon: "play",
+                      onClick: () => actions.play(task),
+                    },
+                  ]),
+              { divider: true },
+              {
+                id: "delete",
+                label: t("common.delete"),
+                icon: "trash",
+                danger: true,
+                onClick: () => actions.remove(task),
+              },
+            ],
+          }),
     ),
   );
 }
@@ -2024,6 +2041,8 @@ export function FocusPage(props = {}) {
   const [catchUpOpen, setCatchUpOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [busy, setBusy] = useState(false);
+  // 教学任务的作业/课程工作台；普通任务仍走 TaskDialog。
+  const [assignment, setAssignment] = useState(null);
   const amb = useAmbience();
 
   useSearchHotkey(() => setSearchOpen(true));
@@ -2147,6 +2166,7 @@ export function FocusPage(props = {}) {
     play: playTask,
     remove: (task) => setDeleteTarget(task),
     quickAdd: openNew,
+    openAssignment: (target) => setAssignment(target),
   };
 
   const confirmDelete = async () => {
@@ -2316,6 +2336,15 @@ export function FocusPage(props = {}) {
       busy,
       onClose: () => setDeleteTarget(null),
       onConfirm: confirmDelete,
+    }),
+    h(AssignmentDialog, {
+      open: assignment !== null,
+      onClose: () => setAssignment(null),
+      assessmentId: assignment ? (assignment.assessmentId ?? null) : null,
+      lessonId: assignment ? (assignment.lessonId ?? null) : null,
+      data,
+      today,
+      now: (state && state.serverTime) || null,
     }),
   );
 }

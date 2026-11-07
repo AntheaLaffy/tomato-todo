@@ -578,6 +578,10 @@ if (!process.env.SMOKE_LIVE) {
     ],
     // 作业工作台的 fixture：题目 sourceIds 与项目考纲都指向真实的资源记录，
     // 这样 SSR 渲染（不跑 effect、没有文件令牌）也能列出资料与下载按钮。
+    // t1 是今天的语法任务，挂到作业上：项目页/今日专注都应改开工作台。
+    focusTasks: [
+      { taskId: "t1", sourceId: "homework-to-submit", kind: "homework" },
+    ],
     resources: [
       {
         id: "res-grammar",
@@ -818,6 +822,8 @@ for (const pageId of PAGE_IDS) {
       if (!markup.includes("另有 1 件逾期任务"))
         failures.push("今日专注没有逾期提示");
       if (markup.includes("已逾期")) failures.push("今日专注混入了逾期任务行");
+      if (!markup.includes("打开任务详情"))
+        failures.push("今日专注的教学任务没有工作台入口");
     }
   } catch (e) {
     failures.push(
