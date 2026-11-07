@@ -139,12 +139,10 @@ body[data-ds-dark-theme] .t-mask{background:#00000073}
 html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
 /* 窄屏不显示看板娘，避免压住正文。 */
-@media (max-width:1500px){#tomato-persona{display:none!important}}
+@media (max-width:1100px){#tomato-persona{display:none!important}}
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
-/* 看板娘开启时：内容最大宽度收紧到刚好不压立绘（不再用大块右侧留白），
-   这样卡片右边缘贴着立绘左侧，不会出现大片空地。 */
-html[data-tomato-persona=on] .t-appcontent{max-width:min(1180px, calc(100vw - 860px))!important}
+/* 看板娘是悬浮装饰：卡片保持居中，立绘左缘用渐隐遮罩，碰到卡片处自然透明。 */
 
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,

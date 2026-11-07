@@ -270,12 +270,10 @@ body[data-ds-dark-theme] .t-mask{background:#00000073}
 html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
 /* 窄屏不显示看板娘，避免压住正文。 */
-@media (max-width:1500px){#tomato-persona{display:none!important}}
+@media (max-width:1100px){#tomato-persona{display:none!important}}
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
-/* 看板娘开启时：内容最大宽度收紧到刚好不压立绘（不再用大块右侧留白），
-   这样卡片右边缘贴着立绘左侧，不会出现大片空地。 */
-html[data-tomato-persona=on] .t-appcontent{max-width:min(1180px, calc(100vw - 860px))!important}
+/* 看板娘是悬浮装饰：卡片保持居中，立绘左缘用渐隐遮罩，碰到卡片处自然透明。 */
 
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,
@@ -2098,9 +2096,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         zIndex: 1,
         opacity: 0.94,
         filter: "drop-shadow(0 14px 24px #3a24151a)",
-        WebkitMaskImage: "linear-gradient(to top, transparent 0%, #000 9%), linear-gradient(to left, #000 55%, transparent 100%)",
+        // 左缘渐隐（叠在卡片上的部分接近透明）+ 下缘轻微淡出，像背景板而不是贴纸。
+        WebkitMaskImage: "linear-gradient(to right, transparent 0%, #0006 16%, #000c 34%, #000 52%), linear-gradient(to top, transparent 0%, #000 8%)",
         WebkitMaskComposite: "source-in",
-        maskImage: "linear-gradient(to top, transparent 0%, #000 9%), linear-gradient(to left, #000 55%, transparent 100%)",
+        maskImage: "linear-gradient(to right, transparent 0%, #0006 16%, #000c 34%, #000 52%), linear-gradient(to top, transparent 0%, #000 8%)",
         maskComposite: "intersect"
       }
     });
