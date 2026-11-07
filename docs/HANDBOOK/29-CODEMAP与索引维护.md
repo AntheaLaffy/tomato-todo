@@ -1,6 +1,6 @@
 # 域：CODEMAP 与索引维护（导航资产怎么活）
 
-> 手册章节 ｜ 最后核对：v0.12.0（2026-11-02）｜ 更新时机：新增/移动文件、调整目录职责、更新 CODEMAP 或 `.analysis.md` 索引时
+> 手册章节 ｜ 最后核对：v0.13.0（2026-11-07）｜ 更新时机：新增/移动文件、调整目录职责、更新 CODEMAP 时
 > 事实一律以当前代码为准；本章每条事实都标了出处，核对时先看那一行。
 > 导航：文件与阅读顺序见 [04-导航对照](04-导航对照.md)（维护者附录）与 [CODEMAP](../../CODEMAP.md)。
 > 验证：本章没有自动化测试背书（索引/流程类资产，靠维护者核对，见 F 段）。
@@ -9,8 +9,8 @@
 
 | # | 事实 | 出处 |
 | --- | --- | --- |
-| 1 | 每级目录一份 `CODEMAP.md`；单文件超过 1000 行时配 `<文件名>.analysis.md` | `.agents/skills/codemap/SKILL.md` |
-| 2 | 大文件通过 companion analysis 提供功能行段与符号入口；界面索引见 `src/main.ts.analysis.md` 与 `src/style.css.analysis.md` | 对应 `.analysis.md` |
+| 1 | 每级目录一份 `CODEMAP.md`；单文件超过 1000 行时配 `<文件名>.analysis.md`（重构后目前没有任何 `.analysis.md`：大文件靠章节与 CODEMAP 定位） | `.agents/skills/codemap/SKILL.md`；仓库现状 |
+| 2 | 需要 companion analysis 时，它给功能行段与符号入口；当前两个上千行的规则文件 `packages/core/src/lib.ts`、`education.ts` 直接靠 CODEMAP 与章节导航 | 根 `CODEMAP.md` 的文件表 |
 | 3 | 地图包含四段结构：Scope and Exclusions、任务指南（Target / Also Check）、子目录、文件 | 根 `CODEMAP.md` 与各级 `CODEMAP.md` |
 | 4 | 导航顺序由协议规定：先匹配任务指南的 Target，再按 Domain 下钻；大文件先看 Feature Index 的行段 | `AGENTS.md`「CODEMAP Navigation Protocol」 |
 | 5 | **每个纳入的文件在一个地图里恰好有一行归属**；地图与 companion analysis 本身不递归纳入 | `SKILL.md`「Inventory and scope」 |
@@ -21,10 +21,10 @@
 | 10 | 地图是索引产物，不参与递归清单；改动结构后要求同步受影响的局部地图 | `AGENTS.md` 同节 + `project-maintenance` 技能 |
 | 11 | 手册与地图分工：地图负责「改哪动哪」，手册负责「机制与规则」；对应关系记在 [04-导航对照](04-导航对照.md) | 本手册 `00-读法与约定`、`04-导航对照` |
 | 12 | 地图与手册都有生成/校验脚本兜底：手册侧是 `scripts/check-handbook.py`（含「04 附录里的文件必须存在」），地图侧是维护者技能与人工核对 | `scripts/check-handbook.py` |
-| 13 | `.analysis.md` **没有生成脚本**：规则写在 codemap 技能里（只对超过 1000 行的文件配一份），刷新由维护者或编码智能体手工完成 | `.agents/skills/codemap/SKILL.md`、`references/format.md`（第 65 行） |
+| 13 | `.analysis.md` **没有生成脚本**：规则写在 codemap 技能里（只对超过 1000 行的文件配一份），刷新由维护者或编码智能体手工完成 | `.agents/skills/codemap/SKILL.md` 的 references |
 | 14 | 地图类文件在维护报告里**单列**，且「记录文件自身不进入指纹」——它们是被跟踪的索引资产，不是源码 | `.agents/skills/project-maintenance/references/verification.md`（第 46 行） |
-| 15 | 目前共 **16 个 `CODEMAP.md`**：根 1、`.github` 2（含 releases）、`crates` 4（含 core/src、preview/src）、`docs` 1、`scripts` 1、`src-tauri` 2、`src` 1、`tests` 2（含 fixtures） | 仓库现状（`find -name CODEMAP.md`） |
-| 16 | CI 里**只有手册侧校验**（`python3 scripts/check-handbook.py`），没有地图一致性兜底：文件移动后地图是否同步，目前靠维护流程与评审把关 | `.github/workflows/ci.yml:74` |
+| 15 | 目前共 **10 个 `CODEMAP.md`**：根 1、`.github` 2（含 releases）、`crates` 1、`docs` 1、`scripts` 1、`packages/core` 1、`plugin/src/client` 1、`desktop-integrations` 2（含 gnome） | 仓库现状（`find -name CODEMAP.md`） |
+| 16 | CI 里**只有手册侧校验**（`python3 scripts/check-handbook.py`），没有地图一致性兜底：文件移动后地图是否同步，目前靠维护流程与评审把关 | `.github/workflows/ci.yml` 的 `check-handbook.py` 一步 |
 
 ## B. 可讲的细节
 
@@ -57,5 +57,5 @@
 ## F. 待补与更新点
 
 - [x] 已核对（见 A 表第 13–14 条）：没有生成脚本，规则由 codemap 技能规定（>1000 行的文件配套一份），刷新靠人工；维护报告里地图类文件单列、且不计入指纹。
-- [x] 已统计（见 A 表第 15 条）：16 个文件，逐目录一份（根、`.github` 与 releases、`crates` 各子级、`docs`、`scripts`、`src-tauri` 各子级、`src`、`tests` 与 fixtures）。
+- [x] 已统计（见 A 表第 15 条）：10 个文件，逐目录一份（根、`.github` 与 releases、`crates`、`docs`、`scripts`、`packages/core`、`plugin/src/client`、`desktop-integrations` 与 gnome）。
 - [x] 已确认（见 A 表第 16 条）：**没有兜底**。CI 只跑手册校验；地图一致性依赖维护流程（`project-maintenance` 技能）与评审。若要把这条变成自动化，需要先给地图定义可机检的不变量（例如「文件表里不存在幽灵路径」）。
