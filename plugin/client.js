@@ -4074,31 +4074,114 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
 
   // plugin/src/client/app/navigation.js
-  var PAGE_KEY = "tomato-dsh.page";
+  var NAV_KEY = "tomato-dsh.nav";
+  var LEGACY_PAGE_KEY = "tomato-dsh.page";
+  var BOOT_KEY = "tomato-dsh.booted";
   var activePageId = null;
   var openPanelFn = null;
+  var coldStart = null;
+  var lastCompleteSerial = 0;
   var listeners5 = /* @__PURE__ */ new Set();
-  function readStored() {
+  function sessionGet(key) {
     try {
-      return localStorage.getItem(PAGE_KEY);
+      if (typeof sessionStorage === "undefined" || !sessionStorage) return null;
+      return sessionStorage.getItem(key);
     } catch {
       return null;
     }
   }
+  function sessionSet(key, value) {
+    try {
+      if (typeof sessionStorage === "undefined" || !sessionStorage) return;
+      sessionStorage.setItem(key, value);
+    } catch {
+    }
+  }
+  function readLegacyPage() {
+    try {
+      if (typeof localStorage === "undefined" || !localStorage) return null;
+      return localStorage.getItem(LEGACY_PAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+  function writeLegacyPage(id) {
+    try {
+      if (typeof localStorage === "undefined" || !localStorage) return;
+      localStorage.setItem(LEGACY_PAGE_KEY, id);
+    } catch {
+    }
+  }
+  function readNavState() {
+    const raw = sessionGet(NAV_KEY);
+    if (raw !== null) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          return {
+            panel: parsed.panel === "tomato" ? "tomato" : "conversation",
+            page: typeof parsed.page === "string" && parsed.page !== "" ? parsed.page : null
+          };
+        }
+      } catch {
+      }
+    }
+    const legacy = readLegacyPage();
+    if (legacy === null || legacy === "") return null;
+    const migrated = { panel: "conversation", page: legacy };
+    writeNavState(migrated);
+    return migrated;
+  }
+  function writeNavState(state) {
+    sessionSet(NAV_KEY, JSON.stringify(state));
+  }
   function resetActivePageCache() {
     activePageId = null;
+    coldStart = null;
+    lastCompleteSerial = 0;
+  }
+  function isColdStart() {
+    if (coldStart !== null) return coldStart;
+    coldStart = false;
+    try {
+      if (typeof sessionStorage === "undefined" || !sessionStorage) return false;
+      coldStart = sessionStorage.getItem(BOOT_KEY) === null;
+      sessionStorage.setItem(BOOT_KEY, "1");
+    } catch {
+      coldStart = false;
+    }
+    return coldStart;
+  }
+  function setPanelVisible(visible) {
+    const state = readNavState();
+    writeNavState({
+      panel: visible ? "tomato" : "conversation",
+      page: state && state.page || activePageId || readLegacyPage()
+    });
+  }
+  function dialogOpen() {
+    try {
+      return typeof document !== "undefined" && !!(document && document.querySelector?.('[role="dialog"]'));
+    } catch {
+      return false;
+    }
   }
   function getActivePageId() {
-    if (activePageId === null) activePageId = readStored();
+    if (activePageId === null) {
+      const state = readNavState();
+      activePageId = state && state.page ? state.page : readLegacyPage();
+    }
     return activePageId;
   }
   function setActivePageId(id) {
     if (typeof id !== "string" || id === "") return;
     activePageId = id;
-    try {
-      localStorage.setItem(PAGE_KEY, id);
-    } catch {
-    }
+    const state = readNavState();
+    writeNavState({
+      panel: state && state.panel ? state.panel : "conversation",
+      page: id
+    });
+    writeLegacyPage(id);
     for (const fn of Array.from(listeners5)) {
       try {
         fn(id);
@@ -4106,9 +4189,64 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       }
     }
   }
-  function subscribeActivePage(fn) {
+  function subscribe2(fn) {
     listeners5.add(fn);
     return () => listeners5.delete(fn);
+  }
+  function shouldGrab(reason, ctx = {}) {
+    switch (reason) {
+      case "boot":
+      case "user":
+        return true;
+      case "restore":
+        return ctx.panel === "tomato";
+      case "reminder":
+        return false;
+      case "complete":
+        if (ctx.dialogOpen === true) return false;
+        return Number(ctx.serial) > Number(ctx.lastSerial ?? 0);
+      default:
+        return false;
+    }
+  }
+  function targetPage(reason, page, state) {
+    if (reason === "boot" || reason === "complete") return "focus";
+    if (reason === "restore") return state && state.page || "focus";
+    return page;
+  }
+  function navigate({ page = null, reason = "user", serial = null } = {}) {
+    const state = readNavState();
+    const completed = serial === null ? null : Number(serial) || 0;
+    const grab = shouldGrab(reason, {
+      dialogOpen: dialogOpen(),
+      panel: state && state.panel,
+      serial: completed ?? 0,
+      lastSerial: lastCompleteSerial
+    });
+    if (reason === "complete" && completed !== null) {
+      lastCompleteSerial = Math.max(lastCompleteSerial, completed);
+    }
+    if (!grab) return false;
+    const target = targetPage(reason, page, state);
+    if (target && target !== activePageId) {
+      activePageId = target;
+      writeLegacyPage(target);
+      for (const fn of Array.from(listeners5)) {
+        try {
+          fn(target);
+        } catch {
+        }
+      }
+    }
+    try {
+      openPanelFn?.("tomato");
+    } catch {
+    }
+    writeNavState({ panel: "tomato", page: target || state && state.page || null });
+    return true;
+  }
+  function restore() {
+    return isColdStart() ? navigate({ page: "focus", reason: "boot" }) : navigate({ reason: "restore" });
   }
   var pendingTasksFilter = null;
   var filterListeners = /* @__PURE__ */ new Set();
@@ -4133,13 +4271,6 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
   function bindPanelOpener(fn) {
     openPanelFn = typeof fn === "function" ? fn : null;
-  }
-  function openPanelAt(pageId) {
-    if (pageId) setActivePageId(pageId);
-    try {
-      openPanelFn?.();
-    } catch {
-    }
   }
 
   // plugin/src/client/app/frame.js
@@ -4496,12 +4627,16 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       return () => root.removeAttribute("data-tomato-takeover");
     }, []);
     useEffect(() => {
+      setPanelVisible(true);
+      return () => setPanelVisible(false);
+    }, []);
+    useEffect(() => {
       const collapse = props.collapseSidebar;
-      const restore = props.restoreSidebar;
+      const restore2 = props.restoreSidebar;
       if (typeof collapse !== "function") return void 0;
       const collapsedByUs = collapse();
       return () => {
-        if (collapsedByUs && typeof restore === "function") restore();
+        if (collapsedByUs && typeof restore2 === "function") restore2();
       };
     }, []);
     useEffect(() => {
@@ -4511,7 +4646,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const [activeId, setActiveId] = useState(() => loadActivePage(pages));
     const narrow = useViewportNarrow();
     const active2 = pages.find((page) => page.id === activeId) ?? pages[0] ?? null;
-    useEffect(() => subscribeActivePage(setActiveId), []);
+    useEffect(() => subscribe2(setActiveId), []);
     useEffect(() => {
       if (active2 === null && pages.length > 0) setActivePageId(pages[0].id);
     }, [pages.length]);
@@ -5602,7 +5737,7 @@ ${JSON.stringify(refs, null, 2)}`;
     });
     const goSchedule = () => {
       closeImmersive();
-      openPanelAt("calendar");
+      navigate({ page: "calendar", reason: "user" });
     };
     if (!visible) return null;
     const badge = (() => {
@@ -5958,6 +6093,17 @@ ${JSON.stringify(refs, null, 2)}`;
     );
   }
 
+  // plugin/src/client/app/attention.js
+  function attentionCue(prev, next) {
+    if (!prev || !next) return null;
+    if (!prev.hydrated || !next.hydrated) return null;
+    if (Number(next.serial) > Number(prev.serial)) return "complete";
+    if (!prev.running && next.running) return next.mode === "focus" ? "start" : "resume";
+    if (prev.running && !next.running && next.paused) return "pause";
+    if (Number(next.reminders) > Number(prev.reminders)) return "reminder";
+    return null;
+  }
+
   // plugin/src/client/app/hud.js
   registerCopy("hud", {
     zh: {
@@ -6038,14 +6184,6 @@ ${JSON.stringify(refs, null, 2)}`;
     if (mode === "longBreak") return t("hud.modeLong");
     return t("hud.modeFocus");
   }
-  function attentionCue(prev, next) {
-    if (!prev || !next) return null;
-    if (Number(next.serial) > Number(prev.serial)) return "complete";
-    if (!prev.running && next.running) return next.mode === "focus" ? "start" : "resume";
-    if (prev.running && !next.running && next.paused) return "pause";
-    if (Number(next.reminders) > Number(prev.reminders)) return "reminder";
-    return null;
-  }
   function Hud({ openPanel }) {
     const state = useSnapshot();
     const immersive = useImmersiveOpen();
@@ -6070,6 +6208,8 @@ ${JSON.stringify(refs, null, 2)}`;
     const prevRef = useRef(null);
     useEffect(() => {
       const next = {
+        // store 在首次请求返回前是 null；只有拿到真实快照才允许比较跃迁。
+        hydrated: !!(state && state.data),
         running: view.running,
         paused: view.paused,
         mode: view.mode,
@@ -6081,6 +6221,7 @@ ${JSON.stringify(refs, null, 2)}`;
       if (prev === null) return;
       const cue = attentionCue(prev, next);
       if (cue) sound.playCue(cue);
+      if (cue === "complete") navigate({ reason: "complete", serial: next.serial });
     }, [view.running, view.paused, view.mode, view.timer.completionSerial, data]);
     useEffect(() => {
       if (!expanded) return void 0;
@@ -6362,8 +6503,17 @@ ${JSON.stringify(refs, null, 2)}`;
   }
 
   // plugin/src/client/app/overlay.js
+  var restored = false;
+  function useStartupNavigation() {
+    useEffect(() => {
+      if (restored) return;
+      restored = true;
+      restore();
+    }, []);
+  }
   function AppOverlay({ openPanel }) {
     useLocale();
+    useStartupNavigation();
     return h(
       Fragment,
       null,
@@ -12429,7 +12579,7 @@ ${JSON.stringify(refs, null, 2)}`;
       sort
     );
     const editingTask = editor && editor.id ? taskById(data, editor.id) : null;
-    const dialogOpen = !!editor && (!editor.id || !!editingTask);
+    const dialogOpen2 = !!editor && (!editor.id || !!editingTask);
     const editingTemplate = templateEditor && templateEditor.id ? templates.find((template) => template && template.id === templateEditor.id) || null : null;
     const templateDialogOpen = !!templateEditor && (!templateEditor.id || !!editingTemplate);
     const prints = Array.isArray(data.prints) ? data.prints : [];
@@ -12757,7 +12907,7 @@ ${JSON.stringify(refs, null, 2)}`;
         busy: adding
       }),
       h(TaskDialog, {
-        open: dialogOpen,
+        open: dialogOpen2,
         task: editingTask,
         today,
         projects,
@@ -21111,13 +21261,10 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     if (typeof ctx.effect === "function") ctx.effect(() => cleanup);
     const layout = ctx.get ? ctx.get("layout") : null;
-    const openPanel = () => {
-      try {
-        if (layout && typeof layout.selectPanel === "function") layout.selectPanel("tomato");
-      } catch {
-      }
-    };
-    bindPanelOpener(openPanel);
+    const openPanel = () => navigate({ reason: "user" });
+    bindPanelOpener(
+      layout && typeof layout.selectPanel === "function" ? (panelId) => layout.selectPanel(panelId) : null
+    );
     try {
       if (typeof window !== "undefined" && window.__TOMATO_TEST__) {
         window.__tomatoDsh = {
@@ -21134,6 +21281,7 @@ ${JSON.stringify(refs, null, 2)}`;
         if (layout && typeof layout.selectPanel === "function") layout.selectPanel(null);
       } catch {
       }
+      setPanelVisible(false);
     };
     const openAssistant = (kind, records) => {
       const prompt = assistantPrompt(kind, records);
