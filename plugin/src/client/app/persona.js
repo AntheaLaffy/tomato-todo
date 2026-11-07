@@ -75,53 +75,81 @@ export function personaFile(id = current) {
   return found.file;
 }
 
-/**
- * 背景板立绘。挂在 shell.overlay 上（页面右下角、pointer-events:none），
- * 番茄页接管时由 CSS 隐藏；沉浸层 z70 会盖住它。
- */
-export function PersonaBackdrop() {
+function usePersonaEnabled() {
   const state = useSnapshot();
   const [id, setId] = useState(getPersonaId());
   useEffect(() => subscribePersona(setId), []);
-
-  const enabled = !!(state && state.data && state.data.settings && state.data.settings.personaBackdrop);
+  const enabled = !!(
+    state &&
+    state.data &&
+    state.data.settings &&
+    state.data.settings.personaBackdrop
+  );
   useEffect(() => {
     const root = document.documentElement;
     if (enabled) root.setAttribute("data-tomato-persona", "on");
     else root.removeAttribute("data-tomato-persona");
     return () => root.removeAttribute("data-tomato-persona");
   }, [enabled]);
+  return enabled ? id : null;
+}
 
-  if (!enabled) return null;
+/** 立绘样式：不做整体透明——不压卡片时必须实心（用户要求）。 */
+function personaStyle(position) {
+  return {
+    position,
+    right: "max(10px, 1.6vw)",
+    bottom: "5vh",
+    height: "min(42vh, 380px)",
+    width: "auto",
+    maxWidth: "22vw",
+    objectFit: "contain",
+    objectPosition: "bottom right",
+    pointerEvents: "none",
+    userSelect: "none",
+    zIndex: 1,
+    filter: "drop-shadow(0 16px 26px #3a241524)",
+    // 只在最左缘做很短的过渡，避免边界生硬；主体完全实心。
+    WebkitMaskImage:
+      "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+    WebkitMaskComposite: "source-in",
+    maskImage:
+      "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+    maskComposite: "intersect",
+  };
+}
 
+/**
+ * DSH 页面（对话/插件页等）的看板娘：挂在 shell.overlay 上，右下方、不拦点击。
+ * 番茄页接管时由 CSS 隐藏——那边用页面内的 PersonaBoard（在卡片后面）。
+ */
+export function PersonaBackdrop() {
+  const id = usePersonaEnabled();
+  if (id === null) return null;
   return h("img", {
     id: "tomato-persona",
     src: ASSET_BASE + personaFile(id),
     alt: "",
     "aria-hidden": "true",
     draggable: false,
-    style: {
-      position: "fixed",
-      right: "max(10px, 1.6vw)",
-      bottom: "5vh",
-      height: "min(42vh, 380px)",
-      width: "auto",
-      maxWidth: "22vw",
-      objectFit: "contain",
-      objectPosition: "bottom right",
-      pointerEvents: "none",
-      userSelect: "none",
-      zIndex: 1,
-      // 整体半透明：像背景板而不是贴纸；压到卡片上也能透出文字。
-      opacity: 0.68,
-      filter: "drop-shadow(0 16px 26px #3a241524)",
-      // 左缘很短的渐隐，避免边界生硬；主体靠整体 opacity 做成半透明背景板。
-      WebkitMaskImage:
-        "linear-gradient(to right, transparent 0%, #000c 7%, #000 15%), linear-gradient(to top, transparent 0%, #000 3%)",
-      WebkitMaskComposite: "source-in",
-      maskImage:
-        "linear-gradient(to right, transparent 0%, #000c 7%, #000 15%), linear-gradient(to top, transparent 0%, #000 3%)",
-      maskComposite: "intersect",
-    },
+    style: personaStyle("fixed"),
+  });
+}
+
+/**
+ * 番茄主视图内的看板娘：作为页面最底层（z-index 0）的 img 绝对定位在右下角，
+ * 卡片（z-index 1，纸色不透明）自然把它盖住——于是「碰到卡片」的地方看不见，
+ * 没被盖住的部分完全实心。这就是旧版背景板的真实行为。
+ */
+export function PersonaBoard() {
+  const id = usePersonaEnabled();
+  if (id === null) return null;
+  return h("img", {
+    id: "tomato-persona-board",
+    src: ASSET_BASE + personaFile(id),
+    alt: "",
+    "aria-hidden": "true",
+    draggable: false,
+    style: { ...personaStyle("absolute"), zIndex: 0 },
   });
 }

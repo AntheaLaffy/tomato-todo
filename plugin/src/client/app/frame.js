@@ -9,6 +9,7 @@ import { IconBtn, Ring, ToastHost } from "../shared/ui.js";
 import { useSnapshot, refresh as refreshStore } from "../shared/store.js";
 import { todayKey, timerView, greeting } from "../shared/derive.js";
 import { pageList } from "./registry.js";
+import { PersonaBoard } from "./persona.js";
 import {
   getActivePageId,
   setActivePageId,
@@ -224,6 +225,9 @@ function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave 
         overflowX: compact ? "auto" : undefined,
         overflowY: "auto",
         alignItems: compact ? "center" : "stretch",
+        // 抬到看板娘之上：内容实心盖住立绘，没被盖住的部分才显示。
+        position: "relative",
+        zIndex: 1,
       },
       className: "t-scroll",
     },
@@ -313,6 +317,7 @@ export function AppShell(props) {
         overflow: "hidden",
       },
     },
+    h(PersonaBoard, null),
     h(NavColumn, {
       pages,
       activeId: active ? active.id : null,
@@ -326,7 +331,7 @@ export function AppShell(props) {
       "main",
       {
         className: "t-scroll t-root t-appmain",
-        style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" },
+        style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto", position: "relative", zIndex: 1 },
       },
       h(
         "div",

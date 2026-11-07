@@ -271,17 +271,20 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
 /* 窄屏不显示看板娘，避免压住正文。 */
 /* 竖屏/窄窗口：看板娘照样显示，只按窗口收紧尺寸并往右下角让位。 */
+/* 番茄页接管时隐藏 overlay 版立绘，改用页面内 PersonaBoard（在卡片后面）。 */
+html[data-tomato-takeover] #tomato-persona{display:none!important}
+
 @media (max-width:1500px){
-  #tomato-persona{height:min(36vh, 320px)!important;max-width:26vw!important;bottom:4vh!important}
+  :is(#tomato-persona, #tomato-persona-board){height:min(36vh, 320px)!important;max-width:26vw!important;bottom:4vh!important}
 }
 @media (max-width:1100px){
-  #tomato-persona{height:min(28vh, 240px)!important;max-width:32vw!important;right:6px!important;bottom:2vh!important}
+  :is(#tomato-persona, #tomato-persona-board){height:min(28vh, 240px)!important;max-width:32vw!important;right:6px!important;bottom:2vh!important}
 }
 @media (max-width:760px){
-  #tomato-persona{height:min(21vh, 170px)!important;max-width:38vw!important;opacity:.62!important}
+  :is(#tomato-persona, #tomato-persona-board){height:min(21vh, 170px)!important;max-width:38vw!important}
 }
 @media (max-width:520px){
-  #tomato-persona{display:none!important}
+  :is(#tomato-persona, #tomato-persona-board){display:none!important}
 }
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
@@ -2082,7 +2085,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const found = PERSONAS.find((p) => p.id === id) ?? PERSONAS[0];
     return found.file;
   }
-  function PersonaBackdrop() {
+  function usePersonaEnabled() {
     const state = useSnapshot();
     const [id, setId] = useState(getPersonaId());
     useEffect(() => subscribePersona(setId), []);
@@ -2093,34 +2096,51 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       else root.removeAttribute("data-tomato-persona");
       return () => root.removeAttribute("data-tomato-persona");
     }, [enabled]);
-    if (!enabled) return null;
+    return enabled ? id : null;
+  }
+  function personaStyle(position) {
+    return {
+      position,
+      right: "max(10px, 1.6vw)",
+      bottom: "5vh",
+      height: "min(42vh, 380px)",
+      width: "auto",
+      maxWidth: "22vw",
+      objectFit: "contain",
+      objectPosition: "bottom right",
+      pointerEvents: "none",
+      userSelect: "none",
+      zIndex: 1,
+      filter: "drop-shadow(0 16px 26px #3a241524)",
+      // 只在最左缘做很短的过渡，避免边界生硬；主体完全实心。
+      WebkitMaskImage: "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+      WebkitMaskComposite: "source-in",
+      maskImage: "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+      maskComposite: "intersect"
+    };
+  }
+  function PersonaBackdrop() {
+    const id = usePersonaEnabled();
+    if (id === null) return null;
     return h("img", {
       id: "tomato-persona",
       src: ASSET_BASE + personaFile(id),
       alt: "",
       "aria-hidden": "true",
       draggable: false,
-      style: {
-        position: "fixed",
-        right: "max(10px, 1.6vw)",
-        bottom: "5vh",
-        height: "min(42vh, 380px)",
-        width: "auto",
-        maxWidth: "22vw",
-        objectFit: "contain",
-        objectPosition: "bottom right",
-        pointerEvents: "none",
-        userSelect: "none",
-        zIndex: 1,
-        // 整体半透明：像背景板而不是贴纸；压到卡片上也能透出文字。
-        opacity: 0.68,
-        filter: "drop-shadow(0 16px 26px #3a241524)",
-        // 左缘很短的渐隐，避免边界生硬；主体靠整体 opacity 做成半透明背景板。
-        WebkitMaskImage: "linear-gradient(to right, transparent 0%, #000c 7%, #000 15%), linear-gradient(to top, transparent 0%, #000 3%)",
-        WebkitMaskComposite: "source-in",
-        maskImage: "linear-gradient(to right, transparent 0%, #000c 7%, #000 15%), linear-gradient(to top, transparent 0%, #000 3%)",
-        maskComposite: "intersect"
-      }
+      style: personaStyle("fixed")
+    });
+  }
+  function PersonaBoard() {
+    const id = usePersonaEnabled();
+    if (id === null) return null;
+    return h("img", {
+      id: "tomato-persona-board",
+      src: ASSET_BASE + personaFile(id),
+      alt: "",
+      "aria-hidden": "true",
+      draggable: false,
+      style: { ...personaStyle("absolute"), zIndex: 0 }
     });
   }
 
@@ -2918,7 +2938,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           background: compact ? "transparent" : "color-mix(in srgb, var(--tomato-surface-2) 55%, transparent)",
           overflowX: compact ? "auto" : void 0,
           overflowY: "auto",
-          alignItems: compact ? "center" : "stretch"
+          alignItems: compact ? "center" : "stretch",
+          // 抬到看板娘之上：内容实心盖住立绘，没被盖住的部分才显示。
+          position: "relative",
+          zIndex: 1
         },
         className: "t-scroll"
       },
@@ -2991,6 +3014,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           overflow: "hidden"
         }
       },
+      h(PersonaBoard, null),
       h(NavColumn, {
         pages,
         activeId: active2 ? active2.id : null,
@@ -3004,7 +3028,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         "main",
         {
           className: "t-scroll t-root t-appmain",
-          style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" }
+          style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto", position: "relative", zIndex: 1 }
         },
         h(
           "div",
