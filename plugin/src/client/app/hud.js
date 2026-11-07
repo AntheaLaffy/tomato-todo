@@ -201,7 +201,10 @@ export function Hud({ openPanel }) {
 
   const pauseRound = () => act({ type: "pauseTimer" }, t("hud.notifyPaused"));
 
+  // 空闲时不出现在右上角：番茄预计/实际在左下角入口面板里，HUD 只在专注/暂停/
+  // 保护生效时出现，显示倒计时与当前任务。
   if (immersive) return null;
+  if (!view.running && !view.paused && !protection.active) return null;
 
   const label = view.running
     ? `${focusMode ? t("hud.focusing") : t("hud.resting")} ${fmtClock(liveRemaining)}`

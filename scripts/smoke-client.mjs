@@ -450,7 +450,7 @@ if (!mainMarkup.includes("番茄 Todo")) failures.push("主视图没有渲染品
 for (const word of ["今日专注", "全部任务", "数据统计", "偏好设置"]) {
   if (!mainMarkup.includes(word)) failures.push(`主视图导航缺少「${word}」`);
 }
-if (!(renderedBy["shell.overlay"] || "").includes("番茄")) failures.push("overlay 渲染内容里没有番茄文案");
+
 // 提醒条只在该任务的「当前时段」内渲染；样例构造了提醒时刻=5 分钟前的任务。
 if (!process.env.SMOKE_LIVE) {
   const dock = renderedBy["conversation.composer.dock"] || "";
@@ -460,7 +460,13 @@ if (!process.env.SMOKE_LIVE) {
   }
 }
 if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注")) failures.push("入口卡没有渲染开始专注按钮");
-if (!(renderedBy["shell.overlay"] || "").includes("个番茄")) failures.push("HUD 没有渲染今日番茄计数");
+if (!/[0-9]+ \/ 8 番茄/.test(renderedBy["conversation.composer.dock"] || "")) {
+  failures.push("左下角入口面板没有番茄预计/实际计数");
+}
+if ((renderedBy["shell.overlay"] || "").includes("个番茄")) {
+  failures.push("右上角 HUD 空闲时仍在显示番茄计数");
+}
+
 if (!(renderedBy["conversation.composer.dock"] || "").includes("今日待办")) failures.push("入口卡没有渲染今日待办");
 
 // 清理 effect（验证 dispose 路径不抛错）

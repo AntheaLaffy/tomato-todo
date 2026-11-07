@@ -4585,6 +4585,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     };
     const pauseRound = () => act({ type: "pauseTimer" }, t("hud.notifyPaused"));
     if (immersive) return null;
+    if (!view.running && !view.paused && !protection.active) return null;
     const label = view.running ? `${focusMode ? t("hud.focusing") : t("hud.resting")} ${fmtClock(liveRemaining)}` : view.paused ? `${t("hud.paused")} ${fmtClock(liveRemaining)}` : idleBreak ? modeLabel(view.mode) : `${done} / ${goal} ${t("hud.pomodoro")}`;
     const subline = task && (focusMode || view.running) ? task.title : idleBreak ? t("hud.restNext", { mode: modeLabel(view.mode) }) : protection.active ? t("hud.protected") : t("hud.noTask");
     const primaryTitle = view.running ? t("hud.pause") : view.paused ? t("hud.resume") : idleBreak ? t("hud.startRest") : t("hud.start");
@@ -4848,7 +4849,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       start: "现在专注",
       view: "查看今天",
       running: "专注中 {time}",
-      idle: "准备好就开始吧"
+      idle: "准备好就开始吧",
+      pomodoro: "{done} / {goal} 番茄"
     },
     en: {
       due: "{n} due today",
@@ -4856,7 +4858,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       start: "Focus now",
       view: "Open today",
       running: "Focusing {time}",
-      idle: "Ready when you are"
+      idle: "Ready when you are",
+      pomodoro: "{done} / {goal} pomodoros"
     }
   });
   function DockCard({ openPanel }) {
@@ -4866,8 +4869,11 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const stats = state && state.stats || {};
     const today = todayKey(state && state.serverTime);
     const view = timerView(state);
+    const settings = data.settings || {};
     const due = todayTasks(data, today).length;
     const focusMinutes = Math.round((Number(stats.todaySeconds) || 0) / 60);
+    const goal = Number(settings.dailyGoal) || 8;
+    const done = Number(stats.todayPomodoros) || 0;
     const start = async () => {
       setBusy(true);
       const res = await tryDispatch({ type: view.running ? "pauseTimer" : "startTimer" });
@@ -4897,7 +4903,20 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           flexWrap: "wrap"
         }
       },
-      h(Icon, { name: "tomato", size: 16, style: { color: "var(--tomato-brand)" } }),
+      // 番茄预计/实际：放在左下角这条面板里（不再占右上角 HUD）。
+      h(
+        "div",
+        {
+          style: { display: "flex", alignItems: "center", gap: 6, flex: "none" },
+          title: t("dock.pomodoro", { done, goal })
+        },
+        h(Ring, { value: goal > 0 ? Math.min(1, done / goal) : 0, size: 20, stroke: 3, color: "var(--tomato-brand)" }),
+        h(
+          "span",
+          { className: "t-mono", style: { fontSize: 11.5, color: "var(--tomato-ink-2)", fontWeight: 600 } },
+          t("dock.pomodoro", { done, goal })
+        )
+      ),
       h(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, flexWrap: "wrap" } },
