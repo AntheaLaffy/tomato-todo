@@ -271,20 +271,17 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
 /* 窄屏不显示看板娘，避免压住正文。 */
 /* 竖屏/窄窗口：看板娘照样显示，只按窗口收紧尺寸并往右下角让位。 */
-/* 番茄页接管时隐藏 overlay 版立绘，改用页面内 PersonaBoard（在卡片后面）。 */
-html[data-tomato-takeover] #tomato-persona{display:none!important}
-
 @media (max-width:1500px){
-  :is(#tomato-persona, #tomato-persona-board){height:min(36vh, 320px)!important;max-width:26vw!important;bottom:4vh!important}
+  #tomato-persona{height:min(36vh, 320px)!important;max-width:26vw!important;bottom:4vh!important}
 }
 @media (max-width:1100px){
-  :is(#tomato-persona, #tomato-persona-board){height:min(28vh, 240px)!important;max-width:32vw!important;right:6px!important;bottom:2vh!important}
+  #tomato-persona{height:min(28vh, 240px)!important;max-width:32vw!important;right:6px!important;bottom:2vh!important}
 }
 @media (max-width:760px){
-  :is(#tomato-persona, #tomato-persona-board){height:min(21vh, 170px)!important;max-width:38vw!important}
+  #tomato-persona{height:min(21vh, 170px)!important;max-width:38vw!important}
 }
 @media (max-width:520px){
-  :is(#tomato-persona, #tomato-persona-board){display:none!important}
+  #tomato-persona{display:none!important}
 }
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
@@ -2113,10 +2110,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       zIndex: 1,
       opacity,
       filter: "drop-shadow(0 16px 26px #3a241524)",
-      // 只在最左缘做很短的过渡，避免边界生硬；主体完全实心。
-      WebkitMaskImage: "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+      // 只有左缘（压到卡片的那一段）渐隐，主体完全实心：
+      // 0-18% 从透明升到 ~35%，34% 到 85%，44% 之后完全不透明。
+      WebkitMaskImage: "linear-gradient(to right, transparent 0%, #00000059 18%, #000000d9 34%, #000 44%), linear-gradient(to top, transparent 0%, #000 3%)",
       WebkitMaskComposite: "source-in",
-      maskImage: "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+      maskImage: "linear-gradient(to right, transparent 0%, #00000059 18%, #000000d9 34%, #000 44%), linear-gradient(to top, transparent 0%, #000 3%)",
       maskComposite: "intersect"
     };
   }
@@ -2129,19 +2127,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       alt: "",
       "aria-hidden": "true",
       draggable: false,
-      style: personaStyle("fixed", 0.55)
-    });
-  }
-  function PersonaBoard() {
-    const id = usePersonaEnabled();
-    if (id === null) return null;
-    return h("img", {
-      id: "tomato-persona-board",
-      src: ASSET_BASE + personaFile(id),
-      alt: "",
-      "aria-hidden": "true",
-      draggable: false,
-      style: { ...personaStyle("absolute", 1), zIndex: 0 }
+      style: personaStyle("fixed", 1)
     });
   }
 
@@ -3015,7 +3001,6 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           overflow: "hidden"
         }
       },
-      h(PersonaBoard, null),
       h(NavColumn, {
         pages,
         activeId: active2 ? active2.id : null,

@@ -9,7 +9,6 @@ import { IconBtn, Ring, ToastHost } from "../shared/ui.js";
 import { useSnapshot, refresh as refreshStore } from "../shared/store.js";
 import { todayKey, timerView, greeting } from "../shared/derive.js";
 import { pageList } from "./registry.js";
-import { PersonaBoard } from "./persona.js";
 import {
   getActivePageId,
   setActivePageId,
@@ -317,7 +316,6 @@ export function AppShell(props) {
         overflow: "hidden",
       },
     },
-    h(PersonaBoard, null),
     h(NavColumn, {
       pages,
       activeId: active ? active.id : null,

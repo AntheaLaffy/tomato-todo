@@ -114,12 +114,13 @@ function personaStyle(position, opacity = 1) {
     zIndex: 1,
     opacity,
     filter: "drop-shadow(0 16px 26px #3a241524)",
-    // 只在最左缘做很短的过渡，避免边界生硬；主体完全实心。
+    // 只有左缘（压到卡片的那一段）渐隐，主体完全实心：
+    // 0-18% 从透明升到 ~35%，34% 到 85%，44% 之后完全不透明。
     WebkitMaskImage:
-      "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+      "linear-gradient(to right, transparent 0%, #00000059 18%, #000000d9 34%, #000 44%), linear-gradient(to top, transparent 0%, #000 3%)",
     WebkitMaskComposite: "source-in",
     maskImage:
-      "linear-gradient(to right, transparent 0%, #000d 6%, #000 13%), linear-gradient(to top, transparent 0%, #000 3%)",
+      "linear-gradient(to right, transparent 0%, #00000059 18%, #000000d9 34%, #000 44%), linear-gradient(to top, transparent 0%, #000 3%)",
     maskComposite: "intersect",
   };
 }
@@ -137,7 +138,7 @@ export function PersonaBackdrop() {
     alt: "",
     "aria-hidden": "true",
     draggable: false,
-    style: personaStyle("fixed", 0.55),
+    style: personaStyle("fixed", 1),
   });
 }
 
