@@ -274,7 +274,7 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
 /* 看板娘占据右侧空间：主列右侧留出立绘宽度，内容整体被挤到左边（窄屏由上一节隐藏立绘） */
-html[data-tomato-persona=on] .t-appmain{padding-right:clamp(200px, 20vw, 320px)!important}
+html[data-tomato-persona=on] .t-appmain{padding-right:clamp(140px, 13vw, 220px)!important}
 
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,
@@ -2087,9 +2087,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         position: "fixed",
         right: "max(10px, 1.6vw)",
         bottom: 0,
-        height: "min(42vh, 380px)",
+        height: "min(36vh, 320px)",
         width: "auto",
-        maxWidth: "22vw",
+        maxWidth: "18vw",
         objectFit: "contain",
         objectPosition: "bottom right",
         pointerEvents: "none",
