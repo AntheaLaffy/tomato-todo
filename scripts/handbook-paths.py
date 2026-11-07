@@ -47,7 +47,7 @@ ENTRY = {
 CHAINS = {
     "10-锁与专注保护": ["`server.mjs::desiredGuard()` → `guard.lock/unlock`（runtime 每秒同步期望态）",
                     "`state.rs::enforce_worker()` → `guard.rs::decide()` → 把前台窗口切回锁窗",
-                    "`main.mjs` tick → 新提醒 / 一轮结束 → `guard.focus()` + `guard.notify()`"],
+                    "`main.mjs` tick → 新提醒 / 一轮结束 → 按设置 `guard.notify()`（不自动置前）"],
     "12-课表与提醒": ["`core.tick` → 置 `reminderPending` → `engine.tick` 落盘",
                   "前端轮询 `/api/state` → HUD 提醒条（只在空闲时显示）",
                   "`blocks.band()` 被 `diagnostics` 用来判定与「需专心」时段的冲突"],

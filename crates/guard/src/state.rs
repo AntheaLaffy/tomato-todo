@@ -1,6 +1,6 @@
 //! 进程内锁定状态与 enforce 工作线程。
 //! 无长期状态：进程退出即失去锁定，runtime 每次专注会话重发 lock 命令；
-//! 进程内 re-lock 只替换白名单，unlock 结束工作线程并销毁锁窗（RAII）。
+//! niri 直接全屏/回焦 DSH，其他后端持有自建锁窗（RAII）。
 use crate::guard::{self, LockWindow};
 use crate::protocol::Status;
 use std::sync::{
@@ -22,6 +22,8 @@ struct Inner {
     whitelist: Arc<Mutex<Vec<String>>>,
     worker: Option<std::thread::JoinHandle<()>>,
     stop: Option<Arc<AtomicBool>>,
+    native_target: Option<u64>,
+    immersive: bool,
 }
 
 impl State {
@@ -32,6 +34,8 @@ impl State {
                 whitelist: Arc::new(Mutex::new(Vec::new())),
                 worker: None,
                 stop: None,
+                native_target: None,
+                immersive: false,
             }),
             backend: guard::Desktop::detect().name().to_string(),
         }
@@ -41,19 +45,30 @@ impl State {
         let inner = self.inner.lock().unwrap();
         let whitelist = inner.whitelist.lock().unwrap().clone();
         Status {
-            locked: inner.locked,
+            locked: inner.locked && inner.worker.as_ref().is_some_and(|w| !w.is_finished()),
             whitelist,
             pid: std::process::id(),
             backend: self.backend.clone(),
         }
     }
 
-    /// 把 DeepSeek Harness 的窗口切到前台。锁机期间不抢（会让锁窗失去前台）。
+    /// 只暴露有可见窗口的实际 app_id，供白名单建议使用。
+    pub fn running_apps(&self) -> Result<Vec<String>, String> {
+        let ids = guard::Desktop::detect()
+            .windows()?
+            .into_iter()
+            .filter_map(|window| window.app_id)
+            .filter(|id| !id.is_empty())
+            .collect::<std::collections::BTreeSet<_>>();
+        Ok(ids.into_iter().collect())
+    }
+
+    /// 自建锁窗期间不激活 DSH；niri 的保护目标本来就是 DSH。
     /// 没找到 DSH 窗口时返回 Ok(None)，不是错误。
     pub fn focus(&self) -> Result<Option<String>, String> {
         {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;
-            if inner.locked {
+            if inner.locked && inner.native_target.is_none() {
                 return Ok(None);
             }
         }
@@ -70,46 +85,81 @@ impl State {
     /// 上锁或（已锁定时）替换白名单。锁窗创建失败时保持未锁定并报错。
     pub fn lock(&self, whitelist: Vec<String>) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();
+        if inner.worker.as_ref().is_some_and(|w| w.is_finished()) {
+            inner.worker.take().unwrap().join().ok();
+            inner.locked = false;
+        }
         if inner.locked {
             *inner.whitelist.lock().unwrap() = whitelist;
             return Ok(());
         }
         let desktop = guard::Desktop::detect();
-        let lock_window = desktop
-            .lock_window()
-            .map_err(|error| format!("无法创建全屏锁窗（{}）：{error}", desktop.name()))?;
+        let (lock_window, native_target) =
+            if desktop.native_dsh() {
+                let target = desktop
+                    .dsh_window()?
+                    .ok_or("未找到 DSH 窗口，无法开启专注保护")?;
+                desktop.fullscreen(&target, true)?;
+                if !target.is_focused && !desktop.focus(target.id)? {
+                    let _ = desktop.fullscreen(&target, inner.immersive);
+                    return Err("DSH 窗口尚未取得焦点".into());
+                }
+                (None, Some(target.id))
+            } else {
+                (
+                    Some(desktop.lock_window().map_err(|error| {
+                        format!("无法创建全屏锁窗（{}）：{error}", desktop.name())
+                    })?),
+                    None,
+                )
+            };
         let stop = Arc::new(AtomicBool::new(false));
         let shared = Arc::clone(&inner.whitelist);
         *shared.lock().unwrap() = whitelist;
         let worker_stop = Arc::clone(&stop);
         let worker = std::thread::Builder::new()
             .name("tomato-guard-enforce".into())
-            .spawn(move || enforce_worker(desktop, lock_window, worker_stop, shared))
+            .spawn(move || enforce_worker(desktop, lock_window, native_target, worker_stop, shared))
             .map_err(|error| format!("无法启动保护循环：{error}"))?;
         inner.locked = true;
         inner.worker = Some(worker);
         inner.stop = Some(stop);
+        inner.native_target = native_target;
+        Ok(())
+    }
+
+    pub fn fullscreen(&self, enabled: bool) -> Result<(), String> {
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let desktop = guard::Desktop::detect();
+        let target = desktop.dsh_window()?.ok_or("未找到 DSH 窗口")?;
+        desktop.fullscreen(&target, enabled || inner.locked)?;
+        inner.immersive = enabled;
         Ok(())
     }
 
     /// 解锁：通知工作线程退出并等待其销毁锁窗（最多约一个 tick）。
-    pub fn unlock(&self) {
+    pub fn unlock(&self) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();
         if !inner.locked {
-            return;
+            return Ok(());
         }
         if let Some(stop) = inner.stop.as_ref() {
             stop.store(true, Ordering::Relaxed);
         }
         let worker = inner.worker.take();
         inner.stop = None;
-        drop(inner);
         if let Some(worker) = worker {
             let _ = worker.join();
         }
-        let mut inner = self.inner.lock().unwrap();
         inner.locked = false;
         *inner.whitelist.lock().unwrap() = Vec::new();
+        if let Some(id) = inner.native_target.take() {
+            let desktop = guard::Desktop::detect();
+            if let Some(target) = desktop.windows()?.into_iter().find(|w| w.id == id) {
+                desktop.fullscreen(&target, inner.immersive)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -123,7 +173,8 @@ impl Default for State {
 /// 锁窗句柄由本线程持有，线程退出（unlock/进程退出）时 RAII 销毁。
 fn enforce_worker(
     desktop: guard::Desktop,
-    lock_window: Box<dyn LockWindow + Send>,
+    lock_window: Option<Box<dyn LockWindow + Send>>,
+    native_target: Option<u64>,
     stop: Arc<AtomicBool>,
     whitelist: Arc<Mutex<Vec<String>>>,
 ) {
@@ -137,13 +188,32 @@ fn enforce_worker(
         let whitelist = whitelist.lock().unwrap().clone();
         match desktop.windows() {
             Ok(windows) => {
-                match guard::decide(&windows, own_pid, &whitelist) {
+                let decision = if let Some(id) = native_target {
+                    let Some(_) = windows.iter().find(|w| w.id == id) else {
+                        eprintln!("tomato-guard：DSH 窗口已关闭，等待 runtime 重新预检");
+                        break;
+                    };
+                    guard::decide_target(&windows, id, &whitelist)
+                } else {
+                    guard::decide(&windows, own_pid, &whitelist)
+                };
+                match decision {
                     guard::Decision::Focus(id) => {
                         let blocked = windows.iter().find(|w| w.is_focused).cloned();
+                        if native_target.is_some() {
+                            if let Some(target) = windows.iter().find(|w| w.id == id) {
+                                if let Err(error) = desktop.fullscreen(target, true) {
+                                    eprintln!("tomato-guard：恢复 DSH 全屏失败：{error}");
+                                }
+                            }
+                        }
                         match desktop.focus(id) {
                             Ok(true) => eprintln!(
                                 "tomato-guard：已把 {}(app_id={:?}, pid={:?}) 切回锁窗",
-                                blocked.as_ref().and_then(|w| w.title.as_deref()).unwrap_or("?"),
+                                blocked
+                                    .as_ref()
+                                    .and_then(|w| w.title.as_deref())
+                                    .unwrap_or("?"),
                                 blocked.as_ref().and_then(|w| w.app_id.as_deref()),
                                 blocked.as_ref().and_then(|w| w.pid),
                             ),
@@ -192,8 +262,8 @@ mod tests {
         assert!(state.status().whitelist.is_empty());
         assert_eq!(state.status().pid, std::process::id());
         assert_eq!(state.status().backend, guard::Desktop::detect().name());
-        state.unlock();
-        state.unlock();
+        state.unlock().unwrap();
+        state.unlock().unwrap();
         assert!(!state.status().locked);
     }
 
@@ -204,11 +274,15 @@ mod tests {
             return;
         }
         let state = State::new();
-        state.lock(Vec::new()).expect("隔离嵌套桌面内 lock 必须成功");
+        state
+            .lock(Vec::new())
+            .expect("隔离嵌套桌面内 lock 必须成功");
         assert!(state.status().locked);
-        state.lock(vec!["code".into()]).expect("re-lock 只替换白名单");
+        state
+            .lock(vec!["code".into()])
+            .expect("re-lock 只替换白名单");
         assert_eq!(state.status().whitelist, vec!["code".to_string()]);
-        state.unlock();
+        state.unlock().unwrap();
         assert!(!state.status().locked);
         assert!(state.status().whitelist.is_empty());
     }

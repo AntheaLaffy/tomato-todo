@@ -8,10 +8,13 @@
 // - /mcp：Streamable HTTP 桩（POST JSON-RPC），Bearer token 认证（数据目录
 //   agent/connection.json），拒绝任何带 Origin 的请求；GET/SSE 未实现。
 import { createServer } from "node:http";
+import { randomBytes } from "node:crypto";
+import { createReadStream, fstatSync, openSync, closeSync, constants } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { mcpMethod, safeEqual } from "./mcp.mjs";
 import { listApps } from "./apps.mjs";
 import { GuardClient } from "./guard-client.ts";
+import { ProjectLibrary, LibraryError } from "./project-library.mjs";
 
 export const UI_ORIGIN = "http://127.0.0.1:3080";
 export const DEFAULT_PORT = 43987;
@@ -106,6 +109,65 @@ function handlePreflight(req, res) {
     Vary: "Origin",
   });
   res.end();
+}
+
+function decodeId(value) {
+  try { return decodeURIComponent(value); }
+  catch { throw new HttpError(400, "无效的资源 ID"); }
+}
+
+function sendResourceFile(req, res, url, library, id, fileToken) {
+  if (!safeEqual(url.searchParams.get("access") ?? "", fileToken)) {
+    throw new HttpError(403, "资源文件访问令牌无效");
+  }
+  const file = library.metadata(id);
+  const download = url.searchParams.get("download") === "1";
+  if (!download && !file.canPreview) {
+    throw new HttpError(413, "此文件不能预览；可下载原件（预览上限 20 MiB）");
+  }
+  // 文件读取直接流式传输，不把百 MiB 教材塞进 JSON 或前端内存。
+  const fd = openSync(file.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  let stat;
+  try { stat = fstatSync(fd); }
+  catch (error) { closeSync(fd); throw error; }
+  if (!stat.isFile()) { closeSync(fd); throw new HttpError(400, "资源不是普通文件"); }
+  const size = stat.size;
+  const range = req.headers.range;
+  let start = 0;
+  let end = size - 1;
+  if (range !== undefined) {
+    const parts = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (!parts || (!parts[1] && !parts[2])) {
+      closeSync(fd);
+      return sendApi(res, 416, { error: "仅支持单段 bytes Range" }, { "Content-Range": "bytes */" + size });
+    }
+    if (!parts[1]) {
+      const count = Number(parts[2]);
+      start = Math.max(0, size - count);
+    } else {
+      start = Number(parts[1]);
+      if (parts[2]) end = Math.min(end, Number(parts[2]));
+    }
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= size) {
+      closeSync(fd);
+      return sendApi(res, 416, { error: "Range 超出文件长度" }, { "Content-Range": "bytes */" + size });
+    }
+  }
+  const filename = encodeURIComponent(file.name.replace(/[\r\n]/g, "_"));
+  res.writeHead(range === undefined ? 200 : 206, {
+    "Content-Type": file.mimeType,
+    "Content-Length": end - start + 1,
+    "Content-Disposition": (download ? "attachment" : "inline") + "; filename*=UTF-8''" + filename,
+    "Content-Range": range === undefined ? undefined : "bytes " + start + "-" + end + "/" + size,
+    "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Origin": UI_ORIGIN,
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+  });
+  const stream = createReadStream(null, { fd, autoClose: true, start, end });
+  stream.on("error", () => res.destroy());
+  stream.pipe(res);
 }
 
 async function handleMcp(req, res, { engine, token }) {
@@ -262,7 +324,12 @@ export function createGuardSync(engine, guard) {
   const run = async () => {
     const desired = desiredGuard(engine);
     const key = JSON.stringify(desired);
-    if (key === appliedKey) return;
+    if (key === appliedKey) {
+      const probe = await guard.status();
+      if (probe.ok && probe.data?.locked === (desired.command === "lock") &&
+          JSON.stringify(probe.data?.whitelist ?? []) === JSON.stringify(desired.whitelist)) return;
+      appliedKey = null;
+    }
     const result =
       desired.command === "lock"
         ? await guard.lock({ whitelist: desired.whitelist })
@@ -305,13 +372,36 @@ function uiStateOptions(url) {
 }
 
 async function handleApi(req, res, url, ctx) {
-  const { engine, guard, syncGuard } = ctx;
+  const { engine, guard, syncGuard, library, fileToken } = ctx;
   const path = url.pathname;
   const now = () => Math.floor(Date.now() / 1000);
   const method = req.method;
 
   // 只读端点：允许 DSH UI origin 跨域
   if (method === "GET") {
+    if (path === "/api/file-token") {
+      if (req.headers.origin !== undefined && req.headers.origin !== UI_ORIGIN) throw new HttpError(403, "Origin 不在白名单");
+      return sendApi(res, 200, { access: fileToken });
+    }
+    let match = /^\/api\/resources\/([^/]+)\/file$/.exec(path);
+    if (match) return sendResourceFile(req, res, url, library, decodeId(match[1]), fileToken);
+    match = /^\/api\/resources\/([^/]+)\/info$/.exec(path);
+    if (match) {
+      const { path: _path, resource: _resource, ...info } = library.metadata(decodeId(match[1]));
+      return sendApi(res, 200, info);
+    }
+    match = /^\/api\/projects\/([^/]+)\/grant$/.exec(path);
+    if (match) return sendApi(res, 200, library.grantStatus(decodeId(match[1])));
+    match = /^\/api\/projects\/([^/]+)\/resources\/scan$/.exec(path);
+    if (match) return sendApi(res, 200, library.scan(decodeId(match[1])));
+    match = /^\/api\/projects\/([^/]+)\/resources$/.exec(path);
+    if (match) return sendApi(res, 200, library.list(decodeId(match[1]), {
+      q: url.searchParams.get("q") ?? "",
+      kind: url.searchParams.get("kind") ?? "",
+      status: url.searchParams.get("status") ?? "",
+      offset: Number(url.searchParams.get("offset") ?? 0),
+      limit: Number(url.searchParams.get("limit") ?? 40),
+    }));
     if (path === "/api/snapshot") {
       const guardView = await guardSummary(guard);
       return sendApi(res, 200, { ...engine.snapshot(now()), guard: guardView });
@@ -347,8 +437,13 @@ async function handleApi(req, res, url, ctx) {
     }
     if (path === "/api/stats") return sendApi(res, 200, engine.stats(now()));
     if (path === "/api/apps") {
-      // 白名单要填 app_id（.desktop 文件名），所以枚举的是已安装应用而不是窗口。
-      const { apps, cached } = listApps(now());
+      const running = await guard.runningApps();
+      if (!running.ok) return sendApi(res, 503, { error: running.error ?? "无法读取运行中的应用" });
+      const ids = Array.isArray(running.data?.apps) ? running.data.apps : [];
+      const { apps: installed, cached } = listApps(now());
+      const names = new Map(installed.map((app) => [app.id, app]));
+      const apps = [...new Set(ids.filter((id) => typeof id === "string" && id !== ""))]
+        .map((id) => ({ id, name: names.get(id)?.name ?? id }));
       return sendApi(res, 200, { apps, count: apps.length, cached, asOf: now() });
     }
     sendApi(res, 404, { error: "Not found" });
@@ -356,6 +451,31 @@ async function handleApi(req, res, url, ctx) {
   }
 
   ensureWriteOrigin(req);
+  if (method === "POST" && path === "/api/projects") {
+    const result = library.create(await parseJson(req));
+    return sendApi(res, 201, result);
+  }
+  let projectMatch = /^\/api\/projects\/([^/]+)\/(authorize|rename|resources(?:\/cleanup)?|resources\/[^/]+\/repair)$/.exec(path);
+  if (method === "POST" && projectMatch) {
+    const projectId = decodeId(projectMatch[1]);
+    const op = projectMatch[2];
+    const body = await parseJson(req);
+    if (op === "authorize") return sendApi(res, 200, library.bind(projectId, body.directory));
+    if (op === "rename") return sendApi(res, 200, library.rename(projectId, body));
+    if (op === "resources") return sendApi(res, 201, library.register(projectId, body.resource));
+    if (op === "resources/cleanup") return sendApi(res, 200, library.cleanup(projectId, body.ids ?? null));
+    const resourceId = decodeId(op.slice("resources/".length, -"/repair".length));
+    return sendApi(res, 200, library.repair(projectId, resourceId, body.path));
+  }
+  if (method === "POST" && path === "/api/desktop/fullscreen") {
+    const body = await parseJson(req);
+    if (typeof body.enabled !== "boolean") {
+      return sendApi(res, 400, { error: "enabled 必须是布尔值" });
+    }
+    const result = await guard.fullscreen(body.enabled);
+    return sendApi(res, result.ok ? 200 : 503,
+      result.ok ? result.data : { error: result.error ?? "DSH 全屏控制失败" });
+  }
   if (method === "POST" && path === "/api/dispatch") {
     const body = await parseJson(req);
     let outcome;
@@ -441,6 +561,8 @@ export async function startServer({
   // guardClient 仅测试注入用：避免在真实桌面上误发锁屏命令。
   const guard = guardClient ?? GuardClient.fromDataDir(dataDir);
   const syncGuard = createGuardSync(engine, guard);
+  const library = new ProjectLibrary(engine, dataDir);
+  const fileToken = randomBytes(24).toString("hex");
   const startedAt = Date.now();
   const server = createServer((req, res) => {
     let url;
@@ -476,11 +598,13 @@ export async function startServer({
             engine,
             guard,
             syncGuard,
+            library,
+            fileToken,
           });
         }
         send(res, 404, { error: "Not found" });
       } catch (error) {
-        if (error instanceof HttpError) {
+        if (error instanceof HttpError || error instanceof LibraryError) {
           sendApi(res, error.status, { error: error.message });
         } else {
           console.error("request error:", error);

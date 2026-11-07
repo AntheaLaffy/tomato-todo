@@ -208,5 +208,7 @@ pub fn niri_list() -> AppResult<Vec<Window>> {
 
 pub fn niri_focus(id: u64) -> AppResult<bool> {
     niri_request(json!({"Action": {"FocusWindow": {"id": id}}}))?;
-    Ok(true)
+    Ok(niri_list()?
+        .iter()
+        .any(|window| window.id == id && window.is_focused))
 }

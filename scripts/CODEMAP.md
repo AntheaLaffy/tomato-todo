@@ -13,7 +13,10 @@ generated_at: 2026-10-09
 | install-desktop-integration.py | 桌面集成 | 安装 GNOME 扩展到用户 XDG 目录，提供启用命令而不自动启用，支持临时 home 和 dry-run                                                          |
 | install.py                     | 安装     | 旧 Tauri 时代的用户安装脚本（随收尾阶段退役，由 install.mjs 取代）                                                                          |
 | install.mjs                    | 安装     | 安装 runtime+guard 到 ~/.local/lib/tomato/，写 systemd user unit 并 enable runtime 自启；--dry-run/--uninstall，manifest 记录路径以安全卸载 |
+| niri-guard.test.mjs             | 验证     | 独立 Xvfb+niri 与真实 GTK 窗口：运行中应用枚举、全屏/退出、白名单、锁机忽略白名单、释放与确认抢焦；仅连接临时桌面 |
 | export-sqlite.mjs              | 迁移     | 一次性把旧 sqlite 库导出为 plan.json 与 backup-v4.json（v3 先按 crates/core/src/migration.rs 语义升级；只读打开、原子写、--force 覆盖）     |
+| build-host-tools.mjs           | 构建     | 从 runtime/src/tools.mjs 生成插件自带 Host 工具 schema；`--check` 拒绝与运行时漂移                         |
+| plugin-host.test.mjs           | 验证     | 验证全部 Host 工具注册与教学读取转发；`LIVE_TOMATO=1` 时只读联通当前实例                            |
 | build-agent.mjs                | 构建     | 打包固定版本 Pi SDK、按本机或显式 Rust 目标校验并内置 Node 运行时，生成 agent/bundle（不含私人数据与 npm 绝对路径 .bin 软链）               |
 | agent-runtime.mjs              | 构建     | Linux/Windows/macOS x64/ARM64 的固定 Node 版本、官方校验和与 Rust 目标选择，拒绝不兼容 ABI                                                  |
 | check-android-apk.py           | 构建     | 校验 universal APK 的四个原生 ABI、ELF 架构和桌面 Node 资源排除；供本机原生测试和 CI 共用                                                   |

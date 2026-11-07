@@ -1,0 +1,9 @@
+interface:
+  display_name: "学习记忆"
+  short_description: "用有日期、来源和确认状态的本地记录延续学情、目标、偏好与复盘结论。"
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "tomato"
+      description: "正在运行的番茄 Todo 本机实例"

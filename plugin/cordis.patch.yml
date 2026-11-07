@@ -1,17 +1,8 @@
 # 番茄 Todo 插件装载补丁。
-# 两行：MCP 行把 assistant 接到 tomato-runtime 的 stdio MCP 入口；
-# 插件行携带 host/client 两个半，tomatoBin 是 host 工具与 UI 之外
-# 唯一需要按机器调整的字段（默认软链路径，安装脚本会创建）。
+# DSH 对话只使用插件自带的 Host 工具，避免独立 MCP 客户端断线后
+# 学习助手无法控制番茄 Todo。runtime 的 MCP 入口仍供其他客户端使用。
+# tomatoBin 是 Host 工具的一次性 runtime 入口。
 - insert:
-    - id: tomato-mcp
-      name: "@deepseek-ai/dsh-mcp-client"
-      config:
-        serverName: tomato
-        transport: stdio
-        command: /home/fuurin/.local/bin/tomato-runtime
-        args: ["--mcp"]
-        env:
-          HOME: /home/fuurin
     - id: tomato-dsh
       name: "@local/tomato-dsh"
       config:

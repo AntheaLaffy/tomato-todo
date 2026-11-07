@@ -37,6 +37,7 @@ HTTP 接口（契约见 API.md）：
   POST /guard       {\"command\":\"lock\",\"whitelist\":[...]} / {\"command\":\"unlock\"}
                     / {\"command\":\"notify\",\"title\":...,\"body\":...}
   GET  /guard/status → {\"locked\":bool,\"whitelist\":[...],\"pid\":n}
+  GET  /guard/apps   → {\"apps\":[\"app-id\",...]}（当前有窗口的应用）
 
 锁定期间白名单外的应用会被切回锁窗；白名单为空即严格锁定。
 guard 不保存任何长期状态：进程重启后不恢复锁定，runtime 会重发命令。
@@ -92,7 +93,9 @@ fn parse_from(mut args: impl Iterator<Item = String>) -> Result<Args, String> {
             }
             "--port" => {
                 let value = args.next().ok_or("--port 需要一个端口参数")?;
-                port = value.parse::<u16>().map_err(|_| format!("无效端口：{value}"))?;
+                port = value
+                    .parse::<u16>()
+                    .map_err(|_| format!("无效端口：{value}"))?;
             }
             "--whitelist" => {
                 let value = args.next().ok_or("--whitelist 需要逗号分隔的 app id")?;
@@ -119,7 +122,12 @@ fn parse_from(mut args: impl Iterator<Item = String>) -> Result<Args, String> {
         if unlock {
             return Err("--unlock 不能与 --serve/--lock 混用".into());
         }
-        return Ok(Args::Serve { data, port, lock, whitelist });
+        return Ok(Args::Serve {
+            data,
+            port,
+            lock,
+            whitelist,
+        });
     }
     Ok(Args::Unlock { data, port })
 }
@@ -129,8 +137,7 @@ impl crate::http::CommandBackend for state::State {
         state::State::lock(self, whitelist)
     }
     fn unlock(&self) -> Result<(), String> {
-        state::State::unlock(self);
-        Ok(())
+        state::State::unlock(self)
     }
     fn notify(&self, title: String, body: String) -> Result<(), String> {
         notify::show(&title, &body)
@@ -140,6 +147,12 @@ impl crate::http::CommandBackend for state::State {
     }
     fn status(&self) -> Status {
         state::State::status(self)
+    }
+    fn fullscreen(&self, enabled: bool) -> Result<(), String> {
+        state::State::fullscreen(self, enabled)
+    }
+    fn running_apps(&self) -> Result<Vec<String>, String> {
+        state::State::running_apps(self)
     }
 }
 
@@ -156,17 +169,22 @@ fn main() {
         Args::Help => {
             print!("{USAGE}");
         }
-        Args::Serve { data, port, lock, whitelist } => {
+        Args::Serve {
+            data,
+            port,
+            lock,
+            whitelist,
+        } => {
             let data_dir = data.unwrap_or_else(token::default_data_dir);
-            let token_value =
-                token::load_or_create(&data_dir).unwrap_or_else(|error| {
-                    eprintln!("无法准备 token 文件：{error}");
-                    std::process::exit(1);
-                });
+            let token_value = token::load_or_create(&data_dir).unwrap_or_else(|error| {
+                eprintln!("无法准备 token 文件：{error}");
+                std::process::exit(1);
+            });
             let listener = TcpListener::bind(("127.0.0.1", port)).unwrap_or_else(|error| {
                 eprintln!("无法监听 127.0.0.1:{port}：{error}");
                 std::process::exit(1);
             });
+            let port = listener.local_addr().unwrap().port();
             println!(
                 "tomato-guard 已启动：http://127.0.0.1:{port}（token 文件：{}）",
                 token::token_file(&data_dir).display()
@@ -174,7 +192,10 @@ fn main() {
             let state = Arc::new(state::State::new());
             if lock {
                 match state.lock(whitelist) {
-                    Ok(()) => println!("tomato-guard：已锁定（白名单 {} 项）", state.status().whitelist.len()),
+                    Ok(()) => println!(
+                        "tomato-guard：已锁定（白名单 {} 项）",
+                        state.status().whitelist.len()
+                    ),
                     Err(error) => {
                         eprintln!("锁定失败：{error}");
                         std::process::exit(1);
@@ -220,8 +241,8 @@ fn post_unlock(port: u16, token_value: &str) -> Result<String, String> {
         "POST /guard HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer {token_value}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len(),
     );
-    let mut stream =
-        TcpStream::connect(("127.0.0.1", port)).map_err(|error| format!("guard 服务未运行：{error}"))?;
+    let mut stream = TcpStream::connect(("127.0.0.1", port))
+        .map_err(|error| format!("guard 服务未运行：{error}"))?;
     stream
         .write_all(request.as_bytes())
         .map_err(|error| error.to_string())?;
@@ -258,8 +279,22 @@ mod tests {
 
     #[test]
     fn cli_parses_serve_lock_and_whitelist() {
-        match parsed(&["--serve", "--data", "/tmp/guard", "--lock", "--whitelist", "code, firefox"]).unwrap() {
-            Args::Serve { data, port, lock, whitelist } => {
+        match parsed(&[
+            "--serve",
+            "--data",
+            "/tmp/guard",
+            "--lock",
+            "--whitelist",
+            "code, firefox",
+        ])
+        .unwrap()
+        {
+            Args::Serve {
+                data,
+                port,
+                lock,
+                whitelist,
+            } => {
                 assert_eq!(data, Some(PathBuf::from("/tmp/guard")));
                 assert_eq!(port, http::DEFAULT_PORT);
                 assert!(lock);

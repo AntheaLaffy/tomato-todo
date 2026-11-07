@@ -1,10 +1,5 @@
-// 已安装桌面应用的枚举（GET /api/apps）：专注保护的白名单要填的是 app_id，
-// 而 app_id 在 Wayland 上就是 .desktop 文件名去掉 `.desktop`（X11 的 WM_CLASS
-// 通常同源），所以「扫桌面入口目录」比枚举窗口更接近用户要填的东西。
-//
-// 为什么放在 runtime 而不是 guard：guard 只看得到**正在运行的窗口**，用户要选
-// 的常常是还没启动的应用；而且 guard 的 HTTP 面要保持最小（只有锁/解锁/通知/
-// 抢焦四条命令），不该为了一次性列表扩容。
+// 已安装桌面入口仅用于给 guard 枚举的运行中 app_id 补充可读名称。
+// 白名单建议只取实际有窗口的应用，不把安装目录当候选来源。
 //
 // 取舍：
 // - 只读 `[Desktop Entry]` 段，跳过 `NoDisplay=true`、`Hidden=true`、非
@@ -12,8 +7,7 @@
 // - id 取文件名（含子目录时用 basename）：flatpak/snap 的入口也是这个规则，
 //   与白名单的精确匹配一致。重名先到先得（用户目录优先）。
 // - 名称优先取 `Name[zh_CN]`（当前 locale 是中文时），否则 `Name`。
-// - 结果缓存 30 秒：目录里通常几百个文件，一次扫描几毫秒，但页面「刷新应用」
-//   会被连点；缓存只影响新鲜度，不影响正确性。
+// - 名称缓存 30 秒；候选 app_id 每次都由 guard 实时读取。
 
 import { readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";

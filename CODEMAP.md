@@ -25,10 +25,11 @@ generated_at: 2026-11-07
 | 番茄计时、提醒调度、数据落盘 | runtime | runtime/src/engine.ts | runtime/test/engine.test.mjs、API.md |
 | HTTP API 与 MCP 入口 | runtime | runtime/src/server.mjs、mcp.mjs、mcp-stdio.mjs | API.md、docs/MCP.md、runtime/test/ |
 | guard 客户端与 --guard-status | runtime | runtime/src/guard-client.ts | API.md guard 命令协议、runtime/test/ |
-| DSH 插件 host 工具 | 插件 | plugin/index.js | API.md、docs/MCP.md |
+| DSH 插件 host 工具 | 插件 | plugin/index.js、plugin/host-tool-specs.js（由 scripts/build-host-tools.mjs 生成） | runtime/src/tools.mjs、scripts/plugin-host.test.mjs、API.md、docs/MCP.md |
+| DSH 插件内置技能与跨 agent 链接 | 插件 | plugin/skills.js（技能提供者）、plugin/skills/、plugin/link-skills.js（挂载时软链）与 link-skills.mjs（命令行） | plugin/README.md |
 | DSH 插件 UI 源码（皮肤/主视图/沉浸/HUD） | 插件 | plugin/src/client/（入口 entry.js；skin/ 皮肤、app/ 框架与常驻组件、pages/ 九页、shared/ 组件库与数据层；局部地图 plugin/src/client/CODEMAP.md） | docs/SKIN.md、docs/LEGACY_FEATURES.md、API.md「UI 数据面」、scripts/smoke-client.mjs |
 | DSH 插件 client 构建与冒烟 | 插件 | plugin/client.js（构建产物，pnpm build:client）、scripts/build-client.mjs、scripts/smoke-client.mjs | plugin/README.md、docs/SKIN.md |
-| 专注保护与锁屏（各桌面后端） | 原生 | crates/guard/src/（guard.rs 后端选择、x11/wayland/wayland_surface/shell/win32/macos 各后端） | API.md guard 命令协议、crates/guard/README.md |
+| 专注保护与锁屏（各桌面后端） | 原生 | crates/guard/src/CODEMAP.md（guard/state、niri IPC 与 toplevel 显式全屏） | API.md guard 命令协议、crates/guard/README.md、scripts/niri-guard.test.mjs |
 | GNOME Shell 桥接扩展 | 桌面集成 | desktop-integrations/ | crates/guard/src/shell.rs |
 | 数据迁移（旧 sqlite → plan.json） | 工具 | scripts/export-sqlite.mjs | scripts/export-sqlite.test.mjs |
 | 安装与自启 | 工具 | scripts/install.mjs | scripts/install.test.mjs |

@@ -28,7 +28,10 @@ tomato-guard --notify 番茄完成 休息一下
 | `POST /guard` `{"command":"lock","whitelist":["app-id",...]}` | 全屏锁定 + 白名单（已锁定时只替换白名单） |
 | `POST /guard` `{"command":"unlock"}` | 解锁并销毁锁窗 |
 | `POST /guard` `{"command":"notify","title":...,"body":...}` | 系统通知 |
+| `POST /guard` `{"command":"focus"}` | 激活并确认 DSH 窗口焦点 |
+| `POST /guard` `{"command":"fullscreen","enabled":true}` | niri：显式控制 DSH 全屏；`false` 退出，保护期间仍保持全屏 |
 | `GET /guard/status` | `{"locked":bool,"whitelist":[...],"pid":n,"backend":"<实际后端名>"}` |
+| `GET /guard/apps` | 当前有窗口的应用 ID；不返回标题或 PID，供白名单建议使用 |
 
 所有请求需 `Authorization: Bearer <token>`；只监听 127.0.0.1，token 比较为恒时风格。
 
@@ -37,7 +40,8 @@ tomato-guard --notify 番茄完成 休息一下
 | 环境 | 窗口发现 / 激活 | 全屏锁窗 |
 | --- | --- | --- |
 | X11（会话非 Wayland） | EWMH 只读枚举 + _NET_ACTIVE_WINDOW（`x11.rs`） | 自建全屏 X 窗口 |
-| niri / Sway / Hyprland（Wayland） | 各自的 IPC socket（`wayland.rs`） | xdg_toplevel 全屏锁面（`wayland_surface.rs`） |
+| niri（Wayland） | niri IPC，激活后复查焦点 | 通过 foreign-toplevel 协议全屏实际 DSH 窗口（`toplevel.rs`），保留倒计时与解锁按钮 |
+| Sway / Hyprland（Wayland） | 各自的 IPC socket（`wayland.rs`） | xdg_toplevel 全屏锁面（`wayland_surface.rs`） |
 | GNOME / KWin（Wayland） | 会话总线：GNOME Shell 扩展 `studio.tomato.Guard1`（需 desktop-integrations/）、KWin 脚本（`shell.rs`） | 同上 |
 | 其他 Wayland 桌面 | 明确报错，**绝不把 Xwayland 当完整保护能力** | 不可用 |
 | Windows | Win32 只读枚举（含 UWP AUMID / Wine 回退）+ 前台激活（`win32.rs`） | WS_POPUP 全屏锁窗 |
@@ -53,10 +57,12 @@ tomato-guard --notify 番茄完成 休息一下
 - 其余窗口只有 `app_id` 与白名单条目**精确相等**才放行——不做前缀/子串/大小写
   折叠匹配，`code-malicious` 不会蹭到 `code` 的权限。
 - 白名单为空 = 严格锁定（除了锁窗全部拦截）；最多 100 项，校验见 `protocol.rs`。
+- niri 只放行被选中的 DSH 窗口，不因同一 PID 额外放行其他窗口。锁机模式、快速/定时锁机忽略所有白名单；只有白名单专注模式放行配置的应用。
 
 ## 测试政策（务必遵守）
 
 - 单元测试全部无桌面依赖（状态机、HTTP 路由、白名单判定、各 IPC 报文形状）。
+- `cargo build --manifest-path crates/guard/Cargo.toml` 后运行 `node scripts/niri-guard.test.mjs`：自动启动独立 Xvfb + niri，覆盖全屏幂等/退出、白名单、锁机不放行白名单、解锁与焦点确认；不连接用户当前桌面。
 - **绝不在用户当前桌面自动启用真实锁定**。需要真桌面冒烟时，在独立嵌套桌面
   （如 Xephyr/sway 嵌套会话）里设 `TOMATO_GUARD_TEST_ISOLATED=1` 运行
   `cargo test`，`state.rs` 的 lock 测试只在该变量下执行；失败不影响主流程。

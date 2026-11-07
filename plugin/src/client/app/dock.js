@@ -3,7 +3,7 @@
 // 保留它是因为「打开 DSH 就在场」的入口不能只有悬浮 HUD：对话是学习助手
 // 的主场，入口卡是对话与专注之间的桥。
 import { h, useState } from "../runtime.js";
-import { t } from "../shared/copy.js";
+import { t, useLocale } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import { Chip, notify } from "../shared/ui.js";
 import { registerCopy } from "../shared/copy.js";
@@ -33,6 +33,7 @@ registerCopy("dock", {
 });
 
 export function DockCard({ openPanel }) {
+  useLocale();
   const state = useSnapshot();
   const [busy, setBusy] = useState(false);
   const data = (state && state.data) || {};

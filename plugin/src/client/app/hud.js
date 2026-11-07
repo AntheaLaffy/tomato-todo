@@ -18,7 +18,6 @@ import { Ring, Btn, IconBtn, Bar, notify } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
 import { timerView, fmtClock, taskById, protectionView } from "../shared/derive.js";
 import { useImmersiveOpen, openImmersive, openEndDialog } from "./immersive.js";
-import { openPanelAt } from "./navigation.js";
 import { useSound, ensureAudio } from "./sound.js";
 
 registerCopy("hud", {
@@ -108,14 +107,16 @@ function modeLabel(mode) {
 }
 
 /**
- * 状态跃迁 → 是否要把界面拉回今日专注：complete | reminder | null。
+ * 状态跃迁 → 播放一次对应音效，不改变 DSH 当前页面。
  *
  * 只看跃迁（首次快照 prev 为 null 时不动手），轮询重复渲染不会反复跳页；
  * 同时发生时以「一轮结束」优先。
  */
-export function attentionSwitch(prev, next) {
+export function attentionCue(prev, next) {
   if (!prev || !next) return null;
   if (Number(next.serial) > Number(prev.serial)) return "complete";
+  if (!prev.running && next.running) return next.mode === "focus" ? "start" : "resume";
+  if (prev.running && !next.running && next.paused) return "pause";
   if (Number(next.reminders) > Number(prev.reminders)) return "reminder";
   return null;
 }
@@ -153,17 +154,7 @@ export function Hud({ openPanel }) {
   const focusMode = view.mode === "focus";
   const idleBreak = !alive && !focusMode; // 专注结束、尚未开始休息
 
-  // 有对话框开着（任务编辑、删除确认等）时不抢页面：跳页会把未保存的草稿丢掉。
-  const canGrabAttention = () => {
-    try {
-      return !document.querySelector('[role="dialog"]');
-    } catch {
-      return true;
-    }
-  };
-
   // 关键节点音效：开始 / 暂停 / 完成 / 提醒。只看状态跃迁，轮询重复渲染不重复响。
-  // 完成与提醒还会把 DSH 面板切到今日专注；窗口置前由 runtime → guard 的原生 focus 完成。
   const prevRef = useRef(null);
   useEffect(() => {
     const next = {
@@ -176,19 +167,8 @@ export function Hud({ openPanel }) {
     const prev = prevRef.current;
     prevRef.current = next;
     if (prev === null) return;
-    const grab = attentionSwitch(prev, next);
-    if (next.serial > prev.serial) {
-      sound.playCue("complete");
-    } else if (!prev.running && next.running) {
-      sound.playCue(next.mode === "focus" ? "start" : "resume");
-    } else if (prev.running && !next.running && next.paused) {
-      sound.playCue("pause");
-    } else if (next.reminders > prev.reminders) {
-      sound.playCue("reminder");
-    }
-    // 一轮计时自然结束 / 新提醒到点：把 DSH 面板切回今日专注（用户明确要的行为）。
-    // 前端只切视图；系统级置前由 runtime 调 guard focus（原生后端）。
-    if (grab && canGrabAttention()) openPanelAt("focus");
+    const cue = attentionCue(prev, next);
+    if (cue) sound.playCue(cue);
     // 音效只在状态跃迁时触发；sound 的引用稳定，不参与依赖以免重复播放。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.running, view.paused, view.mode, view.timer.completionSerial, data]);

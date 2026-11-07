@@ -108,13 +108,13 @@ export function registerSkin(ctx) {
   safeInject(
     ctx,
     "sidebar.brand.mark",
-    { name: "sidebar.brand.mark" },
+    { name: "sidebar.brand.mark", priority: -5 },
     TomatoMark,
   );
   safeInject(
     ctx,
     "sidebar.brand.name",
-    { name: "sidebar.brand.name" },
+    { name: "sidebar.brand.name", priority: -5 },
     TomatoWordmark,
   );
   safeInject(

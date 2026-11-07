@@ -386,6 +386,7 @@ export function educationGrading(data) {
         name: project ? project.name : "",
         grading: 0,
         review: 0,
+        records: [],
       });
     }
     return buckets.get(key);
@@ -393,13 +394,21 @@ export function educationGrading(data) {
 
   for (const submission of submissions) {
     const assessment = assessmentOf.get(submission.assessmentId) || null;
-    if (!graded.has(submission.id)) bucket(assessment && assessment.projectId).grading += 1;
+    if (!graded.has(submission.id)) {
+      const item = bucket(assessment && assessment.projectId);
+      item.grading += 1;
+      item.records.push({ projectId: assessment?.projectId, assessmentId: assessment?.id,
+        submissionId: submission.id });
+    }
   }
   for (const grade of grades) {
     if (grade.needsReview !== true) continue;
     const submission = submissions.find((item) => item.id === grade.submissionId) || null;
     const assessment = submission ? assessmentOf.get(submission.assessmentId) : null;
-    bucket(assessment && assessment.projectId).review += 1;
+    const item = bucket(assessment && assessment.projectId);
+    item.review += 1;
+    item.records.push({ projectId: assessment?.projectId, assessmentId: assessment?.id,
+      submissionId: grade.submissionId, gradeId: grade.id });
   }
 
   const items = [...buckets.values()]

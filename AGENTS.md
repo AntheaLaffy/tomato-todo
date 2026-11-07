@@ -45,7 +45,7 @@ Mode: maintenance. 从 [CODEMAP.md](CODEMAP.md) 开始导航。
 
 ## 助手与 MCP 实现规范
 
-学习助手的界面与能力完全在 DSH 侧；本仓库只提供接口：runtime 的 MCP 工具（stdio `--mcp` 与 `/mcp` streamable HTTP）是 DSH 对话与软件的桥。语义以 [API.md](API.md) 与 [docs/MCP.md](docs/MCP.md) 为准，实现时遵守：
+学习助手的界面与能力完全在 DSH 侧；本仓库提供插件自带的 `tomato_*` Host 工具作为 DSH 对话入口，runtime 的 MCP 工具（stdio `--mcp` 与 `/mcp` streamable HTTP）供其他客户端使用。两条入口都连接同一运行实例，语义以 [API.md](API.md) 与 [docs/MCP.md](docs/MCP.md) 为准，实现时遵守：
 
 - **不给长任务设人为上限**：工具调用跑到完成，只有传输层/调用方超时才结束；不要加 wall-clock 截止、轮次上限这类"保险"。
 - **错误按 MCP 语义报告**：工具失败返回 `isError: true` 与可读信息，不把用户停止等正常中止描述成故障。

@@ -1,7 +1,7 @@
 //! 极简 HTTP 服务：127.0.0.1 单客户端、每连接一线程、Connection: close，
 //! 不依赖任何 HTTP crate。鉴权：`Authorization: Bearer <token>`（token 见 token.rs）。
 //! 路由与解析均为纯函数，用 mock backend 做无桌面单测。
-use crate::protocol::{FocusReply, Command, ErrorReply, OkReply, Status, valid_whitelist};
+use crate::protocol::{valid_whitelist, Command, ErrorReply, FocusReply, OkReply, Status};
 use crate::token;
 use serde::Serialize;
 use std::io::{Read, Write};
@@ -23,6 +23,8 @@ pub trait CommandBackend: Send + Sync {
     /// 找到 DSH 窗口并切到前台；返回窗口标题（没找到时 None）。
     fn focus(&self) -> Result<Option<String>, String>;
     fn status(&self) -> Status;
+    fn fullscreen(&self, enabled: bool) -> Result<(), String>;
+    fn running_apps(&self) -> Result<Vec<String>, String>;
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -88,9 +90,18 @@ fn json<T: Serialize>(value: &T) -> String {
 }
 
 /// 纯路由 + 鉴权：返回 (HTTP 状态码, JSON 响应体)。
-pub fn route(request: Request, expected_token: &str, backend: &dyn CommandBackend) -> (u16, String) {
+pub fn route(
+    request: Request,
+    expected_token: &str,
+    backend: &dyn CommandBackend,
+) -> (u16, String) {
     if !token::matches(request.bearer.as_deref(), expected_token) {
-        return (401, json(&ErrorReply { error: "unauthorized".into() }));
+        return (
+            401,
+            json(&ErrorReply {
+                error: "unauthorized".into(),
+            }),
+        );
     }
     match (request.method.as_str(), request.path.as_str()) {
         ("POST", "/guard") => match serde_json::from_slice::<Command>(&request.body) {
@@ -117,6 +128,7 @@ pub fn route(request: Request, expected_token: &str, backend: &dyn CommandBacken
                         }
                         Command::Unlock => backend.unlock(),
                         Command::Notify { title, body } => backend.notify(title, body),
+                        Command::Fullscreen { enabled } => backend.fullscreen(enabled),
                         Command::Focus => unreachable!(),
                     };
                     match result {
@@ -125,13 +137,30 @@ pub fn route(request: Request, expected_token: &str, backend: &dyn CommandBacken
                     }
                 }
             },
-            Err(error) => (400, json(&ErrorReply { error: format!("无效命令：{error}") })),
+            Err(error) => (
+                400,
+                json(&ErrorReply {
+                    error: format!("无效命令：{error}"),
+                }),
+            ),
         },
         ("GET", "/guard/status") => (200, json(&backend.status())),
-        ("POST", "/guard/status") | ("GET", "/guard") => {
-            (405, json(&ErrorReply { error: "方法不允许".into() }))
-        }
-        _ => (404, json(&ErrorReply { error: "not found".into() })),
+        ("GET", "/guard/apps") => match backend.running_apps() {
+            Ok(apps) => (200, json(&serde_json::json!({ "apps": apps }))),
+            Err(error) => (500, json(&ErrorReply { error })),
+        },
+        ("POST", "/guard/status") | ("GET", "/guard") => (
+            405,
+            json(&ErrorReply {
+                error: "方法不允许".into(),
+            }),
+        ),
+        _ => (
+            404,
+            json(&ErrorReply {
+                error: "not found".into(),
+            }),
+        ),
     }
 }
 
@@ -181,7 +210,13 @@ fn handle_stream(
             break;
         }
         if buffer.len() > MAX_HEADER {
-            return respond(&mut stream, 400, &json(&ErrorReply { error: "请求头过大".into() }));
+            return respond(
+                &mut stream,
+                400,
+                &json(&ErrorReply {
+                    error: "请求头过大".into(),
+                }),
+            );
         }
     }
     let content_length = buffer
@@ -208,7 +243,13 @@ fn handle_stream(
         }
         buffer.extend_from_slice(&chunk[..read]);
         if buffer.len() > body_start + MAX_BODY {
-            return respond(&mut stream, 400, &json(&ErrorReply { error: "请求体过大".into() }));
+            return respond(
+                &mut stream,
+                400,
+                &json(&ErrorReply {
+                    error: "请求体过大".into(),
+                }),
+            );
         }
     }
     let request = match parse_request(&buffer) {
@@ -243,6 +284,12 @@ mod tests {
     }
 
     impl CommandBackend for Mock {
+        fn running_apps(&self) -> Result<Vec<String>, String> {
+            Ok(vec!["code".into(), "kitty".into()])
+        }
+        fn fullscreen(&self, _: bool) -> Result<(), String> {
+            Ok(())
+        }
         fn lock(&self, whitelist: Vec<String>) -> Result<(), String> {
             *self.locked.lock().unwrap() = true;
             *self.whitelist.lock().unwrap() = whitelist;
@@ -284,7 +331,9 @@ mod tests {
     fn rejects_malformed_requests() {
         assert!(parse_request(b"POST /guard HTTP/1.1\r\nAuthorization: Bearer t").is_err());
         assert!(parse_request(b"POST /guard HTTP/1.1\r\n\r\n").is_ok());
-        assert!(parse_request(b"GET /guard/status HTTP/1.1\r\nContent-Length: 5\r\n\r\n123").is_err());
+        assert!(
+            parse_request(b"GET /guard/status HTTP/1.1\r\nContent-Length: 5\r\n\r\n123").is_err()
+        );
         assert!(parse_request(b"GET /guard/status HTTP/1.1\r\nContent-Length: x\r\n\r\n").is_err());
     }
 
@@ -323,7 +372,10 @@ mod tests {
             &*mock,
         );
         assert_eq!(status, 200);
-        assert_eq!(mock.notifications.lock().unwrap().as_slice(), &[("t".into(), "b".into())]);
+        assert_eq!(
+            mock.notifications.lock().unwrap().as_slice(),
+            &[("t".into(), "b".into())]
+        );
 
         let (status, body) = route(
             Request {
@@ -357,6 +409,20 @@ mod tests {
         assert_eq!(value["pid"], std::process::id());
         assert_eq!(value["backend"], "mock");
 
+        let (status, body) = route(
+            Request {
+                method: "GET".into(),
+                path: "/guard/apps".into(),
+                bearer: bearer(),
+                body: vec![],
+            },
+            token,
+            &*mock,
+        );
+        assert_eq!(status, 200);
+        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(value["apps"], serde_json::json!(["code", "kitty"]));
+
         let (status, _) = route(
             Request {
                 method: "POST".into(),
@@ -385,6 +451,8 @@ mod tests {
         let (status, body) = route(base("GET", "/guard/status", None, vec![]), token, &*mock);
         assert_eq!(status, 401);
         assert!(body.contains("unauthorized"));
+        let (status, _) = route(base("GET", "/guard/apps", None, vec![]), token, &*mock);
+        assert_eq!(status, 401);
         let (status, _) = route(
             base("GET", "/guard/status", Some("wrong".into()), vec![]),
             token,
@@ -453,11 +521,15 @@ mod tests {
         assert_eq!(status, 200);
         assert_eq!(body, r#"{"ok":true}"#);
         assert!(mock.status().locked);
-        let (status, body) = call("GET /guard/status HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer secret\r\n\r\n");
+        let (status, body) = call(
+            "GET /guard/status HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer secret\r\n\r\n",
+        );
         assert_eq!(status, 200);
         let value: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(value["locked"], true);
-        let (status, _) = call("GET /guard/status HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer nope\r\n\r\n");
+        let (status, _) = call(
+            "GET /guard/status HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer nope\r\n\r\n",
+        );
         assert_eq!(status, 401);
         // accept 循环永不返回：不 join，随测试进程退出即可。
     }

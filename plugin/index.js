@@ -12,9 +12,21 @@
 //        "whitelist":[],"pid":1234}}
 //     → {"ok":false,"error":"..."} (still exit 0 when it produced a reply)
 //   non-zero exit / no output means the runtime itself is not reachable.
+import z from "@deepseek-ai/schemastery";
+import { registerBundledSkills } from "./skills.js";
+import { installSkillLinks } from "./link-skills.js";
+import { HOST_TOOL_SPECS } from "./host-tool-specs.js";
+
 export const inject = ["tools", "subprocess"];
 
 const DEFAULT_BIN = "/home/fuurin/.local/bin/tomato-runtime";
+
+export const Config = z.object({
+  /** tomato-runtime 可执行文件；换机器时改这里，或改 cordis.patch.yml。 */
+  tomatoBin: z.string().default(DEFAULT_BIN),
+  /** 把随包技能软链给其他 agent：默认链进已存在的 agent 技能目录，false 关闭，数组指定目录。 */
+  linkSkills: z.union([z.boolean(), z.array(z.string())]).default(true),
+});
 
 // Why a pinned HOME: the runtime resolves its data directory
 // (~/.local/share/studio.tomato.todo) and MCP token from $HOME. The host
@@ -112,8 +124,41 @@ async function callRuntimeTool(ctx, bin, name, args) {
   return value;
 }
 
+function registerRuntimeTools(ctx, bin) {
+  for (const spec of HOST_TOOL_SPECS) {
+    ctx.tools.register({
+      name: `tomato_${spec.name}`,
+      description: spec.description,
+      parameters: spec.inputSchema,
+      output: {
+        schema: { type: "object", additionalProperties: true },
+        render(args, value) {
+          return [{ type: "text", text: JSON.stringify(value) }];
+        },
+      },
+      async execute(args) {
+        const value = await callRuntimeTool(ctx, bin, spec.name, args);
+        // DSH Host output requires an object; retain any MCP scalar or array.
+        return value && typeof value === "object" && !Array.isArray(value)
+          ? value : { result: value };
+      },
+    });
+  }
+}
+
 export function apply(ctx, config) {
   const bin = (config && config.tomatoBin) || DEFAULT_BIN;
+
+  // 教学技能随插件一起发布（skills/ 在包内）：插件更新即技能更新，
+  // 用户不需要再单独安装或同步一套技能目录。
+  registerBundledSkills(ctx);
+
+  // 同时也链进其他 agent 的技能目录，Codex/Claude Code 读到的就是这一份。
+  installSkillLinks(ctx, config && config.linkSkills, "tomato-dsh");
+
+  // These plugin-owned tools stay available if DSH's independent MCP client
+  // disconnects. Both routes still use the same running runtime and core.
+  registerRuntimeTools(ctx, bin);
 
   ctx.tools.register({
     name: "tomato_today",

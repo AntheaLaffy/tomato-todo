@@ -17,3 +17,7 @@ __pycache__/
 *.pyc
 node_modules/
 **/.vite/
+
+# 插件技能里的本机导航（本机可用，但不随仓库/安装包分发）
+/plugin/skills/tomato-todo/references/local-context.md
+/plugin/skills/exam-authoring/references/local-library.md

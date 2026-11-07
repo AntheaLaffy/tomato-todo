@@ -6,7 +6,7 @@
 // - 角色背景板（settings.personaBackdrop）：旧版数据语义，写回 core Settings，
 //   换设备也一致。
 import { h, useState, useEffect } from "../runtime.js";
-import { t, registerCopy } from "../shared/copy.js";
+import { t, registerCopy, useLocale } from "../shared/copy.js";
 import { Toggle, Select, Dot } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
 import { getSkinPrefs, setSkinPrefs, subscribeSkinPrefs } from "./prefs.js";
@@ -102,6 +102,7 @@ function Row({ label, hint, children, dim = false }) {
 }
 
 export function TomatoSkinSettingsRow() {
+  useLocale();
   const state = useSnapshot();
   const [prefs, setPrefs] = useState(getSkinPrefs());
   const [persona, setPersona] = useState(getPersonaId());

@@ -74,8 +74,7 @@ export const ATMOS_CSS = `
 /* ---------- 纸底与根容器 ---------- */
 html{background:var(--tomato-paper)}
 body{background:transparent}
-#root{position:relative;z-index:1;animation:tomato-root-in .52s ease both}
-@keyframes tomato-root-in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+#root{position:relative;z-index:1}
 ::selection{background:#d96d5536;color:inherit}
 body{scrollbar-color:var(--tomato-line-strong) transparent}
 body ::-webkit-scrollbar{width:10px;height:10px}

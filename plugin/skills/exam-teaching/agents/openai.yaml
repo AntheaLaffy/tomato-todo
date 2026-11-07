@@ -1,0 +1,9 @@
+interface:
+  display_name: "应试教学与批改"
+  short_description: "根据实际资料与学情备课、讲解、布置作业，按固定评分标准批改和复盘。"
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "tomato"
+      description: "正在运行的番茄 Todo 本机实例"

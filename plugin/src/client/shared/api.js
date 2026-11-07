@@ -72,9 +72,16 @@ export function getExportBackup(opts) {
   return request("/api/export/backup", { timeoutMs: 30000, ...opts });
 }
 
-/** 已安装桌面应用（GET /api/apps）→ {apps: [{id, name, icon, exec}], count}。 */
+/** 当前有窗口的应用（GET /api/apps）→ {apps: [{id, name}], count}。 */
 export function getApps(opts) {
   return request("/api/apps", opts);
+}
+
+let fullscreenQueue = Promise.resolve();
+export function setDesktopFullscreen(enabled) {
+  const run = () => request("/api/desktop/fullscreen", { method: "POST", body: { enabled } });
+  fullscreenQueue = fullscreenQueue.then(run, run);
+  return fullscreenQueue;
 }
 
 /** guard 与 runtime 健康摘要（GET /health）。 */

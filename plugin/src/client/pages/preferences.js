@@ -5,7 +5,7 @@
 // saveSettings（必须完整：core 校验全部字段，且不能把 protection 清掉）。
 // 离开页面不自动保存，避免轮询/卸载时序里把半截草稿写进 runtime。
 import { h, useState, useEffect, useRef } from "../runtime.js";
-import { t, registerCopy } from "../shared/copy.js";
+import { t, registerCopy, useLocale } from "../shared/copy.js";
 import {
   PageHeader,
   Card,
@@ -13,6 +13,7 @@ import {
   Btn,
   Chip,
   Input,
+  Select,
   Toggle,
   Segmented,
   Modal,
@@ -69,6 +70,8 @@ registerCopy("prefs", {
     importInvalid: "文件不是合法的 JSON",
     importReadFailed: "读取文件失败：{error}",
     sectionExperience: "体验与提醒",
+    language: "界面语言",
+    languageHint: "与 DSH 的语言设置同步；首次启动按浏览器或系统语言选择。",
     appearance: "外观主题",
     appearanceNote:
       "外观跟随 DSH「设置 → 外观」的深浅色偏好；番茄皮肤自动覆盖纸色系。",
@@ -161,6 +164,8 @@ registerCopy("prefs", {
     importInvalid: "This file is not valid JSON",
     importReadFailed: "Couldn't read the file: {error}",
     sectionExperience: "Experience & reminders",
+    language: "Language",
+    languageHint: "Synced with DSH settings; first launch follows your browser or system language.",
     appearance: "Appearance",
     appearanceNote:
       "Appearance follows DSH Settings → Appearance; the tomato skin layers the paper palette on top.",
@@ -426,6 +431,7 @@ function InfoRow({ label, value }) {
 }
 
 function PreferencesPage(props) {
+  const language = useLocale();
   const state = useSnapshot();
   const liveSettings =
     state && state.data && state.data.settings ? state.data.settings : null;
@@ -796,6 +802,19 @@ function PreferencesPage(props) {
     Card,
     { pad: 22 },
     h(SectionTitle, { icon: "bell", title: t("prefs.sectionExperience") }),
+    h(SettingRow, { label: t("prefs.language"), hint: t("prefs.languageHint") },
+      h(Select, {
+        value: language,
+        width: 142,
+        options: [
+          { value: "zh", label: "中文" },
+          { value: "en", label: "English" },
+          { value: "ja", label: "日本語" },
+        ],
+        onChange: (next) => props.onLanguageChange?.(next),
+      }),
+    ),
+    h(Divider, null),
     h(InfoRow, {
       label: t("prefs.appearance"),
       value: t("prefs.appearanceNote"),

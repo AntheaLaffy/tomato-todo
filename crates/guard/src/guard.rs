@@ -1,25 +1,28 @@
 //! 平台无关的保护语义与后端选择。
 //! 移植自旧 crates/core/src/guard.rs（guard_x11/guard_wayland/guard_shell/
 //! guard_windows/guard_macos 的公共层），去掉旧应用的窗口与域名依赖：
-//! 「专注窗口」现在是 guard 自建的全屏锁窗。
+//! niri 保护 DSH 的实际窗口；其他后端仍使用 guard 自建锁窗。
+#[cfg(target_os = "macos")]
+#[path = "macos.rs"]
+mod macos;
 #[cfg(target_os = "linux")]
-#[path = "x11.rs"]
-mod x11;
+#[path = "shell.rs"]
+mod shell;
+#[cfg(target_os = "linux")]
+#[path = "toplevel.rs"]
+mod toplevel;
 #[cfg(target_os = "linux")]
 #[path = "wayland.rs"]
 mod wayland;
 #[cfg(target_os = "linux")]
 #[path = "wayland_surface.rs"]
 mod wayland_surface;
-#[cfg(target_os = "linux")]
-#[path = "shell.rs"]
-mod shell;
 #[cfg(target_os = "windows")]
 #[path = "win32.rs"]
 mod win32;
-#[cfg(target_os = "macos")]
-#[path = "macos.rs"]
-mod macos;
+#[cfg(target_os = "linux")]
+#[path = "x11.rs"]
+mod x11;
 use serde::{Deserialize, Serialize};
 
 pub type AppResult<T> = Result<T, String>;
@@ -72,7 +75,9 @@ pub struct Desktop {
 
 impl Desktop {
     pub fn detect() -> Self {
-        Desktop { backend: detect_backend() }
+        Desktop {
+            backend: detect_backend(),
+        }
     }
 
     pub fn name(&self) -> &'static str {
@@ -144,12 +149,9 @@ impl Desktop {
     /// 「DeepSeek Harness」/「… · DeepSeek Harness」）。
     ///
     /// 返回被激活的窗口（找不到时 Ok(None)）；调用方据此判断是否真的抢到了目标。
-    pub fn focus_dsh(&self) -> AppResult<Option<Window>> {
+    pub fn dsh_window(&self) -> AppResult<Option<Window>> {
         let windows = self.windows()?;
-        let mut candidates: Vec<Window> = windows
-            .into_iter()
-            .filter(is_dsh_window)
-            .collect();
+        let mut candidates: Vec<Window> = windows.into_iter().filter(is_dsh_window).collect();
         if candidates.is_empty() {
             return Ok(None);
         }
@@ -158,16 +160,41 @@ impl Desktop {
         }
         // 同一个 DSH 可能同时有桌面窗口和浏览器标签：优先桌面窗口。
         candidates.sort_by_key(|window| {
-            let app = window
-                .app_id
-                .as_deref()
-                .unwrap_or("")
-                .to_ascii_lowercase();
+            let app = window.app_id.as_deref().unwrap_or("").to_ascii_lowercase();
             u8::from(!(app == "dsh-desktop" || app == "studio.dsh.desktop"))
         });
         let target = candidates.remove(0);
-        self.focus(target.id)?;
         Ok(Some(target))
+    }
+
+    pub fn focus_dsh(&self) -> AppResult<Option<Window>> {
+        let Some(target) = self.dsh_window()? else {
+            return Ok(None);
+        };
+        if !target.is_focused && !self.focus(target.id)? {
+            return Err("DSH 窗口尚未取得焦点".into());
+        }
+        Ok(Some(target))
+    }
+
+    pub fn native_dsh(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            return self.backend == Backend::Niri;
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
+    }
+
+    pub fn fullscreen(&self, window: &Window, enabled: bool) -> AppResult<()> {
+        #[cfg(target_os = "linux")]
+        if self.native_dsh() {
+            return toplevel::fullscreen(window, enabled);
+        }
+        let _ = (window, enabled);
+        Err("当前桌面未接入 DSH 原生全屏控制".into())
     }
 
     pub fn focus(&self, id: u64) -> AppResult<bool> {
@@ -205,9 +232,11 @@ impl Desktop {
         #[cfg(target_os = "linux")]
         {
             return match self.backend {
-                Backend::Niri | Backend::Sway | Backend::Hyprland | Backend::Gnome | Backend::KWin => {
-                    Ok(Box::new(wayland_surface::lock_surface()?))
-                }
+                Backend::Niri
+                | Backend::Sway
+                | Backend::Hyprland
+                | Backend::Gnome
+                | Backend::KWin => Ok(Box::new(wayland_surface::lock_surface()?)),
                 Backend::X11 => Ok(Box::new(x11::lock_window()?)),
                 Backend::WaylandUnsupported => Err("当前 Wayland 桌面尚无窗口接口".into()),
             };
@@ -338,22 +367,48 @@ pub fn decide(windows: &[Window], own_pid: u32, whitelist: &[String]) -> Decisio
     }
 }
 
+pub fn decide_target(windows: &[Window], target: u64, whitelist: &[String]) -> Decision {
+    if !windows.iter().any(|w| w.id == target) {
+        return Decision::OwnClosed;
+    }
+    match windows.iter().find(|w| w.is_focused) {
+        Some(active)
+            if active.id == target
+                || active
+                    .app_id
+                    .as_ref()
+                    .is_some_and(|app| whitelist.contains(app)) =>
+        {
+            Decision::None
+        }
+        _ => Decision::Focus(target),
+    }
+}
+
 /// 前后两次窗口列表的集合差集（按 id），供诊断日志使用。
 pub fn changed(previous: &[Window], current: &[Window]) -> (Vec<Window>, Vec<Window>) {
-    let ids = |list: &[Window]| list.iter().map(|w| w.id).collect::<std::collections::HashSet<_>>();
+    let ids = |list: &[Window]| {
+        list.iter()
+            .map(|w| w.id)
+            .collect::<std::collections::HashSet<_>>()
+    };
     let (old, new) = (ids(previous), ids(current));
-    let added = current.iter().filter(|w| !old.contains(&w.id)).cloned().collect();
-    let removed = previous.iter().filter(|w| !new.contains(&w.id)).cloned().collect();
+    let added = current
+        .iter()
+        .filter(|w| !old.contains(&w.id))
+        .cloned()
+        .collect();
+    let removed = previous
+        .iter()
+        .filter(|w| !new.contains(&w.id))
+        .cloned()
+        .collect();
     (added, removed)
 }
 
 /// DSH 窗口识别：应用 ID 优先，其次浏览器/WebKit 窗口标题里的产品名。
 fn is_dsh_window(window: &Window) -> bool {
-    let app = window
-        .app_id
-        .as_deref()
-        .unwrap_or("")
-        .to_ascii_lowercase();
+    let app = window.app_id.as_deref().unwrap_or("").to_ascii_lowercase();
     if app == "dsh-desktop" || app == "studio.dsh.desktop" {
         return true;
     }
@@ -396,7 +451,11 @@ mod tests {
     fn whitelist_matches_exact_app_ids_and_own_process() {
         let whitelist = vec!["code".into()];
         assert!(allowed(&window(1, "code", 200, true), 100, &whitelist));
-        assert!(!allowed(&window(1, "code-malicious", 200, true), 100, &whitelist));
+        assert!(!allowed(
+            &window(1, "code-malicious", 200, true),
+            100,
+            &whitelist
+        ));
         assert!(allowed(&window(1, "tomato", 100, true), 100, &whitelist));
         assert!(!allowed(&window(1, "tomato", 201, true), 100, &whitelist));
     }
@@ -410,16 +469,27 @@ mod tests {
     }
 
     #[test]
+    fn dsh_lock_targets_one_window_and_never_inherits_a_process_allowance() {
+        let windows = vec![
+            window(10, "dsh-desktop", 100, false),
+            window(20, "code", 100, true),
+        ];
+        assert_eq!(decide_target(&windows, 10, &[]), Decision::Focus(10));
+        assert_eq!(
+            decide_target(&windows, 10, &["code".into()]),
+            Decision::None
+        );
+        assert_eq!(decide_target(&windows, 99, &[]), Decision::OwnClosed);
+    }
+
+    #[test]
     fn decide_redirects_blocked_focus_to_own_window() {
         let windows = vec![
             window(10, "tomato-guard", 100, false),
             window(20, "code", 200, false),
             window(30, "blocked", 300, true),
         ];
-        assert_eq!(
-            decide(&windows, 100, &["code".into()]),
-            Decision::Focus(10)
-        );
+        assert_eq!(decide(&windows, 100, &["code".into()]), Decision::Focus(10));
         // 白名单应用在前台：无需动作。
         let windows = vec![
             window(10, "tomato-guard", 100, false),
@@ -449,16 +519,35 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn compositor_selection_does_not_treat_unknown_wayland_as_x11() {
-        assert_eq!(select_linux_backend(true, false, false, true, "GNOME"), Backend::Niri);
-        assert_eq!(select_linux_backend(false, true, false, true, "sway"), Backend::Sway);
-        assert_eq!(select_linux_backend(false, false, true, true, "Hyprland"), Backend::Hyprland);
+        assert_eq!(
+            select_linux_backend(true, false, false, true, "GNOME"),
+            Backend::Niri
+        );
+        assert_eq!(
+            select_linux_backend(false, true, false, true, "sway"),
+            Backend::Sway
+        );
+        assert_eq!(
+            select_linux_backend(false, false, true, true, "Hyprland"),
+            Backend::Hyprland
+        );
         assert_eq!(
             select_linux_backend(false, false, false, true, "ubuntu:GNOME"),
             Backend::Gnome
         );
-        assert_eq!(select_linux_backend(false, false, false, true, "KDE"), Backend::KWin);
+        assert_eq!(
+            select_linux_backend(false, false, false, true, "KDE"),
+            Backend::KWin
+        );
         for desktop in [
-            "GNOME", "KDE", "XFCE", "X-Cinnamon", "MATE", "LXQt", "Unity", "Budgie",
+            "GNOME",
+            "KDE",
+            "XFCE",
+            "X-Cinnamon",
+            "MATE",
+            "LXQt",
+            "Unity",
+            "Budgie",
         ] {
             assert_eq!(
                 select_linux_backend(false, false, false, false, desktop),

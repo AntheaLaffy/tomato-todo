@@ -1,0 +1,9 @@
+interface:
+  display_name: "番茄 Todo 教学连接"
+  short_description: "在 Codex 中通过本机 MCP 读取学情、维护教学记录并应用学习计划。"
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "tomato"
+      description: "正在运行的番茄 Todo 本机实例"

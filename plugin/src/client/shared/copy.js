@@ -1,30 +1,53 @@
 // 文案注册表：每个模块自注册命名空间，键形如 `任务中心.title`。
 //
 // 为什么不用 DSH 的 locale service 注册字典：插件客户端半拿不到稳定类型，
-// 而页面文案量大、命名空间多；这里的 t() 只依赖本模块状态，locale 切换由
-// skin/main.js 订阅 DSH locale 后调用 setLocale，React 重渲染即生效。
+// 而页面文案量大、命名空间多；这里的 t() 只依赖本模块状态，语言选择由
+// DSH locale 持久化，本模块订阅后让各个独立槽位及时重渲染。
+import { useEffect, useState } from "../runtime.js";
+import { japaneseCopy } from "./ja.js";
+
 const REG = new Map();
+const listeners = new Set();
 
 let current = "zh";
 
 const ZH = "zh";
 const EN = "en";
+const JA = "ja";
 
-/** 注册一个命名空间的 zh/en 字典；重复注册按 key 覆盖（HMR 安全）。 */
+/** 注册一个命名空间的字典；重复注册按 key 覆盖（HMR 安全）。 */
 export function registerCopy(ns, dicts) {
-  const entry = REG.get(ns) ?? { zh: {}, en: {} };
+  const entry = REG.get(ns) ?? { zh: {}, en: {}, ja: {} };
   Object.assign(entry.zh, dicts.zh ?? {});
   Object.assign(entry.en, dicts.en ?? {});
+  Object.assign(entry.ja, japaneseCopy[ns] ?? {}, dicts.ja ?? {});
   REG.set(ns, entry);
 }
 
-/** DSH locale id → 本插件语言（zh* 用中文，其余英文）。 */
+/** DSH locale id → 本插件语言。 */
 export function setLocale(id) {
-  current = typeof id === "string" && /^zh/i.test(id) ? ZH : EN;
+  const next = typeof id === "string" && /^zh/i.test(id)
+    ? ZH
+    : typeof id === "string" && /^ja/i.test(id) ? JA : EN;
+  if (next === current) return;
+  current = next;
+  for (const fn of Array.from(listeners)) fn(current);
 }
 
 export function getLocale() {
   return current;
+}
+
+export function subscribeLocale(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+/** 独立 DSH 槽位都订阅同一语言状态，避免等待下一轮 runtime 轮询才换文案。 */
+export function useLocale() {
+  const [language, update] = useState(current);
+  useEffect(() => subscribeLocale(update), []);
+  return language;
 }
 
 /**
@@ -39,8 +62,9 @@ export function t(key, vars) {
   const dict = entry ? entry[current] : undefined;
   let text = dict && dict[name] !== undefined ? dict[name] : undefined;
   if (text === undefined) {
-    const fallback = entry ? entry[ZH] : undefined;
-    text = fallback && fallback[name] !== undefined ? fallback[name] : key;
+    const fallback = entry ? entry[EN] : undefined;
+    text = fallback && fallback[name] !== undefined ? fallback[name] : undefined;
+    if (text === undefined) text = entry && entry[ZH][name] !== undefined ? entry[ZH][name] : key;
   }
   if (vars) {
     for (const k of Object.keys(vars)) {

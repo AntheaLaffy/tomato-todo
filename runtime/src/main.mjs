@@ -7,7 +7,7 @@ import { startServer, DEFAULT_PORT } from "./server.mjs";
 import { runMcpStdio } from "./mcp-stdio.mjs";
 import { ensureGuardToken, runGuardStatus } from "./guard-client.ts";
 import { startGuardSupervisor } from "./supervise.mjs";
-import { loadOrCreateConnection, writeConnection } from "./connection.mjs";
+import { ensureConnection, loadOrCreateConnection, writeConnection } from "./connection.mjs";
 import { VERSION } from "./version.mjs";
 
 const USAGE = `番茄 Todo runtime ${VERSION}（随 DSH 插件分发）
@@ -118,29 +118,23 @@ export async function main(argv) {
   });
   if (port !== opts.port) connection.mcpUrl = `http://${opts.host}:${port}/mcp`;
   writeConnection(opts.dataDir, connection);
-
-  // 提醒/一轮计时结束 → 让原生 guard 把 DSH 窗口拉到前台。前端只能切面板，
-  // 抢系统焦点必须由 native 侧做（见 crates/guard 的 focus 命令）。
-  let lastFocusError = null;
-  const focusDsh = () => {
-    void guard.focus().then((result) => {
-      if (result.ok) {
-        lastFocusError = null;
-        return;
-      }
-      const message = result.error ?? `HTTP ${result.status}`;
-      if (message !== lastFocusError) {
-        lastFocusError = message;
-        console.error(`guard focus 失败：${message}（提醒仍会显示，只是窗口不会被拉到前台）`);
-      }
-    });
-  };
-  const pendingReminders = () =>
-    engine.data.tasks.filter((task) => task && task.reminderPending).length;
+  // 若外部测试进程误改连接文件，在它退出后恢复本服务的地址与令牌。
+  let lastConnectionError = null;
+  const connectionWatcher = setInterval(() => {
+    try {
+      ensureConnection(opts.dataDir, connection);
+      lastConnectionError = null;
+    } catch (error) {
+      const message = error?.message ?? String(error);
+      if (message !== lastConnectionError) console.error(`MCP 连接文件恢复失败：${message}`);
+      lastConnectionError = message;
+    }
+  }, 15000);
+  connectionWatcher.unref();
 
   // 桌面系统通知也走 guard：浏览器里的 Web Notification 在窗口失焦/权限未授予时
   // 不可靠，而 guard 已经能调系统通知中心。只在设置开着时发；失败不重试——
-  // 到点这件事本身已经由前端提醒条与抢焦兜住了。
+  // 到点这件事本身已经由前端提醒条与音效呈现。
   const notifyDesktop = (title, body) => {
     if (!engine.data.settings.notifications) return;
     void guard.notify({ title, body }).then((result) => {
@@ -157,7 +151,6 @@ export async function main(argv) {
     engine.data.tasks.filter((task) => task && task.reminderPending).map((task) => task.id);
   let prev = {
     serial: Number(engine.data.timer.completionSerial) || 0,
-    reminders: pendingReminders(),
     reminderIds: reminderIds(),
   };
 
@@ -169,13 +162,11 @@ export async function main(argv) {
     syncGuard();
     const next = {
       serial: Number(engine.data.timer.completionSerial) || 0,
-      reminders: pendingReminders(),
       reminderIds: reminderIds(),
     };
-    // 首次 tick 只建立基线：启动时已有的 pending 提醒不抢焦点、也不补发通知。
+    // 首次 tick 只建立基线：启动时已有的 pending 提醒不补发通知。
     const fresh = newlyPending(prev.reminderIds, next.reminderIds);
     if (next.serial > prev.serial || fresh.length > 0) {
-      focusDsh();
       if (next.serial > prev.serial) {
         notifyDesktop("番茄 Todo", "这一轮专注结束了，起来动一动。");
       }
@@ -195,6 +186,7 @@ export async function main(argv) {
   const guardSupervisor = startGuardSupervisor({ dataDir: opts.dataDir });
   const shutdown = () => {
     clearInterval(interval);
+    clearInterval(connectionWatcher);
     guardSupervisor.stop();
     engine.flushNow();
     server.close(() => process.exit(0));

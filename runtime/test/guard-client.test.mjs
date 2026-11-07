@@ -9,7 +9,7 @@ import { GuardClient, ensureGuardToken } from "../src/guard-client.ts";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "tomato-guard-"));
 
-test("lock/unlock/notify/status 按 API.md 协议发请求", async (t) => {
+test("lock/unlock/notify/status/apps 按 API.md 协议发请求", async (t) => {
   const received = [];
   const mock = createServer((req, res) => {
     let raw = "";
@@ -23,6 +23,8 @@ test("lock/unlock/notify/status 按 API.md 协议发请求", async (t) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       if (req.url === "/guard/status") {
         res.end(JSON.stringify({ locked: false, whitelist: [], pid: 42 }));
+      } else if (req.url === "/guard/apps") {
+        res.end(JSON.stringify({ apps: ["code", "kitty"] }));
       } else {
         res.end(JSON.stringify({ ok: true }));
       }
@@ -42,9 +44,13 @@ test("lock/unlock/notify/status 按 API.md 协议发请求", async (t) => {
   assert.equal(unlocked.ok, true);
   const notified = await client.notify({ title: "休息一下", body: "5 分钟" });
   assert.equal(notified.ok, true);
+  assert.equal((await client.fullscreen(true)).ok, true);
+  assert.deepEqual(received.at(-1).body, { command: "fullscreen", enabled: true });
   const status = await client.status();
   assert.equal(status.ok, true);
   assert.deepEqual(status.data, { locked: false, whitelist: [], pid: 42 });
+  const apps = await client.runningApps();
+  assert.deepEqual(apps.data, { apps: ["code", "kitty"] });
 
   assert.deepEqual(
     received.slice(0, 3).map((r) => r.body.command),
@@ -54,7 +60,7 @@ test("lock/unlock/notify/status 按 API.md 协议发请求", async (t) => {
   assert.equal(received[2].body.title, "休息一下");
   assert.equal(received[2].body.body, "5 分钟");
   assert.ok(received.every((r) => r.auth === "Bearer guard-token"));
-  assert.equal(received[3].path, "/guard/status");
+  assert.equal(received.at(-1).path, "/guard/apps");
 });
 
 test("guard 进程没跑：返回 { ok:false, error }，不抛异常", async (t) => {
@@ -74,6 +80,7 @@ test("guard 进程没跑：返回 { ok:false, error }，不抛异常", async (t)
     () => client.unlock(),
     () => client.notify({ title: "t", body: "b" }),
     () => client.status(),
+    () => client.runningApps(),
   ]) {
     const result = await call();
     assert.equal(result.ok, false);

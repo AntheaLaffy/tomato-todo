@@ -13,8 +13,13 @@ export function createPlugin(require) {
     // 声明得越精确，插件被激活前的等待越短。
     inject: ["slots", "timer", "theme", "locale", "layout"],
     apply(ctx) {
-      registerSkin(ctx);
-      registerApp(ctx);
+      try {
+        registerSkin(ctx);
+        registerApp(ctx);
+      } catch (error) {
+        console.error("[tomato] client activation failed", error);
+        throw error;
+      }
     },
   };
 }

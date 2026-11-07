@@ -12,6 +12,7 @@ import {
   startServer,
   UI_ORIGIN,
   desiredGuard,
+  createGuardSync,
   projectUiState,
 } from "../src/server.mjs";
 import { parseDesktopEntry } from "../src/apps.mjs";
@@ -24,6 +25,19 @@ function fakeGuard() {
   const calls = [];
   return {
     calls,
+    fullscreenError: null,
+    runningAppsError: null,
+    async runningApps() {
+      return this.runningAppsError
+        ? { ok: false, error: this.runningAppsError }
+        : { ok: true, data: { apps: ["kitty", "code", "kitty", "dsh-desktop"] } };
+    },
+    async fullscreen(enabled) {
+      calls.push({ command: "fullscreen", enabled });
+      return this.fullscreenError
+        ? { ok: false, error: this.fullscreenError }
+        : { ok: true, data: { ok: true } };
+    },
     async lock({ whitelist } = {}) {
       calls.push({ command: "lock", whitelist });
       return { ok: true, status: 200, data: { locked: true } };
@@ -82,6 +96,25 @@ const dispatch = (action) =>
   });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("原生全屏端点校验输入与 Origin，并向 UI 透传失败", async () => {
+  const post = (body, origin = UI_ORIGIN) => json("/api/desktop/fullscreen", {
+    method: "POST", headers: { "Content-Type": "application/json", Origin: origin },
+    body: JSON.stringify(body),
+  });
+  assert.equal((await post({ enabled: true })).status, 200);
+  assert.deepEqual(guard.calls.at(-1), { command: "fullscreen", enabled: true });
+  assert.equal((await post({ enabled: "true" })).status, 400);
+  assert.equal((await post({ enabled: true }, "https://example.com")).status, 403);
+  guard.fullscreenError = "未找到 DSH 窗口";
+  try {
+    const result = await post({ enabled: false });
+    assert.equal(result.status, 503);
+    assert.equal(result.body.error, guard.fullscreenError);
+  } finally {
+    guard.fullscreenError = null;
+  }
+});
 
 test("GET /api/state：全量快照 + 学情摘要 + guard 摘要（不可达给 available:false）", async () => {
   const { status, headers, body } = await json("/api/state");
@@ -536,6 +569,7 @@ test("desiredGuard：锁机优先、白名单专注按保护模式、空闲解�
     data.settings.protection.mode = "lock";
     assert.deepEqual(desiredGuard(engine).whitelist, []);
 
+    data.settings.protection.mode = "whitelist";
     data.lock.active = {
       name: "小憩",
       startedAt: 1,
@@ -558,12 +592,36 @@ test("desiredGuard：锁机优先、白名单专注按保护模式、空闲解�
   }
 });
 
-test("GET /api/apps：返回已安装应用（id=桌面入口文件名），并有解析单测", async () => {
+test("guard 同步会在守卫重启或锁定状态丢失后重新发送锁机命令", async () => {
+  const engine = Engine.open(tmp());
+  engine.applyAction({ type: "startQuickLock", minutes: 5, strict: false });
+  let locked = false;
+  let locks = 0;
+  const guard = {
+    async lock({ whitelist }) {
+      assert.deepEqual(whitelist, []);
+      locks += 1;
+      locked = true;
+      return { ok: true };
+    },
+    async status() { return { ok: true, data: { locked, whitelist: [] } }; },
+  };
+  const sync = createGuardSync(engine, guard);
+  await sync();
+  await sync();
+  assert.equal(locks, 1);
+  locked = false;
+  await sync();
+  assert.equal(locks, 2);
+});
+
+test("GET /api/apps：只返回 guard 看到的运行中应用", async () => {
   const res = await fetch(`${base}/api/apps`);
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.ok(Array.isArray(body.apps));
   assert.equal(body.count, body.apps.length);
+  assert.deepEqual(body.apps.map((app) => app.id), ["kitty", "code", "dsh-desktop"]);
   for (const app of body.apps) {
     assert.equal(typeof app.id, "string");
     // id 是桌面入口文件名去后缀；像 com.ccswitch.desktop.desktop 这种带点的
@@ -571,6 +629,17 @@ test("GET /api/apps：返回已安装应用（id=桌面入口文件名），并�
     assert.ok(app.id.length > 0 && !app.id.startsWith("."));
     assert.equal(typeof app.name, "string");
     assert.ok(app.name.length > 0);
+  }
+});
+
+test("GET /api/apps：guard 不可达时不退回全部已安装应用", async () => {
+  guard.runningAppsError = "niri IPC unavailable";
+  try {
+    const res = await fetch(base + "/api/apps");
+    assert.equal(res.status, 503);
+    assert.match((await res.json()).error, /niri IPC unavailable/);
+  } finally {
+    guard.runningAppsError = null;
   }
 });
 

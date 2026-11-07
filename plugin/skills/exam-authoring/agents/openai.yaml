@@ -1,0 +1,4 @@
+interface:
+  display_name: "有依据的命题与组卷"
+  short_description: "以真题为质量基准，发挥各类资料的命题价值，执行蓝图、逐题取证、复解与固定评分。"
+  default_prompt: "用 $exam-authoring 依据我的资料命题，以真题校准质量，说明每类材料的贡献，并完成答案、评分与复解。"

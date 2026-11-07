@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import * as core from "../vendor/core.mjs";
 import { atomicWrite, readDataFiles, writeDataFiles } from "./data-files.mjs";
+import { validateResourceAction } from "./project-library.mjs";
 import type {
   Block,
   DispatchAction,
@@ -510,6 +511,7 @@ export class Engine {
       return this.legacyDispatch(action as Record<string, unknown>, now);
     }
     const parsed = core.parseAction(action);
+    validateResourceAction(this.dataDir, this.engine.data, parsed);
     const before = JSON.stringify(core.serializeAppData(this.engine.data));
     this.engine.dispatch(parsed, now);
     const snapshot = this.engine.snapshot(now);
@@ -533,6 +535,7 @@ export class Engine {
     now: number = nowSecs(),
   ): { changed: boolean; snapshot: ReturnType<Engine["state"]> } {
     const parsed = core.parseAction(action);
+    validateResourceAction(this.dataDir, this.engine.data, parsed);
     const before = JSON.stringify(core.serializeAppData(this.engine.data));
     this.engine.dispatch(parsed, now);
     const afterData = this.engine.data;

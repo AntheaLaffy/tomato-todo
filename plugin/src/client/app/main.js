@@ -6,7 +6,7 @@
 // - 输入框上方的今日入口卡
 import { h } from "../runtime.js";
 import { Icon } from "../shared/icons.js";
-import { setLocale } from "../shared/copy.js";
+import { setLocale, t, useLocale } from "../shared/copy.js";
 import {
   dispatch,
   startPolling,
@@ -14,6 +14,7 @@ import {
 } from "../shared/store.js";
 import * as api from "../shared/api.js";
 import { AppShell } from "./frame.js";
+import { assistantPrompt } from "./assistant-prompt.js";
 import {
   bindPanelOpener,
   getActivePageId,
@@ -22,8 +23,9 @@ import {
 } from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
 import { DockCard } from "./dock.js";
-import { SidebarTomatoProgress } from "./sidebar-progress.js";
+import { SidebarTomatoIcon } from "./sidebar-progress.js";
 import { ReminderStrip } from "./reminders.js";
+import { notify } from "../shared/ui.js";
 import { PersonaBackdrop } from "./persona.js";
 import "./nav-copy.js";
 import "../pages/index.js";
@@ -32,9 +34,9 @@ function localeId(locale) {
   try {
     const snapshot = locale && typeof locale.getLocale === "function" ? locale.getLocale() : null;
     const active = snapshot && (snapshot.active || snapshot.locale);
-    return typeof active === "string" && active !== "" ? active : "zh";
+    return typeof active === "string" && active !== "" ? active : (typeof navigator !== "undefined" ? navigator.language : "en");
   } catch {
-    return "zh";
+    return typeof navigator !== "undefined" ? navigator.language : "en";
   }
 }
 
@@ -43,6 +45,7 @@ function localeId(locale) {
  * 点整条进番茄面板，按钮各自执行（开始专注 / 稍后）。
  */
 function TopReminder({ openPanel }) {
+  useLocale();
   return h(
     "div",
     {
@@ -65,6 +68,20 @@ function TopReminder({ openPanel }) {
 
 export function registerApp(ctx) {
   const locale = ctx.get ? ctx.get("locale") : null;
+  const hasJapanese = locale && typeof locale.getLocale === "function" &&
+    locale.getLocale().locales?.some((item) => item.id === "ja");
+  const removeJapanese = !hasJapanese && typeof locale?.addLanguage === "function"
+    ? locale.addLanguage({ id: "ja", label: "日本語", fallback: "en" })
+    : null;
+  let removeJapaneseSettings = null;
+  if (typeof locale?.register === "function") {
+    try {
+      removeJapaneseSettings = locale.register("settings.locale", "ja", { "language.title": "言語" });
+    } catch (error) {
+      // DSH 的独立日语包可能已占有该字典；重复贡献不能阻断整个插件启动。
+      if (!String(error?.message || error).includes('already has locale')) throw error;
+    }
+  }
   setLocale(localeId(locale));
   let removeLocale = null;
   if (locale && typeof locale.subscribe === "function") {
@@ -77,6 +94,8 @@ export function registerApp(ctx) {
     disposeStore();
     try {
       removeLocale?.();
+      removeJapaneseSettings?.();
+      removeJapanese?.();
     } catch {
       /* already disposed */
     }
@@ -102,6 +121,7 @@ export function registerApp(ctx) {
         setActivePageId,
         getActivePageId,
         resetActivePageCache,
+        openAssistant: (...args) => openAssistant(...args),
       };
     }
   } catch {
@@ -114,6 +134,36 @@ export function registerApp(ctx) {
     } catch {
       /* DSH 版本差异时忽略 */
     }
+  };
+  const openAssistant = (kind, records) => {
+    const prompt = assistantPrompt(kind, records);
+    try {
+      const sessions = ctx.get?.("sessions") ?? ctx.sessions;
+      const conversation = ctx.get?.("conversation") ?? ctx.conversation;
+      const current = Object.values(sessions?.list?.getSnapshot?.()?.byId ?? {})
+        .find((row) => (row.retainedBy?.mainView ?? 0) > 0)?.id;
+      const binding = current ? sessions?.binding?.(current) : null;
+      if (binding && conversation?.input?.requestDraftInitialization) {
+        const result = conversation.input.requestDraftInitialization(binding, {
+          prompt, whenDraftExists: "append",
+        });
+        if (result === "blocked") throw new Error("conversation draft busy");
+        leaveToConversation();
+        const scope = sessions.scope?.(current);
+        if (scope) conversation.input.for(scope)?.focus?.();
+        return true;
+      }
+      const workspace = ctx.get?.("uiWorkspace") ?? ctx.uiWorkspace;
+      if (typeof workspace?.startSession === "function") {
+        leaveToConversation();
+        workspace.startSession(undefined, { prompt, whenDraftExists: "append" });
+        return true;
+      }
+    } catch (error) {
+      console.warn("[tomato] assistant draft unavailable:", error);
+    }
+    notify(t("assistantPrompt.unavailable"), "danger");
+    return false;
   };
 
   // 进入番茄页时收起 DSH 侧栏（若本来就收起则不重复切换）；离开时还原。
@@ -143,6 +193,11 @@ export function registerApp(ctx) {
     dispatch,
     api,
     onLeave: leaveToConversation,
+    onAssistant: openAssistant,
+    onLanguageChange: (id) => {
+      if (typeof locale?.setLocale === "function") locale.setLocale(id);
+      else setLocale(id);
+    },
     collapseSidebar,
     restoreSidebar,
   };
@@ -159,7 +214,13 @@ export function registerApp(ctx) {
 
   safeInject("main", { name: "main", key: "tomato" }, () => h(AppShell, pageProps));
 
-  // 番茄入口只保留左下角那一条（面板列表里的顶部条目按用户要求移除）。
+  // 与主面板共用 tomato ID，侧栏负责导航和选中态。
+  safeInject(
+    "sidebar.panellist",
+    { name: "sidebar.panellist", id: "tomato", order: 10, label: () => t("side.label") },
+    SidebarTomatoIcon,
+  );
+
   safeInject("shell.overlay", { name: "shell.overlay", id: "tomato-overlay", order: 900 }, () =>
     h(AppOverlay, { openPanel }),
   );
@@ -178,10 +239,4 @@ export function registerApp(ctx) {
     h(TopReminder, { openPanel }),
   );
 
-  // 左下角「栏目」：侧栏底部的番茄预计/实际进度（展开态显示 0 / 8，收起只留环）。
-  safeInject(
-    "sidebar.footer.action",
-    { name: "sidebar.footer.action", id: "tomato-progress", order: 5 },
-    (props) => h(SidebarTomatoProgress, { ...props, openPanel }),
-  );
 }

@@ -34,6 +34,7 @@ export function SectionTitle({ icon, title, hint, action, style }) {
       style: {
         display: "flex",
         alignItems: "center",
+        flexWrap: "wrap",
         gap: 9,
         marginBottom: 12,
         ...style,
@@ -42,11 +43,11 @@ export function SectionTitle({ icon, title, hint, action, style }) {
     icon ? h(Icon, { name: icon, size: 17, style: { color: "var(--tomato-ink-3)" } }) : null,
     h(
       "div",
-      { style: { fontSize: 14, fontWeight: 620, color: "var(--tomato-ink)", flex: 1, minWidth: 0 } },
+      { style: { fontSize: 14, fontWeight: 620, color: "var(--tomato-ink)", flex: "0 1 auto", minWidth: 0, marginRight: "auto" } },
       title,
     ),
     hint
-      ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, hint)
+      ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)", flex: "1 1 220px", minWidth: 0, textAlign: "right", lineHeight: 1.5, overflowWrap: "anywhere" } }, hint)
       : null,
     action ?? null,
   );

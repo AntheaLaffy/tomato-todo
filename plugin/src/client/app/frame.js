@@ -3,7 +3,7 @@
 // 框架只负责三件事：导航、当前页状态（localStorage 记住）、页头/底部的全局
 // 信息。每个页面的内容、对话框、快捷键都在页面自己的模块里，框架不感知。
 import { h, useState, useEffect, useRef } from "../runtime.js";
-import { t } from "../shared/copy.js";
+import { t, useLocale } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import { Bar, Dot, IconBtn, Ring, ToastHost } from "../shared/ui.js";
 import { useSnapshot, refresh as refreshStore } from "../shared/store.js";
@@ -384,6 +384,7 @@ function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave 
  * 每个页面拿到 { state, dispatch, refresh }，自己订阅派生数据。
  */
 export function AppShell(props) {
+  useLocale();
   const state = useSnapshot();
 
   // 标记「番茄页接管中」：顶部常驻提醒（对话用）在番茄页里隐藏，避免和页面内提醒重复。
@@ -463,12 +464,12 @@ export function AppShell(props) {
         "div",
         {
           key: active ? active.id : "empty",
-          className: "t-fadein t-appcontent",
+          className: "t-appcontent",
           // 顶部留出悬浮提醒条的位置（提醒在页面最顶端居中）。
           style: { maxWidth: 1270, margin: 0, padding: narrow ? "40px 18px 60px" : "44px 28px 72px" },
         },
         active
-          ? h(active.Component, { state, dispatch: props.dispatch, refresh: refreshStore, api: props.api })
+          ? h(active.Component, { state, dispatch: props.dispatch, refresh: refreshStore, api: props.api, onLeave: props.onLeave, onAssistant: props.onAssistant, onLanguageChange: props.onLanguageChange })
           : null,
       ),
     ),

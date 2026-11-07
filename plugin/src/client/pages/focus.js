@@ -50,7 +50,7 @@ import {
   weekdayIndex,
 } from "../shared/derive.js";
 import { registerPage } from "../app/registry.js";
-import { openPanelAt, setActivePageId } from "../app/navigation.js";
+import { setActivePageId } from "../app/navigation.js";
 import { TaskDialog } from "./task-dialog.js";
 import { SearchDialog, useSearchHotkey } from "./search.js";
 import { AMBIENCE_KINDS, useAmbience } from "../app/sound.js";
@@ -61,7 +61,7 @@ registerCopy("focus", {
     headline: "今天，也要慢慢向前。",
     gradingBanner: "{name}：{n} 份作业已交，等着批改或订正",
     gradingBannerAll: "{n} 份作业已交，等着批改或订正",
-    gradingBannerAction: "打开应试教育",
+    gradingBannerAction: "打开学习助手",
     sub: "专注当下，让每一小步都有回响。",
     newTask: "新建任务",
     statFocus: "今日专注",
@@ -153,12 +153,16 @@ registerCopy("focus", {
     deleted: "任务已删除",
     weekTitle: "这一周的专注节奏",
     viewStats: "查看统计",
+    weekTotal: "本周 {time}",
     weekBarTitle: "{date} · {n} 分钟",
     loadingTitle: "正在读取今天的计划…",
     loadingHint: "读不到时会自动重试，不需要刷新页面。",
   },
   en: {
     headline: "Today, let's keep moving — slowly.",
+    gradingBanner: "{name}: submitted work awaiting review or revision ({n})",
+    gradingBannerAll: "Submitted work awaiting review or revision ({n})",
+    gradingBannerAction: "Open learning assistant",
     sub: "Stay with this moment; let each small step echo.",
     newTask: "New task",
     statFocus: "Focus today",
@@ -235,6 +239,8 @@ registerCopy("focus", {
     minutesPerSession: "{n} min / session",
     overdue: "Overdue",
     catchUpBadge: "Catch up",
+    overdueHint: "{n} more overdue tasks",
+    goTasks: "Go to all tasks",
     untitled: "(untitled)",
     taskCheck: "Mark “{title}” done",
     taskUncheck: "Reopen “{title}”",
@@ -1012,8 +1018,8 @@ function TaskGroup({ title, tasks, data, today, view, busy, actions, onHelp }) {
   );
 }
 
-/** 今日页顶部的「已交待批改」横幅：只提示，不改动作，点击进应试教育页。 */
-function GradingBanner({ items, total }) {
+/** 今日页顶部的「已交待批改」横幅：引导到学习助手对话处理。 */
+function GradingBanner({ items, total, onAssistant }) {
   const first = items[0];
   const label =
     items.length === 1 && first.name
@@ -1054,7 +1060,7 @@ function GradingBanner({ items, total }) {
           variant: "ghost",
           size: "sm",
           icon: "arrowRight",
-          onClick: () => openPanelAt("education"),
+          onClick: onAssistant,
         },
         t("focus.gradingBannerAction"),
       ),
@@ -1708,7 +1714,7 @@ function DeleteTaskDialog({ open, task, busy, onClose, onConfirm }) {
 
 // ---------------------------------------------------------------- 页面
 
-export function FocusPage() {
+export function FocusPage(props = {}) {
   const state = useSnapshot();
   const [tab, setTab] = useState("active");
   const [editor, setEditor] = useState(null);
@@ -1895,7 +1901,8 @@ export function FocusPage() {
     header,
     h(StatRow, { stats, pendingCount: pending.length }),
     grading.total > 0
-      ? h(GradingBanner, { items: grading.items, total: grading.total })
+      ? h(GradingBanner, { items: grading.items, total: grading.total,
+          onAssistant: () => props.onAssistant?.("triage", grading.items.flatMap((item) => item.records)) })
       : null,
     h(
       "div",

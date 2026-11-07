@@ -61,6 +61,11 @@ registerCopy("education", {
     latestProgressLabel: "最新学情",
     noProgress: "还没有学情记录",
     viewDetail: "查看详情",
+    assignAction: "布置作业",
+    submitAction: "提交作业",
+    gradeAction: "批改作业",
+    correctAction: "订正作业",
+    reviewAction: "复核作业",
     todayTasks: "今日学习任务",
     todayTasksHint: "{n} 项",
     startFocus: "开始专注",
@@ -75,9 +80,10 @@ registerCopy("education", {
     needsAttention: "需要处理",
     attentionHint: "{n} 项",
     pendingSubmit: "待交",
+    pendingGrade: "待批改",
     pendingCorrection: "待订正",
     pendingReview: "待复核",
-    nothingPending: "暂时没有待交、待订正或待复核的事项。",
+    nothingPending: "暂时没有待交、待批改、待订正或待复核的事项。",
     causeLabel: "错因",
     retestLabel: "复测 {date}",
     deadlineLabel: "截止 {date}",
@@ -187,6 +193,11 @@ registerCopy("education", {
     latestProgressLabel: "Latest progress",
     noProgress: "No progress yet",
     viewDetail: "View details",
+    assignAction: "Assign homework",
+    submitAction: "Submit homework",
+    gradeAction: "Grade homework",
+    correctAction: "Correct homework",
+    reviewAction: "Review homework",
     todayTasks: "Today's study tasks",
     todayTasksHint: "{n}",
     startFocus: "Start focus",
@@ -201,9 +212,10 @@ registerCopy("education", {
     needsAttention: "Needs attention",
     attentionHint: "{n}",
     pendingSubmit: "To submit",
+    pendingGrade: "To grade",
     pendingCorrection: "To correct",
     pendingReview: "Needs review",
-    nothingPending: "Nothing to submit, correct, or review right now.",
+    nothingPending: "Nothing to submit, grade, correct, or review right now.",
     causeLabel: "Cause",
     retestLabel: "Retest {date}",
     deadlineLabel: "Due {date}",
@@ -289,6 +301,15 @@ registerCopy("education", {
     resourceKindReference: "Reference",
     resourceKindAttachment: "Attachment",
     resourceKindAnswerSheet: "Answer sheet",
+  },
+  ja: {
+    pendingGrade: "採点待ち",
+    nothingPending: "提出・採点・訂正・再確認待ちの課題はありません。",
+    assignAction: "宿題を出す",
+    submitAction: "宿題を提出",
+    gradeAction: "宿題を採点",
+    correctAction: "宿題を訂正",
+    reviewAction: "宿題を再確認",
   },
 });
 
@@ -878,12 +899,18 @@ function TeachingTaskRow({ task, data, onToggle, onFocus }) {
   );
 }
 
-function AssessmentRow({ assessment, index, at }) {
+function AssessmentRow({ assessment, index, at, onAssistant }) {
   const status = assessmentStatus(assessment, index, at);
   const submission = index.submissionOf.get(assessment.id) || null;
   const grade = submission ? index.gradeOf.get(submission.id) || null : null;
   const total = assessmentTotal(assessment);
   const score = grade !== null ? gradeScore(grade) : null;
+  const action = status === "submitted" ? "grade"
+    : status === "correctionDue" ? "correct"
+    : status === "needsReview" ? "review"
+    : ["awaitingSubmission", "overdue", "missed"].includes(status) ? "submit" : null;
+  const actionKey = { submit: "submitAction", grade: "gradeAction",
+    correct: "correctAction", review: "reviewAction" };
   return h(
     "div",
     { style: ROW },
@@ -928,6 +955,10 @@ function AssessmentRow({ assessment, index, at }) {
         )
       : null,
     h(Chip, { tone: statusTone(status) }, statusLabel(status)),
+    action && onAssistant ? h(Btn, { variant: "ghost", size: "sm",
+      onClick: () => onAssistant(action, { projectId: assessment.projectId,
+        assessmentId: assessment.id, submissionId: submission?.id, gradeId: grade?.id }),
+    }, t(`education.${actionKey[action]}`)) : null,
   );
 }
 
@@ -994,6 +1025,7 @@ export function ProjectDetail({
   at,
   index,
   onBack,
+  onAssistant,
 }) {
   const projectId = strOr(study.projectId);
   const color = projectColor(data, projectId);
@@ -1611,6 +1643,9 @@ export function ProjectDetail({
       icon: "tasks",
       title: t("education.assessmentsTitle"),
       hint: t("education.attentionHint", { n: assessments.length }),
+      action: onAssistant ? h(Btn, { variant: "soft", size: "sm",
+        onClick: () => onAssistant("assign", { projectId }),
+      }, t("education.assignAction")) : null,
     }),
     assessments.length === 0
       ? mutedText(t("education.assessmentsEmpty"))
@@ -1620,6 +1655,7 @@ export function ProjectDetail({
             assessment,
             index,
             at,
+            onAssistant,
           }),
         ),
   );
@@ -1934,7 +1970,7 @@ export function ProjectDetail({
 
 // ---------------------------------------------------------------- 页面
 
-export function EducationPage() {
+export function EducationPage({ onAssistant } = {}) {
   const state = useSnapshot();
   const [detailId, setDetailId] = useState(null);
 
@@ -2028,6 +2064,7 @@ export function EducationPage() {
       at,
       index,
       onBack: () => setDetailId(null),
+      onAssistant,
     });
   }
 
@@ -2206,16 +2243,12 @@ export function EducationPage() {
                 t("education.noProgress"),
               ),
         ),
-        h(
-          Btn,
-          {
-            variant: "soft",
-            size: "sm",
-            iconRight: "arrowRight",
-            onClick: () => setDetailId(study.projectId),
-            style: { alignSelf: "flex-start" },
-          },
-          t("education.viewDetail"),
+        h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+          h(Btn, { variant: "soft", size: "sm", iconRight: "arrowRight",
+            onClick: () => setDetailId(study.projectId) }, t("education.viewDetail")),
+          onAssistant ? h(Btn, { variant: "ghost", size: "sm",
+            onClick: () => onAssistant("assign", { projectId: study.projectId }),
+          }, t("education.assignAction")) : null,
         ),
       ),
     );
@@ -2299,6 +2332,7 @@ export function EducationPage() {
 
   // ---- 需要处理
   const pendingSubmit = [];
+  const pendingGrade = [];
   const pendingCorrection = [];
   const pendingReview = [];
   for (const assessment of edu.assessments) {
@@ -2319,9 +2353,10 @@ export function EducationPage() {
         pendingCorrection.push({ assessment, grade, error });
       }
     }
+    if (submission !== null && grade === null) pendingGrade.push({ assessment, submission });
   }
 
-  const attentionRow = (key, color, title, kind, timeText, note, status) =>
+  const attentionRow = (key, color, title, kind, timeText, note, status, action, onAction) =>
     h(
       "div",
       { key, style: ROW },
@@ -2355,10 +2390,11 @@ export function EducationPage() {
       status
         ? h(Chip, { tone: statusTone(status) }, statusLabel(status))
         : null,
+      onAction ? h(Btn, { variant: "ghost", size: "sm", onClick: onAction }, action) : null,
     );
 
   const attentionTotal =
-    pendingSubmit.length + pendingCorrection.length + pendingReview.length;
+    pendingSubmit.length + pendingGrade.length + pendingCorrection.length + pendingReview.length;
   const attentionCard = h(
     Card,
     { pad: 22 },
@@ -2388,6 +2424,28 @@ export function EducationPage() {
                     }),
                     "",
                     status,
+                    t("education.submitAction"),
+                    onAssistant ? () => onAssistant("submit", { projectId: assessment.projectId,
+                      assessmentId: assessment.id }) : null,
+                  ),
+                ),
+              )
+            : null,
+          pendingGrade.length > 0
+            ? h("div", null,
+                subHeading(t("education.pendingGrade"), pendingGrade.length),
+                pendingGrade.map(({ assessment, submission }, gradeIndex) =>
+                  attentionRow(
+                    `grade-${submission.id || gradeIndex}`,
+                    projectColor(data, assessment.projectId),
+                    strOr(assessment.title, t("education.unnamedProject")),
+                    assessmentKindLabel(assessment.kind),
+                    fmtDateTime(submission.submittedAt),
+                    "",
+                    "submitted",
+                    t("education.gradeAction"),
+                    onAssistant ? () => onAssistant("grade", { projectId: assessment.projectId,
+                      assessmentId: assessment.id, submissionId: submission.id }) : null,
                   ),
                 ),
               )
@@ -2420,6 +2478,10 @@ export function EducationPage() {
                       fmtDateTime(grade.gradedAt),
                       note,
                       "correctionDue",
+                      t("education.correctAction"),
+                      onAssistant ? () => onAssistant("correct", { projectId: assessment.projectId,
+                        assessmentId: assessment.id, submissionId: grade.submissionId,
+                        gradeId: grade.id, questionId: error.questionId }) : null,
                     );
                   },
                 ),
@@ -2439,6 +2501,10 @@ export function EducationPage() {
                     fmtDateTime(grade.gradedAt),
                     "",
                     "needsReview",
+                    t("education.reviewAction"),
+                    onAssistant ? () => onAssistant("review", { projectId: assessment.projectId,
+                      assessmentId: assessment.id, submissionId: grade.submissionId,
+                      gradeId: grade.id }) : null,
                   ),
                 ),
               )

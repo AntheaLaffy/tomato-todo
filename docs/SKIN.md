@@ -127,6 +127,9 @@
    `pointer-events:none`（页面点击照常穿过，画布贴边的滚动条也不被挡）。触摸设备没有 hover：
    `@media (hover:none)` 才把立绘放开成可点，点立绘开合。偏好写 localStorage
    `tomato-dsh.persona`，与 DSH 设置-通用「番茄氛围」的下拉框共用同一份状态。
+   头像列的落脚点默认与立绘底部齐平，那里正好压着 DSH 输入框右端的发送按钮；展开时用
+   `[data-composer-seat]` 实测输入区上缘，把列抬到它上面 12px（输入框被多行草稿撑高时
+   跟着让位，上限立绘头顶）。没有输入区的番茄页/设置页，以及输入框居中的新会话，列保持原位。
 6. **窗光洗层**（`shell.overlay`，order -1000，pointer-events:none）：一层
    `linear-gradient(160deg, #fff2dbb3, transparent 42%, #e7b98f14)`，mix-blend-mode
    `soft-light`，「光落在屏幕上」的细微层次；深色改为 `#ffd9a712` 的左上暖光。

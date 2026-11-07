@@ -12,6 +12,11 @@
   },
   "files": [
     "index.js",
+    "host-tool-specs.js",
+    "skills.js",
+    "link-skills.js",
+    "link-skills.mjs",
+    "skills",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",

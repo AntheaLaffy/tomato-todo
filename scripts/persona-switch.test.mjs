@@ -56,3 +56,36 @@ test("换人写入状态并通知订阅者，未知 id 被忽略", () => {
   assert.deepEqual(seen, ["ryuji"]);
   assert.equal(persona.getPersonaId(), "atri");
 });
+
+test("切换列抬到输入区上缘之上；输入区在立绘上方或不存在时不抬", () => {
+  const rect = (top, bottom, height) => ({
+    getBoundingClientRect: () => ({ top, bottom, height }),
+  });
+  const art = rect(600, 950, 350);
+  const previous = globalThis.document;
+  const seats = (...items) => ({ querySelectorAll: () => items });
+  try {
+    // 输入区贴着页面底部：列底边抬到输入区上缘再往上 12px，不压住发送按钮。
+    globalThis.document = seats(rect(800, 995, 195));
+    assert.equal(persona.composerLift(art), 162);
+
+    // 多会话保留在 DOM 里：只认贴在页底的那个，藏在别处（高度 0）的不算。
+    globalThis.document = seats(rect(0, 0, 0), rect(800, 995, 195));
+    assert.equal(persona.composerLift(art), 162);
+
+    // 新会话把输入框居中：整个在立绘上方，立绘那一带没有可挡的东西。
+    globalThis.document = seats(rect(300, 520, 220));
+    assert.equal(persona.composerLift(art), 0);
+
+    // 番茄页/设置页没有输入区。
+    globalThis.document = seats();
+    assert.equal(persona.composerLift(art), 0);
+
+    // 输入区再高也不把列抬过立绘头顶。
+    globalThis.document = seats(rect(610, 995, 385));
+    assert.equal(persona.composerLift(art), 310);
+  } finally {
+    if (previous === undefined) delete globalThis.document;
+    else globalThis.document = previous;
+  }
+});

@@ -8,7 +8,7 @@
 // 点一下就换人——不用进设置。触摸设备没有 hover，直接点立绘开合同一列。
 // 选择存在 localStorage；DSH 设置-通用「番茄氛围」里的下拉框改的是同一个值。
 import { h, useState, useEffect, useRef } from "../runtime.js";
-import { t, registerCopy } from "../shared/copy.js";
+import { t, registerCopy, useLocale } from "../shared/copy.js";
 import { useSnapshot } from "../shared/store.js";
 
 registerCopy("persona", {
@@ -87,6 +87,37 @@ export function personaAvatar(id = current) {
   return found.avatar;
 }
 
+/**
+ * 切换列的落脚点默认与立绘底部齐平，那里在对话界面正好压着 DSH 输入框的右端
+ * （发送按钮所在）。DSH 把整块输入区放在 `[data-composer-seat]` 里，把列抬到它的
+ * 上缘再往上 12px，输入框长高（多行草稿、入口卡占位）时列跟着上移。
+ *
+ * 不抬的两种情况：没有输入区的界面（番茄页、设置页）；输入区整个在立绘上方
+ * （新会话把输入框居中），这时立绘那一带本来就没有可挡的东西。上限再按立绘
+ * 高度收一收，最差也只是升到立绘头顶，不会飞到页面中间。
+ */
+export function composerLift(anchor) {
+  if (!anchor) return 0;
+  const box = composerSeatRect();
+  const base = anchor.getBoundingClientRect();
+  if (!box || !box.height || !base.height) return 0;
+  if (box.top <= base.top) return 0;
+  const lift = Math.round(base.bottom - box.top + 12);
+  return Math.min(Math.max(0, lift), Math.max(0, Math.round(base.height - 40)));
+}
+
+/** 当前可见会话的输入区（多会话保留在 DOM 里时，只有贴在底部的那个有高度）。 */
+function composerSeatRect() {
+  if (typeof document === "undefined" || typeof document.querySelectorAll !== "function") return null;
+  let best = null;
+  for (const node of document.querySelectorAll("[data-composer-seat]")) {
+    const rect = node.getBoundingClientRect();
+    if (!rect.height) continue;
+    if (!best || rect.bottom > best.bottom) best = rect;
+  }
+  return best;
+}
+
 /** 在矩形内、外扩 pad 像素（看板娘没有可点区域，用几何命中代替 hover 命不中的问题）。 */
 function hit(el, x, y, pad) {
   if (!el) return false;
@@ -95,7 +126,7 @@ function hit(el, x, y, pad) {
   return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
 }
 
-export function PersonaSwitch({ currentId, onPick, panelRef }) {
+export function PersonaSwitch({ currentId, onPick, panelRef, lift = 0 }) {
   return h(
     "div",
     {
@@ -103,6 +134,7 @@ export function PersonaSwitch({ currentId, onPick, panelRef }) {
       ref: panelRef,
       role: "group",
       "aria-label": t("persona.label"),
+      style: lift > 0 ? { marginBottom: `${lift}px` } : undefined,
       onPointerDown: (e) => e.stopPropagation(),
       onClick: (e) => e.stopPropagation(),
     },
@@ -183,8 +215,10 @@ function personaStyle() {
  * - Esc 收起。
  */
 export function PersonaBackdrop() {
+  useLocale();
   const id = usePersonaEnabled();
   const [open, setOpen] = useState(false);
+  const [lift, setLift] = useState(0);
   const imgRef = useRef(null);
   const panelRef = useRef(null);
   const timer = useRef(0);
@@ -203,6 +237,7 @@ export function PersonaBackdrop() {
           window.clearTimeout(timer.current);
           timer.current = 0;
         }
+        setLift(composerLift(imgRef.current));
         setOpen(true);
       } else if (!timer.current) {
         timer.current = window.setTimeout(() => {
@@ -226,6 +261,21 @@ export function PersonaBackdrop() {
     };
   }, [id]);
 
+  // 列展开期间跟着输入区走：多行草稿把输入框撑高、入口卡出现/消失都会改变上缘。
+  useEffect(() => {
+    if (!open) return undefined;
+    const measure = () => setLift(composerLift(imgRef.current));
+    measure();
+    const seat = typeof document === "undefined" ? null : document.querySelector("[data-composer-seat]");
+    const observer = seat && typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+    if (observer) observer.observe(seat);
+    window.addEventListener("resize", measure);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [open]);
+
   if (id === null) return null;
 
   return h(
@@ -235,6 +285,7 @@ export function PersonaBackdrop() {
       ? h(PersonaSwitch, {
           currentId: id,
           panelRef,
+          lift,
           onPick: (next) => setPersonaId(next),
         })
       : null,

@@ -19,6 +19,9 @@ pub enum Command {
     },
     /// 把 DeepSeek Harness 的窗口切到前台（桌面窗口托管模式与浏览器都适用）。
     Focus,
+    Fullscreen {
+        enabled: bool,
+    },
 }
 
 /// `GET /guard/status` 的响应体（形状由 API.md 固定）。
@@ -65,15 +68,20 @@ mod tests {
 
     #[test]
     fn command_json_round_trip() {
-        let lock: Command = serde_json::from_str(r#"{"command":"lock","whitelist":["code"]}"#).unwrap();
-        assert!(matches!(lock, Command::Lock { ref whitelist } if whitelist == &["code".to_string()]));
+        let lock: Command =
+            serde_json::from_str(r#"{"command":"lock","whitelist":["code"]}"#).unwrap();
+        assert!(
+            matches!(lock, Command::Lock { ref whitelist } if whitelist == &["code".to_string()])
+        );
         let lock_empty: Command = serde_json::from_str(r#"{"command":"lock"}"#).unwrap();
         assert!(matches!(lock_empty, Command::Lock { ref whitelist } if whitelist.is_empty()));
         let unlock: Command = serde_json::from_str(r#"{"command":"unlock"}"#).unwrap();
         assert!(matches!(unlock, Command::Unlock));
         let notify: Command =
             serde_json::from_str(r#"{"command":"notify","title":"番茄","body":"完成"}"#).unwrap();
-        assert!(matches!(notify, Command::Notify { ref title, ref body } if title == "番茄" && body == "完成"));
+        assert!(
+            matches!(notify, Command::Notify { ref title, ref body } if title == "番茄" && body == "完成")
+        );
         let focus: Command = serde_json::from_str(r#"{"command":"focus"}"#).unwrap();
         assert!(matches!(focus, Command::Focus));
         assert!(serde_json::from_str::<Command>(r#"{"command":"unknown"}"#).is_err());

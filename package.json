@@ -8,13 +8,15 @@
     "core:test": "pnpm --filter @tomato/core test",
     "runtime:test": "cd runtime && node --test",
     "build:runtime": "node scripts/build-runtime.mjs",
+    "build:host-tools": "node scripts/build-host-tools.mjs",
+    "check:host-tools": "node scripts/build-host-tools.mjs --check",
     "format": "prettier --write \"packages/**/*.ts\" \"runtime/**/*.{ts,mjs}\" \"plugin/**/*.{js,json,yml}\" \"scripts/**/*.{mjs,js}\"",
-    "check": "pnpm core:test && pnpm runtime:test && pnpm check:client",
+    "check": "pnpm check:host-tools && pnpm core:test && pnpm runtime:test && pnpm check:client",
     "check:handbook": "python3 scripts/check-handbook.py",
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs && node scripts/smoke-client.mjs",
     "check:client:live": "node scripts/build-client.mjs && SMOKE_LIVE=1 node scripts/smoke-client.mjs",
-    "test:tools": "node --test scripts/export-sqlite.test.mjs scripts/import-backup.test.mjs scripts/install.test.mjs scripts/persona-switch.test.mjs scripts/modal-ssr.test.mjs scripts/navigation-filter.test.mjs scripts/attention.test.mjs"
+    "test:tools": "node --test scripts/export-sqlite.test.mjs scripts/import-backup.test.mjs scripts/install.test.mjs scripts/persona-switch.test.mjs scripts/modal-ssr.test.mjs scripts/navigation-filter.test.mjs scripts/attention.test.mjs scripts/plugin-host.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

@@ -136,8 +136,20 @@ export class GuardClient {
     });
   }
 
+  fullscreen(enabled: boolean): Promise<GuardResult> {
+    return this.#request("/guard", {
+      method: "POST",
+      body: { command: "fullscreen", enabled },
+    });
+  }
+
   status(): Promise<GuardResult> {
     return this.#request("/guard/status");
+  }
+
+  /** 当前有窗口的应用 ID，供白名单建议使用。 */
+  runningApps(): Promise<GuardResult> {
+    return this.#request("/guard/apps");
   }
 
   async #request(

@@ -4,7 +4,7 @@
 // 保护设置只是其中一个字段；页面每次改动都浅拷贝当前快照里的 settings，再整体
 // 覆写 protection。这样既不会丢其他设置，也不会把旧版的 allowedApps 字段带回去。
 // 保护规则不可绕开：本页不提供任何解锁入口，严格模式生效时写操作会被 core 拒绝。
-import { h, useState } from "../runtime.js";
+import { h, useEffect, useState } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import {
   PageHeader,
@@ -52,7 +52,7 @@ registerCopy("guard", {
     whitelistTitle: "应用白名单",
     whitelistHint: "以整个应用 id 为单位，不需要填窗口标题。",
     whitelistDisabled: "切换到「应用白名单」后即可编辑。",
-    whitelistEmpty: "白名单还是空的；下面挑几个常用应用，或手动输入 app id。",
+    whitelistEmpty: "白名单还是空的；从已启动的应用中选择，或手动输入 app id。",
     manualTitle: "手动添加",
     addApp: "添加",
     appPlaceholder: "输入应用 id，如 code",
@@ -65,17 +65,17 @@ registerCopy("guard", {
     suggestionsTitle: "建议应用",
     refreshApps: "刷新应用",
     refreshBusy: "正在枚举…",
-    refreshFound: "找到 {n} 个已安装应用。",
-    refreshEmpty: "没有找到可添加的已安装应用。",
+    refreshFound: "找到 {n} 个正在运行的应用。",
+    refreshEmpty: "没有找到可添加的运行中应用。",
     refreshFailed: "读不到应用列表：{error}",
-    appsHint: "来自桌面入口（app_id 即 .desktop 文件名），未启动的应用也能选。",
-    noSuggestions: "没有可添加的建议应用。",
+    appsHint: "只建议当前已启动且有窗口的应用，最多显示 8 个；其他应用可手动输入 id。",
+    noSuggestions: "当前没有可添加的运行中应用。",
     semanticsTitle: "白名单如何工作",
     semantics: [
       "白名单以整个应用 id 为单位，而不是某个窗口或标签页。",
       "保护生效时，guard 约每 0.6 秒检查一次前台窗口，把不在白名单里的切回去。",
       "系统级快捷键、全屏游戏和多显示器可能让切回失效，个别窗口需要手动处理。",
-      "白名单只在保护真正生效时起作用：专注正在运行，且模式不是「自由专注」。",
+      "白名单只在「应用白名单」专注模式生效；界面锁定、快速锁机和定时锁机都不放行白名单。",
       "项目可以设置专属白名单替代通用白名单，优先于这里的配置。",
     ],
     statusTitle: "guard 运行状态",
@@ -123,7 +123,7 @@ registerCopy("guard", {
     whitelistHint: "Entries are whole app ids, not window titles.",
     whitelistDisabled: "Switch to “App whitelist” to edit this list.",
     whitelistEmpty:
-      "The whitelist is empty. Pick a common app below, or type an app id.",
+      "The whitelist is empty. Pick a running app below, or type an app id.",
     manualTitle: "Add manually",
     addApp: "Add",
     appPlaceholder: "App id, e.g. code",
@@ -136,18 +136,18 @@ registerCopy("guard", {
     suggestionsTitle: "Suggested apps",
     refreshApps: "Refresh apps",
     refreshBusy: "Scanning…",
-    refreshFound: "{n} installed apps found.",
-    refreshEmpty: "No installed apps left to add.",
+    refreshFound: "{n} running apps found.",
+    refreshEmpty: "No running apps left to add.",
     refreshFailed: "Could not read the app list: {error}",
     appsHint:
-      "Read from desktop entries — the app id is the .desktop file name, so apps that are not running can still be picked.",
-    noSuggestions: "No suggested apps left to add.",
+      "Only running apps with windows are suggested, up to 8. Other app ids can be entered manually.",
+    noSuggestions: "No running apps left to add.",
     semanticsTitle: "How the whitelist works",
     semantics: [
       "The whitelist works by whole app id, not by window or tab.",
       "While protection is active the guard checks the foreground window about every 0.6 seconds and sends back anything not whitelisted.",
       "System shortcuts, full-screen games, and multiple monitors can defeat the switch-back; some windows need manual handling.",
-      "The whitelist only applies while protection is truly active: a focus timer is running and the mode is not Free focus.",
+      "The whitelist only applies in App whitelist focus mode. Screen lock, quick lock, and scheduled lock ignore it.",
       "A project can define its own whitelist to replace the general one; it takes precedence over this configuration.",
     ],
     statusTitle: "Guard status",
@@ -182,16 +182,6 @@ const MODES = [
   },
 ];
 
-// 旧版常用 app id：runtime 没有应用枚举端点，用它作为冷启动建议。
-const LEGACY_APPS = [
-  "firefox",
-  "code",
-  "ChatGPT",
-  "wps-office",
-  "bili-live-hime",
-  "kitty",
-];
-
 /** 读 protection，兼容旧快照的 allowedApps 字段；写回一律用 whitelist。 */
 function readProtection(settings) {
   const raw = (settings && settings.protection) || {};
@@ -213,37 +203,6 @@ function readProtection(settings) {
     whitelist,
     strict: !!raw.strict,
   };
-}
-
-/** 从快照已知来源重建设备上的建议列表（项目白名单、当前白名单、guard 白名单、旧版常用）。 */
-function buildSuggestions(state, whitelist) {
-  const data = (state && state.data) || {};
-  const settings = data.settings || {};
-  const rawProtection = settings.protection || {};
-  const projects = Array.isArray(data.projects) ? data.projects : [];
-  const guard = (state && state.guard) || {};
-  const guardList = Array.isArray(guard.whitelist) ? guard.whitelist : [];
-  const sources = [
-    ...LEGACY_APPS,
-    ...(Array.isArray(rawProtection.whitelist) ? rawProtection.whitelist : []),
-    ...(Array.isArray(rawProtection.allowedApps)
-      ? rawProtection.allowedApps
-      : []),
-    ...projects.flatMap((project) =>
-      Array.isArray(project.appWhitelist) ? project.appWhitelist : [],
-    ),
-    ...guardList,
-  ];
-  const seen = new Set(whitelist);
-  const out = [];
-  for (const raw of sources) {
-    const app = String(raw ?? "").trim();
-    if (app === "" || /\s/.test(app) || seen.has(app)) continue;
-    seen.add(app);
-    out.push(app);
-    if (out.length >= 24) break;
-  }
-  return out;
 }
 
 function ModeCard({ option, selected, onSelect }) {
@@ -416,10 +375,10 @@ function GuardSkeleton() {
 export function GuardPage({ refresh }) {
   const state = useSnapshot();
   const [draft, setDraft] = useState("");
-  // 应用枚举是页面里唯一「按需拉一次」的数据：白名单要的是还没启动的应用，
-  // 所以不能靠快照推。null = 还没点过刷新。
+  // 建议只取当前有窗口的 app_id，不从历史配置或安装目录推断。
   const [apps, setApps] = useState(null);
   const [appsBusy, setAppsBusy] = useState(false);
+  useEffect(() => { void refreshApps(); }, []);
   if (state === null) return h(GuardSkeleton, null);
 
   const data = state.data || {};
@@ -433,12 +392,7 @@ export function GuardPage({ refresh }) {
   const active = !!view.active;
   const whitelist = protection.whitelist;
   const editable = protection.mode === "whitelist";
-  // 建议列表两种来源：还没刷新时用配置里出现过的 app id；刷新后用真实枚举，
-  // 名称给人看、id 写进白名单（两者在常见应用里不同，例如 文件 ↔ nautilus）。
-  const suggestions =
-    apps !== null
-      ? apps.filter((app) => !whitelist.includes(app.id)).slice(0, 24)
-      : buildSuggestions(state, whitelist).map((id) => ({ id, name: id }));
+  const suggestions = (apps || []).filter((app) => !whitelist.includes(app.id)).slice(0, 8);
   const semantics = t("guard.semantics");
   const semanticItems = Array.isArray(semantics) ? semantics : [];
   const pid =
@@ -511,15 +465,13 @@ export function GuardPage({ refresh }) {
     try {
       const result = await getApps();
       const list = Array.isArray(result && result.apps) ? result.apps : [];
-      const known = new Set(buildSuggestions(state, []));
       const ranked = list
         .map((app) => ({
           id: String(app.id ?? ""),
           name: String(app.name ?? app.id ?? ""),
-          known: known.has(app.id),
         }))
-        .filter((app) => app.id !== "")
-        .sort((a, b) => Number(b.known) - Number(a.known) || a.name.localeCompare(b.name, "zh-Hans-CN"));
+        .filter((app) => app.id !== "" && app.id !== "dsh-desktop" && app.id !== "studio.dsh.desktop")
+        .sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
       setApps(ranked);
       if (ranked.length === 0) notify(t("guard.refreshEmpty"), "neutral");
       else notify(t("guard.refreshFound", { n: ranked.length }), "brand");

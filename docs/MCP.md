@@ -1,6 +1,6 @@
 # 把 tomato-runtime 的 MCP 接入任意客户端
 
-`tomato-runtime` 自带一个 MCP 服务器。DSH 插件用它把番茄 Todo 挂成对话工具；任何 MCP 客户端（Claude Desktop、Codex、另一个 DSH 实例等）也能以同样方式接入。它连接的是**正在运行的 runtime**，共享同一份计划数据，不另开数据库；runtime 关闭后不可操作。初始化返回 `serverInfo.name = tomato-todo`，`instructions` 简述接管入口。
+`tomato-runtime` 自带一个 MCP 服务器。DSH 插件自带的 `tomato_*` Host 工具经一次性 `--mcp` 调用它，作为 DSH 对话入口；独立 MCP 客户端（Claude Desktop、Codex 等）也能接入。两条路径都连接**正在运行的 runtime**，共享同一份计划数据，不另开数据库；runtime 关闭后不可操作。初始化返回 `serverInfo.name = tomato-todo`，`instructions` 简述接管入口。
 
 两条入口，同一份工具：
 
@@ -39,7 +39,7 @@ streamable HTTP：从连接文件读出 `mcpUrl` 与令牌后：
 ## token 与连接文件
 
 - **位置**：数据目录下的 `agent/connection.json`，默认 `~/.local/share/studio.tomato.todo/agent/connection.json`；runtime 用 `--data` 指定数据目录时跟着走。
-- **内容**：当前实例的本机 MCP 地址（`mcpUrl`）与随机认证令牌；**runtime 每次重启都会更新**，stdio 入口每次调用重读该文件，适合稳定的本机客户端配置。
+- **内容**：当前实例的本机 MCP 地址（`mcpUrl`）与认证令牌；runtime 重启会复用已有令牌并更新进程与地址，stdio 入口每次调用重读该文件，适合稳定的本机客户端配置。
 - **边界**：只监听 127.0.0.1；HTTP 端点要求 `Authorization: Bearer <token>`，并拒绝浏览器 Origin——浏览器侧请走面板只读 API（见 [API.md](../API.md)）。
 - 令牌不要写进客户端配置的描述、日志或版本库；能读到连接文件的人才能连上 runtime。
 

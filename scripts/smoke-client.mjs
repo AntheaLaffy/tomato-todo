@@ -185,6 +185,11 @@ if (typeof plugin.apply !== "function") failures.push("plugin.apply 不是函数
 const overrides = [];
 const slotRegistrations = [];
 const effects = [];
+const localeListeners = new Set();
+const localeState = {
+  active: "zh",
+  locales: [{ id: "zh", label: "中文" }, { id: "en", label: "English" }],
+};
 const services = {
   theme: {
     overrideTokens(source, tokens) {
@@ -199,8 +204,25 @@ const services = {
     },
   },
   locale: {
-    getLocale: () => ({ active: "zh" }),
-    subscribe: () => () => {},
+    getLocale: () => localeState,
+    subscribe(fn) {
+      localeListeners.add(fn);
+      return () => localeListeners.delete(fn);
+    },
+    addLanguage(language) {
+      localeState.locales.push(language);
+      return () => {
+        localeState.locales = localeState.locales.filter((item) => item.id !== language.id);
+      };
+    },
+    register() {
+      return () => {};
+    },
+    setLocale(id) {
+      if (!localeState.locales.some((item) => item.id === id)) throw new Error("unknown locale");
+      localeState.active = id;
+      for (const fn of localeListeners) fn();
+    },
   },
   layout: {
     selectPanel() {},
@@ -242,13 +264,19 @@ const expectedSlots = [
   "sidebar.brand.name",
   "conversation.hero.brand.mark",
   "settings.general.item",
-  "sidebar.footer.action",
+  "sidebar.panellist",
 ];
 const got = new Set(slotRegistrations.map((r) => r.key));
 for (const key of expectedSlots) {
   if (!got.has(key)) failures.push(`缺少 slot 注册：${key}`);
 }
 if (overrides.length === 0) failures.push("没有调用 theme.overrideTokens");
+if (!localeState.locales.some((item) => item.id === "ja")) failures.push("没有向 DSH 注册日语");
+const tomatoEntry = slotRegistrations.find((r) => r.key === "sidebar.panellist");
+if (tomatoEntry?.registration?.options?.id !== "tomato") failures.push("侧栏入口没有绑定番茄主面板");
+if (slotRegistrations.some((r) => r.key === "sidebar.footer.action" && r.registration?.options?.id === "tomato-progress")) {
+  failures.push("番茄侧栏入口重复注册");
+}
 if (!head.children.some((n) => n.id === "tomato-skin-style")) failures.push("没有注入皮肤样式表");
 if (!body.children.some((n) => n.id === "tomato-ambient")) failures.push("没有注入氛围层");
 
@@ -272,11 +300,14 @@ let sampleState = {
       { id: "t3", title: "高数 1-5 极限运算法则", completed: false, dueDate: localDate(-3), reminderTime: "09:40", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 45, priority: 1, scrapMinutes: 30, reminderPending: false, reminderFired: true, reminderExpired: true, completedAt: null, createdAt: 1700000000 },
       // reminderPending + 当前时段：验证页面内提醒条（提醒时刻=5 分钟前，计划块尚未结束）
       { id: "t2", title: "408 真题：数据结构错题回顾", completed: false, dueDate: localDate(0), reminderTime: (() => { const d = new Date(Date.now() - 5 * 60000); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; })(), projectId: "p1", tags: ["408"], subtasks: [], notes: "", estimate: 2, focusMinutes: 25, priority: 2, scrapMinutes: 30, reminderPending: true, reminderFired: true, reminderExpired: false, completedAt: null, createdAt: 1700000000 },
+      // 跨项目交错日期：全部任务必须全局排序，不能先按项目分桶。
+      { id: "t4", title: "跨项目明日任务", completed: false, dueDate: localDate(1), reminderTime: null, projectId: "p2", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 25, priority: 0, scrapMinutes: 0, createdAt: 1700000001 },
+      { id: "t5", title: "原项目后日任务", completed: false, dueDate: localDate(2), reminderTime: null, projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 25, priority: 0, scrapMinutes: 0, createdAt: 1700000002 },
     ],
     blocks: [],
     templates: [],
     prints: [{ templateId: "tpl1", date: "2026-11-04" }],
-    projects: [{ id: "p1", name: "数学一", color: "#df7561", appWhitelist: null }],
+    projects: [{ id: "p1", name: "数学一", color: "#df7561", appWhitelist: null }, { id: "p2", name: "英语", color: "#75aabb", appWhitelist: null }],
     habits: [{ id: "h1", name: "晨间" }],
     visions: [{ id: "v1", name: "把数学一学扎实", notes: "不是周期任务，是方向", projectId: null }],
     blocks: [
@@ -363,6 +394,20 @@ let sampleState = {
   stats: { todaySeconds: 1200, todayPomodoros: 2, todayCompleted: 1, totalSeconds: 36000, totalPomodoros: 26, streak: 3, days: [] },
   guard: { available: true, backend: "niri / Wayland", locked: false, whitelist: [], pid: 1234 },
 };
+if (!process.env.SMOKE_LIVE) {
+  const now = sampleState.serverTime;
+  sampleState.data.education = {
+    projects: [{ projectId: "p1", target: "130+", examMode: true }],
+    assessments: [
+      { id: "homework-to-submit", projectId: "p1", kind: "homework",
+        title: "待交作业", startsAt: now - 3600, endsAt: now + 86400, questions: [] },
+      { id: "homework-to-grade", projectId: "p1", kind: "homework",
+        title: "待批改作业", startsAt: now - 86400, endsAt: now + 86400, questions: [] },
+    ],
+    submissions: [{ id: "submission-to-grade", assessmentId: "homework-to-grade", submittedAt: now - 60 }],
+    grades: [], events: [], summaries: [],
+  };
+}
 
 // SMOKE_LIVE=1：用运行中的 runtime 真实 /api/state 渲染（数据面联调）；不可达时退回样例。
 if (process.env.SMOKE_LIVE) {
@@ -424,6 +469,34 @@ const nav = context.window.__tomatoDsh;
 if (!nav || typeof nav.setActivePageId !== "function") {
   failures.push("没有暴露测试导航钩子 window.__tomatoDsh.setActivePageId");
 }
+const handoffs = [];
+const panelSelections = [];
+services.layout.selectPanel = (id) => panelSelections.push(id);
+services.sessions = {
+  list: { getSnapshot: () => ({ byId: { active: { id: "active", retainedBy: { mainView: 1 } } } }) },
+  binding: (id) => ({ sessionId: id }),
+  scope: (id) => ({ sessionId: id }),
+};
+services.conversation = { input: {
+  requestDraftInitialization: (binding, options) => { handoffs.push({ binding, options }); return "applied"; },
+  for: () => ({ focus() {} }),
+} };
+for (const [kind, records, ids] of [
+  ["assign", { projectId: "p1" }, ["p1"]],
+  ["submit", { projectId: "p1", assessmentId: "a1" }, ["p1", "a1"]],
+  ["grade", { projectId: "p1", assessmentId: "a1", submissionId: "s1" }, ["p1", "a1", "s1"]],
+]) {
+  if (!nav?.openAssistant?.(kind, records)) failures.push(`${kind} 没有打开学习助手草稿`);
+  const handoff = handoffs.at(-1);
+  const prompt = handoff?.options?.prompt ?? "";
+  if (handoff?.binding?.sessionId !== "active" || handoff?.options?.whenDraftExists !== "append" ||
+      !prompt.includes("tomato_get_education") || !prompt.includes("tomato_education") ||
+      ids.some((id) => !prompt.includes(`\"${id}\"`)) || panelSelections.at(-1) !== null) {
+    failures.push(`${kind} 草稿没有保留已有输入、插件工具或稳定记录 ID`);
+  }
+}
+delete services.sessions;
+delete services.conversation;
 for (const pageId of PAGE_IDS) {
   try {
     nav.setActivePageId(pageId);
@@ -443,6 +516,72 @@ for (const pageId of PAGE_IDS) {
     failures.push(`渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
   }
 }
+if (!process.env.SMOKE_LIVE) {
+  const education = renderedBy["page:education"] || "";
+  for (const label of ["布置作业", "提交作业", "批改作业"]) {
+    if (!education.includes(label)) failures.push(`教学页缺少操作「${label}」`);
+  }
+  const allTasks = renderedBy["page:tasks"] || "";
+  const positions = ["高数 1-5 极限运算法则", "语法加强 Day05（下）", "跨项目明日任务", "原项目后日任务"]
+    .map((title) => allTasks.indexOf(title));
+  if (positions.some((n) => n < 0) || positions.some((n, i) => i > 0 && n <= positions[i - 1])) {
+    failures.push("全部任务没有跨项目按到期日全局排序");
+  }
+}
+storage.delete("tomato-dsh.page");
+services.locale.setLocale("en");
+nav.setActivePageId("preferences");
+const englishPrefs = ReactDOMServer.renderToStaticMarkup(
+  React.createElement(mainRegistration.registration.Component, {}),
+);
+if (!englishPrefs.includes("Language") || !englishPrefs.includes("English")) {
+  failures.push("DSH 切到英语后番茄设置没有同步");
+}
+services.locale.setLocale("ja");
+const japanesePrefs = ReactDOMServer.renderToStaticMarkup(
+  React.createElement(mainRegistration.registration.Component, {}),
+);
+if (!japanesePrefs.includes("言語") || !japanesePrefs.includes("日本語")) {
+  failures.push("DSH 切到日语后番茄设置没有同步");
+}
+if (!japanesePrefs.includes("すべてのタスク") || !japanesePrefs.includes("設定")) {
+  failures.push("番茄 Todo 主视图没有显示日语导航");
+}
+if (tomatoEntry && tomatoEntry.registration.options.label() !== "トマト Todo") {
+  failures.push("DSH 侧栏番茄入口没有跟随日语");
+}
+const japaneseMarkers = {
+  focus: "今日は、ゆっくりと進みましょう。",
+  tasks: "少しずつ、物事を終わらせよう。",
+  habits: "習慣は繰り返される小さな行動",
+  stats: "時間を振り返る",
+  calendar: "横軸に曜日、縦軸に時刻",
+  education: "学習プロジェクト",
+  guard: "フォーカスガード",
+  schedule: "予定されたロック",
+  preferences: "ポモドーロ、学習プラン",
+};
+for (const pageId of PAGE_IDS) {
+  try {
+    nav.setActivePageId(pageId);
+    const markup = ReactDOMServer.renderToStaticMarkup(
+      React.createElement(mainRegistration.registration.Component, {}),
+    );
+    if (!markup.includes(japaneseMarkers[pageId])) failures.push(`页面 ${pageId} 的日语文案没有显示`);
+  } catch (error) {
+    failures.push(`日语页面 ${pageId} 渲染失败：${error.message}`);
+  }
+}
+if (!process.env.SMOKE_LIVE) {
+  nav.setActivePageId("education");
+  const education = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(mainRegistration.registration.Component, {}),
+  );
+  for (const label of ["宿題を出す", "宿題を提出", "宿題を採点"]) {
+    if (!education.includes(label)) failures.push(`日语教学页缺少操作「${label}」`);
+  }
+}
+services.locale.setLocale("zh");
 storage.delete("tomato-dsh.page");
 // 渲染主视图里的九个页面：直接触发 main 组件即可（页面由注册表提供）。
 const mainMarkup = renderedBy["main"] || "";
@@ -468,9 +607,9 @@ if (!process.env.SMOKE_LIVE) {
   }
   const dock = renderedBy["conversation.composer.dock"] || "";
   if (/[0-9]+ \/ 8 番茄/.test(dock)) failures.push("番茄预计/实际又回到了最下面那条面板");
-  const sidebarFoot = renderedBy["sidebar.footer.action"] || "";
-  if (!sidebarFoot.includes("番茄 Todo")) failures.push("侧栏底部缺少番茄入口文案");
-  if (!/[0-9]+\s*\/\s*8/.test(sidebarFoot)) failures.push("左下角侧栏没有番茄预计/实际进度");
+  if (!(renderedBy["sidebar.panellist"] || "").includes("svg")) {
+    failures.push("侧栏面板列表没有番茄图标");
+  }
 }
 if (!(renderedBy["conversation.composer.dock"] || "").includes("现在专注")) failures.push("入口卡没有渲染开始专注按钮");
 if ((renderedBy["shell.overlay"] || "").includes("个番茄")) {

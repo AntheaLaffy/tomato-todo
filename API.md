@@ -26,8 +26,8 @@
 - `GET /api/today` — `{ "today": "YYYY-MM-DD", "dueCount": number, "focusMinutes": number }`
 - `GET /api/stats`、`GET /health` — health 附带可选 `guard` 摘要字段
   `{"ok":true,"runtime":{"pid":…},"guard":{"available":true,"backend":"x11","locked":false,"whitelist":[],"pid":1234}}`（guard 摘要在 guard 不可达时给 `{"available":false}`，不得整体报错）
-- `GET /api/apps` — 已安装桌面应用（专注保护白名单用）：`{"apps":[{"id":"code","name":"Visual Studio Code","exec":"code","icon":"vscode"}],"count":160,"cached":false}`。
-  `id` 是桌面入口文件名去掉 `.desktop`，与 guard 的白名单精确匹配同一个值；结果缓存 30 秒
+- `GET /api/apps` — 当前有窗口的应用（白名单建议用）：`{"apps":[{"id":"code","name":"Visual Studio Code"}],"count":1,"cached":false}`。
+  `id` 来自 guard 实际窗口的 `app_id`；桌面入口仅补充可读名称，缓存 30 秒。guard 不可达时返回 503，不退回全机安装列表
 - `GET /api/state`、`GET /api/export/plan`、`GET /api/export/backup` — 见下节（UI 数据面与导出）
 
 浏览器写端点（同 Origin 白名单；写路径也必须经 @tomato/core 的校验与保护规则）：
@@ -64,6 +64,7 @@ UI 不再按页面堆端点，而是「取一份全量状态 + 提交 Action」�
   `400` + `{ "error": "…" }`（错误信息来自 @tomato/core 的 AppError，中文可读）。
   写路径同样经过 core 的校验与保护规则；`emergencyUnlock` 在严格模式下仍被拒绝。
 - 写端点在保护生效时同步驱动 guard（lock/unlock/whitelist），并每秒 tick 计时器。
+- `POST /api/desktop/fullscreen` `{ "enabled": true|false }`：沉浸层进入/退出时控制 DSH 原生全屏；沿用 UI Origin 校验，失败返回 503 与可读 `error`。仅改变视图，不修改计时与保护规则；保护期间退出沉浸不会解除全屏。
 
 **导出端点（偏好设置页用）**：
 
@@ -114,14 +115,17 @@ MCP 端点：`/mcp` streamable HTTP，Bearer token（数据目录 `agent/connect
 
 - `POST /guard`，body `{ "command": "lock", "whitelist": ["app-id", ...] }` → 全屏锁定 + 白名单
 - `POST /guard` `{ "command": "unlock" }`
+- `POST /guard` `{ "command": "fullscreen", "enabled": true|false }`：显式设置 DSH 全屏（当前接入 niri 的 Wayland foreign-toplevel 接口），重复调用不反转状态。保护期间保持全屏；解锁后跟随沉浸层的状态。
 - `POST /guard` `{ "command": "notify", "title": ..., "body": ... }`
 - `POST /guard` `{ "command": "focus" }` → 把 DeepSeek Harness 窗口切到前台（提醒/一轮结束
-  时由 runtime 调用；锁机期间不抢）。响应 `{ "ok": true, "focused": bool, "window": string|null }`。
+  时由 runtime 调用；niri 锁机期间仍可激活保护目标 DSH，其他后端的自建锁窗期间不抢）。响应 `{ "ok": true, "focused": bool, "window": string|null }`。
   窗口识别：应用 ID `dsh-desktop`（桌面窗口）或标题含 `DeepSeek Harness`（浏览器标签）；
   没有 DSH 窗口时 `focused=false`，不是错误。
 - `GET /guard/status` → `{ "locked": bool, "whitelist": [...], "pid": ..., "backend": "<实际后端名>" }`
   （backend 取 guard 实际检测到的后端显示名，如 "Sway / Wayland"、"EWMH / X11"，供 runtime 诊断）
+- `GET /guard/apps` → `{ "apps": ["app-id", ...] }`：当前有窗口的应用 ID，去重；同样需要 Bearer token，不返回窗口标题或 PID
 - guard 无长期状态；runtime 每次专注会话重发锁屏命令（guard 崩溃由 runtime 重启并重发）。
+- niri 的保护目标是实际 DSH 窗口，不另建空白锁窗。锁机模式、快速锁机与定时锁机始终发送空白名单，只允许该 DSH 窗口；白名单专注模式才传递有效白名单。守卫每 600ms 检查焦点，切回 DSH 时再次请求全屏。runtime 每秒核对守卫实际锁定状态，进程重启或保护线程退出后重新预检/锁定。
 
 ## 数据形状
 
@@ -132,10 +136,12 @@ MCP 端点：`/mcp` streamable HTTP，Bearer token（数据目录 `agent/connect
 
 ## 插件（plugin/）契约
 
-- MCP 行：`@deepseek-ai/dsh-mcp-client`，stdio，`command: runtime/bin/tomato-runtime`，
-  `args: ['--mcp']`，`serverName: tomato`。
-- host 半负责：拉起/保活 runtime 子进程（subprocess）、`tomato_today` 等 agent 工具、
-  UI 数据代理（如需要）。
-- client 半：composer.dock 入口卡 + shell.overlay 面板（今日专注/任务/统计/设置），
-  数据直连 `http://127.0.0.1:43987` 只读端点；全部样式走 `--dsw-alias-*` token，
-  配色沿用奶油白 `#faf8f4` + 番茄红 `#d96d55` 设计语言。
+- host 半首选：`tomato_*` Agent 工具覆盖 runtime 的 13 个 MCP 操作，
+  另有 `tomato_today` 与 `tomato_guard_status`。每次以一次性 subprocess 调用
+  正在运行的 runtime；插件不另开数据库，也不负责保活服务。工具 schema 从
+  `runtime/src/tools.mjs` 生成，DSH 的 MCP 客户端断线不影响这些 Host 工具。
+- runtime MCP 入口保留给独立客户端：`tomato-runtime --mcp` 或带令牌的
+  `http://127.0.0.1:43987/mcp`；DSH 插件配置不注册第二个 Tomato MCP 客户端。
+- client 半：DSH 左侧入口、main 九页、专注 HUD 和 composer.dock 入口卡；
+  UI 数据直连 `http://127.0.0.1:43987/api/state`，动作走 `/api/dispatch`，
+  布置/提交/批改按钮向学习助手草稿注入稳定记录 ID。

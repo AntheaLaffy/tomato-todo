@@ -6,6 +6,8 @@
 
 ### 变更
 
+- 应用白名单建议改为只列当前有窗口的运行中应用，自动刷新并最多显示 8 项；DSH 自身不列入建议，手动输入仍可添加其他 app id。桌面入口只用于名称，guard 不可达时不回退为全部已安装应用。
+- niri 保护改为直接全屏并回焦 DSH 实际窗口，保留倒计时与解锁入口；锁机模式、快速/定时锁机忽略所有白名单，白名单专注模式才放行有效白名单。沉浸层接入显式原生全屏/退出，守卫重启后 runtime 根据实际状态重发保护命令；独立 Xvfb+niri 回归覆盖上述行为。
 - 界面改为「整个 DSH 的番茄皮肤」：`skin/` 用 `theme.overrideTokens` 把 `--dsw-alias-*` 换成纸色系（浅/深同源、不改用户明暗偏好），注入 `--tomato-*` 变量、组件样式、`#tomato-ambient` 氛围层（窗光/纸纹/线描书桌/漂移微粒/竖排小字/时段变化）与侧栏、会话首屏品牌位；另有常驻专注 HUD（`shell.overlay`）与全屏沉浸模式（含 Legacy 2b 结束确认）。
 - 番茄应用成为 DSH 主视图 `main` panel `tomato`：左侧九页导航（今日专注/全部任务/习惯愿景/数据统计/本周日程/应试教育/专注保护/定时锁机/偏好设置），页面源码按 `pages/` 分文件自注册；侧栏 `sidebar.panellist` 提供番茄入口。
 - 客户端改为模块化 + esbuild 构建（`plugin/src/client/` → `plugin/client.js`，`pnpm build:client`），新增无浏览器冒烟 `pnpm check:client`（假 DOM + 真 React 逐页渲染）与 `SMOKE_LIVE=1` 实时数据联调；视觉基准见 `docs/SKIN.md`。
@@ -21,10 +23,11 @@
 - 学习助手不再内置：对话、审阅与教学全部交给 DSH，助手经 MCP（`--mcp` stdio 或 `/mcp` streamable HTTP）接管 tomato-runtime；MCP 工具语义沿用旧外部清单，实现全部重写。
 - runtime MCP 工具补齐教学面：新增 `education`（学期/课程/作业/考试/答卷/批改/订正/学情写入，`command.op`）、`get_education` / `get_study_progress` / `get_tasks`（分页读取）与 `apply_file`（导出文件按哈希应用）；`tomato_today` 改用 camelCase 的 `get_context` 形状并返回结构化对象。旧清单里已随内置助手移除的 `get_control_status` / `set_external_control` / `review_file` / `read_file` / `patch_file` 等不再暴露——文件读写、搜索、定时由 DSH 自带工具承担。
 - 存储改为计划 JSON 文件（`plan.json`）唯一数据源，原子写；旧 SQLite 提供一次性导出脚本。
-- 专注保护白名单补上应用枚举：`GET /api/apps` 扫 XDG 桌面入口（含 flatpak 导出），返回 `{id, name, exec, icon}`，`id` 就是 guard 精确匹配的 app_id；页面「刷新应用」把中文名摆出来、id 挂在提示上，未启动的应用也能选。结果按 30 秒缓存。
+- 专注保护白名单建议由 guard 枚举当前有窗口的 app_id；`GET /api/apps` 用 XDG 桌面入口补充名称，不再推荐未启动应用。名称缓存 30 秒，候选 ID 每次实时读取。
 - 桌面系统通知接上原生侧：runtime 每秒 tick 发现新提醒或一轮计时结束时，按 `settings.notifications` 调 guard 的 `notify` 发系统通知；浏览器失焦或没授权也能看到。抢焦与通知是同一次跃迁，失败只记一行日志、不重试。
 - 今日专注页补回「已交待批改」横幅：按项目聚合答卷未批改与批改后待复核的数量，点击切到应试教育页；判定与应试教育页共用 `shared/derive.js` 的 `educationGrading`，两处不会再各说一套。
 - 习惯对话框支持多时段：每个时段各带星期与时间，可增删（最多 49 个），同一天同一时间重复会被 core 拒绝；原来「另有 N 个时段保持不变」只读提示删除。
+- 教学技能（`tomato-todo`、`exam-teaching`、`exam-authoring`、`study-planning`、`study-diagnosis`、`study-memory`）收进 `plugin/skills/`：插件挂载时由 `plugin/skills.js` 注册成技能提供者（rank 350，高于用户目录、低于项目目录），插件更新即技能更新；挂载时还把 `skills/` 软链进已存在的 agent 技能根（优先 `~/.agents/skills`，否则 `~/.codex`、`~/.claude`、`~/.gemini`、opencode），Codex 等非 DSH agent 读到同一份文件、随插件更新；`linkSkills` 配置可关闭或指定目录，`plugin/link-skills.mjs` 提供检查、撤销与指定目录。
 
 ### 移除
 
@@ -45,6 +48,7 @@
 
 ### 修复
 
+- 看板娘的角色切换列不再压住 DSH 输入框的发送按钮：展开时按 `[data-composer-seat]` 实测输入区上缘，把列抬到它上面 12px，多行草稿把输入框撑高时跟着让位（上限立绘头顶）；番茄页等没有输入区的界面、以及输入框还居中的新会话保持原位。
 - 对话框（新建/编辑任务、删除确认、打印等）改挂到 `document.body`：页面内容在可滚动容器里，祖先 `animation`（`fill-mode:both` 的 transform 关键帧）会让 `position:fixed` 以内容列为包含块，遮罩只盖内容、对话框偏下并在上方留出大片空白；现在遮罩盖住整屏、对话框在视口居中。无 `react-dom` 的环境（冒烟/SSR）退回内联渲染。
 
 ### 破坏性变更

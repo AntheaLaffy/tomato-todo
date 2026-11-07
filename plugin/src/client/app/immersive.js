@@ -13,6 +13,7 @@ import { Icon } from "../shared/icons.js";
 import { Btn, IconBtn, Dropdown, Modal, notify } from "../shared/ui.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
 import { timerView, fmtClock, taskById, protectionView, toMinutes } from "../shared/derive.js";
+import { setDesktopFullscreen } from "../shared/api.js";
 import { openPanelAt } from "./navigation.js";
 import { useAmbience, ensureAudio } from "./sound.js";
 
@@ -316,18 +317,34 @@ export function Immersive() {
   const settings = data.settings || {};
   const task = taskById(data, view.taskId);
   const protection = protectionView(state);
-  const now = useNow(view.running && open);
+  const lockActive = !!(data.lock && data.lock.active);
+  const forced = lockActive || (protection.active && protection.mode === "lock");
+  const visible = open || forced;
+  const now = useNow((view.running || lockActive) && visible);
 
-  const liveRemaining =
-    view.running && typeof view.timer.deadline === "number"
+  const liveRemaining = lockActive
+    ? Math.max(0, Math.ceil(data.lock.active.endsAt - now / 1000))
+    : view.running && typeof view.timer.deadline === "number"
       ? Math.max(0, Math.round(view.timer.deadline - now / 1000))
       : view.remainingSecs;
-  const progress = view.totalSecs > 0 ? Math.max(0, Math.min(1, 1 - liveRemaining / view.totalSecs)) : 0;
-  const resting = view.mode !== "focus";
+  const totalSecs = lockActive ? data.lock.active.endsAt - data.lock.active.startedAt : view.totalSecs;
+  const progress = totalSecs > 0 ? Math.max(0, Math.min(1, 1 - liveRemaining / totalSecs)) : 0;
+  const resting = lockActive || view.mode !== "focus";
   const focusMinutes = toMinutes(view.totalSecs - liveRemaining);
   const cycleEvery = Number(settings.longBreakEvery) || 4;
   const cycle = Number(view.cycle) || 1;
-  const lockActive = !!(data.lock && data.lock.active);
+
+  useEffect(() => {
+    if (!visible) return;
+    setDesktopFullscreen(true).catch((error) => {
+      notify(error.userMessage || error.message, "danger");
+    });
+    return () => {
+      setDesktopFullscreen(false).catch((error) => {
+        notify(error.userMessage || error.message, "danger");
+      });
+    };
+  }, [visible]);
 
   // 计时结束 / 被停止（且不是暂停）时自动让出全屏；休息模式保留轻量界面。
   useEffect(() => {
@@ -395,7 +412,7 @@ export function Immersive() {
     openPanelAt("calendar");
   };
 
-  if (!open) return null;
+  if (!visible) return null;
 
   const badge = (() => {
     if (lockActive) return { icon: "moon", text: t("imm.badgeBreakLock") };
@@ -417,7 +434,7 @@ export function Immersive() {
     (data.lock && data.lock.active && data.lock.active.strict) ||
     (view.running && view.mode === "focus" && protection.mode !== "off" && protection.strict)
   );
-  const canEarly = !resting && view.remainingSecs < view.totalSecs;
+  const canEarly = !lockActive && !resting && view.remainingSecs < view.totalSecs;
 
   const soundKind = ambience.kind || "silent";
   const soundKindLabel =
@@ -551,7 +568,7 @@ export function Immersive() {
             opacity: 0.9,
           },
         },
-        resting ? t("imm.badgeRest") : t("imm.focusLabel"),
+        lockActive ? data.lock.active.name : resting ? t("imm.badgeRest") : t("imm.focusLabel"),
       ),
       h(
         "div",
@@ -594,7 +611,7 @@ export function Immersive() {
             { style: { fontSize: narrow ? 13 : 14.5, color: INK_2, letterSpacing: ".04em", lineHeight: 1.7 } },
             resting ? t("imm.restHint") : t("imm.onlyThis"),
           ),
-      task && !resting
+      task && !resting && !lockActive
         ? h(
             "div",
             {
@@ -659,7 +676,7 @@ export function Immersive() {
           width: "calc(100vw - 40px)",
         },
       },
-      h(
+      !forced && h(
         Btn,
         {
           size: "sm",
@@ -698,7 +715,12 @@ export function Immersive() {
             }),
           )
         : null,
-      !resting
+      lockActive
+        ? h(Btn, {
+            size: "sm", icon: "unlock", disabled: busy || strictActive,
+            onClick: interrupt,
+          }, t("imm.interrupt"))
+        : !resting
         ? h(
             Btn,
             {
@@ -740,8 +762,8 @@ export function Immersive() {
           t("imm.cycle", { n: cycle, total: cycleEvery }),
         )
       : null,
-    // 右下角：退出沉浸模式（不结束计时；严格模式下只是离开全屏）
-    h(
+    // 锁机不能通过关闭沉浸层离开保护界面。
+    !forced && h(
       "div",
       { style: { position: "absolute", right: narrow ? 14 : 24, bottom: narrow ? 16 : 24, display: "flex" } },
       h(IconBtn, {

@@ -1,8 +1,5 @@
-// 全部任务：工具条 + 按项目分组的清单 + 只读模板视图 + 底部内联添加。
-//
-// 为什么按项目分组而不是平铺：这份清单回答的是「我还有哪些事、它们属于哪个
-// 方向」，平铺列表会丢掉项目这一层；项目顺序直接用 data.projects，未分类
-// （projectId 为 null 或指向已删除项目）永远落在最后的「收件箱」组。
+// 全部任务：工具条 + 全局排序的清单 + 只读模板视图 + 底部内联添加。
+// 项目由工具条筛选，每条任务的元信息仍显示所属项目。
 //
 // 写操作全部走 tryDispatch（永不抛）；批量操作逐个提交而不是伪造批量 Action，
 // 因为 core 的 saveTask/deleteTask 才是唯一权威，失败时停在第一个错误上并说明。
@@ -284,26 +281,6 @@ function sortTasks(tasks, sort) {
     return compareByTime(a, b);
   });
   return items;
-}
-
-/** 按项目分组：项目顺序来自 data.projects，未分类合并成最后一组。 */
-function groupTasks(tasks, projects, inboxLabel) {
-  const known = new Set(projects.map((project) => project.id));
-  const groups = projects.map((project) => ({
-    key: project.id,
-    name: project.name,
-    color: project.color || "var(--tomato-ink-3)",
-    tasks: [],
-  }));
-  const byKey = new Map(groups.map((group) => [group.key, group]));
-  const inbox = { key: "__inbox", name: inboxLabel, color: "var(--tomato-ink-3)", tasks: [] };
-  for (const task of tasks) {
-    const group = task.projectId && known.has(task.projectId) ? byKey.get(task.projectId) : inbox;
-    if (group) group.tasks.push(task);
-  }
-  const out = groups.filter((group) => group.tasks.length > 0);
-  if (inbox.tasks.length > 0) out.push(inbox);
-  return out;
 }
 
 /** 模板印刷规则的人读摘要；缺字段时按「没有规则」处理，不让脏数据崩页面。 */
@@ -808,38 +785,6 @@ function TaskRow({
   );
 }
 
-// ---------------------------------------------------------------- 项目分组
-
-function ProjectGroup({ group, ...rowProps }) {
-  return h(
-    "div",
-    { style: { marginBottom: 6 } },
-    h(
-      "div",
-      { style: { display: "flex", alignItems: "center", gap: 8, padding: "10px 6px 4px" } },
-      h(Dot, { color: group.color, size: 8 }),
-      h(
-        "span",
-        { style: { fontSize: 12.5, fontWeight: 600, color: "var(--tomato-ink-2)" } },
-        group.name,
-      ),
-      h(
-        "span",
-        { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-        t("common.tasksCount", { n: group.tasks.length }),
-      ),
-    ),
-    group.tasks.map((task, index) =>
-      h(TaskRow, {
-        key: task.id,
-        task,
-        last: index === group.tasks.length - 1,
-        ...rowProps,
-      }),
-    ),
-  );
-}
-
 // ---------------------------------------------------------------- 模板视图
 
 function TemplateList({
@@ -1167,7 +1112,6 @@ function TasksPage() {
     }),
     sort,
   );
-  const groups = groupTasks(visible, projects, t("tasks.inbox"));
   const editingTask = editor && editor.id ? taskById(data, editor.id) : null;
   const dialogOpen = !!editor && (!editor.id || !!editingTask);
   const editingTemplate =
@@ -1524,7 +1468,9 @@ function TasksPage() {
             : h(
                 "div",
                 null,
-                groups.map((group) => h(ProjectGroup, { key: group.key, group, ...rowProps })),
+                visible.map((task, index) =>
+                  h(TaskRow, { key: task.id, task, last: index === visible.length - 1, ...rowProps }),
+                ),
               ),
         ),
     tab === "templates"

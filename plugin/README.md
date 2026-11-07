@@ -5,27 +5,45 @@
 
 ## 提供什么
 
-- **host 半**（`index.js`）：agent 工具 `tomato_today`、`tomato_guard_status`。
-  两者都经 `tomato-runtime` 的一次性子进程探询（`--mcp` 一行 JSON-RPC /
-  `--guard-status` 一行 JSON），不常驻、不持有进程。
-- **MCP 行**（`cordis.patch.yml` 的 `tomato-mcp` 行）：assistant 直连
-  `tomato-runtime --mcp`（stdio），工具语义沿用旧 external.rs（get_context、
-  create_task、complete_task 等）。
-- **client 半**（`client.js`）：`conversation.composer.dock` 入口卡
-  （运行时健康点 + 今日待办/投入分钟，30s 轮询，点按钮开面板）+
-  `shell.overlay` 全屏四页签面板（今日专注 / 全部任务 / 统计 / 设置），
-  数据直连 `http://127.0.0.1:43987`。样式全部走 `--dsw-alias-*` 主题 token，
-  奶油白 `#faf8f4` + 番茄红 `#d96d55` 只作作品图形色（番茄标志、计时环、统计条形），
-  深色主题下同样协调。
+- **host 半**（`index.js`）：首选的 `tomato_*` Agent 工具覆盖 runtime 的全部
+  13 个 MCP 操作；另有 `tomato_today` 与 `tomato_guard_status`。每次经
+  `tomato-runtime --mcp` 的一次性子进程调用同一运行实例，独立于 DSH 的 MCP
+  客户端连接。工具 schema 来自 `runtime/src/tools.mjs`，由
+  `scripts/build-host-tools.mjs` 生成 `host-tool-specs.js`。
+- **runtime MCP**：`tomato-runtime --mcp` 仍可供 Codex 等独立客户端接入；
+  DSH 插件配置不额外启动 `tomato-mcp` 客户端。
+- **client 半**（`client.js`）：DSH 左侧导航、主区域九页、专注 HUD 与输入框
+  入口卡。数据面直连运行时 `GET /api/state`、`POST /api/dispatch`，与 DSH
+  语言同步支持中文、英语、日语。作业操作会把稳定记录 ID 与请求写入学习助手草稿。
+- **内置技能**（`skills/` + `skills.js`）：`tomato-todo`、`exam-teaching`、
+  `exam-authoring`、`study-planning`、`study-diagnosis`、`study-memory` 随包发布。
+  插件挂载时 `skills.js` 把它们注册成 DSH 技能提供者（rank 350：高于用户目录、
+  低于项目目录），**插件更新即技能更新**，用户不用另外安装或同步一套技能。
+  `references/local-context.md` 与 `references/local-library.md` 是本机导航，
+  已 gitignore，不随包分发。
+- **跨 agent 链接**（`link-skills.js`）：插件挂载时把 `skills/` 软链进已经存在的
+  agent 技能目录（优先 `~/.agents/skills` 这个共享根，没有就退到
+  `~/.codex`、`~/.claude`、`~/.gemini`、opencode），所以 Codex / Claude Code 读到的
+  也是同一份文件，插件更新后一起更新。只建符号链接，绝不删真实目录或文件。
 
 ## 安装
 
 1. 确保 `tomato-runtime` 已构建，并软链到 `/home/fuurin/.local/bin/tomato-runtime`
-   （默认路径）。换机器时改 `cordis.patch.yml` 两处路径：`tomato-mcp` 行的
-   `command` 与 `tomato-dsh` 行的 `config.tomatoBin`。
+   （默认路径）。换机器时改 `cordis.patch.yml` 的 `config.tomatoBin`。
 2. 用 DSH 的 `plugin_manager` → `install_bundle` 安装本目录（绝对路径）。
-   补丁会插入 `tomato-mcp` 行与 `@local/tomato-dsh` 插件行。
-3. 面板 UI 需要 runtime 的 HTTP 服务在运行（见下）；host 工具与 MCP 用
+   补丁会插入 `@local/tomato-dsh` 插件行。更新 Host 工具后
+   重启 DSH Web 服务，让现有进程重新注册工具。
+3. 其他 agent 的技能目录**不用手动处理**：插件挂载时会自动软链（见上）。
+   想指定目录或先看看结果，再用命令：
+
+   ```bash
+   node link-skills.mjs --dir ~/.codex/skills   # 指定目录
+   node link-skills.mjs --check                 # 只检查，缺失/过期退出码 1
+   node link-skills.mjs --remove                # 撤销本包创建的链接
+   ```
+
+   不想要自动链接就在补丁里设 `linkSkills: false`（或给一个目录数组）。
+4. 面板 UI 需要 runtime 的 HTTP 服务在运行（见下）；host 工具与 MCP 用
    一次性子进程，也需要 runtime 可执行（失败时按返回文案引导用户）。
 
 ## 运行时要求
@@ -35,7 +53,9 @@
   （systemd user service / autostart 由 packaging 阶段安装）。
 - **guard（tomato-guard）可选**：未接入时设置页显示「未接入 guard」、
   专注锁定不可用；`tomato_guard_status` 工具如实报告 `guard.available`。
-- 插件本身不负责拉起或保活 runtime（安装/打包脚本负责常驻）。
+- 插件本身不负责拉起或保活 runtime（安装/打包脚本负责常驻）。若 MCP 客户端
+  提示 disconnected，先用插件的 `tomato_get_context` 或 `tomato_get_education`
+  核对数据，不让学习助手要求用户手工转录作业。
 
 ## 依赖的 runtime 契约
 
@@ -54,27 +74,20 @@
 
   非零退出或无输出 = runtime 本身不可达。
 
-### client UI 契约（面板直连 127.0.0.1:43987，全部容忍式读取）
+### client UI 契约
 
-| 端点 | 用途 | 形状（以 runtime 工作流为准，此处为 UI 假设） |
-| --- | --- | --- |
-| `GET /health` | 设置页 | `{ ok, service, version, dataDir, guard:{available,backend,message?,locked,whitelist,pid} \| null }` |
-| `GET /api/today` | 今日专注页 | `{ today, dueCount, focusMinutes, tasks:[{id,title,completed,dueDate?,reminderTime?}], timer:{status:'running'\|'paused'\|'idle', mode, remainingSeconds, totalSeconds, cycle?} }` |
-| `GET /api/stats` | 统计页 | `{ todaySeconds, todayPomodoros, todayCompleted, streakDays, totalSeconds, days:[{date,seconds}×7] }` |
-| `POST /api/focus/start` `/pause` `/stop` | 计时控制（骨架） | 体 `{}` |
-| `POST /api/tasks` | 新建任务 | 体 `{ title }` |
-| `POST /api/tasks/:id/complete` | 勾选完成 | 体 `{}` |
-
-字段形状由 runtime 工作流定稿；client 侧所有 normalizer 都是容忍式收窄
-（多字段名回退），形状微调不会破坏 UI。写端点走 runtime 的 Origin 白名单，
-UI 之外的写操作走 MCP。
+九页界面从 `GET /api/state` 读取全量快照，用 `POST /api/dispatch` 提交
+`@tomato/core` Action；健康状态使用 `GET /health`。浏览器操作与 Agent
+工具都落到同一个运行时及其校验规则。
 
 ## 开发
 
 - `client.js` 是**构建产物**：源码在 `src/client/`（`skin/` 皮肤、`app/` 框架与常驻
   组件、`pages/` 九个页面、`shared/` 组件库与数据层），由 `pnpm build:client`
   （esbuild）打成单入口 IIFE。**不要手改 client.js**。
-- 自检：`pnpm check:client`（构建 + 无浏览器冒烟：假 DOM + 真 React 渲染全部 slot）；
+- 自检：`pnpm check:host-tools`（Host schema 与 runtime 一致）、
+  `LIVE_TOMATO=1 node --test scripts/plugin-host.test.mjs`（当前运行实例只读冒烟）、
+  `pnpm check:client`（构建 + 无浏览器冒烟）；
   `node --check plugin/client.js plugin/index.js`；locale/package JSON 合法；
   `exports` 与 `files` 一一对应。
 - 视觉与交互规范见 [docs/SKIN.md](../docs/SKIN.md)，功能面见
@@ -82,5 +95,5 @@ UI 之外的写操作走 MCP。
 
 ## 已知局限
 
-- 面板交互尚未在真实 DSH 里做视觉验收（本阶段以组装与语法复验为准）。
-- `/api/today`、`/api/stats`、`/health` 的字段形状待 runtime 工作流定稿后核对。
+- Host 工具要求正在运行的 runtime；它消除 MCP 客户端断线依赖，不在 runtime
+  关闭时伪造操作成功。
