@@ -16,6 +16,7 @@ import * as api from "../shared/api.js";
 import { AppShell } from "./frame.js";
 import { assistantPrompt } from "./assistant-prompt.js";
 import {
+  bindPanelInfo,
   bindPanelOpener,
   getActivePageId,
   navigate,
@@ -127,6 +128,9 @@ export function registerApp(ctx) {
       ? (panelId) => layout.selectPanel(panelId)
       : null,
   );
+  // 面板真值源优先于「组件是否挂载」：刷新时 React 卸载顺序不可靠，用真值源
+  // 才知道用户此刻究竟在番茄面板还是对话。
+  bindPanelInfo(layout && layout.panelInfo ? layout.panelInfo : null);
 
   // 测试钩子：无浏览器冒烟（scripts/smoke-client.mjs）需要跨页重挂主视图；
   // 也方便在真实页面控制台里排查导航。只有测试页显式置位时才暴露。

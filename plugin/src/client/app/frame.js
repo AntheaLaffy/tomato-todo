@@ -14,6 +14,7 @@ import {
   openTasksForProject,
   setActivePageId,
   setPanelVisible,
+  hasPanelInfo,
   subscribe,
 } from "./navigation.js";
 
@@ -493,11 +494,14 @@ export function AppShell(props) {
   }, []);
 
   // 记住番茄面板是否可见：DSH 自己也能打开/关闭面板（侧栏入口、切回对话），
-  // 不经过 app/main.js 的 openPanel/leaveToConversation，所以以本组件的挂载
-  // 周期为准。刷新时按这个标记恢复面板，避免「在对话里刷新却被拉回番茄」。
+  // 不一定经过 app/main.js 的 openPanel/leaveToConversation。
   useEffect(() => {
+    // 有面板真值源时由 navigation.bindPanelInfo 负责记录；这里的挂载标记只是
+    // 老 DSH 版本的兜底。卸载时不要写「已离开」——刷新时的卸载顺序会把它误记
+    // 成「用户回到了对话」，下次刷新就会跳去助手页。
+    if (hasPanelInfo()) return undefined;
     setPanelVisible(true);
-    return () => setPanelVisible(false);
+    return undefined;
   }, []);
 
   // 兜底：即使 fixed 接管受祖先裁剪影响，也把 DSH 侧栏收起来（离开时还原）。

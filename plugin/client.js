@@ -4448,6 +4448,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   var BOOT_KEY = "tomato-dsh.booted";
   var activePageId = null;
   var openPanelFn = null;
+  var panelInfoObs = null;
   var coldStart = null;
   var lastCompleteSerial = 0;
   var listeners5 = /* @__PURE__ */ new Set();
@@ -4607,10 +4608,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         }
       }
     }
-    try {
-      openPanelFn?.("tomato");
-    } catch {
-    }
+    selectPanelWithRetry("tomato");
     writeNavState({
       panel: "tomato",
       page: target || state && state.page || null
@@ -4618,7 +4616,24 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     return true;
   }
   function restore() {
-    return isColdStart() ? navigate({ page: "focus", reason: "boot" }) : navigate({ reason: "restore" });
+    if (isColdStart()) return navigate({ page: "focus", reason: "boot" });
+    if (currentPanelId() === "tomato") {
+      const state = readNavState();
+      const page = state && state.page || "focus";
+      if (page !== activePageId) {
+        activePageId = page;
+        writeLegacyPage(page);
+        for (const fn of Array.from(listeners5)) {
+          try {
+            fn(page);
+          } catch {
+          }
+        }
+      }
+      writeNavState({ panel: "tomato", page });
+      return false;
+    }
+    return navigate({ reason: "restore" });
   }
   var pendingTasksFilter = null;
   var filterListeners = /* @__PURE__ */ new Set();
@@ -4643,6 +4658,38 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
   function bindPanelOpener(fn) {
     openPanelFn = typeof fn === "function" ? fn : null;
+  }
+  function bindPanelInfo(observer) {
+    panelInfoObs = observer && typeof observer.subscribe === "function" ? observer : null;
+    if (panelInfoObs === null) return;
+    const sync = () => {
+      const snapshot2 = panelInfoObs.getSnapshot?.() ?? null;
+      setPanelVisible(snapshot2?.activePanelId === "tomato");
+    };
+    sync();
+    panelInfoObs.subscribe(sync);
+  }
+  function hasPanelInfo() {
+    return panelInfoObs !== null;
+  }
+  function currentPanelId() {
+    try {
+      return panelInfoObs?.getSnapshot?.()?.activePanelId ?? null;
+    } catch {
+      return null;
+    }
+  }
+  function selectPanelWithRetry(panelId, attempt = 0) {
+    try {
+      openPanelFn?.(panelId);
+      return true;
+    } catch {
+      if (attempt >= 20) return false;
+      const delay = 50;
+      if (typeof setTimeout === "function")
+        setTimeout(() => selectPanelWithRetry(panelId, attempt + 1), delay);
+      return false;
+    }
   }
 
   // plugin/src/client/app/frame.js
@@ -5089,8 +5136,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       return () => root.removeAttribute("data-tomato-takeover");
     }, []);
     useEffect(() => {
+      if (hasPanelInfo()) return void 0;
       setPanelVisible(true);
-      return () => setPanelVisible(false);
+      return void 0;
     }, []);
     useEffect(() => {
       const collapse = props.collapseSidebar;
@@ -23664,6 +23712,7 @@ ${JSON.stringify(refs, null, 2)}`;
     bindPanelOpener(
       layout && typeof layout.selectPanel === "function" ? (panelId) => layout.selectPanel(panelId) : null
     );
+    bindPanelInfo(layout && layout.panelInfo ? layout.panelInfo : null);
     try {
       if (typeof window !== "undefined" && window.__TOMATO_TEST__) {
         window.__tomatoDsh = {

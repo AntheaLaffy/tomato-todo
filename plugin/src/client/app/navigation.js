@@ -16,6 +16,7 @@ const BOOT_KEY = "tomato-dsh.booted"; // sessionStorage：本标签页已经加�
 
 let activePageId = null;
 let openPanelFn = null;
+let panelInfoObs = null; // DSH layout 的面板真值源（有它就不用猜）
 let coldStart = null; // null = 本次页面加载还没判定
 let lastCompleteSerial = 0;
 const listeners = new Set();
@@ -248,11 +249,7 @@ export function navigate({ page = null, reason = "user", serial = null } = {}) {
       }
     }
   }
-  try {
-    openPanelFn?.("tomato");
-  } catch {
-    /* DSH 版本差异时忽略 */
-  }
+  selectPanelWithRetry("tomato");
   writeNavState({
     panel: "tomato",
     page: target || (state && state.page) || null,
@@ -265,9 +262,27 @@ export function navigate({ page = null, reason = "user", serial = null } = {}) {
  * 返回是否改变了界面（测试与排查用）。
  */
 export function restore() {
-  return isColdStart()
-    ? navigate({ page: "focus", reason: "boot" })
-    : navigate({ reason: "restore" });
+  if (isColdStart()) return navigate({ page: "focus", reason: "boot" });
+  // 面板已经由 DSH 恢复成番茄（真值源这么说）：只把页恢复过去，不再调
+  // selectPanel——重复设置会把「用户已经看到的界面」再切一次。
+  if (currentPanelId() === "tomato") {
+    const state = readNavState();
+    const page = (state && state.page) || "focus";
+    if (page !== activePageId) {
+      activePageId = page;
+      writeLegacyPage(page);
+      for (const fn of Array.from(listeners)) {
+        try {
+          fn(page);
+        } catch {
+          /* 订阅者异常不影响其他订阅者 */
+        }
+      }
+    }
+    writeNavState({ panel: "tomato", page });
+    return false;
+  }
+  return navigate({ reason: "restore" });
 }
 
 // ---------------------------------------------------------------- 项目筛选
@@ -305,4 +320,55 @@ export function subscribeTasksFilter(fn) {
 /** app/main.js 在插件 apply 时把 ctx.layout.selectPanel 绑进来（参数是面板 id）。 */
 export function bindPanelOpener(fn) {
   openPanelFn = typeof fn === "function" ? fn : null;
+}
+
+/**
+ * 绑定 DSH 的面板真值源（`ctx.layout.panelInfo`）。
+ *
+ * 为什么不能只靠「main 组件挂载 = 面板可见」：DSH 自己也能切面板（侧栏、对话
+ * 按钮），组件挂载周期只是它的影子；而刷新时组件卸载与页面卸载的先后顺序并
+ * 不可靠，用卸载写「已离开」会把「我在番茄页刷新」记成「我在对话页」。
+ * 订阅真值源之后，{panel} 一直反映实际选择。
+ */
+export function bindPanelInfo(observer) {
+  panelInfoObs =
+    observer && typeof observer.subscribe === "function" ? observer : null;
+  if (panelInfoObs === null) return;
+  const sync = () => {
+    const snapshot = panelInfoObs.getSnapshot?.() ?? null;
+    setPanelVisible(snapshot?.activePanelId === "tomato");
+  };
+  sync();
+  panelInfoObs.subscribe(sync);
+}
+
+/** 是否已经拿到面板真值源（拿不到时 frame.js 的挂载标记才是唯一线索）。 */
+export function hasPanelInfo() {
+  return panelInfoObs !== null;
+}
+
+/** 当前 DSH 选中的面板 id（拿不到真值源时返回 null）。 */
+export function currentPanelId() {
+  try {
+    return panelInfoObs?.getSnapshot?.()?.activePanelId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 面板注册可能比 overlay 的 effect 晚一拍：selectPanel 对未注册的 id 会抛错。
+ * 这里退避重试几次，而不是让「刷新恢复」因为一次时序竞态静默失败。
+ */
+function selectPanelWithRetry(panelId, attempt = 0) {
+  try {
+    openPanelFn?.(panelId);
+    return true;
+  } catch {
+    if (attempt >= 20) return false;
+    const delay = 50;
+    if (typeof setTimeout === "function")
+      setTimeout(() => selectPanelWithRetry(panelId, attempt + 1), delay);
+    return false;
+  }
 }

@@ -32,6 +32,7 @@ beforeEach(() => {
   globalThis.sessionStorage = session;
   nav.resetActivePageCache();
   nav.bindPanelOpener(null);
+  nav.bindPanelInfo(null);
   delete globalThis.document;
 });
 
@@ -202,4 +203,69 @@ test("subscribe：切页广播，退订后不再收到", () => {
   off();
   nav.setActivePageId("tasks");
   assert.deepEqual(seen, ["focus", "calendar"]);
+});
+
+// ---- 面板真值源与重试 ----
+
+/** 假 DSH panelInfo：可读快照 + 订阅，用来验证「以真值源为准」。 */
+function fakePanelInfo(initial) {
+  let snapshot = { activePanelId: initial };
+  const listeners = new Set();
+  return {
+    getSnapshot: () => snapshot,
+    subscribe: (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    set(panelId) {
+      snapshot = { activePanelId: panelId };
+      for (const fn of listeners) fn(snapshot);
+    },
+  };
+}
+
+test("面板真值源：DSH 切到番茄/切回对话都会写进 {panel}", () => {
+  beforeEach(() => nav.bindPanelInfo(null));
+  const info = fakePanelInfo(null);
+  nav.bindPanelInfo(info);
+  assert.equal(nav.isPanelVisible(), false);
+  info.set("tomato");
+  assert.equal(nav.isPanelVisible(), true);
+  info.set(null);
+  assert.equal(nav.isPanelVisible(), false);
+  nav.bindPanelInfo(null);
+});
+
+test("restore：DSH 已把面板恢复成番茄时，只回页不再调 selectPanel", () => {
+  assert.equal(nav.isColdStart(), true);
+  nav.navigate({ page: "calendar", reason: "user" });
+  const calls = opener();
+  // 刷新后 DSH 自己把面板恢复成番茄（真值源先说话）。
+  nav.resetActivePageCache();
+  const info = fakePanelInfo("tomato");
+  nav.bindPanelInfo(info);
+
+  assert.equal(nav.restore(), false);
+  assert.deepEqual(calls, []);
+  assert.equal(nav.getActivePageId(), "calendar");
+  assert.equal(nav.isPanelVisible(), true);
+});
+
+test("selectPanel 暂时抛错（面板未注册）时会重试到成功", async () => {
+  // 先记录「上次停在番茄-日历」，再把 DSH 的 opener 换成前两次抛错的假实现。
+  assert.equal(nav.isColdStart(), true);
+  nav.navigate({ page: "calendar", reason: "user" });
+  let attempts = 0;
+  nav.bindPanelOpener((panelId) => {
+    attempts += 1;
+    if (attempts < 3) throw new Error("main panel not registered");
+    return panelId;
+  });
+
+  nav.resetActivePageCache();
+  nav.restore();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.ok(attempts >= 3, `expected retries, got ${attempts}`);
+  nav.bindPanelOpener(null);
+  nav.bindPanelInfo(null);
 });
