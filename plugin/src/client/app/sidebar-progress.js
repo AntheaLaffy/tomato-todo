@@ -45,6 +45,8 @@ export function SidebarTomatoProgress({ wide = true, openPanel }) {
     ? t("side.running", { time: fmtClock(view.remainingSecs) })
     : t("side.pomodoro", { done, goal });
 
+  // 降一档：不做卡片，回到「图标 + 文案 + 计数 + →」的普通行样式，
+  // 和番茄面板里的「学习助手」行同一种克制程度；hover 只给浅底。
   return h(
     "button",
     {
@@ -57,130 +59,88 @@ export function SidebarTomatoProgress({ wide = true, openPanel }) {
         ? {
             display: "flex",
             alignItems: "center",
-            gap: 10,
-            width: "calc(100% - 16px)",
-            margin: "6px 8px 4px",
-            padding: "8px 10px",
-            borderRadius: 13,
-            border: "1px solid color-mix(in srgb, var(--tomato-brand) 28%, transparent)",
-            background:
-              "linear-gradient(135deg, color-mix(in srgb, var(--tomato-brand-soft) 82%, var(--tomato-surface)) 0%, var(--tomato-surface) 100%)",
-            boxShadow: "0 10px 22px -16px color-mix(in srgb, var(--tomato-brand-deep) 65%, transparent)",
-            color: "var(--tomato-ink)",
+            gap: 9,
+            height: 34,
+            width: "calc(100% - 12px)",
+            margin: "2px 6px 4px",
+            padding: "0 8px",
+            border: "none",
+            borderRadius: 9,
+            background: "transparent",
+            color: "var(--tomato-ink-2)",
             cursor: "pointer",
             fontFamily: "inherit",
             textAlign: "left",
             minWidth: 0,
             flex: "1 1 100%",
-            transition: "transform .18s ease, box-shadow .18s ease",
           }
         : {
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 34,
-            height: 34,
+            width: 32,
+            height: 32,
             padding: 0,
             border: "none",
-            borderRadius: 10,
-            background: "color-mix(in srgb, var(--tomato-brand-soft) 75%, transparent)",
-            color: "var(--tomato-brand-deep)",
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--tomato-ink-2)",
             cursor: "pointer",
             flex: "none",
           },
       onMouseEnter: (e) => {
-        e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow =
-          "0 14px 26px -16px color-mix(in srgb, var(--tomato-brand-deep) 75%, transparent)";
+        e.currentTarget.style.background = "var(--tomato-surface-2)";
+        e.currentTarget.style.color = "var(--tomato-ink)";
       },
       onMouseLeave: (e) => {
-        e.currentTarget.style.transform = "none";
-        e.currentTarget.style.boxShadow = wide
-          ? "0 10px 22px -16px color-mix(in srgb, var(--tomato-brand-deep) 65%, transparent)"
-          : "none";
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.color = "var(--tomato-ink-2)";
       },
     },
+    h(Icon, {
+      name: "tomato",
+      size: 17,
+      stroke: 1.5,
+      style: { color: "var(--tomato-brand)", flex: "none" },
+    }),
     wide
       ? h(
           "span",
           {
             style: {
-              width: 27,
-              height: 27,
-              borderRadius: 9,
-              background: "var(--tomato-brand-soft)",
-              display: "grid",
-              placeItems: "center",
-              flex: "none",
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontSize: 13,
+              fontWeight: 550,
+              color: "var(--tomato-ink)",
             },
           },
-          h(Icon, { name: "tomato", size: 16, stroke: 1.6, style: { color: "var(--tomato-brand-deep)" } }),
+          t("side.label"),
         )
-      : h(Icon, { name: "tomato", size: 18, stroke: 1.6 }),
+      : null,
     wide
       ? h(
           "span",
-          { style: { display: "flex", flexDirection: "column", gap: 1, flex: 1, minWidth: 0 } },
-          h(
-            "span",
-            {
-              style: {
-                fontSize: 13.5,
-                fontWeight: 650,
-                color: "var(--tomato-ink)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                letterSpacing: ".01em",
-              },
+          {
+            className: "t-mono",
+            style: {
+              flex: "none",
+              fontSize: 10.5,
+              fontWeight: 600,
+              color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
+              background: "var(--tomato-surface-2)",
+              borderRadius: 6,
+              padding: "1px 6px",
             },
-            t("side.label"),
-          ),
-          h(
-            "span",
-            {
-              style: {
-                fontSize: 10.5,
-                color: "var(--tomato-ink-3)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              },
-            },
-            view.running
-              ? t("side.subRunning", { round: view.cycle || 1 })
-              : t("side.sub", { done, goal }),
-          ),
+          },
+          view.running ? fmtClock(view.remainingSecs) : `${done} / ${goal}`,
         )
       : null,
-    h(
-      "span",
-      {
-        className: "t-mono",
-        style: {
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: wide ? 21 : 0,
-          minWidth: wide ? 40 : 0,
-          padding: wide ? "0 7px" : 0,
-          borderRadius: 7,
-          fontSize: wide ? 11 : 0,
-          fontWeight: 700,
-          flex: "none",
-          color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-on-brand)",
-          background: view.running ? "var(--tomato-brand-soft)" : "var(--tomato-btn-fill)",
-          border: view.running ? "1px solid color-mix(in srgb, var(--tomato-brand) 35%, transparent)" : "none",
-        },
-      },
-      wide ? (view.running ? fmtClock(view.remainingSecs) : `${done} / ${goal}`) : null,
-    ),
     wide
-      ? h(Icon, {
-          name: "arrowRight",
-          size: 14,
-          style: { color: "var(--tomato-brand-deep)", opacity: 0.6, flex: "none" },
-        })
+      ? h(Icon, { name: "arrowRight", size: 13, style: { opacity: 0.4, flex: "none" } })
       : null,
   );
 }
