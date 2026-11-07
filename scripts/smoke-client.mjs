@@ -816,7 +816,7 @@ if (typeof nav?.openProject === "function") {
         "project:registered",
         "ProjectRegisteredSection",
         { project, reloadKey: 0 },
-        ["已登记资料", "检查状态", "清单 JSON", "清单 CSV"],
+        ["已登记资料", "检查状态", "移除失效", "清单 JSON", "清单 CSV"],
       ],
       [
         "project:binding",
@@ -847,6 +847,24 @@ if (typeof nav?.openProject === "function") {
         );
       }
     }
+    // 三语文案：直接渲染资料区各块，缺 key 时 t() 会返回 key 本身。
+    services.locale.setLocale("ja");
+    for (const [key, component, props] of renders) {
+      const Component = parts[component];
+      if (typeof Component !== "function") continue;
+      try {
+        const rendered = ReactDOMServer.renderToStaticMarkup(
+          React.createElement(Component, props),
+        );
+        if (/(?:project|preview|common|education)\.[a-zA-Z]/.test(rendered))
+          failures.push(`${component} 日语渲染出现未翻译的文案 key`);
+      } catch (e) {
+        failures.push(
+          `渲染 ${component}（日语）失败：${e && e.message ? e.message : e}`,
+        );
+      }
+    }
+    services.locale.setLocale("zh");
   }
 } else {
   failures.push("没有暴露测试导航钩子 window.__tomatoDsh.openProject");

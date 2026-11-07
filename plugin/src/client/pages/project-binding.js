@@ -146,9 +146,17 @@ function alertBox(message) {
   );
 }
 
-function ResourceMultiPick({ kind, items, selected, onChange, disabled }) {
+function ResourceMultiPick({
+  kind,
+  items,
+  selected,
+  onChange,
+  disabled,
+  loading,
+}) {
   const known = new Set(items.map((item) => item.id));
-  const missing = selected.filter((id) => !known.has(id));
+  // 候选列表还在读时，已绑定 ID 看起来都“缺失”；这时不要先闪一排未找到。
+  const missing = loading ? [] : selected.filter((id) => !known.has(id));
   const toggle = (id) => {
     onChange(
       selected.includes(id)
@@ -472,6 +480,7 @@ export function ProjectEducationBinding({ project, profile, reloadKey }) {
         selected: past,
         onChange: setPast,
         disabled: loading || saving,
+        loading,
       }),
       h(ResourceMultiPick, {
         kind: "mockPaper",
@@ -479,6 +488,7 @@ export function ProjectEducationBinding({ project, profile, reloadKey }) {
         selected: mock,
         onChange: setMock,
         disabled: loading || saving,
+        loading,
       }),
       h(
         "div",

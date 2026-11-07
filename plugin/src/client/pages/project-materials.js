@@ -23,6 +23,7 @@ import {
   notify,
 } from "../shared/ui.js";
 import { todayKey } from "../shared/derive.js";
+import { FilePreview } from "../shared/file-preview.js";
 import { refresh } from "../shared/store.js";
 import {
   authorizeProjectDirectory,
@@ -34,6 +35,7 @@ import {
   getProjectResources,
   importProjectResources,
   libraryFileUrl,
+  cleanupProjectResources,
   scanLibrary,
   scanProjectLibrary,
 } from "../shared/api.js";
@@ -98,6 +100,14 @@ registerCopy("project", {
     registeredEmptyHint: "在上方索引里勾选导入，或整目录导入。",
     checkStates: "检查状态",
     checkingStates: "正在检查…",
+    cleanupMissing: "移除失效",
+    cleanupTitle: "移除失效的资料登记？",
+    cleanupBody:
+      "只移除仍然缺失、且没有被课程、作业或批改记录引用的登记；仍被引用的会保留。磁盘上的文件不会被删除。",
+    cleanupConfirm: "移除失效",
+    cleanupBusy: "正在清理…",
+    cleanupDone: "已移除 {n} 条失效登记",
+    cleanupEmpty: "没有可清理的失效登记",
     statesChecked: "可用 {a}，缺失 {m}，不可用 {u}",
     stateAvailable: "可用",
     stateMissing: "缺失",
@@ -171,6 +181,14 @@ registerCopy("project", {
       "Select entries in the index above, or import the whole folder.",
     checkStates: "Check status",
     checkingStates: "Checking…",
+    cleanupMissing: "Remove missing",
+    cleanupTitle: "Remove missing material entries?",
+    cleanupBody:
+      "Only entries that are still missing and are not referenced by lessons, homework, or grading records are removed; referenced entries stay. Files on disk are never deleted.",
+    cleanupConfirm: "Remove missing",
+    cleanupBusy: "Removing…",
+    cleanupDone: "Removed {n} missing entries",
+    cleanupEmpty: "No missing entries to remove",
     statesChecked: "{a} available, {m} missing, {u} unavailable",
     stateAvailable: "Available",
     stateMissing: "Missing",
@@ -243,6 +261,14 @@ registerCopy("project", {
       "上の索引で選択してインポートするか、フォルダごとインポートしてください。",
     checkStates: "状態を確認",
     checkingStates: "確認中…",
+    cleanupMissing: "欠落を削除",
+    cleanupTitle: "欠落した資料登録を削除しますか？",
+    cleanupBody:
+      "まだ欠落していて、授業・宿題・採点記録から参照されていない登録だけを削除します。参照中のものは残ります。ディスク上のファイルは削除しません。",
+    cleanupConfirm: "欠落を削除",
+    cleanupBusy: "削除中…",
+    cleanupDone: "欠落した登録を {n} 件削除しました",
+    cleanupEmpty: "削除できる欠落登録はありません",
     statesChecked: "利用可 {a}、欠落 {m}、利用不可 {u}",
     stateAvailable: "利用可",
     stateMissing: "欠落",
@@ -266,15 +292,6 @@ function fmtSize(bytes) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function fmtMtime(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return "";
-  const d = new Date(n > 1e12 ? n : n * 1000);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (v) => String(v).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** 索引条目容错：缺 name/ext 时从 path 推；未知字段不影响列表。 */
@@ -389,234 +406,43 @@ function cachedFileToken() {
   return fileTokenPromise;
 }
 
-function isTextItem(item) {
-  const mime = String(item.mimeType || "").toLowerCase();
-  if (mime.startsWith("text/")) return true;
-  return ["txt", "md", "markdown", "csv", "json", "log"].includes(item.ext);
-}
-
 /**
- * 资料预览：图片直接嵌入，文本读出来放进 pre，其余给原文件链接。
- * 读取失败只影响这块预览，不改变页面状态。
+ * 资料预览：令牌由本页取，渲染交给 shared/file-preview.js（图片/音视频内联、
+ * PDF iframe、Markdown 自己排版）；取令牌失败时把服务端错误当作不可预览说明。
  */
 function LibraryPreview({ item, onClose }) {
-  const [state, setState] = useState({
-    status: "loading",
-    text: "",
-    url: "",
-    access: "",
-    error: null,
-  });
+  const [access, setAccess] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!item) return undefined;
     let cancelled = false;
-    setState({ status: "loading", text: "", url: "", access: "", error: null });
-    (async () => {
-      try {
-        const access = await cachedFileToken();
-        const url = libraryFileUrl(item.path, access);
-        const base = { text: "", url, access, error: null };
-        if (!item.previewable) {
-          if (!cancelled) setState({ ...base, status: "unsupported" });
-          return;
-        }
-        if (item.kind === "image") {
-          if (!cancelled) setState({ ...base, status: "image" });
-          return;
-        }
-        if (!isTextItem(item)) {
-          if (!cancelled) setState({ ...base, status: "unsupported" });
-          return;
-        }
-        const response = await fetch(url);
-        if (!response || !response.ok || typeof response.text !== "function")
-          throw new Error(`HTTP ${response ? response.status : "?"}`);
-        const text = await response.text();
-        if (!cancelled)
-          setState({
-            ...base,
-            status: "text",
-            text: text.length > 20000 ? `${text.slice(0, 20000)}…` : text,
-          });
-      } catch (error) {
-        if (!cancelled)
-          setState({
-            status: "error",
-            text: "",
-            url: "",
-            access: "",
-            error: errorText(error),
-          });
-      }
-    })();
+    setAccess("");
+    setError("");
+    cachedFileToken()
+      .then((value) => {
+        if (!cancelled) setAccess(value);
+      })
+      .catch((caught) => {
+        if (!cancelled) setError(errorText(caught));
+      });
     return () => {
       cancelled = true;
     };
   }, [item && item.path]);
 
   if (!item) return null;
-  const body = h(
-    "div",
-    { style: { display: "flex", flexDirection: "column", gap: 10 } },
-    h(
-      "div",
-      {
-        className: "t-mono",
-        style: {
-          fontSize: 11.5,
-          color: "var(--tomato-ink-3)",
-          wordBreak: "break-all",
-          lineHeight: 1.6,
-        },
-      },
-      item.path,
-    ),
-    h(
-      "div",
-      {
-        style: {
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 12,
-          fontSize: 11.5,
-          color: "var(--tomato-ink-3)",
-        },
-      },
-      item.sizeBytes
-        ? h(
-            "span",
-            null,
-            `${t("project.previewSize")} ${fmtSize(item.sizeBytes)}`,
-          )
-        : null,
-      item.mtime
-        ? h(
-            "span",
-            null,
-            `${t("project.previewModified")} ${fmtMtime(item.mtime)}`,
-          )
-        : null,
-      item.ext ? h(Chip, { tone: "neutral" }, item.ext.toUpperCase()) : null,
-    ),
-    state.status === "loading"
-      ? h(
-          "div",
-          { style: { fontSize: 12.5, color: "var(--tomato-ink-3)" } },
-          t("project.previewLoading"),
-        )
-      : null,
-    state.status === "error"
-      ? h(
-          "div",
-          {
-            role: "alert",
-            style: {
-              padding: "9px 12px",
-              borderRadius: 10,
-              background: "var(--tomato-brand-soft)",
-              color: "var(--tomato-brand-deep)",
-              fontSize: 12.5,
-            },
-          },
-          t("project.previewFailed", { error: state.error }),
-        )
-      : null,
-    state.status === "unsupported"
-      ? h(
-          "div",
-          { style: { fontSize: 12.5, color: "var(--tomato-ink-2)" } },
-          t("project.previewUnsupported"),
-        )
-      : null,
-    state.status === "image"
-      ? h("img", {
-          src: state.url,
-          alt: item.name,
-          style: {
-            maxWidth: "100%",
-            maxHeight: "60vh",
-            borderRadius: 10,
-            border: "1px solid var(--tomato-line)",
-            objectFit: "contain",
-          },
-        })
-      : null,
-    state.status === "text"
-      ? h(
-          "pre",
-          {
-            className: "t-scroll",
-            style: {
-              margin: 0,
-              padding: "12px 14px",
-              maxHeight: "52vh",
-              overflow: "auto",
-              borderRadius: 10,
-              background: "var(--tomato-surface-2)",
-              color: "var(--tomato-ink-2)",
-              fontSize: 12,
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            },
-          },
-          state.text,
-        )
-      : null,
-  );
-  return h(
-    Modal,
-    {
-      open: true,
-      onClose,
-      icon: "eye",
-      title: item.name,
-      subtitle: item.kind ? indexKindLabel(item.kind) : undefined,
-      width: 760,
-      footer: h(
-        "div",
-        { style: { display: "flex", gap: 8, width: "100%", flexWrap: "wrap" } },
-        state.url
-          ? h(
-              "a",
-              {
-                href: state.url,
-                target: "_blank",
-                rel: "noreferrer",
-                style: {
-                  fontSize: 12.5,
-                  color: "var(--tomato-brand-deep)",
-                  alignSelf: "center",
-                },
-              },
-              t("project.previewOpen"),
-            )
-          : null,
-        state.access
-          ? h(
-              "a",
-              {
-                href: libraryFileUrl(item.path, state.access, true),
-                style: {
-                  fontSize: 12.5,
-                  color: "var(--tomato-ink-2)",
-                  alignSelf: "center",
-                },
-              },
-              t("project.previewDownload"),
-            )
-          : null,
-        h("div", { style: { flex: 1 } }),
-        h(
-          Btn,
-          { variant: "plain", size: "sm", onClick: onClose },
-          t("common.close"),
-        ),
-      ),
-    },
-    body,
-  );
+  return h(FilePreview, {
+    open: true,
+    onClose,
+    name: item.name,
+    kind: item.kind,
+    sizeBytes: item.sizeBytes,
+    viewUrl: access ? libraryFileUrl(item.path, access) : "",
+    downloadUrl: access ? libraryFileUrl(item.path, access, true) : "",
+    previewable: item.previewable !== false && error === "",
+    emptyHint: error !== "" ? error : t("project.previewUnsupported"),
+  });
 }
 
 // ---------------------------------------------------------------- 授权
@@ -1777,7 +1603,7 @@ function stateChip(state) {
   return null;
 }
 
-export function ProjectRegisteredSection({ project, reloadKey }) {
+export function ProjectRegisteredSection({ project, reloadKey, onChanged }) {
   const projectId = project.id;
   const [resources, setResources] = useState([]);
   const [total, setTotal] = useState(0);
@@ -1790,6 +1616,10 @@ export function ProjectRegisteredSection({ project, reloadKey }) {
   const [scanSummary, setScanSummary] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [localReload, setLocalReload] = useState(0);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
+  const [cleanupError, setCleanupError] = useState("");
 
   useEffect(() => {
     setOffset(0);
@@ -1797,6 +1627,8 @@ export function ProjectRegisteredSection({ project, reloadKey }) {
     setScanSummary("");
     setStateError("");
     setExportError("");
+    setCleanupOpen(false);
+    setCleanupError("");
   }, [projectId, reloadKey]);
 
   useEffect(() => {
@@ -1821,7 +1653,7 @@ export function ProjectRegisteredSection({ project, reloadKey }) {
     return () => {
       cancelled = true;
     };
-  }, [projectId, offset, reloadKey]);
+  }, [projectId, offset, reloadKey, localReload]);
 
   async function loadStates() {
     const result = await scanProjectLibrary(projectId);
@@ -1857,6 +1689,33 @@ export function ProjectRegisteredSection({ project, reloadKey }) {
       setStateError(errorText(error));
     } finally {
       setStateBusy(false);
+    }
+  }
+
+  async function cleanupMissing() {
+    if (cleanupBusy) return;
+    setCleanupBusy(true);
+    setCleanupError("");
+    try {
+      // 不带 ids：服务端只清「仍缺失且没有教学引用」的登记；有引用会保留并
+      // 由 core 拒绝，错误原样显示。磁盘文件永远不删。
+      const result = await cleanupProjectResources(projectId);
+      const removed = Number(result && result.removed) || 0;
+      notify(
+        removed > 0
+          ? t("project.cleanupDone", { n: removed })
+          : t("project.cleanupEmpty"),
+        removed > 0 ? "brand" : "neutral",
+      );
+      setCleanupOpen(false);
+      setStates(null);
+      setScanSummary("");
+      setLocalReload((value) => value + 1);
+      onChanged?.();
+    } catch (error) {
+      setCleanupError(errorText(error));
+    } finally {
+      setCleanupBusy(false);
     }
   }
 
@@ -1900,215 +1759,273 @@ export function ProjectRegisteredSection({ project, reloadKey }) {
   const pageStart = total === 0 ? 0 : offset + 1;
   const pageEnd = Math.min(offset + RESOURCE_PAGE, total);
 
-  return h(
-    Card,
-    null,
-    h(SectionTitle, {
-      icon: "folder",
-      title: t("project.registeredTitle"),
-      hint: t("project.registeredCount", { n: total }),
-      action: h(
+  const cleanupDialog = h(
+    Modal,
+    {
+      open: cleanupOpen,
+      onClose: () => (cleanupBusy ? null : setCleanupOpen(false)),
+      icon: "trash",
+      title: t("project.cleanupTitle"),
+      subtitle: t("project.cleanupBody"),
+      width: 520,
+      footer: h(
         "div",
-        { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+        { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
         h(
           Btn,
           {
             variant: "ghost",
-            size: "sm",
-            icon: "refresh",
-            disabled: stateBusy || exporting || loading,
-            onClick: checkStates,
+            disabled: cleanupBusy,
+            onClick: () => setCleanupOpen(false),
           },
-          stateBusy ? t("project.checkingStates") : t("project.checkStates"),
+          t("common.cancel"),
         ),
         h(
           Btn,
           {
-            variant: "soft",
-            size: "sm",
-            icon: "download",
-            disabled: exporting || stateBusy || loading,
-            onClick: () => exportList("json"),
+            variant: "danger",
+            icon: "trash",
+            disabled: cleanupBusy,
+            onClick: cleanupMissing,
           },
-          exporting ? t("project.exporting") : t("project.exportJson"),
-        ),
-        h(
-          Btn,
-          {
-            variant: "ghost",
-            size: "sm",
-            icon: "download",
-            disabled: exporting || stateBusy || loading,
-            onClick: () => exportList("csv"),
-          },
-          t("project.exportCsv"),
+          cleanupBusy ? t("project.cleanupBusy") : t("project.cleanupConfirm"),
         ),
       ),
-    }),
-    mutedHint(t("project.registeredHint")),
-    scanSummary !== ""
-      ? h(
+    },
+    cleanupError !== "" ? alertBox(cleanupError) : null,
+  );
+
+  return h(
+    "div",
+    null,
+    h(
+      Card,
+      null,
+      h(SectionTitle, {
+        icon: "folder",
+        title: t("project.registeredTitle"),
+        hint: t("project.registeredCount", { n: total }),
+        action: h(
           "div",
-          {
-            style: {
-              marginTop: 7,
-              fontSize: 11.5,
-              color: "var(--tomato-ink-3)",
+          { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "trash",
+              disabled: cleanupBusy || stateBusy || exporting || loading,
+              onClick: () => {
+                setCleanupError("");
+                setCleanupOpen(true);
+              },
             },
-          },
-          scanSummary,
-        )
-      : null,
-    stateError !== "" ? alertBox(stateError) : null,
-    exportError !== "" ? alertBox(exportError) : null,
-    h("div", { style: { marginTop: 10 } }),
-    loading && resources.length === 0
-      ? h(Skeleton, { w: "52%", h: 13 })
-      : resources.length === 0
-        ? h(Empty, {
-            icon: "folder",
-            title: t("project.registeredEmpty"),
-            hint: t("project.registeredEmptyHint"),
-          })
-        : h(
+            cleanupBusy
+              ? t("project.cleanupBusy")
+              : t("project.cleanupMissing"),
+          ),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "refresh",
+              disabled: stateBusy || exporting || loading,
+              onClick: checkStates,
+            },
+            stateBusy ? t("project.checkingStates") : t("project.checkStates"),
+          ),
+          h(
+            Btn,
+            {
+              variant: "soft",
+              size: "sm",
+              icon: "download",
+              disabled: exporting || stateBusy || loading,
+              onClick: () => exportList("json"),
+            },
+            exporting ? t("project.exporting") : t("project.exportJson"),
+          ),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "download",
+              disabled: exporting || stateBusy || loading,
+              onClick: () => exportList("csv"),
+            },
+            t("project.exportCsv"),
+          ),
+        ),
+      }),
+      mutedHint(t("project.registeredHint")),
+      scanSummary !== ""
+        ? h(
             "div",
-            null,
-            resources.map((resource, index) => {
-              const info = states ? states.get(resource.id) : null;
-              return h(
-                "div",
-                {
-                  key: resource.id || `resource-${index}`,
-                  className: "t-row",
-                  style: {
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    minHeight: 44,
-                    padding: "6px 6px",
-                    borderBottom:
-                      index === resources.length - 1
-                        ? "none"
-                        : "1px solid var(--tomato-line)",
-                  },
-                },
-                h(Icon, {
-                  name: "folder",
-                  size: 15,
-                  style: { color: "var(--tomato-ink-3)", flex: "none" },
-                }),
-                h(
+            {
+              style: {
+                marginTop: 7,
+                fontSize: 11.5,
+                color: "var(--tomato-ink-3)",
+              },
+            },
+            scanSummary,
+          )
+        : null,
+      stateError !== "" ? alertBox(stateError) : null,
+      exportError !== "" ? alertBox(exportError) : null,
+      h("div", { style: { marginTop: 10 } }),
+      loading && resources.length === 0
+        ? h(Skeleton, { w: "52%", h: 13 })
+        : resources.length === 0
+          ? h(Empty, {
+              icon: "folder",
+              title: t("project.registeredEmpty"),
+              hint: t("project.registeredEmptyHint"),
+            })
+          : h(
+              "div",
+              null,
+              resources.map((resource, index) => {
+                const info = states ? states.get(resource.id) : null;
+                return h(
                   "div",
                   {
+                    key: resource.id || `resource-${index}`,
+                    className: "t-row",
                     style: {
-                      flex: 1,
-                      minWidth: 0,
                       display: "flex",
-                      flexDirection: "column",
-                      gap: 2,
+                      alignItems: "center",
+                      gap: 10,
+                      minHeight: 44,
+                      padding: "6px 6px",
+                      borderBottom:
+                        index === resources.length - 1
+                          ? "none"
+                          : "1px solid var(--tomato-line)",
                     },
                   },
+                  h(Icon, {
+                    name: "folder",
+                    size: 15,
+                    style: { color: "var(--tomato-ink-3)", flex: "none" },
+                  }),
                   h(
-                    "span",
+                    "div",
                     {
                       style: {
-                        fontSize: 12.5,
-                        color: "var(--tomato-ink)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        flex: 1,
+                        minWidth: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
                       },
                     },
-                    resource.title || resource.path,
-                  ),
-                  h(
-                    "span",
-                    {
-                      className: "t-mono",
-                      style: {
-                        fontSize: 10.5,
-                        color: "var(--tomato-ink-3)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                    h(
+                      "span",
+                      {
+                        style: {
+                          fontSize: 12.5,
+                          color: "var(--tomato-ink)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        },
                       },
-                    },
-                    resource.path,
-                  ),
-                ),
-                resource.kind
-                  ? h(
-                      Chip,
-                      { tone: "neutral" },
-                      resourceKindLabel(resource.kind),
-                    )
-                  : null,
-                info && info.sizeBytes
-                  ? h(
+                      resource.title || resource.path,
+                    ),
+                    h(
                       "span",
                       {
                         className: "t-mono",
                         style: {
                           fontSize: 10.5,
                           color: "var(--tomato-ink-3)",
-                          flex: "none",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                         },
                       },
-                      fmtSize(info.sizeBytes),
-                    )
-                  : null,
-                info ? stateChip(info.state) : null,
-              );
-            }),
-            h(
-              "div",
-              {
-                style: {
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginTop: 10,
-                  flexWrap: "wrap",
-                },
-              },
+                      resource.path,
+                    ),
+                  ),
+                  resource.kind
+                    ? h(
+                        Chip,
+                        { tone: "neutral" },
+                        resourceKindLabel(resource.kind),
+                      )
+                    : null,
+                  info && info.sizeBytes
+                    ? h(
+                        "span",
+                        {
+                          className: "t-mono",
+                          style: {
+                            fontSize: 10.5,
+                            color: "var(--tomato-ink-3)",
+                            flex: "none",
+                          },
+                        },
+                        fmtSize(info.sizeBytes),
+                      )
+                    : null,
+                  info ? stateChip(info.state) : null,
+                );
+              }),
               h(
-                "span",
+                "div",
                 {
-                  className: "t-mono",
-                  style: { fontSize: 11, color: "var(--tomato-ink-3)" },
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginTop: 10,
+                    flexWrap: "wrap",
+                  },
                 },
-                total > 0
-                  ? t("project.registeredRange", {
-                      a: pageStart,
-                      b: pageEnd,
-                      total,
-                    })
-                  : t("project.registeredCount", { n: 0 }),
-              ),
-              h("div", { style: { flex: 1 } }),
-              h(
-                Btn,
-                {
-                  variant: "ghost",
-                  size: "sm",
-                  icon: "arrowLeft",
-                  disabled: offset <= 0 || loading,
-                  onClick: () => setOffset(Math.max(0, offset - RESOURCE_PAGE)),
-                },
-                t("project.registeredPrev"),
-              ),
-              h(
-                Btn,
-                {
-                  variant: "ghost",
-                  size: "sm",
-                  iconRight: "arrowRight",
-                  disabled: offset + RESOURCE_PAGE >= total || loading,
-                  onClick: () => setOffset(offset + RESOURCE_PAGE),
-                },
-                t("project.registeredNext"),
+                h(
+                  "span",
+                  {
+                    className: "t-mono",
+                    style: { fontSize: 11, color: "var(--tomato-ink-3)" },
+                  },
+                  total > 0
+                    ? t("project.registeredRange", {
+                        a: pageStart,
+                        b: pageEnd,
+                        total,
+                      })
+                    : t("project.registeredCount", { n: 0 }),
+                ),
+                h("div", { style: { flex: 1 } }),
+                h(
+                  Btn,
+                  {
+                    variant: "ghost",
+                    size: "sm",
+                    icon: "arrowLeft",
+                    disabled: offset <= 0 || loading,
+                    onClick: () =>
+                      setOffset(Math.max(0, offset - RESOURCE_PAGE)),
+                  },
+                  t("project.registeredPrev"),
+                ),
+                h(
+                  Btn,
+                  {
+                    variant: "ghost",
+                    size: "sm",
+                    iconRight: "arrowRight",
+                    disabled: offset + RESOURCE_PAGE >= total || loading,
+                    onClick: () => setOffset(offset + RESOURCE_PAGE),
+                  },
+                  t("project.registeredNext"),
+                ),
               ),
             ),
-          ),
+    ),
+    cleanupDialog,
   );
 }

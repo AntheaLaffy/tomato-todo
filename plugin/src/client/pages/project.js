@@ -822,6 +822,7 @@ export function ProjectPage({ state, projectId }) {
       h(ProjectRegisteredSection, {
         project,
         reloadKey: materialsVersion,
+        onChanged: () => setMaterialsVersion((value) => value + 1),
       }),
       h(ProjectEducationBinding, {
         project,
