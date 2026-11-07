@@ -2085,10 +2085,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       style: {
         position: "fixed",
         right: "max(10px, 1.6vw)",
-        bottom: 0,
-        height: "min(42vh, 380px)",
+        bottom: "5vh",
+        height: "min(36vh, 330px)",
         width: "auto",
-        maxWidth: "22vw",
+        maxWidth: "20vw",
         objectFit: "contain",
         objectPosition: "bottom right",
         pointerEvents: "none",
