@@ -155,7 +155,12 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
 /* 看板娘是悬浮半透明背景板：卡片区整体略往左让一点，右缘与立绘留出缝隙。 */
-html[data-tomato-persona=on] .t-appcontent{margin-right:clamp(24px, 4vw, 80px)!important;margin-left:auto!important}
+html[data-tomato-persona=on] .t-appcontent{
+  /* 在「居中」的基础上右移 60px 的右外边距，等效内容整体左移 30px；
+     容器变窄时退化为普通居中。 */
+  margin-right:max(24px, calc((100% - 1180px) / 2 + 60px))!important;
+  margin-left:auto!important;
+}
 
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,
