@@ -265,6 +265,18 @@ body[data-ds-dark-theme] .t-mask{background:#00000073}
   .t-ring-progress{transition:none!important}
   .t-mask,.t-modal,.t-fadein,.t-pulse{animation:none!important}
 }
+
+/* 番茄页接管时，顶部悬浮提醒上移到页面最顶端（没有 DSH 头部了）。 */
+html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
+
+/* 窄屏不显示看板娘，避免压住正文。 */
+@media (max-width:1100px){#tomato-persona{display:none!important}}
+
+/* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
+html[data-tomato-persona=on] #tomato-sky .t-amb-art,
+html[data-tomato-persona=on] #tomato-ambient .t-amb-art,
+html[data-tomato-persona=on] #tomato-sky .t-amb-enso,
+html[data-tomato-persona=on] #tomato-ambient .t-amb-enso{display:none!important}
 `;
 
   // plugin/src/client/skin/styles.js
