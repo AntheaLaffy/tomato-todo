@@ -1,24 +1,26 @@
-// 侧栏底部的番茄进度：左下角「栏目」里的常驻小卡（不是页面最下面那条）。
+// 左侧栏底部的番茄入口 + 今日番茄预计/实际。
 //
-// 用户要求番茄预计/实际不要放右上角，也不要塞在输入框下方最底部；这里放在
-// 左侧栏底部操作区（Settings 旁），展开态显示进度环 + 「0 / 8」，收起成窄条时
-// 只留环。点击进入番茄主视图。
+// 和番茄面板里的「学习助手」入口保持一致：同样是「图标 + 文案 + 右侧计数」的
+// 条目样式（面板里是 chat 图标 + 学习助手 + →；这里是番茄图标 + 番茄 Todo + 0/8）。
+// 放在侧栏底部（Settings 旁），点击进入番茄主视图；侧栏收起成窄条时只留图标。
 import { h } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
-import { Ring } from "../shared/ui.js";
+import { Icon } from "../shared/icons.js";
 import { useSnapshot } from "../shared/store.js";
 import { fmtClock, timerView } from "../shared/derive.js";
 
 registerCopy("side", {
   zh: {
+    label: "番茄 Todo",
     pomodoro: "今日番茄 {done} / {goal}",
     running: "专注中 {time}",
-    open: "打开番茄 Todo",
+    open: "打开番茄 Todo 主视图",
   },
   en: {
+    label: "Tomato Todo",
     pomodoro: "Today {done} / {goal} pomodoros",
     running: "Focusing {time}",
-    open: "Open Tomato Todo",
+    open: "Open the Tomato Todo view",
   },
 });
 
@@ -45,65 +47,73 @@ export function SidebarTomatoProgress({ wide = true, openPanel }) {
       type: "button",
       onClick: () => openPanel?.(),
       title: `${title} · ${t("side.open")}`,
+      "aria-label": t("side.label"),
       className: "t-root",
       style: {
-        display: "inline-flex",
+        display: "flex",
         alignItems: "center",
-        gap: 7,
+        gap: 8,
         height: 30,
-        padding: wide ? "0 9px 0 7px" : 0,
-        width: wide ? "auto" : 30,
-        justifyContent: "center",
+        padding: wide ? "0 8px" : 0,
+        width: wide ? "100%" : 30,
+        justifyContent: wide ? "flex-start" : "center",
         border: "none",
         borderRadius: 9,
         background: "transparent",
         color: "var(--tomato-ink-2)",
         cursor: "pointer",
         fontFamily: "inherit",
-        fontSize: 11.5,
-        fontWeight: 600,
+        fontSize: 12.5,
         minWidth: 0,
-        flex: "none",
+        flex: wide ? "1 1 auto" : "none",
+        textAlign: "left",
       },
       onMouseEnter: (e) => {
         e.currentTarget.style.background = "var(--tomato-surface-2)";
+        e.currentTarget.style.color = "var(--tomato-ink)";
       },
       onMouseLeave: (e) => {
         e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.color = "var(--tomato-ink-2)";
       },
     },
-    h(
-      Ring,
-      {
-        value: goal > 0 ? Math.min(1, done / goal) : 0,
-        size: 19,
-        stroke: 3,
-        color: view.running ? "var(--tomato-brand)" : "var(--tomato-leaf)",
-      },
-      h(
-        "span",
-        {
-          className: "t-mono",
-          style: { fontSize: 8.5, fontWeight: 700, color: "var(--tomato-ink-2)", lineHeight: 1 },
-        },
-        done,
-      ),
-    ),
+    h(Icon, { name: "tomato", size: 16, stroke: 1.5, style: { color: "var(--tomato-brand)", flex: "none" } }),
     wide
       ? h(
           "span",
           {
-            className: "t-mono",
             style: {
-              fontSize: 11,
-              color: "var(--tomato-ink-2)",
-              whiteSpace: "nowrap",
+              flex: 1,
+              minWidth: 0,
               overflow: "hidden",
               textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontWeight: 550,
             },
           },
-          view.running ? fmtClock(view.remainingSecs) : `${done} / ${goal}`,
+          t("side.label"),
         )
       : null,
+    h(
+      "span",
+      {
+        className: "t-mono",
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: 18,
+          padding: wide ? "0 6px" : 0,
+          minWidth: wide ? 30 : 0,
+          borderRadius: 6,
+          fontSize: wide ? 10.5 : 9.5,
+          fontWeight: 600,
+          color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-ink-2)",
+          background: view.running ? "var(--tomato-brand-soft)" : "var(--tomato-surface-2)",
+          flex: "none",
+        },
+      },
+      view.running ? fmtClock(view.remainingSecs) : `${done}/${goal}`,
+    ),
   );
 }

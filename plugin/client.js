@@ -5048,14 +5048,16 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   // plugin/src/client/app/sidebar-progress.js
   registerCopy("side", {
     zh: {
+      label: "番茄 Todo",
       pomodoro: "今日番茄 {done} / {goal}",
       running: "专注中 {time}",
-      open: "打开番茄 Todo"
+      open: "打开番茄 Todo 主视图"
     },
     en: {
+      label: "Tomato Todo",
       pomodoro: "Today {done} / {goal} pomodoros",
       running: "Focusing {time}",
-      open: "Open Tomato Todo"
+      open: "Open the Tomato Todo view"
     }
   });
   function SidebarTomatoProgress({ wide = true, openPanel }) {
@@ -5073,64 +5075,72 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         type: "button",
         onClick: () => openPanel?.(),
         title: `${title} · ${t("side.open")}`,
+        "aria-label": t("side.label"),
         className: "t-root",
         style: {
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
-          gap: 7,
+          gap: 8,
           height: 30,
-          padding: wide ? "0 9px 0 7px" : 0,
-          width: wide ? "auto" : 30,
-          justifyContent: "center",
+          padding: wide ? "0 8px" : 0,
+          width: wide ? "100%" : 30,
+          justifyContent: wide ? "flex-start" : "center",
           border: "none",
           borderRadius: 9,
           background: "transparent",
           color: "var(--tomato-ink-2)",
           cursor: "pointer",
           fontFamily: "inherit",
-          fontSize: 11.5,
-          fontWeight: 600,
+          fontSize: 12.5,
           minWidth: 0,
-          flex: "none"
+          flex: wide ? "1 1 auto" : "none",
+          textAlign: "left"
         },
         onMouseEnter: (e) => {
           e.currentTarget.style.background = "var(--tomato-surface-2)";
+          e.currentTarget.style.color = "var(--tomato-ink)";
         },
         onMouseLeave: (e) => {
           e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = "var(--tomato-ink-2)";
         }
       },
-      h(
-        Ring,
-        {
-          value: goal > 0 ? Math.min(1, done / goal) : 0,
-          size: 19,
-          stroke: 3,
-          color: view.running ? "var(--tomato-brand)" : "var(--tomato-leaf)"
-        },
-        h(
-          "span",
-          {
-            className: "t-mono",
-            style: { fontSize: 8.5, fontWeight: 700, color: "var(--tomato-ink-2)", lineHeight: 1 }
-          },
-          done
-        )
-      ),
+      h(Icon, { name: "tomato", size: 16, stroke: 1.5, style: { color: "var(--tomato-brand)", flex: "none" } }),
       wide ? h(
+        "span",
+        {
+          style: {
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontWeight: 550
+          }
+        },
+        t("side.label")
+      ) : null,
+      h(
         "span",
         {
           className: "t-mono",
           style: {
-            fontSize: 11,
-            color: "var(--tomato-ink-2)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis"
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: 18,
+            padding: wide ? "0 6px" : 0,
+            minWidth: wide ? 30 : 0,
+            borderRadius: 6,
+            fontSize: wide ? 10.5 : 9.5,
+            fontWeight: 600,
+            color: view.running ? "var(--tomato-brand-deep)" : "var(--tomato-ink-2)",
+            background: view.running ? "var(--tomato-brand-soft)" : "var(--tomato-surface-2)",
+            flex: "none"
           }
         },
-        view.running ? fmtClock(view.remainingSecs) : `${done} / ${goal}`
-      ) : null
+        view.running ? fmtClock(view.remainingSecs) : `${done}/${goal}`
+      )
     );
   }
 
