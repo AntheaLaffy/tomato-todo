@@ -76,6 +76,7 @@ jobs:
       - name: Package tarball
         run: >-
           node scripts/package-release.mjs
+          --full
           --arch ${{ matrix.arch }}
           --version "${RELEASE_TAG#v}"
           --guard crates/guard/target/release/tomato-guard

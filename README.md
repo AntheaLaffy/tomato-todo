@@ -69,23 +69,62 @@ tomato-guard（Rust 原生守卫，被 runtime 指挥）
 
 ## 安装
 
-### 前置
+发行页提供三种包，按「有没有 DSH」选一个即可：
 
-装好 DeepSeek Harness（DSH），并确认能打开它的对话与插件管理。
+| 包 | 内容 | 适合 |
+| --- | --- | --- |
+| `tomato-todo-<版本>-<arch>-linux-full.tar.gz` | 内嵌 DSH（含依赖）+ runtime + 守卫 + 插件 + `dsh` 启动器 | 从零开始，不想另外安装 DSH |
+| `tomato-todo-<版本>-<arch>-linux.tar.gz` | runtime + 守卫 + 插件 | 已经装好 DSH，只要番茄 |
+| `tomato-todo-plugin-<版本>.tar.gz` | 只有 `plugin/` | 已有 DSH 与 runtime，只更新插件 |
 
-### 插件（@local/tomato-dsh）
+前置：Linux；Node ≥ 24.9（完整版内嵌的 DSH 要求；只装 runtime 时 ≥ 20.11 即可）。安装都在用户目录，不需要 root。
 
-在 DSH 的 `plugin_manager` 里安装 `@local/tomato-dsh`（本地构建时指向仓库的 `plugin/` 目录，发行时用随包插件包）。启用后，composer.dock 出现番茄入口卡，对话获得番茄 Todo 的 `tomato_*` 工具；外部客户端仍可单独接 MCP。
+### 完整版（内嵌 DSH）
 
-### runtime 与守卫
+解包后装 runtime/守卫，再把插件挂进 DSH profile 并启动：
+
+```sh
+tar -xzf tomato-todo-<版本>-<arch>-linux-full.tar.gz
+cd tomato-todo-<版本>-full
+
+node scripts/install.mjs --runtime runtime/bin/tomato-runtime --guard guard/tomato-guard
+node scripts/install-dsh.mjs --profile tomato
+
+./dsh --profile tomato web
+```
+
+- `install-dsh.mjs` 第一次会用 DSH 的 web 模板创建 profile `tomato`，并把本目录的 `plugin/` 以 `link:` 挂进 `dsh.profile.bundles`；profile 已存在时只追加插件，不覆盖现有配置。
+- 数据、凭据、会话仍然在 `~/.dsh`（可用 `DSH_HOME` 覆盖），与系统安装的 DSH 共用；完整版只是自带一份 DSH 程序。
+- 内嵌的 DSH 版本固定在 `packaging/dsh-version`（当前 `0.2.2-rc.1`）。升级 DSH 时重新下载新版完整包即可，profile 与数据不动。
+- 安装后再移动解包目录会让 `link:` 失效：把目录放稳；已经移动的话重跑一次 `node scripts/install-dsh.mjs --profile tomato`。
+- 可选：`ln -s "$PWD/dsh" ~/.local/bin/tomato-dsh`，之后用 `tomato-dsh --profile tomato web` 启动。
+- runtime 与守卫的 systemd user service 由 `install.mjs` 写好；需要登录自启时执行 `systemctl --user enable --now tomato-runtime`。
+
+### 轻量版（已有 DSH）
+
+```sh
+tar -xzf tomato-todo-<版本>-<arch>-linux.tar.gz
+cd tomato-todo-<版本>
+
+node scripts/install.mjs --runtime runtime/bin/tomato-runtime --guard guard/tomato-guard
+```
+
+然后在 DSH 的 `plugin_manager` 里安装本目录的 `plugin/`；或手动在 profile 的 `package.json` 加：
+
+```json
+"@local/tomato-dsh": "link:<解包目录>/plugin"
+```
+
+并把 `@local/tomato-dsh` 加入 `dsh.profile.bundles`。重启 DSH 后，composer.dock 出现番茄入口卡，对话获得 `tomato_*` 工具。
+
+### 只装/更新插件
+
+下载插件包，在 DSH 的 `plugin_manager` 里安装解包后的 `plugin/`，或按上面的 `link:` 方式挂进 profile。插件只含界面、Host 工具与随包技能；面板需要 `tomato-runtime` 在 `127.0.0.1:43987` 运行，专注保护需要 `tomato-guard`。
+
+### runtime 与守卫（单独安装）
 
 ```sh
 node scripts/install.mjs
-```
-
-把 `tomato-runtime` 与 `tomato-guard` 装进用户目录，并注册 systemd user service：
-
-```sh
 systemctl --user enable --now tomato-runtime
 ```
 
@@ -99,6 +138,9 @@ pnpm build:runtime                                  # 打包 runtime（内置 @t
 cargo build --release --manifest-path crates/guard/Cargo.toml
 node scripts/install.mjs
 ```
+
+要从源码打发行包：`node scripts/package-release.mjs`（轻量版 + 插件包），
+加 `--full` 会再内嵌一份 DSH 产出完整版（需要网络安装 DSH 依赖）。
 
 完整的构建、测试与贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

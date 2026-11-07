@@ -18,7 +18,8 @@ generated_at: 2026-11-07
 | install-desktop-integration.py | 桌面集成 | 安装 GNOME Shell 桥接扩展到用户 XDG 目录，提供启用命令而不自动启用，支持临时 home 与 dry-run |
 | export-sqlite.mjs | 迁移 | 一次性把旧 sqlite 库导出为 plan.json 与 backup-v4.json（v3 先按 core 的迁移语义升级；只读打开、原子写、`--force` 覆盖） |
 | import-backup.mjs | 迁移 | 把旧完整备份 v4 与现有 plan.json 合并进 runtime 数据目录；幂等、失败不写坏原文件 |
-| package-release.mjs | 发布 | 把 runtime（bin/src/vendor）、guard、plugin 与安装脚本打成一个 Linux tarball 并出 sha256；布局以 install.mjs 的相对位置假设为准，CI 用 `install.mjs --dry-run` 验证 |
+| package-release.mjs | 发布 | 打三种 Linux 包：轻量版（runtime bin/src/vendor + guard + plugin + 安装脚本）、插件-only、`--full` 内嵌 DSH（版本读 `packaging/dsh-version`）与 `dsh` 启动器；布局以 install.mjs 的相对位置假设为准，CI 用 `install.mjs --dry-run` 验证 |
+| install-dsh.mjs | 发布 | 完整版安装器：用包内 DSH 创建/复用 profile（web 模板）并 `plugin add link:` 挂随包插件；只写 `DSH_HOME`，`--dry-run` 可预览 |
 | publish-aur.mjs | 发布 | 下载发行 tarball、从文件动态计算 sha256、由 `packaging/aur` 模板渲染 PKGBUILD/.SRCINFO；`--push` 时提交并推送到 AUR |
 | handbook-stats.py | 维护 | 采集源码/文档规模、版本与测试入口，生成 `docs/HANDBOOK/01-规模盘点.md` |
 | handbook-tests.py | 维护 | 采集 vitest/node/Rust 用例与脚本断言，生成 `docs/HANDBOOK/95-测试索引.md` |
