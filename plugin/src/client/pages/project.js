@@ -23,7 +23,6 @@ import {
   Modal,
   PageHeader,
   Segmented,
-  Select,
   Skeleton,
   notify,
 } from "../shared/ui.js";
@@ -35,7 +34,7 @@ import {
   timerView,
   todayKey,
 } from "../shared/derive.js";
-import { useSnapshot, tryDispatch } from "../shared/store.js";
+import { tryDispatch } from "../shared/store.js";
 import { registerPage } from "../app/registry.js";
 import { getActiveProjectId, setActivePageId } from "../app/navigation.js";
 import { openImmersive } from "../app/immersive.js";
@@ -43,12 +42,11 @@ import { TaskDialog } from "./task-dialog.js";
 import { sortTasks } from "./tasks.js";
 import { ProjectWhitelistCard } from "../shared/project-whitelist.js";
 import {
-  getFileToken,
-  getLibraryItems,
-  getLibraryStats,
-  libraryFileUrl,
-  scanLibrary,
-} from "../shared/api.js";
+  ProjectIndexBrowser,
+  ProjectMaterialsSection,
+  ProjectRegisteredSection,
+} from "./project-materials.js";
+import { ProjectEducationBinding } from "./project-binding.js";
 
 registerCopy("project", {
   zh: {
@@ -76,7 +74,7 @@ registerCopy("project", {
     perSession: "{n} 分钟/次",
     overdue: "已逾期",
     editTitle: "编辑项目",
-    editHint: "只改这个项目的名称与颜色；资料目录在应试教育页维护。",
+    editHint: "只改这个项目的名称与颜色；资料目录在下方「项目资料」里维护。",
     nameLabel: "项目名称",
     colorLabel: "颜色",
     nameRequired: "项目名称不能为空",
@@ -94,9 +92,9 @@ registerCopy("project", {
     libraryHint: "来自共享资料库索引，按项目目录过滤。",
     libraryMissing: "资料库尚未建索引",
     libraryMissingHint:
-      "先在应试教育页授权资料目录，然后扫描一次；这里会列出该项目目录下的文件。",
-    libraryUnauthorized: "共享资料库尚未授权",
-    libraryUnauthorizedHint: "到应试教育页授权整个资料目录后即可扫描。",
+      "先在本页授权资料目录，然后扫描一次；这里会列出该项目目录下的文件。",
+    libraryUnauthorized: "资料目录尚未授权",
+    libraryUnauthorizedHint: "先在本页授权共享资料库根目录或项目专属目录。",
     libraryScan: "扫描资料库",
     libraryScanning: "正在扫描…",
     libraryScanDone: "已索引 {n} 个文件",
@@ -153,7 +151,7 @@ registerCopy("project", {
     overdue: "Overdue",
     editTitle: "Edit project",
     editHint:
-      "Only the name and color change here; the folder lives on the study page.",
+      "Only the name and color change here; the folder lives under “Project materials” below.",
     nameLabel: "Project name",
     colorLabel: "Color",
     nameRequired: "Project name is required",
@@ -172,10 +170,10 @@ registerCopy("project", {
       "From the shared library index, filtered to this project folder.",
     libraryMissing: "The library has no index yet",
     libraryMissingHint:
-      "Authorize the folder on the study page, then scan once; files under this project folder will show up here.",
-    libraryUnauthorized: "Shared library not authorized",
+      "Authorize the folder here, then scan once; files under this project folder will show up here.",
+    libraryUnauthorized: "Materials folder not authorized",
     libraryUnauthorizedHint:
-      "Authorize the whole materials folder on the study page to scan.",
+      "Authorize the shared library root or a project folder here first.",
     libraryScan: "Scan library",
     libraryScanning: "Scanning…",
     libraryScanDone: "Indexed {n} files",
@@ -233,7 +231,7 @@ registerCopy("project", {
     overdue: "期限切れ",
     editTitle: "プロジェクトを編集",
     editHint:
-      "ここでは名前と色だけを変更します。資料フォルダは学習ページで管理します。",
+      "ここでは名前と色だけを変更します。資料フォルダは下の「プロジェクト資料」で管理します。",
     nameLabel: "プロジェクト名",
     colorLabel: "色",
     nameRequired: "プロジェクト名を入力してください",
@@ -253,10 +251,10 @@ registerCopy("project", {
       "共有ライブラリの索引から、このプロジェクトのフォルダで絞り込みます。",
     libraryMissing: "ライブラリの索引がまだありません",
     libraryMissingHint:
-      "学習ページで資料フォルダを認可してから一度スキャンしてください。このプロジェクトのフォルダ内のファイルがここに表示されます。",
-    libraryUnauthorized: "共有ライブラリが認可されていません",
+      "このページで資料フォルダを認可してから一度スキャンしてください。このプロジェクトのフォルダ内のファイルがここに表示されます。",
+    libraryUnauthorized: "資料フォルダが未認可です",
     libraryUnauthorizedHint:
-      "学習ページで資料フォルダ全体を認可するとスキャンできます。",
+      "このページで共有ライブラリのルートかプロジェクト専用フォルダを認可してください。",
     libraryScan: "ライブラリをスキャン",
     libraryScanning: "スキャン中…",
     libraryScanDone: "{n}件のファイルを索引しました",
@@ -291,9 +289,6 @@ registerCopy("project", {
   },
 });
 
-const LIBRARY_PAGE = 30;
-const KINDS = ["pdf", "image", "doc", "audio", "video", "other"];
-
 const PROJECT_COLORS = [
   "#df7561",
   "#d5a553",
@@ -304,47 +299,6 @@ const PROJECT_COLORS = [
   "#8b8fc7",
   "#6fa8a0",
 ];
-
-function fmtSize(bytes) {
-  const n = Number(bytes);
-  if (!Number.isFinite(n) || n < 0) return "";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function fmtMtime(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return "";
-  const d = new Date(n > 1e12 ? n : n * 1000);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (v) => String(v).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** 索引条目容错：缺 name/ext 时从 path 推；未知字段不影响列表。 */
-function normalizeItem(raw) {
-  const path = String((raw && raw.path) || "");
-  const name = String((raw && raw.name) || path.split("/").pop() || path);
-  const ext = String(
-    (raw && raw.ext) || (name.includes(".") ? name.split(".").pop() : ""),
-  ).toLowerCase();
-  return {
-    path,
-    name,
-    ext,
-    sizeBytes: Number(raw && raw.sizeBytes) || 0,
-    mtime: raw && raw.mtime,
-    kind: String((raw && raw.kind) || ""),
-    mimeType: String((raw && raw.mimeType) || ""),
-    previewable: raw && raw.previewable !== false,
-  };
-}
-
-function kindLabel(kind) {
-  const key = `project.libraryKind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
-  return t(key);
-}
 
 // ---------------------------------------------------------------- 任务行
 
@@ -498,749 +452,6 @@ function ProjectTaskRow({
   );
 }
 
-// ---------------------------------------------------------------- 资料区
-
-let fileTokenPromise = null;
-
-/** 令牌随 runtime 进程有效；失败后清掉缓存，下次点击再试。 */
-function cachedFileToken() {
-  if (fileTokenPromise === null) {
-    fileTokenPromise = getFileToken()
-      .then((result) => (result && result.access) || "")
-      .catch((error) => {
-        fileTokenPromise = null;
-        throw error;
-      });
-  }
-  return fileTokenPromise;
-}
-
-function isTextItem(item) {
-  const mime = String(item.mimeType || "").toLowerCase();
-  if (mime.startsWith("text/")) return true;
-  return ["txt", "md", "markdown", "csv", "json", "log"].includes(item.ext);
-}
-
-/**
- * 资料预览：图片直接嵌入，文本读出来放进 pre，其余给原文件链接。
- * 读取失败只影响这块预览，不改变页面状态。
- */
-function LibraryPreview({ item, onClose }) {
-  const [state, setState] = useState({
-    status: "loading",
-    text: "",
-    url: "",
-    access: "",
-    error: null,
-  });
-
-  useEffect(() => {
-    if (!item) return undefined;
-    let cancelled = false;
-    setState({ status: "loading", text: "", url: "", access: "", error: null });
-    (async () => {
-      try {
-        const access = await cachedFileToken();
-        const url = libraryFileUrl(item.path, access);
-        const base = { text: "", url, access, error: null };
-        if (!item.previewable) {
-          if (!cancelled) setState({ ...base, status: "unsupported" });
-          return;
-        }
-        if (item.kind === "image") {
-          if (!cancelled) setState({ ...base, status: "image" });
-          return;
-        }
-        if (!isTextItem(item)) {
-          if (!cancelled) setState({ ...base, status: "unsupported" });
-          return;
-        }
-        const response = await fetch(url);
-        if (!response || !response.ok || typeof response.text !== "function")
-          throw new Error(`HTTP ${response ? response.status : "?"}`);
-        const text = await response.text();
-        if (!cancelled)
-          setState({
-            ...base,
-            status: "text",
-            text: text.length > 20000 ? `${text.slice(0, 20000)}…` : text,
-          });
-      } catch (error) {
-        if (!cancelled)
-          setState({
-            status: "error",
-            text: "",
-            url: "",
-            access: "",
-            error:
-              (error && (error.userMessage || error.message)) || String(error),
-          });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [item && item.path]);
-
-  if (!item) return null;
-  const body = h(
-    "div",
-    { style: { display: "flex", flexDirection: "column", gap: 10 } },
-    h(
-      "div",
-      {
-        className: "t-mono",
-        style: {
-          fontSize: 11.5,
-          color: "var(--tomato-ink-3)",
-          wordBreak: "break-all",
-          lineHeight: 1.6,
-        },
-      },
-      item.path,
-    ),
-    h(
-      "div",
-      {
-        style: {
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 12,
-          fontSize: 11.5,
-          color: "var(--tomato-ink-3)",
-        },
-      },
-      item.sizeBytes
-        ? h(
-            "span",
-            null,
-            `${t("project.previewSize")} ${fmtSize(item.sizeBytes)}`,
-          )
-        : null,
-      item.mtime
-        ? h(
-            "span",
-            null,
-            `${t("project.previewModified")} ${fmtMtime(item.mtime)}`,
-          )
-        : null,
-      item.ext ? h(Chip, { tone: "neutral" }, item.ext.toUpperCase()) : null,
-    ),
-    state.status === "loading"
-      ? h(
-          "div",
-          { style: { fontSize: 12.5, color: "var(--tomato-ink-3)" } },
-          t("project.previewLoading"),
-        )
-      : null,
-    state.status === "error"
-      ? h(
-          "div",
-          {
-            role: "alert",
-            style: {
-              padding: "9px 12px",
-              borderRadius: 10,
-              background: "var(--tomato-brand-soft)",
-              color: "var(--tomato-brand-deep)",
-              fontSize: 12.5,
-            },
-          },
-          t("project.previewFailed", { error: state.error }),
-        )
-      : null,
-    state.status === "unsupported"
-      ? h(
-          "div",
-          { style: { fontSize: 12.5, color: "var(--tomato-ink-2)" } },
-          t("project.previewUnsupported"),
-        )
-      : null,
-    state.status === "image"
-      ? h("img", {
-          src: state.url,
-          alt: item.name,
-          style: {
-            maxWidth: "100%",
-            maxHeight: "60vh",
-            borderRadius: 10,
-            border: "1px solid var(--tomato-line)",
-            objectFit: "contain",
-          },
-        })
-      : null,
-    state.status === "text"
-      ? h(
-          "pre",
-          {
-            className: "t-scroll",
-            style: {
-              margin: 0,
-              padding: "12px 14px",
-              maxHeight: "52vh",
-              overflow: "auto",
-              borderRadius: 10,
-              background: "var(--tomato-surface-2)",
-              color: "var(--tomato-ink-2)",
-              fontSize: 12,
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            },
-          },
-          state.text,
-        )
-      : null,
-  );
-  return h(
-    Modal,
-    {
-      open: true,
-      onClose,
-      icon: "eye",
-      title: item.name,
-      subtitle: item.kind ? kindLabel(item.kind) : undefined,
-      width: 760,
-      footer: h(
-        "div",
-        { style: { display: "flex", gap: 8, width: "100%", flexWrap: "wrap" } },
-        state.url
-          ? h(
-              "a",
-              {
-                href: state.url,
-                target: "_blank",
-                rel: "noreferrer",
-                style: {
-                  fontSize: 12.5,
-                  color: "var(--tomato-brand-deep)",
-                  alignSelf: "center",
-                },
-              },
-              t("project.previewOpen"),
-            )
-          : null,
-        state.access
-          ? h(
-              "a",
-              {
-                href: libraryFileUrl(item.path, state.access, true),
-                style: {
-                  fontSize: 12.5,
-                  color: "var(--tomato-ink-2)",
-                  alignSelf: "center",
-                },
-              },
-              t("project.previewDownload"),
-            )
-          : null,
-        h("div", { style: { flex: 1 } }),
-        h(
-          Btn,
-          { variant: "plain", size: "sm", onClick: onClose },
-          t("common.close"),
-        ),
-      ),
-    },
-    body,
-  );
-}
-
-function ProjectLibraryCard({ project }) {
-  const projectId = project.id;
-  const [stats, setStats] = useState(null);
-  const [statsError, setStatsError] = useState(null);
-  const [missing, setMissing] = useState(false);
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [query, setQuery] = useState("");
-  const [appliedQuery, setAppliedQuery] = useState("");
-  const [kind, setKind] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState(null);
-  const [scanning, setScanning] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [preview, setPreview] = useState(null);
-
-  useEffect(() => {
-    setOffset(0);
-    setQuery("");
-    setAppliedQuery("");
-    setKind("");
-    setMissing(false);
-    setStats(null);
-    setStatsError(null);
-    setItems([]);
-    setTotal(0);
-    setPreview(null);
-  }, [projectId]);
-
-  // 关键词防抖：输入每个字符都请求一次索引没有必要，也会让分页跳动。
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setAppliedQuery(query.trim());
-      setOffset(0);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getLibraryStats()
-      .then((result) => {
-        if (cancelled) return;
-        setStats(result);
-        setStatsError(null);
-        if (result && result.hasIndex === false) setMissing(true);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        if (error && error.status === 404) setMissing(true);
-        else
-          setStatsError(
-            (error && (error.userMessage || error.message)) || String(error),
-          );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, reloadKey]);
-
-  useEffect(() => {
-    if (missing) return undefined;
-    let cancelled = false;
-    setLoading(true);
-    setLoadError(null);
-    getLibraryItems({
-      projectId,
-      q: appliedQuery,
-      kind,
-      offset,
-      limit: LIBRARY_PAGE,
-    })
-      .then((result) => {
-        if (cancelled) return;
-        if (result && result.hasIndex === false) {
-          setMissing(true);
-          setItems([]);
-          setTotal(0);
-          return;
-        }
-        const list = Array.isArray(result && result.items) ? result.items : [];
-        setItems(list.map(normalizeItem));
-        setTotal(Math.max(0, Number(result && result.total) || 0));
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        if (error && error.status === 404) setMissing(true);
-        else
-          setLoadError(
-            (error && (error.userMessage || error.message)) || String(error),
-          );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, appliedQuery, kind, offset, missing, reloadKey]);
-
-  async function scan() {
-    if (scanning) return;
-    setScanning(true);
-    try {
-      const result = await scanLibrary();
-      notify(
-        t("project.libraryScanDone", {
-          n: Number(result && result.count) || 0,
-        }),
-        "brand",
-      );
-      setMissing(false);
-      setReloadKey((value) => value + 1);
-    } catch (error) {
-      notify(
-        t("project.libraryScanFailed", {
-          error:
-            (error && (error.userMessage || error.message)) || String(error),
-        }),
-        "danger",
-      );
-    } finally {
-      setScanning(false);
-    }
-  }
-
-  const unauthorized = stats !== null && stats.authorized === false;
-  const kindOptions = [
-    { value: "", label: t("project.libraryKindAll") },
-    ...KINDS.map((value) => ({
-      value,
-      label: kindLabel(value),
-    })),
-  ];
-  const pageStart = total === 0 ? 0 : offset + 1;
-  const pageEnd = Math.min(offset + LIBRARY_PAGE, total);
-
-  const missingBlock = h(
-    "div",
-    {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        padding: "14px 16px",
-        borderRadius: 12,
-        background: "var(--tomato-surface-2)",
-      },
-    },
-    h(
-      "div",
-      {
-        style: { fontSize: 13, fontWeight: 600, color: "var(--tomato-ink)" },
-      },
-      unauthorized
-        ? t("project.libraryUnauthorized")
-        : t("project.libraryMissing"),
-    ),
-    h(
-      "div",
-      {
-        style: { fontSize: 12, color: "var(--tomato-ink-2)", lineHeight: 1.65 },
-      },
-      unauthorized
-        ? t("project.libraryUnauthorizedHint")
-        : t("project.libraryMissingHint"),
-    ),
-    h(
-      "div",
-      { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-      h(
-        Btn,
-        {
-          variant: "soft",
-          size: "sm",
-          icon: "refresh",
-          disabled: scanning,
-          onClick: scan,
-        },
-        scanning ? t("project.libraryScanning") : t("project.libraryScan"),
-      ),
-    ),
-  );
-
-  const listBlock = h(
-    "div",
-    null,
-    h(
-      "div",
-      {
-        style: {
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: 10,
-        },
-      },
-      h(
-        "div",
-        { style: { position: "relative", flex: "1 1 220px", minWidth: 0 } },
-        h(Icon, {
-          name: "search",
-          size: 14,
-          style: {
-            position: "absolute",
-            left: 11,
-            top: 10,
-            color: "var(--tomato-ink-3)",
-            pointerEvents: "none",
-          },
-        }),
-        h(Input, {
-          value: query,
-          onChange: setQuery,
-          placeholder: t("project.librarySearch"),
-          maxLength: 120,
-          style: { paddingLeft: 32, height: 34, fontSize: 12.5 },
-        }),
-      ),
-      h(Select, {
-        value: kind,
-        options: kindOptions,
-        onChange: (value) => {
-          setKind(value);
-          setOffset(0);
-        },
-        width: 132,
-      }),
-      h(
-        Btn,
-        {
-          variant: "ghost",
-          size: "sm",
-          icon: "refresh",
-          disabled: loading,
-          onClick: () => setReloadKey((value) => value + 1),
-        },
-        t("project.libraryRefresh"),
-      ),
-    ),
-    loadError
-      ? h(
-          "div",
-          {
-            role: "alert",
-            style: {
-              padding: "9px 12px",
-              borderRadius: 10,
-              background: "var(--tomato-brand-soft)",
-              color: "var(--tomato-brand-deep)",
-              fontSize: 12.5,
-            },
-          },
-          t("project.libraryError", { error: loadError }),
-        )
-      : null,
-    items.length === 0
-      ? h(
-          "div",
-          { style: { padding: "16px 4px" } },
-          loading
-            ? h(Skeleton, { w: "52%", h: 13 })
-            : h(Empty, {
-                icon: "folder",
-                title: t("project.libraryEmpty"),
-                hint: t("project.libraryEmptyHint"),
-              }),
-        )
-      : h(
-          "div",
-          null,
-          items.map((item, index) =>
-            h(
-              "div",
-              {
-                key: item.path || index,
-                className: "t-row",
-                style: {
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  minHeight: 44,
-                  padding: "6px 6px",
-                  borderBottom:
-                    index === items.length - 1
-                      ? "none"
-                      : "1px solid var(--tomato-line)",
-                },
-              },
-              h(Icon, {
-                name: "folder",
-                size: 15,
-                style: { color: "var(--tomato-ink-3)", flex: "none" },
-              }),
-              h(
-                "button",
-                {
-                  type: "button",
-                  onClick: () => setPreview(item),
-                  style: {
-                    flex: 1,
-                    minWidth: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    gap: 2,
-                    padding: 0,
-                    border: "none",
-                    background: "transparent",
-                    fontFamily: "inherit",
-                    textAlign: "left",
-                    color: "inherit",
-                    cursor: "pointer",
-                  },
-                },
-                h(
-                  "span",
-                  {
-                    style: {
-                      maxWidth: "100%",
-                      fontSize: 12.5,
-                      color: "var(--tomato-ink)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    },
-                  },
-                  item.name,
-                ),
-                h(
-                  "span",
-                  {
-                    className: "t-mono",
-                    style: {
-                      maxWidth: "100%",
-                      fontSize: 10.5,
-                      color: "var(--tomato-ink-3)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    },
-                  },
-                  item.path,
-                ),
-              ),
-              item.sizeBytes
-                ? h(
-                    "span",
-                    {
-                      className: "t-mono",
-                      style: {
-                        fontSize: 10.5,
-                        color: "var(--tomato-ink-3)",
-                        flex: "none",
-                      },
-                    },
-                    fmtSize(item.sizeBytes),
-                  )
-                : null,
-              h(IconBtn, {
-                name: "eye",
-                size: 15,
-                box: 28,
-                title: t("project.preview"),
-                onClick: () => setPreview(item),
-              }),
-            ),
-          ),
-          h(
-            "div",
-            {
-              style: {
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginTop: 10,
-                flexWrap: "wrap",
-              },
-            },
-            h(
-              "span",
-              {
-                className: "t-mono",
-                style: { fontSize: 11, color: "var(--tomato-ink-3)" },
-              },
-              total > 0
-                ? t("project.libraryRange", {
-                    a: pageStart,
-                    b: pageEnd,
-                    total,
-                  })
-                : t("project.libraryCount", { n: 0 }),
-            ),
-            h("div", { style: { flex: 1 } }),
-            h(
-              Btn,
-              {
-                variant: "ghost",
-                size: "sm",
-                icon: "arrowLeft",
-                disabled: offset <= 0 || loading,
-                onClick: () => setOffset(Math.max(0, offset - LIBRARY_PAGE)),
-              },
-              t("project.libraryPrev"),
-            ),
-            h(
-              Btn,
-              {
-                variant: "ghost",
-                size: "sm",
-                iconRight: "arrowRight",
-                disabled: offset + LIBRARY_PAGE >= total || loading,
-                onClick: () => setOffset(offset + LIBRARY_PAGE),
-              },
-              t("project.libraryNext"),
-            ),
-          ),
-        ),
-  );
-
-  return h(
-    Card,
-    null,
-    h(
-      "div",
-      {
-        style: {
-          display: "flex",
-          alignItems: "baseline",
-          gap: 10,
-          marginBottom: 12,
-          flexWrap: "wrap",
-        },
-      },
-      h(Icon, {
-        name: "folder",
-        size: 17,
-        style: { color: "var(--tomato-ink-3)" },
-      }),
-      h(
-        "div",
-        {
-          style: {
-            fontSize: 14,
-            fontWeight: 620,
-            color: "var(--tomato-ink)",
-            marginRight: "auto",
-          },
-        },
-        t("project.libraryTitle"),
-      ),
-      h(
-        "div",
-        { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-        stats && stats.hasIndex
-          ? t("project.libraryCount", { n: total })
-          : null,
-      ),
-    ),
-    h(
-      "div",
-      {
-        style: {
-          fontSize: 11.5,
-          color: "var(--tomato-ink-3)",
-          marginBottom: 12,
-          lineHeight: 1.6,
-        },
-      },
-      t("project.libraryHint"),
-    ),
-    statsError
-      ? h(
-          "div",
-          {
-            role: "alert",
-            style: {
-              padding: "9px 12px",
-              borderRadius: 10,
-              background: "var(--tomato-brand-soft)",
-              color: "var(--tomato-brand-deep)",
-              fontSize: 12.5,
-            },
-          },
-          statsError,
-        )
-      : missing
-        ? missingBlock
-        : listBlock,
-    h(LibraryPreview, { item: preview, onClose: () => setPreview(null) }),
-  );
-}
-
 // ---------------------------------------------------------------- 页面
 
 export function ProjectPage({ state, projectId }) {
@@ -1264,6 +475,16 @@ export function ProjectPage({ state, projectId }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // 授权/导入后通知「已登记」和「应试绑定」重新取数；不把整页数据塞进一个 effect。
+  const [materialsVersion, setMaterialsVersion] = useState(0);
+  const education = data.education || {};
+  const studyProfiles = Array.isArray(education.projects)
+    ? education.projects
+    : [];
+  const studyProfile = project
+    ? studyProfiles.find((entry) => entry && entry.projectId === project.id) ||
+      null
+    : null;
 
   // 同一页切换项目（侧栏点另一个项目）时重挂状态，而不是把上一个项目的
   // 对话框/标签页带过去。
@@ -1594,7 +815,20 @@ export function ProjectPage({ state, projectId }) {
         },
       },
       h(ProjectWhitelistCard, { project }),
-      h(ProjectLibraryCard, { project }),
+      h(ProjectMaterialsSection, {
+        project,
+        onChanged: () => setMaterialsVersion((value) => value + 1),
+      }),
+      h(ProjectRegisteredSection, {
+        project,
+        reloadKey: materialsVersion,
+        onChanged: () => setMaterialsVersion((value) => value + 1),
+      }),
+      h(ProjectEducationBinding, {
+        project,
+        profile: studyProfile,
+        reloadKey: materialsVersion,
+      }),
     ),
     h(TaskDialog, {
       open: taskDialogOpen,
@@ -1787,6 +1021,17 @@ export function ProjectPage({ state, projectId }) {
       ),
     ),
   );
+}
+
+// 冒烟测试需要单独渲染资料区各块（SSR 不执行 useEffect，整页首屏停在
+// 「读取授权状态」），只在上报测试钩子时暴露，不在生产页面挂全局对象。
+if (typeof window !== "undefined" && window.__TOMATO_TEST__) {
+  window.__tomatoProjectParts = {
+    ProjectIndexBrowser,
+    ProjectMaterialsSection,
+    ProjectRegisteredSection,
+    ProjectEducationBinding,
+  };
 }
 
 registerPage({

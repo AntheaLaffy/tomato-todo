@@ -2821,12 +2821,20 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       )
     );
   }
-  function Select2({ value, options, onChange, style, width }) {
+  function Select2({
+    value,
+    options,
+    onChange,
+    style,
+    width,
+    disabled = false
+  }) {
     return h(
       "select",
       {
         value: value ?? "",
         onChange: (e) => onChange?.(e.target.value),
+        disabled,
         className: "t-root t-select",
         style: { height: 32, fontSize: 13, width, ...style }
       },
@@ -3375,6 +3383,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     getProjectGrant: () => getProjectGrant,
     getProjectResources: () => getProjectResources,
     getState: () => getState,
+    importProjectResources: () => importProjectResources,
     libraryFileUrl: () => libraryFileUrl,
     ping: () => ping,
     postDispatch: () => postDispatch,
@@ -3509,6 +3518,17 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       body: { resource },
       ...opts
     });
+  }
+  function importProjectResources(id, { paths } = {}, opts) {
+    return request(
+      "/api/projects/" + encodeURIComponent(id) + "/resources/import",
+      {
+        method: "POST",
+        body: Array.isArray(paths) ? { paths } : {},
+        timeoutMs: 6e4,
+        ...opts
+      }
+    );
   }
   function cleanupProjectResources(id, ids, opts) {
     return request(
@@ -15306,6 +15326,2809 @@ ${JSON.stringify(refs, null, 2)}`;
     );
   }
 
+  // plugin/src/client/shared/markdown.js
+  var SAFE_LINK = /^(https?:\/\/|mailto:|#|\/)/i;
+  function parseInline(text) {
+    const out = [];
+    let rest = String(text ?? "");
+    const pattern = /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)\s]+)\))/;
+    while (rest !== "") {
+      const match = pattern.exec(rest);
+      if (!match) {
+        out.push({ type: "text", text: rest });
+        break;
+      }
+      if (match.index > 0) {
+        out.push({ type: "text", text: rest.slice(0, match.index) });
+      }
+      if (match[1]) out.push({ type: "strong", text: match[2] });
+      else if (match[3]) out.push({ type: "em", text: match[4] });
+      else if (match[5]) out.push({ type: "code", text: match[6] });
+      else if (match[7]) {
+        out.push({
+          type: "link",
+          text: match[8],
+          href: SAFE_LINK.test(match[9]) ? match[9] : null
+        });
+      }
+      rest = rest.slice(match.index + match[0].length);
+    }
+    return out;
+  }
+  var TABLE_DIVIDER = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/;
+  function splitRow(line) {
+    const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+    return trimmed.split("|").map((cell) => cell.trim());
+  }
+  function parseMarkdown(text) {
+    const lines = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
+    const blocks = [];
+    let index = 0;
+    const pushParagraph = (buffer) => {
+      if (buffer.length === 0) return;
+      blocks.push({ type: "paragraph", lines: buffer.slice() });
+      buffer.length = 0;
+    };
+    const paragraph = [];
+    while (index < lines.length) {
+      const line = lines[index];
+      if (/^\s*```/.test(line)) {
+        pushParagraph(paragraph);
+        const lang = line.replace(/^\s*```/, "").trim();
+        const body = [];
+        index += 1;
+        while (index < lines.length && !/^\s*```/.test(lines[index])) {
+          body.push(lines[index]);
+          index += 1;
+        }
+        if (index < lines.length) index += 1;
+        blocks.push({ type: "code", lang, text: body.join("\n") });
+        continue;
+      }
+      if (line.trim() === "") {
+        pushParagraph(paragraph);
+        index += 1;
+        continue;
+      }
+      const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+      if (heading) {
+        pushParagraph(paragraph);
+        blocks.push({
+          type: "heading",
+          level: heading[1].length,
+          text: heading[2].trim()
+        });
+        index += 1;
+        continue;
+      }
+      if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+        pushParagraph(paragraph);
+        blocks.push({ type: "hr" });
+        index += 1;
+        continue;
+      }
+      if (line.includes("|") && index + 1 < lines.length && TABLE_DIVIDER.test(lines[index + 1])) {
+        pushParagraph(paragraph);
+        const header = splitRow(line);
+        index += 2;
+        const rows = [];
+        while (index < lines.length && lines[index].includes("|")) {
+          rows.push(splitRow(lines[index]));
+          index += 1;
+        }
+        blocks.push({ type: "table", header, rows });
+        continue;
+      }
+      if (/^\s*>\s?/.test(line)) {
+        pushParagraph(paragraph);
+        const quoted = [];
+        while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+          quoted.push(lines[index].replace(/^\s*>\s?/, ""));
+          index += 1;
+        }
+        blocks.push({ type: "quote", lines: quoted });
+        continue;
+      }
+      const bullet = /^\s*[-*+]\s+(.*)$/.exec(line);
+      const ordered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
+      if (bullet || ordered) {
+        pushParagraph(paragraph);
+        const start = ordered ? Number(ordered[1]) : null;
+        const items = [];
+        while (index < lines.length) {
+          const b = /^\s*[-*+]\s+(.*)$/.exec(lines[index]);
+          const o = /^\s*(\d+)[.)]\s+(.*)$/.exec(lines[index]);
+          if (b) items.push(b[1]);
+          else if (o) items.push(o[2]);
+          else break;
+          index += 1;
+        }
+        blocks.push({ type: "list", ordered: start !== null, start, items });
+        continue;
+      }
+      paragraph.push(line);
+      index += 1;
+    }
+    pushParagraph(paragraph);
+    return blocks;
+  }
+  function inlineNodes(text) {
+    return parseInline(text).map((node, i) => {
+      switch (node.type) {
+        case "strong":
+          return h("strong", { key: i }, node.text);
+        case "em":
+          return h("em", { key: i }, node.text);
+        case "code":
+          return h(
+            "code",
+            {
+              key: i,
+              style: {
+                padding: "1px 5px",
+                borderRadius: 5,
+                background: "var(--tomato-surface-2)",
+                fontSize: "0.92em"
+              }
+            },
+            node.text
+          );
+        case "link":
+          return node.href ? h(
+            "a",
+            {
+              key: i,
+              href: node.href,
+              target: "_blank",
+              rel: "noreferrer",
+              style: { color: "var(--tomato-brand-deep)" }
+            },
+            node.text
+          ) : h("span", { key: i }, node.text);
+        default:
+          return node.text;
+      }
+    });
+  }
+  var HEADING_SIZE = { 1: 19, 2: 16.5, 3: 15, 4: 13.5, 5: 13, 6: 12.5 };
+  function tableCellStyle(header) {
+    return {
+      padding: "6px 10px",
+      borderBottom: "1px solid var(--tomato-line)",
+      textAlign: "left",
+      fontSize: 12.5,
+      fontWeight: header ? 600 : 400,
+      color: header ? "var(--tomato-ink)" : "var(--tomato-ink-2)",
+      verticalAlign: "top"
+    };
+  }
+  function Markdown({ text, style }) {
+    const blocks = parseMarkdown(text);
+    return h(
+      "div",
+      {
+        style: {
+          fontSize: 13,
+          lineHeight: 1.75,
+          color: "var(--tomato-ink)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          ...style
+        }
+      },
+      blocks.map((block, i) => {
+        switch (block.type) {
+          case "heading":
+            return h(
+              "div",
+              {
+                key: i,
+                style: {
+                  fontSize: HEADING_SIZE[block.level] ?? 13,
+                  fontWeight: 650,
+                  marginTop: block.level <= 2 ? 8 : 4
+                }
+              },
+              inlineNodes(block.text)
+            );
+          case "code":
+            return h(
+              "pre",
+              {
+                key: i,
+                style: {
+                  margin: 0,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: "var(--tomato-surface-2)",
+                  overflow: "auto",
+                  fontSize: 12,
+                  lineHeight: 1.6
+                }
+              },
+              h("code", null, block.text)
+            );
+          case "table":
+            return h(
+              "div",
+              { key: i, style: { overflowX: "auto" } },
+              h(
+                "table",
+                {
+                  style: {
+                    borderCollapse: "collapse",
+                    width: "100%",
+                    background: "var(--tomato-surface)"
+                  }
+                },
+                h(
+                  "thead",
+                  null,
+                  h(
+                    "tr",
+                    null,
+                    block.header.map(
+                      (cell, c) => h(
+                        "th",
+                        { key: c, style: tableCellStyle(true) },
+                        inlineNodes(cell)
+                      )
+                    )
+                  )
+                ),
+                h(
+                  "tbody",
+                  null,
+                  block.rows.map(
+                    (row, r) => h(
+                      "tr",
+                      { key: r },
+                      row.map(
+                        (cell, c) => h(
+                          "td",
+                          { key: c, style: tableCellStyle(false) },
+                          inlineNodes(cell)
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            );
+          case "quote":
+            return h(
+              "div",
+              {
+                key: i,
+                style: {
+                  padding: "6px 12px",
+                  borderLeft: "3px solid var(--tomato-line)",
+                  color: "var(--tomato-ink-2)"
+                }
+              },
+              inlineNodes(block.lines.join(" "))
+            );
+          case "list":
+            return h(
+              block.ordered ? "ol" : "ul",
+              {
+                key: i,
+                style: {
+                  margin: 0,
+                  paddingLeft: 22,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4
+                }
+              },
+              block.items.map(
+                (item, li) => h("li", { key: li }, inlineNodes(item))
+              )
+            );
+          case "hr":
+            return h("hr", {
+              key: i,
+              style: {
+                border: "none",
+                borderTop: "1px solid var(--tomato-line)",
+                margin: "4px 0"
+              }
+            });
+          default:
+            return h(
+              "div",
+              { key: i, style: { whiteSpace: "pre-wrap" } },
+              block.lines.map(
+                (line, li) => h("div", { key: li }, inlineNodes(line))
+              )
+            );
+        }
+      })
+    );
+  }
+
+  // plugin/src/client/shared/file-preview.js
+  registerCopy("preview", {
+    zh: {
+      size: "大小",
+      download: "下载原件",
+      close: "关闭",
+      unsupported: "这种类型或大小不能内联预览，请下载原件。",
+      failed: "读取失败：{error}",
+      tooLarge: "文件太大，不适合内联预览"
+    },
+    en: {
+      size: "Size",
+      download: "Download",
+      close: "Close",
+      unsupported: "This type or size cannot be previewed inline; download the file.",
+      failed: "Could not read the file: {error}",
+      tooLarge: "File is too large to preview inline"
+    },
+    ja: {
+      size: "サイズ",
+      download: "Download",
+      close: "Close",
+      unsupported: "This type or size cannot be previewed inline; download the file.",
+      failed: "Could not read the file: {error}",
+      tooLarge: "File is too large to preview inline"
+    }
+  });
+  var TEXT_LIMIT = 2 * 1024 * 1024;
+  function isTextKind(kind, name) {
+    const ext = String(name ?? "").split(".").pop()?.toLowerCase() ?? "";
+    if (["md", "markdown"].includes(ext)) return "markdown";
+    if (["txt", "csv", "json", "log", "yml", "yaml"].includes(ext)) return "text";
+    if (kind === "doc" && ["md", "markdown", "txt", "csv", "json"].includes(ext)) {
+      return ext === "md" || ext === "markdown" ? "markdown" : "text";
+    }
+    return null;
+  }
+  function formatBytes(value) {
+    const bytes = Number(value);
+    if (!Number.isFinite(bytes) || bytes <= 0) return "—";
+    const units = ["B", "KiB", "MiB", "GiB"];
+    let size = bytes;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit += 1;
+    }
+    return `${size >= 10 || unit === 0 ? Math.round(size) : size.toFixed(1)} ${units[unit]}`;
+  }
+  function FilePreview({
+    open,
+    onClose,
+    name,
+    kind = "other",
+    sizeBytes,
+    viewUrl,
+    downloadUrl,
+    previewable = true,
+    emptyHint
+  }) {
+    const mode = isTextKind(kind, name);
+    const [text, setText] = useState(null);
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+      if (!open || mode === null || !previewable || !viewUrl) {
+        setText(null);
+        setError("");
+        return void 0;
+      }
+      let cancelled = false;
+      setLoading(true);
+      setError("");
+      setText(null);
+      fetch(viewUrl).then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (blob.size > TEXT_LIMIT) throw new Error(t("preview.tooLarge"));
+        return blob.text();
+      }).then((value) => {
+        if (!cancelled) setText(value);
+      }).catch((e) => {
+        if (!cancelled) setError(e && e.message ? e.message : String(e));
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [open, mode, previewable, viewUrl, name]);
+    if (!open) return null;
+    let body;
+    if (!previewable) {
+      body = h(
+        "div",
+        { style: { fontSize: 12.5, color: "var(--tomato-ink-2)" } },
+        emptyHint || t("preview.unsupported")
+      );
+    } else if (mode !== null) {
+      if (loading) body = h(Skeleton, { w: "100%", h: 240 });
+      else if (error !== "")
+        body = h(
+          "div",
+          { style: { fontSize: 12.5, color: "var(--tomato-brand-deep)" } },
+          t("preview.failed", { error })
+        );
+      else if (mode === "markdown")
+        body = h(
+          "div",
+          { style: { maxHeight: "68vh", overflow: "auto", paddingRight: 6 } },
+          h(Markdown, { text: text ?? "" })
+        );
+      else
+        body = h(
+          "pre",
+          {
+            style: {
+              maxHeight: "68vh",
+              overflow: "auto",
+              margin: 0,
+              padding: "12px 14px",
+              borderRadius: 10,
+              background: "var(--tomato-surface-2)",
+              fontSize: 12.5,
+              lineHeight: 1.7,
+              whiteSpace: "pre-wrap"
+            }
+          },
+          text ?? ""
+        );
+    } else if (kind === "image") {
+      body = h("img", {
+        src: viewUrl,
+        alt: name,
+        style: {
+          display: "block",
+          maxWidth: "100%",
+          maxHeight: "68vh",
+          margin: "0 auto",
+          borderRadius: 8
+        }
+      });
+    } else if (kind === "audio") {
+      body = h("audio", {
+        controls: true,
+        src: viewUrl,
+        style: { width: "100%" }
+      });
+    } else if (kind === "video") {
+      body = h("video", {
+        controls: true,
+        src: viewUrl,
+        style: { display: "block", maxWidth: "100%", maxHeight: "68vh" }
+      });
+    } else {
+      body = h("iframe", {
+        title: name,
+        src: viewUrl,
+        style: {
+          width: "100%",
+          height: "68vh",
+          border: "none",
+          borderRadius: 8,
+          background: "#fff"
+        }
+      });
+    }
+    return h(
+      Modal,
+      {
+        open,
+        onClose,
+        icon: "eye",
+        title: name,
+        subtitle: `${t("preview.size")} ${formatBytes(sizeBytes)}`,
+        width: 920,
+        bodyStyle: { paddingTop: 6 },
+        footer: h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 10
+            }
+          },
+          downloadUrl ? h(
+            "a",
+            {
+              href: downloadUrl,
+              style: {
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--tomato-brand-deep)",
+                textDecoration: "none",
+                padding: "6px 10px",
+                borderRadius: 9,
+                background: "var(--tomato-brand-soft)"
+              }
+            },
+            t("preview.download")
+          ) : null,
+          h(
+            Btn,
+            { variant: "ghost", size: "sm", onClick: onClose },
+            t("preview.close")
+          )
+        )
+      },
+      body
+    );
+  }
+
+  // plugin/src/client/pages/project-materials.js
+  registerCopy("project", {
+    zh: {
+      grantTitle: "资料目录",
+      grantStatusLoading: "读取授权状态…",
+      grantStatusError: "授权状态读取失败",
+      grantUnauthorized: "未授权",
+      grantShared: "共享资料库",
+      grantOwn: "项目专属目录",
+      grantLoading: "读取授权状态…",
+      grantNotAuthorizedHint: "这个项目还没有资料目录。先授权共享资料库根目录或专属子目录，才能浏览、导入并按资料绑定应试内容。",
+      grantNotAuthorizedNoLibraryHint: "共享资料库也尚未授权。可以先在这里给项目一个专属目录，或到「应试教育」页授权整个资料库。",
+      grantSharedHint: "本项目使用共享资料库根目录；索引覆盖整个共享库，导入时按项目目录筛选。",
+      grantOwnHint: "本项目使用共享库内的专属子目录；浏览与导入都只在这个目录范围内。",
+      grantReadOnly: "授权只是读取许可，不移动文件。",
+      grantAuthorize: "授权目录",
+      grantChange: "更换",
+      grantUseShared: "使用共享库",
+      grantUsingShared: "使用中",
+      grantSwitching: "正在切换…",
+      grantRefresh: "刷新",
+      grantPathRequired: "请填写绝对路径",
+      grantModalTitle: "授权项目资料目录",
+      grantModalSubtitle: "选择一个已存在的绝对目录；授权只给读取许可，不移动任何文件。",
+      grantPathLabel: "绝对路径",
+      grantModalHint: "必须在共享资料库内（若已授权）；不能是根目录、整个主目录或应用内部目录。",
+      grantSaved: "资料目录已授权",
+      grantSharedMissing: "共享资料库尚未授权，请先到「应试教育」页授权整个资料库。",
+      grantSharedDone: "已切换为使用共享资料库",
+      grantConfirm: "授权",
+      importAvailable: "索引内 {n} 个文件",
+      importSelected: "导入选中（{n}）",
+      importAll: "导入本目录全部",
+      importAllCount: "导入本目录全部（{n} 个）",
+      importConfirmTitle: "导入本目录全部资料？",
+      importConfirmBody: "将把本项目目录下的 {n} 个索引条目登记为项目资料；已登记过的路径会自动跳过。只登记清单，不复制或移动文件。",
+      importConfirmSubmit: "导入 {n} 个",
+      importBusy: "正在导入…",
+      importDone: "已登记 {registered} 条，跳过 {skipped} 条（已登记过）",
+      selectItem: "选择 {name}",
+      clearSelection: "取消选择",
+      exportHint: "只导出元数据，不导出文件内容。",
+      exportIndexJson: "索引 JSON",
+      exportIndexCsv: "索引 CSV",
+      exportEmpty: "没有可导出的条目",
+      exportDone: "已导出 {n} 条",
+      registeredTitle: "已登记资料",
+      registeredHint: "这些是写进教学记录的登记，不是磁盘文件本身。",
+      registeredCount: "{n} 份已登记",
+      registeredEmpty: "还没有登记任何资料",
+      registeredEmptyHint: "在上方索引里勾选导入，或整目录导入。",
+      checkStates: "检查状态",
+      checkingStates: "正在检查…",
+      cleanupMissing: "移除失效",
+      cleanupTitle: "移除失效的资料登记？",
+      cleanupBody: "只移除仍然缺失、且没有被课程、作业或批改记录引用的登记；仍被引用的会保留。磁盘上的文件不会被删除。",
+      cleanupConfirm: "移除失效",
+      cleanupBusy: "正在清理…",
+      cleanupDone: "已移除 {n} 条失效登记",
+      cleanupEmpty: "没有可清理的失效登记",
+      statesChecked: "可用 {a}，缺失 {m}，不可用 {u}",
+      stateAvailable: "可用",
+      stateMissing: "缺失",
+      stateUnavailable: "不可用",
+      registeredRange: "{a}–{b} / {total}",
+      registeredPrev: "上一页",
+      registeredNext: "下一页",
+      exportJson: "清单 JSON",
+      exportCsv: "清单 CSV",
+      exporting: "正在导出…"
+    },
+    en: {
+      grantTitle: "Materials folder",
+      grantStatusLoading: "Reading authorization…",
+      grantStatusError: "Could not read authorization",
+      grantUnauthorized: "Not authorized",
+      grantShared: "Shared library",
+      grantOwn: "Project folder",
+      grantLoading: "Reading authorization…",
+      grantNotAuthorizedHint: "This project has no materials folder yet. Authorize the shared library root or a project subfolder before browsing, importing, or binding exam materials.",
+      grantNotAuthorizedNoLibraryHint: "The shared library is not authorized either. Give this project its own folder here, or authorize the whole library on the study page.",
+      grantSharedHint: "This project uses the shared library root; the index covers the whole library and imports are filtered by project folder.",
+      grantOwnHint: "This project uses a subfolder inside the shared library; browsing and importing stay inside that folder.",
+      grantReadOnly: "Authorization is read-only permission; files are never moved.",
+      grantAuthorize: "Authorize folder",
+      grantChange: "Change",
+      grantUseShared: "Use shared library",
+      grantUsingShared: "In use",
+      grantSwitching: "Switching…",
+      grantRefresh: "Refresh",
+      grantPathRequired: "Enter an absolute path",
+      grantModalTitle: "Authorize the project materials folder",
+      grantModalSubtitle: "Choose an existing absolute folder; authorization only grants read access and never moves a file.",
+      grantPathLabel: "Absolute path",
+      grantModalHint: "It must be inside the shared library when one is authorized; the root, the whole home folder, and app data folders are rejected.",
+      grantSaved: "Materials folder authorized",
+      grantSharedMissing: "The shared library is not authorized; authorize the whole library on the study page first.",
+      grantSharedDone: "Switched to the shared library",
+      grantConfirm: "Authorize",
+      importAvailable: "{n} files in the index",
+      importSelected: "Import selected ({n})",
+      importAll: "Import this folder",
+      importAllCount: "Import this folder ({n})",
+      importConfirmTitle: "Import every material in this folder?",
+      importConfirmBody: "This registers {n} index entries from this project folder as materials; paths already registered are skipped. Only the list is registered — no file is copied or moved.",
+      importConfirmSubmit: "Import {n}",
+      importBusy: "Importing…",
+      importDone: "Registered {registered}, skipped {skipped} already registered",
+      selectItem: "Select {name}",
+      clearSelection: "Clear selection",
+      exportHint: "Metadata only; file contents are never exported.",
+      exportIndexJson: "Index JSON",
+      exportIndexCsv: "Index CSV",
+      exportEmpty: "Nothing to export",
+      exportDone: "Exported {n} rows",
+      registeredTitle: "Registered materials",
+      registeredHint: "These entries are written into the teaching records; they are not the files themselves.",
+      registeredCount: "{n} registered",
+      registeredEmpty: "No materials registered yet",
+      registeredEmptyHint: "Select entries in the index above, or import the whole folder.",
+      checkStates: "Check status",
+      checkingStates: "Checking…",
+      cleanupMissing: "Remove missing",
+      cleanupTitle: "Remove missing material entries?",
+      cleanupBody: "Only entries that are still missing and are not referenced by lessons, homework, or grading records are removed; referenced entries stay. Files on disk are never deleted.",
+      cleanupConfirm: "Remove missing",
+      cleanupBusy: "Removing…",
+      cleanupDone: "Removed {n} missing entries",
+      cleanupEmpty: "No missing entries to remove",
+      statesChecked: "{a} available, {m} missing, {u} unavailable",
+      stateAvailable: "Available",
+      stateMissing: "Missing",
+      stateUnavailable: "Unavailable",
+      registeredRange: "{a}–{b} / {total}",
+      registeredPrev: "Previous",
+      registeredNext: "Next",
+      exportJson: "List JSON",
+      exportCsv: "List CSV",
+      exporting: "Exporting…"
+    },
+    ja: {
+      grantTitle: "資料フォルダ",
+      grantStatusLoading: "認可状態を読み込み中…",
+      grantStatusError: "認可状態を読み込めません",
+      grantUnauthorized: "未認可",
+      grantShared: "共有ライブラリ",
+      grantOwn: "プロジェクト専用フォルダ",
+      grantLoading: "認可状態を読み込み中…",
+      grantNotAuthorizedHint: "このプロジェクトには資料フォルダがありません。共有ライブラリのルートか専用サブフォルダを認可すると、閲覧・取り込み・試験資料の紐付けができます。",
+      grantNotAuthorizedNoLibraryHint: "共有ライブラリも未認可です。ここで専用フォルダを認可するか、学習ページでライブラリ全体を認可してください。",
+      grantSharedHint: "このプロジェクトは共有ライブラリのルートを使います。索引はライブラリ全体を対象にし、取り込みはプロジェクトのフォルダで絞り込みます。",
+      grantOwnHint: "このプロジェクトは共有ライブラリ内の専用サブフォルダを使います。閲覧と取り込みはそのフォルダ内だけです。",
+      grantReadOnly: "認可は読み取り許可だけです。ファイルは移動しません。",
+      grantAuthorize: "フォルダを認可",
+      grantChange: "変更",
+      grantUseShared: "共有ライブラリを使う",
+      grantUsingShared: "使用中",
+      grantSwitching: "切り替え中…",
+      grantRefresh: "更新",
+      grantPathRequired: "絶対パスを入力してください",
+      grantModalTitle: "プロジェクト資料フォルダを認可",
+      grantModalSubtitle: "既存の絶対フォルダを選択してください。認可は読み取り許可だけで、ファイルは移動しません。",
+      grantPathLabel: "絶対パス",
+      grantModalHint: "共有ライブラリが認可済みならその内側である必要があります。ルート、ホーム全体、アプリ内部フォルダは拒否されます。",
+      grantSaved: "資料フォルダを認可しました",
+      grantSharedMissing: "共有ライブラリが未認可です。先に学習ページでライブラリ全体を認可してください。",
+      grantSharedDone: "共有ライブラリの使用に切り替えました",
+      grantConfirm: "認可",
+      importAvailable: "索引内 {n} ファイル",
+      importSelected: "選択をインポート（{n}）",
+      importAll: "このフォルダをすべてインポート",
+      importAllCount: "このフォルダをすべてインポート（{n}）",
+      importConfirmTitle: "このフォルダの資料をすべてインポートしますか？",
+      importConfirmBody: "このプロジェクトのフォルダにある {n} 件の索引を資料として登録します。登録済みのパスは自動でスキップされます。一覧の登録だけで、ファイルのコピーや移動は行いません。",
+      importConfirmSubmit: "{n} 件をインポート",
+      importBusy: "インポート中…",
+      importDone: "{registered} 件を登録、{skipped} 件をスキップ（登録済み）",
+      selectItem: "{name} を選択",
+      clearSelection: "選択を解除",
+      exportHint: "メタデータのみを出力します。ファイルの中身は出力しません。",
+      exportIndexJson: "索引 JSON",
+      exportIndexCsv: "索引 CSV",
+      exportEmpty: "出力できる項目がありません",
+      exportDone: "{n} 件を出力しました",
+      registeredTitle: "登録済み資料",
+      registeredHint: "教学記録に書き込まれた登録です。ディスク上のファイルそのものではありません。",
+      registeredCount: "{n} 件登録済み",
+      registeredEmpty: "登録済みの資料はまだありません",
+      registeredEmptyHint: "上の索引で選択してインポートするか、フォルダごとインポートしてください。",
+      checkStates: "状態を確認",
+      checkingStates: "確認中…",
+      cleanupMissing: "欠落を削除",
+      cleanupTitle: "欠落した資料登録を削除しますか？",
+      cleanupBody: "まだ欠落していて、授業・宿題・採点記録から参照されていない登録だけを削除します。参照中のものは残ります。ディスク上のファイルは削除しません。",
+      cleanupConfirm: "欠落を削除",
+      cleanupBusy: "削除中…",
+      cleanupDone: "欠落した登録を {n} 件削除しました",
+      cleanupEmpty: "削除できる欠落登録はありません",
+      statesChecked: "利用可 {a}、欠落 {m}、利用不可 {u}",
+      stateAvailable: "利用可",
+      stateMissing: "欠落",
+      stateUnavailable: "利用不可",
+      registeredRange: "{a}–{b} / {total}",
+      registeredPrev: "前へ",
+      registeredNext: "次へ",
+      exportJson: "一覧 JSON",
+      exportCsv: "一覧 CSV",
+      exporting: "出力中…"
+    }
+  });
+  var LIBRARY_PAGE = 30;
+  var RESOURCE_PAGE = 30;
+  var KINDS2 = ["pdf", "image", "doc", "audio", "video", "other"];
+  function fmtSize(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return "";
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  function normalizeItem(raw) {
+    const path = String(raw && raw.path || "");
+    const name = String(raw && raw.name || path.split("/").pop() || path);
+    const ext = String(
+      raw && raw.ext || (name.includes(".") ? name.split(".").pop() : "")
+    ).toLowerCase();
+    return {
+      path,
+      name,
+      ext,
+      sizeBytes: Number(raw && raw.sizeBytes) || 0,
+      mtime: raw && raw.mtime,
+      kind: String(raw && raw.kind || ""),
+      mimeType: String(raw && raw.mimeType || ""),
+      previewable: raw && raw.previewable !== false
+    };
+  }
+  function indexKindLabel(kind) {
+    const key = `project.libraryKind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
+    return t(key);
+  }
+  function resourceKindLabel(kind) {
+    return t(
+      `education.resourceKind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`
+    );
+  }
+  function errorText(error) {
+    return error && (error.userMessage || error.message) || String(error);
+  }
+  function csvCell(value) {
+    const text = value === null || value === void 0 ? "" : String(value);
+    return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  }
+  function rowsToCsv(columns, rows) {
+    return [
+      columns.join(","),
+      ...rows.map((row) => columns.map((key) => csvCell(row[key])).join(","))
+    ].join("\n") + "\n";
+  }
+  function downloadText(filename, text, mime) {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1e3);
+  }
+  async function collectLibraryItems(projectId) {
+    const all = [];
+    let offset = 0;
+    let total = Infinity;
+    while (offset < total) {
+      const page = await getLibraryItems({ projectId, offset, limit: 100 });
+      const list = Array.isArray(page && page.items) ? page.items : [];
+      total = Number(page && page.total) || 0;
+      if (list.length === 0) break;
+      all.push(...list.map(normalizeItem));
+      offset += list.length;
+    }
+    return all;
+  }
+  async function collectProjectResources(projectId) {
+    const all = [];
+    let offset = 0;
+    let total = Infinity;
+    while (offset < total) {
+      const page = await getProjectResources(projectId, {
+        offset,
+        limit: 100
+      });
+      const list = Array.isArray(page && page.resources) ? page.resources : [];
+      total = Number(page && page.total) || 0;
+      if (list.length === 0) break;
+      all.push(...list);
+      offset += list.length;
+    }
+    return all;
+  }
+  var fileTokenPromise = null;
+  function cachedFileToken() {
+    if (fileTokenPromise === null) {
+      fileTokenPromise = getFileToken().then((result) => result && result.access || "").catch((error) => {
+        fileTokenPromise = null;
+        throw error;
+      });
+    }
+    return fileTokenPromise;
+  }
+  function LibraryPreview({ item, onClose }) {
+    const [access, setAccess] = useState("");
+    const [error, setError] = useState("");
+    useEffect(() => {
+      if (!item) return void 0;
+      let cancelled = false;
+      setAccess("");
+      setError("");
+      cachedFileToken().then((value) => {
+        if (!cancelled) setAccess(value);
+      }).catch((caught) => {
+        if (!cancelled) setError(errorText(caught));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [item && item.path]);
+    if (!item) return null;
+    return h(FilePreview, {
+      open: true,
+      onClose,
+      name: item.name,
+      kind: item.kind,
+      sizeBytes: item.sizeBytes,
+      viewUrl: access ? libraryFileUrl(item.path, access) : "",
+      downloadUrl: access ? libraryFileUrl(item.path, access, true) : "",
+      previewable: item.previewable !== false && error === "",
+      emptyHint: error !== "" ? error : t("project.previewUnsupported")
+    });
+  }
+  function alertBox(message) {
+    return h(
+      "div",
+      {
+        role: "alert",
+        style: {
+          padding: "9px 12px",
+          borderRadius: 10,
+          background: "var(--tomato-brand-soft)",
+          color: "var(--tomato-brand-deep)",
+          fontSize: 12.5,
+          lineHeight: 1.65,
+          wordBreak: "break-word"
+        }
+      },
+      message
+    );
+  }
+  function mutedHint(message) {
+    return h(
+      "div",
+      {
+        style: { fontSize: 11.5, color: "var(--tomato-ink-3)", lineHeight: 1.65 }
+      },
+      message
+    );
+  }
+  function ProjectMaterialsSection({ project, onChanged }) {
+    const projectId = project.id;
+    const [grant, setGrant] = useState(null);
+    const [grantError, setGrantError] = useState("");
+    const [library, setLibrary] = useState(null);
+    const [reloadKey, setReloadKey] = useState(0);
+    const [indexReload, setIndexReload] = useState(0);
+    const [authorizeOpen, setAuthorizeOpen] = useState(false);
+    const [directory, setDirectory] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [sharedBusy, setSharedBusy] = useState(false);
+    const [actionError, setActionError] = useState("");
+    useEffect(() => {
+      setGrant(null);
+      setGrantError("");
+      setLibrary(null);
+      setAuthorizeOpen(false);
+      setDirectory("");
+      setActionError("");
+      setIndexReload(0);
+    }, [projectId]);
+    useEffect(() => {
+      let cancelled = false;
+      setGrant(null);
+      setGrantError("");
+      getProjectGrant(projectId).then((result) => {
+        if (!cancelled) setGrant(result);
+      }).catch((error) => {
+        if (!cancelled) setGrantError(errorText(error));
+      });
+      getLibraryGrant().then((result) => {
+        if (!cancelled) setLibrary(result);
+      }).catch(() => {
+        if (!cancelled) setLibrary(null);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, reloadKey]);
+    const loading = grant === null && grantError === "";
+    const authorized = grant !== null && grant.authorized === true;
+    const shared = authorized && grant.shared === true;
+    const libraryReady = library !== null && library !== void 0 && library.authorized === true && typeof library.directory === "string" && library.directory !== "";
+    function acceptGrant(next) {
+      setGrant(next);
+      setGrantError("");
+      setActionError("");
+      setIndexReload((value) => value + 1);
+      refresh();
+      onChanged?.();
+    }
+    function openAuthorize() {
+      setDirectory(grant && grant.directory || "");
+      setActionError("");
+      setAuthorizeOpen(true);
+    }
+    function closeAuthorize() {
+      if (busy) return;
+      setAuthorizeOpen(false);
+      setActionError("");
+    }
+    async function submitAuthorize() {
+      if (busy) return;
+      const value = directory.trim();
+      if (value === "") {
+        setActionError(t("project.grantPathRequired"));
+        return;
+      }
+      setBusy(true);
+      setActionError("");
+      try {
+        const next = await authorizeProjectDirectory(projectId, value);
+        acceptGrant(next);
+        setAuthorizeOpen(false);
+        notify(t("project.grantSaved"), "brand");
+      } catch (error) {
+        setActionError(errorText(error));
+      } finally {
+        setBusy(false);
+      }
+    }
+    async function useSharedLibrary() {
+      if (sharedBusy) return;
+      setSharedBusy(true);
+      setActionError("");
+      try {
+        const nextLibrary = await getLibraryGrant();
+        setLibrary(nextLibrary);
+        if (!nextLibrary || nextLibrary.authorized !== true || typeof nextLibrary.directory !== "string" || nextLibrary.directory === "") {
+          setActionError(t("project.grantSharedMissing"));
+          return;
+        }
+        const next = await authorizeProjectDirectory(
+          projectId,
+          nextLibrary.directory
+        );
+        acceptGrant(next);
+        notify(t("project.grantSharedDone"), "brand");
+      } catch (error) {
+        setActionError(errorText(error));
+      } finally {
+        setSharedBusy(false);
+      }
+    }
+    const statusChip = loading ? h(Chip, { tone: "neutral" }, t("project.grantStatusLoading")) : grantError !== "" ? h(Chip, { tone: "danger" }, t("project.grantStatusError")) : !authorized ? h(Chip, { tone: "neutral" }, t("project.grantUnauthorized")) : shared ? h(Chip, { tone: "brand", icon: "folder" }, t("project.grantShared")) : h(Chip, { tone: "leaf", icon: "folder" }, t("project.grantOwn"));
+    const grantHint = !authorized ? libraryReady ? t("project.grantNotAuthorizedHint") : t("project.grantNotAuthorizedNoLibraryHint") : shared ? t("project.grantSharedHint") : t("project.grantOwnHint");
+    const pathText = loading ? t("project.grantLoading") : grantError !== "" ? t("project.grantStatusError") : grant && grant.directory ? grant.directory : authorized ? t("project.grantUnauthorized") : t("project.grantUnauthorized");
+    const grantPanel = h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 9,
+          padding: "13px 15px",
+          marginBottom: 16,
+          borderRadius: 12,
+          background: "var(--tomato-surface-2)"
+        }
+      },
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap"
+          }
+        },
+        h(
+          "span",
+          {
+            style: {
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--tomato-ink)",
+              marginRight: 2
+            }
+          },
+          t("project.grantTitle")
+        ),
+        statusChip,
+        h("div", { style: { flex: 1 } }),
+        h(
+          Btn,
+          {
+            variant: "plain",
+            size: "sm",
+            icon: "refresh",
+            disabled: loading || busy || sharedBusy,
+            onClick: () => setReloadKey((value) => value + 1)
+          },
+          t("project.grantRefresh")
+        )
+      ),
+      h(
+        "div",
+        {
+          className: "t-mono",
+          style: {
+            fontSize: 11.5,
+            lineHeight: 1.6,
+            color: "var(--tomato-ink-2)",
+            background: "var(--tomato-surface)",
+            borderRadius: 9,
+            padding: "9px 11px",
+            wordBreak: "break-all"
+          }
+        },
+        pathText
+      ),
+      mutedHint(grantHint),
+      !authorized && grant && grant.reason ? h(
+        "div",
+        {
+          style: { fontSize: 12, color: "#b8503f", lineHeight: 1.6 }
+        },
+        grant.reason
+      ) : null,
+      mutedHint(t("project.grantReadOnly")),
+      grantError !== "" ? alertBox(grantError) : null,
+      actionError !== "" ? alertBox(actionError) : null,
+      h(
+        "div",
+        {
+          style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }
+        },
+        h(
+          Btn,
+          {
+            variant: authorized ? "soft" : "primary",
+            size: "sm",
+            icon: "folder",
+            disabled: loading || busy || sharedBusy,
+            onClick: openAuthorize
+          },
+          authorized ? t("project.grantChange") : t("project.grantAuthorize")
+        ),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "folder",
+            disabled: !libraryReady || shared || loading || busy || sharedBusy,
+            title: libraryReady ? void 0 : t("project.grantSharedMissing"),
+            onClick: useSharedLibrary
+          },
+          sharedBusy ? t("project.grantSwitching") : t("project.grantUseShared")
+        ),
+        shared ? h(
+          Chip,
+          { tone: "brand", icon: "check" },
+          t("project.grantUsingShared")
+        ) : null
+      )
+    );
+    const authorizeDialog = h(
+      Modal,
+      {
+        open: authorizeOpen,
+        onClose: closeAuthorize,
+        icon: "folder",
+        title: t("project.grantModalTitle"),
+        subtitle: t("project.grantModalSubtitle"),
+        width: 520,
+        footer: h(
+          "div",
+          { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+          h(
+            Btn,
+            { variant: "ghost", disabled: busy, onClick: closeAuthorize },
+            t("common.cancel")
+          ),
+          h(
+            Btn,
+            {
+              variant: "primary",
+              icon: "folder",
+              disabled: busy,
+              onClick: submitAuthorize
+            },
+            busy ? t("project.grantSwitching") : t("project.grantConfirm")
+          )
+        )
+      },
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 10 } },
+        h(
+          Field,
+          {
+            label: t("project.grantPathLabel"),
+            hint: t("project.grantModalHint")
+          },
+          h(Input, {
+            value: directory,
+            onChange: (value) => {
+              setDirectory(value);
+              setActionError("");
+            },
+            placeholder: "/home/you/materials/project",
+            mono: true,
+            autoFocus: true,
+            onKeyDown: (event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitAuthorize();
+              }
+            }
+          })
+        ),
+        actionError !== "" ? alertBox(actionError) : null
+      )
+    );
+    return h(
+      Card,
+      null,
+      h(SectionTitle, {
+        icon: "folder",
+        title: t("project.libraryTitle"),
+        hint: t("project.libraryHint")
+      }),
+      grantPanel,
+      loading || grantError !== "" ? null : !authorized ? h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            padding: "14px 16px",
+            borderRadius: 12,
+            background: "var(--tomato-surface-2)"
+          }
+        },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--tomato-ink)"
+            }
+          },
+          t("project.libraryUnauthorized")
+        ),
+        mutedHint(t("project.libraryUnauthorizedHint")),
+        h(
+          Btn,
+          {
+            variant: "primary",
+            size: "sm",
+            icon: "folder",
+            disabled: busy,
+            onClick: openAuthorize
+          },
+          t("project.grantAuthorize")
+        )
+      ) : h(ProjectIndexBrowser, {
+        key: projectId,
+        project,
+        reloadKey: indexReload,
+        onImported: () => {
+          setIndexReload((value) => value + 1);
+          onChanged?.();
+        }
+      }),
+      authorizeDialog
+    );
+  }
+  function ProjectIndexBrowser({ project, reloadKey, onImported }) {
+    const projectId = project.id;
+    const [stats, setStats] = useState(null);
+    const [statsError, setStatsError] = useState("");
+    const [missing, setMissing] = useState(false);
+    const [items, setItems] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [allCount, setAllCount] = useState(null);
+    const [offset, setOffset] = useState(0);
+    const [query, setQuery] = useState("");
+    const [appliedQuery, setAppliedQuery] = useState("");
+    const [kind, setKind] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState("");
+    const [scanning, setScanning] = useState(false);
+    const [localReload, setLocalReload] = useState(0);
+    const [preview, setPreview] = useState(null);
+    const [selected, setSelected] = useState(/* @__PURE__ */ new Set());
+    const [importing, setImporting] = useState(false);
+    const [importingAll, setImportingAll] = useState(false);
+    const [importError, setImportError] = useState("");
+    const [lastImport, setLastImport] = useState(null);
+    const [confirmImportAll, setConfirmImportAll] = useState(false);
+    const [exporting, setExporting] = useState(false);
+    const [exportError, setExportError2] = useState("");
+    const bump = () => setLocalReload((value) => value + 1);
+    useEffect(() => {
+      setOffset(0);
+      setQuery("");
+      setAppliedQuery("");
+      setKind("");
+      setMissing(false);
+      setStats(null);
+      setStatsError("");
+      setItems([]);
+      setTotal(0);
+      setAllCount(null);
+      setPreview(null);
+      setSelected(/* @__PURE__ */ new Set());
+      setImportError("");
+      setLastImport(null);
+      setExportError2("");
+    }, [projectId]);
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setAppliedQuery(query.trim());
+        setOffset(0);
+      }, 350);
+      return () => clearTimeout(timer);
+    }, [query]);
+    useEffect(() => {
+      let cancelled = false;
+      getLibraryStats().then((result) => {
+        if (cancelled) return;
+        setStats(result);
+        setStatsError("");
+        if (result && result.hasIndex === false) setMissing(true);
+      }).catch((error) => {
+        if (cancelled) return;
+        if (error && error.status === 404) setMissing(true);
+        else setStatsError(errorText(error));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, reloadKey, localReload]);
+    useEffect(() => {
+      if (missing) return void 0;
+      let cancelled = false;
+      setLoading(true);
+      setLoadError("");
+      getLibraryItems({
+        projectId,
+        q: appliedQuery,
+        kind,
+        offset,
+        limit: LIBRARY_PAGE
+      }).then((result) => {
+        if (cancelled) return;
+        if (result && result.hasIndex === false) {
+          setMissing(true);
+          setItems([]);
+          setTotal(0);
+          return;
+        }
+        const list = Array.isArray(result && result.items) ? result.items : [];
+        setItems(list.map(normalizeItem));
+        setTotal(Math.max(0, Number(result && result.total) || 0));
+      }).catch((error) => {
+        if (cancelled) return;
+        if (error && error.status === 404) setMissing(true);
+        else setLoadError(errorText(error));
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, appliedQuery, kind, offset, missing, reloadKey, localReload]);
+    useEffect(() => {
+      if (missing) {
+        setAllCount(null);
+        return void 0;
+      }
+      let cancelled = false;
+      getLibraryItems({ projectId, offset: 0, limit: 1 }).then((result) => {
+        if (cancelled) return;
+        if (result && result.hasIndex === false) setMissing(true);
+        else setAllCount(Math.max(0, Number(result && result.total) || 0));
+      }).catch(() => {
+        if (!cancelled) setAllCount(null);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, missing, reloadKey, localReload]);
+    async function scan() {
+      if (scanning) return;
+      setScanning(true);
+      try {
+        const result = await scanLibrary();
+        notify(
+          t("project.libraryScanDone", {
+            n: Number(result && result.count) || 0
+          }),
+          "brand"
+        );
+        setMissing(false);
+        bump();
+      } catch (error) {
+        notify(errorText(error), "danger");
+      } finally {
+        setScanning(false);
+      }
+    }
+    function toggleSelected(path) {
+      setSelected((current4) => {
+        const next = new Set(current4);
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+    }
+    function acceptImport(result) {
+      const registered = Number(result && result.registered) || 0;
+      const skipped = Number(result && result.skipped) || 0;
+      setLastImport({ registered, skipped });
+      setImportError("");
+      setSelected(/* @__PURE__ */ new Set());
+      notify(
+        t("project.importDone", { registered, skipped }),
+        registered > 0 ? "brand" : "neutral"
+      );
+      bump();
+      onImported?.();
+    }
+    async function importSelected() {
+      if (importing || importingAll || selected.size === 0) return;
+      setImporting(true);
+      setImportError("");
+      setLastImport(null);
+      try {
+        const result = await importProjectResources(projectId, {
+          paths: Array.from(selected)
+        });
+        acceptImport(result);
+      } catch (error) {
+        setImportError(errorText(error));
+      } finally {
+        setImporting(false);
+      }
+    }
+    function openImportAll() {
+      setImportError("");
+      setConfirmImportAll(true);
+    }
+    function closeImportAll() {
+      if (importingAll) return;
+      setConfirmImportAll(false);
+      setImportError("");
+    }
+    async function importAll() {
+      if (importingAll || importing) return;
+      setImportingAll(true);
+      setImportError("");
+      setLastImport(null);
+      try {
+        const result = await importProjectResources(projectId);
+        acceptImport(result);
+        setConfirmImportAll(false);
+      } catch (error) {
+        setImportError(errorText(error));
+      } finally {
+        setImportingAll(false);
+      }
+    }
+    async function exportIndex(format) {
+      if (exporting) return;
+      setExporting(true);
+      setExportError2("");
+      try {
+        const all = await collectLibraryItems(projectId);
+        if (all.length === 0) {
+          notify(t("project.exportEmpty"), "neutral");
+          return;
+        }
+        const rows = all.map((item) => ({
+          path: item.path,
+          name: item.name,
+          ext: item.ext,
+          kind: item.kind,
+          sizeBytes: item.sizeBytes,
+          mtime: item.mtime
+        }));
+        const columns = ["path", "name", "ext", "kind", "sizeBytes", "mtime"];
+        const text = format === "csv" ? rowsToCsv(columns, rows) : JSON.stringify(rows, null, 2);
+        downloadText(
+          `tomato-project-${projectId}-index-${todayKey()}.${format}`,
+          text,
+          format === "csv" ? "text/csv;charset=utf-8" : "application/json"
+        );
+        notify(t("project.exportDone", { n: rows.length }), "brand");
+      } catch (error) {
+        setExportError2(errorText(error));
+      } finally {
+        setExporting(false);
+      }
+    }
+    const kindOptions = [
+      { value: "", label: t("project.libraryKindAll") },
+      ...KINDS2.map((value) => ({
+        value,
+        label: indexKindLabel(value)
+      }))
+    ];
+    const pageStart = total === 0 ? 0 : offset + 1;
+    const pageEnd = Math.min(offset + LIBRARY_PAGE, total);
+    const missingBlock = h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          padding: "14px 16px",
+          borderRadius: 12,
+          background: "var(--tomato-surface-2)"
+        }
+      },
+      h(
+        "div",
+        {
+          style: { fontSize: 13, fontWeight: 600, color: "var(--tomato-ink)" }
+        },
+        t("project.libraryMissing")
+      ),
+      mutedHint(t("project.libraryMissingHint")),
+      h(
+        "div",
+        { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+        h(
+          Btn,
+          {
+            variant: "soft",
+            size: "sm",
+            icon: "refresh",
+            disabled: scanning,
+            onClick: scan
+          },
+          scanning ? t("project.libraryScanning") : t("project.libraryScan")
+        )
+      )
+    );
+    const listBlock = h(
+      "div",
+      null,
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBottom: 10
+          }
+        },
+        h(
+          "div",
+          { style: { position: "relative", flex: "1 1 220px", minWidth: 0 } },
+          h(Icon, {
+            name: "search",
+            size: 14,
+            style: {
+              position: "absolute",
+              left: 11,
+              top: 10,
+              color: "var(--tomato-ink-3)",
+              pointerEvents: "none"
+            }
+          }),
+          h(Input, {
+            value: query,
+            onChange: setQuery,
+            placeholder: t("project.librarySearch"),
+            maxLength: 120,
+            style: { paddingLeft: 32, height: 34, fontSize: 12.5 }
+          })
+        ),
+        h(Select2, {
+          value: kind,
+          options: kindOptions,
+          onChange: (value) => {
+            setKind(value);
+            setOffset(0);
+          },
+          width: 132
+        }),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "refresh",
+            disabled: loading,
+            onClick: () => setLocalReload((value) => value + 1)
+          },
+          t("project.libraryRefresh")
+        )
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            marginBottom: 10
+          }
+        },
+        h(
+          "span",
+          {
+            className: "t-mono",
+            style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+          },
+          allCount !== null ? t("project.importAvailable", { n: allCount }) : ""
+        ),
+        selected.size > 0 ? h(
+          Btn,
+          {
+            variant: "plain",
+            size: "sm",
+            disabled: importing || importingAll,
+            onClick: () => setSelected(/* @__PURE__ */ new Set())
+          },
+          t("project.clearSelection")
+        ) : null,
+        h("div", { style: { flex: 1 } }),
+        h(
+          Btn,
+          {
+            variant: "soft",
+            size: "sm",
+            icon: "plus",
+            disabled: importing || importingAll || selected.size === 0,
+            onClick: importSelected
+          },
+          importing ? t("project.importBusy") : t("project.importSelected", { n: selected.size })
+        ),
+        h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "folder",
+            disabled: importing || importingAll || allCount === null || allCount === 0,
+            onClick: openImportAll
+          },
+          allCount !== null ? t("project.importAllCount", { n: allCount }) : t("project.importAll")
+        )
+      ),
+      lastImport !== null ? h(
+        "div",
+        {
+          role: "status",
+          style: {
+            padding: "7px 11px",
+            marginBottom: 10,
+            borderRadius: 9,
+            background: "var(--tomato-surface-2)",
+            color: "var(--tomato-ink-2)",
+            fontSize: 11.5
+          }
+        },
+        t("project.importDone", lastImport)
+      ) : null,
+      importError !== "" ? alertBox(importError) : null,
+      loadError !== "" ? alertBox(loadError) : null,
+      items.length === 0 ? h(
+        "div",
+        { style: { padding: "16px 4px" } },
+        loading ? h(Skeleton, { w: "52%", h: 13 }) : h(Empty, {
+          icon: "folder",
+          title: t("project.libraryEmpty"),
+          hint: t("project.libraryEmptyHint")
+        })
+      ) : h(
+        "div",
+        null,
+        items.map(
+          (item, index) => h(
+            "div",
+            {
+              key: item.path || index,
+              className: "t-row",
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                minHeight: 44,
+                padding: "6px 6px",
+                borderBottom: index === items.length - 1 ? "none" : "1px solid var(--tomato-line)"
+              }
+            },
+            h(Check, {
+              checked: selected.has(item.path),
+              label: t("project.selectItem", { name: item.name }),
+              disabled: importing || importingAll,
+              onChange: () => toggleSelected(item.path)
+            }),
+            h(Icon, {
+              name: "folder",
+              size: 15,
+              style: { color: "var(--tomato-ink-3)", flex: "none" }
+            }),
+            h(
+              "button",
+              {
+                type: "button",
+                onClick: () => setPreview(item),
+                style: {
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 2,
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                  color: "inherit",
+                  cursor: "pointer"
+                }
+              },
+              h(
+                "span",
+                {
+                  style: {
+                    maxWidth: "100%",
+                    fontSize: 12.5,
+                    color: "var(--tomato-ink)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                item.name
+              ),
+              h(
+                "span",
+                {
+                  className: "t-mono",
+                  style: {
+                    maxWidth: "100%",
+                    fontSize: 10.5,
+                    color: "var(--tomato-ink-3)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                item.path
+              )
+            ),
+            item.sizeBytes ? h(
+              "span",
+              {
+                className: "t-mono",
+                style: {
+                  fontSize: 10.5,
+                  color: "var(--tomato-ink-3)",
+                  flex: "none"
+                }
+              },
+              fmtSize(item.sizeBytes)
+            ) : null,
+            h(IconBtn, {
+              name: "eye",
+              size: 15,
+              box: 28,
+              title: t("project.preview"),
+              onClick: () => setPreview(item)
+            })
+          )
+        ),
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 10,
+              flexWrap: "wrap"
+            }
+          },
+          h(
+            "span",
+            {
+              className: "t-mono",
+              style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+            },
+            total > 0 ? t("project.libraryRange", {
+              a: pageStart,
+              b: pageEnd,
+              total
+            }) : t("project.libraryCount", { n: 0 })
+          ),
+          h("div", { style: { flex: 1 } }),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "arrowLeft",
+              disabled: offset <= 0 || loading,
+              onClick: () => setOffset(Math.max(0, offset - LIBRARY_PAGE))
+            },
+            t("project.libraryPrev")
+          ),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              iconRight: "arrowRight",
+              disabled: offset + LIBRARY_PAGE >= total || loading,
+              onClick: () => setOffset(offset + LIBRARY_PAGE)
+            },
+            t("project.libraryNext")
+          )
+        )
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 8,
+            flexWrap: "wrap"
+          }
+        },
+        h(
+          "span",
+          {
+            style: {
+              flex: "1 1 220px",
+              fontSize: 11,
+              color: "var(--tomato-ink-3)",
+              lineHeight: 1.6
+            }
+          },
+          t("project.exportHint")
+        ),
+        h(
+          Btn,
+          {
+            variant: "plain",
+            size: "sm",
+            icon: "download",
+            disabled: exporting,
+            onClick: () => exportIndex("json")
+          },
+          t("project.exportIndexJson")
+        ),
+        h(
+          Btn,
+          {
+            variant: "plain",
+            size: "sm",
+            icon: "download",
+            disabled: exporting,
+            onClick: () => exportIndex("csv")
+          },
+          t("project.exportIndexCsv")
+        )
+      ),
+      exportError !== "" ? alertBox(exportError) : null
+    );
+    const importAllDialog = h(
+      Modal,
+      {
+        open: confirmImportAll,
+        onClose: closeImportAll,
+        icon: "folder",
+        title: t("project.importConfirmTitle"),
+        subtitle: t("project.importConfirmBody", { n: allCount ?? 0 }),
+        width: 520,
+        footer: h(
+          "div",
+          { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+          h(
+            Btn,
+            { variant: "ghost", disabled: importingAll, onClick: closeImportAll },
+            t("common.cancel")
+          ),
+          h(
+            Btn,
+            {
+              variant: "primary",
+              icon: "plus",
+              disabled: importingAll || allCount === 0,
+              onClick: importAll
+            },
+            importingAll ? t("project.importBusy") : t("project.importConfirmSubmit", { n: allCount ?? 0 })
+          )
+        )
+      },
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 10 } },
+        h(
+          "div",
+          {
+            className: "t-mono",
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              wordBreak: "break-all"
+            }
+          },
+          project && project.name || projectId
+        ),
+        importError !== "" ? alertBox(importError) : null
+      )
+    );
+    return h(
+      "div",
+      null,
+      statsError !== "" ? alertBox(statsError) : null,
+      missing ? missingBlock : listBlock,
+      h(LibraryPreview, { item: preview, onClose: () => setPreview(null) }),
+      importAllDialog
+    );
+  }
+  function stateChip(state) {
+    if (state === "available")
+      return h(Chip, { tone: "leaf" }, t("project.stateAvailable"));
+    if (state === "missing")
+      return h(Chip, { tone: "danger" }, t("project.stateMissing"));
+    if (state === "unavailable")
+      return h(Chip, { tone: "neutral" }, t("project.stateUnavailable"));
+    return null;
+  }
+  function ProjectRegisteredSection({ project, reloadKey, onChanged }) {
+    const projectId = project.id;
+    const [resources, setResources] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [offset, setOffset] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState("");
+    const [states, setStates] = useState(null);
+    const [stateBusy, setStateBusy] = useState(false);
+    const [stateError, setStateError] = useState("");
+    const [scanSummary, setScanSummary] = useState("");
+    const [exporting, setExporting] = useState(false);
+    const [exportError, setExportError2] = useState("");
+    const [localReload, setLocalReload] = useState(0);
+    const [cleanupOpen, setCleanupOpen] = useState(false);
+    const [cleanupBusy, setCleanupBusy] = useState(false);
+    const [cleanupError, setCleanupError] = useState("");
+    useEffect(() => {
+      setOffset(0);
+      setStates(null);
+      setScanSummary("");
+      setStateError("");
+      setExportError2("");
+      setCleanupOpen(false);
+      setCleanupError("");
+    }, [projectId, reloadKey]);
+    useEffect(() => {
+      let cancelled = false;
+      setLoading(true);
+      setLoadError("");
+      getProjectResources(projectId, { offset, limit: RESOURCE_PAGE }).then((result) => {
+        if (cancelled) return;
+        const list = Array.isArray(result && result.resources) ? result.resources : [];
+        setResources(list);
+        setTotal(Math.max(0, Number(result && result.total) || 0));
+      }).catch((error) => {
+        if (!cancelled) setLoadError(errorText(error));
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, offset, reloadKey, localReload]);
+    async function loadStates() {
+      const result = await scanProjectLibrary(projectId);
+      const list = Array.isArray(result && result.resources) ? result.resources : [];
+      const map = new Map(
+        list.map((entry) => [
+          entry.id,
+          { state: entry.state, sizeBytes: entry.sizeBytes }
+        ])
+      );
+      setStates(map);
+      const count = (state) => list.filter((entry) => entry.state === state).length;
+      setScanSummary(
+        t("project.statesChecked", {
+          a: count("available"),
+          m: count("missing"),
+          u: list.length - count("available") - count("missing")
+        })
+      );
+      return map;
+    }
+    async function checkStates() {
+      if (stateBusy || exporting) return;
+      setStateBusy(true);
+      setStateError("");
+      try {
+        await loadStates();
+      } catch (error) {
+        setStateError(errorText(error));
+      } finally {
+        setStateBusy(false);
+      }
+    }
+    async function cleanupMissing() {
+      if (cleanupBusy) return;
+      setCleanupBusy(true);
+      setCleanupError("");
+      try {
+        const result = await cleanupProjectResources(projectId);
+        const removed = Number(result && result.removed) || 0;
+        notify(
+          removed > 0 ? t("project.cleanupDone", { n: removed }) : t("project.cleanupEmpty"),
+          removed > 0 ? "brand" : "neutral"
+        );
+        setCleanupOpen(false);
+        setStates(null);
+        setScanSummary("");
+        setLocalReload((value) => value + 1);
+        onChanged?.();
+      } catch (error) {
+        setCleanupError(errorText(error));
+      } finally {
+        setCleanupBusy(false);
+      }
+    }
+    async function exportList(format) {
+      if (exporting || stateBusy) return;
+      setExporting(true);
+      setExportError2("");
+      try {
+        const all = await collectProjectResources(projectId);
+        if (all.length === 0) {
+          notify(t("project.exportEmpty"), "neutral");
+          return;
+        }
+        const map = await loadStates();
+        const rows = all.map((resource) => ({
+          id: resource.id || "",
+          title: resource.title || "",
+          kind: resource.kind || "",
+          path: resource.path || "",
+          state: (map.get(resource.id) || {}).state || ""
+        }));
+        const columns = ["id", "title", "kind", "path", "state"];
+        const text = format === "csv" ? rowsToCsv(columns, rows) : JSON.stringify(rows, null, 2);
+        downloadText(
+          `tomato-project-${projectId}-resources-${todayKey()}.${format}`,
+          text,
+          format === "csv" ? "text/csv;charset=utf-8" : "application/json"
+        );
+        notify(t("project.exportDone", { n: rows.length }), "brand");
+      } catch (error) {
+        setExportError2(errorText(error));
+      } finally {
+        setExporting(false);
+      }
+    }
+    const pageStart = total === 0 ? 0 : offset + 1;
+    const pageEnd = Math.min(offset + RESOURCE_PAGE, total);
+    const cleanupDialog = h(
+      Modal,
+      {
+        open: cleanupOpen,
+        onClose: () => cleanupBusy ? null : setCleanupOpen(false),
+        icon: "trash",
+        title: t("project.cleanupTitle"),
+        subtitle: t("project.cleanupBody"),
+        width: 520,
+        footer: h(
+          "div",
+          { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              disabled: cleanupBusy,
+              onClick: () => setCleanupOpen(false)
+            },
+            t("common.cancel")
+          ),
+          h(
+            Btn,
+            {
+              variant: "danger",
+              icon: "trash",
+              disabled: cleanupBusy,
+              onClick: cleanupMissing
+            },
+            cleanupBusy ? t("project.cleanupBusy") : t("project.cleanupConfirm")
+          )
+        )
+      },
+      cleanupError !== "" ? alertBox(cleanupError) : null
+    );
+    return h(
+      "div",
+      null,
+      h(
+        Card,
+        null,
+        h(SectionTitle, {
+          icon: "folder",
+          title: t("project.registeredTitle"),
+          hint: t("project.registeredCount", { n: total }),
+          action: h(
+            "div",
+            { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                icon: "trash",
+                disabled: cleanupBusy || stateBusy || exporting || loading,
+                onClick: () => {
+                  setCleanupError("");
+                  setCleanupOpen(true);
+                }
+              },
+              cleanupBusy ? t("project.cleanupBusy") : t("project.cleanupMissing")
+            ),
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                icon: "refresh",
+                disabled: stateBusy || exporting || loading,
+                onClick: checkStates
+              },
+              stateBusy ? t("project.checkingStates") : t("project.checkStates")
+            ),
+            h(
+              Btn,
+              {
+                variant: "soft",
+                size: "sm",
+                icon: "download",
+                disabled: exporting || stateBusy || loading,
+                onClick: () => exportList("json")
+              },
+              exporting ? t("project.exporting") : t("project.exportJson")
+            ),
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                icon: "download",
+                disabled: exporting || stateBusy || loading,
+                onClick: () => exportList("csv")
+              },
+              t("project.exportCsv")
+            )
+          )
+        }),
+        mutedHint(t("project.registeredHint")),
+        scanSummary !== "" ? h(
+          "div",
+          {
+            style: {
+              marginTop: 7,
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)"
+            }
+          },
+          scanSummary
+        ) : null,
+        stateError !== "" ? alertBox(stateError) : null,
+        exportError !== "" ? alertBox(exportError) : null,
+        h("div", { style: { marginTop: 10 } }),
+        loading && resources.length === 0 ? h(Skeleton, { w: "52%", h: 13 }) : resources.length === 0 ? h(Empty, {
+          icon: "folder",
+          title: t("project.registeredEmpty"),
+          hint: t("project.registeredEmptyHint")
+        }) : h(
+          "div",
+          null,
+          resources.map((resource, index) => {
+            const info = states ? states.get(resource.id) : null;
+            return h(
+              "div",
+              {
+                key: resource.id || `resource-${index}`,
+                className: "t-row",
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  minHeight: 44,
+                  padding: "6px 6px",
+                  borderBottom: index === resources.length - 1 ? "none" : "1px solid var(--tomato-line)"
+                }
+              },
+              h(Icon, {
+                name: "folder",
+                size: 15,
+                style: { color: "var(--tomato-ink-3)", flex: "none" }
+              }),
+              h(
+                "div",
+                {
+                  style: {
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2
+                  }
+                },
+                h(
+                  "span",
+                  {
+                    style: {
+                      fontSize: 12.5,
+                      color: "var(--tomato-ink)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap"
+                    }
+                  },
+                  resource.title || resource.path
+                ),
+                h(
+                  "span",
+                  {
+                    className: "t-mono",
+                    style: {
+                      fontSize: 10.5,
+                      color: "var(--tomato-ink-3)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap"
+                    }
+                  },
+                  resource.path
+                )
+              ),
+              resource.kind ? h(
+                Chip,
+                { tone: "neutral" },
+                resourceKindLabel(resource.kind)
+              ) : null,
+              info && info.sizeBytes ? h(
+                "span",
+                {
+                  className: "t-mono",
+                  style: {
+                    fontSize: 10.5,
+                    color: "var(--tomato-ink-3)",
+                    flex: "none"
+                  }
+                },
+                fmtSize(info.sizeBytes)
+              ) : null,
+              info ? stateChip(info.state) : null
+            );
+          }),
+          h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 10,
+                flexWrap: "wrap"
+              }
+            },
+            h(
+              "span",
+              {
+                className: "t-mono",
+                style: { fontSize: 11, color: "var(--tomato-ink-3)" }
+              },
+              total > 0 ? t("project.registeredRange", {
+                a: pageStart,
+                b: pageEnd,
+                total
+              }) : t("project.registeredCount", { n: 0 })
+            ),
+            h("div", { style: { flex: 1 } }),
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                icon: "arrowLeft",
+                disabled: offset <= 0 || loading,
+                onClick: () => setOffset(Math.max(0, offset - RESOURCE_PAGE))
+              },
+              t("project.registeredPrev")
+            ),
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                iconRight: "arrowRight",
+                disabled: offset + RESOURCE_PAGE >= total || loading,
+                onClick: () => setOffset(offset + RESOURCE_PAGE)
+              },
+              t("project.registeredNext")
+            )
+          )
+        )
+      ),
+      cleanupDialog
+    );
+  }
+
+  // plugin/src/client/pages/project-binding.js
+  registerCopy("project", {
+    zh: {
+      bindTitle: "应试绑定",
+      bindHint: "从本项目已登记的资料里绑定考纲、真题与模拟题；保存只改这四项，目录、愿景、目标与考试日期保持不变。",
+      bindExamMode: "应试模式",
+      bindExamModeHint: "打开后 core 要求同时绑定愿景、目标、考纲、真题和模拟题；缺一项会拒绝保存并返回原因。",
+      bindSyllabus: "考纲",
+      bindPastPapers: "真题",
+      bindMockPapers: "模拟题",
+      bindSyllabusNone: "未绑定考纲",
+      bindMissingOption: "{id}（未找到对应登记）",
+      bindPickNone: "还没有可选的{kind}资料",
+      bindPickHint: "先在上方导入或在应试教育页登记{kind}资料，再回来绑定。",
+      bindSelectedCount: "已选 {n} 份",
+      bindSave: "保存绑定",
+      bindSaving: "正在保存…",
+      bindSaved: "应试绑定已保存",
+      bindMissingProfile: "这个项目还没有应试档案"
+    },
+    en: {
+      bindTitle: "Exam binding",
+      bindHint: "Bind a syllabus, past papers, and mock papers from this project's registered materials. Saving changes only these four fields; folder, vision, target, and exam date stay untouched.",
+      bindExamMode: "Exam mode",
+      bindExamModeHint: "When enabled, core requires a vision, target, syllabus, past papers, and mock papers together; if one is missing it refuses the save and returns the reason.",
+      bindSyllabus: "Syllabus",
+      bindPastPapers: "Past papers",
+      bindMockPapers: "Mock papers",
+      bindSyllabusNone: "No syllabus bound",
+      bindMissingOption: "{id} (no matching entry)",
+      bindPickNone: "No {kind} materials to choose from yet",
+      bindPickHint: "Import materials above or register {kind} materials on the study page, then come back to bind them.",
+      bindSelectedCount: "{n} selected",
+      bindSave: "Save binding",
+      bindSaving: "Saving…",
+      bindSaved: "Exam binding saved",
+      bindMissingProfile: "This project has no study profile yet"
+    },
+    ja: {
+      bindTitle: "試験の紐付け",
+      bindHint: "このプロジェクトに登録済みの資料からシラバス・過去問・模擬問題を選びます。保存で変わるのはこの4項目だけで、フォルダ・ビジョン・目標・試験日はそのままです。",
+      bindExamMode: "試験モード",
+      bindExamModeHint: "有効にすると core はビジョン・目標・シラバス・過去問・模擬問題のすべてを要求します。欠けている場合は保存を拒否し、理由を返します。",
+      bindSyllabus: "シラバス",
+      bindPastPapers: "過去問",
+      bindMockPapers: "模擬問題",
+      bindSyllabusNone: "シラバス未設定",
+      bindMissingOption: "{id}（対応する登録なし）",
+      bindPickNone: "選択できる{kind}資料がまだありません",
+      bindPickHint: "上で資料を取り込むか、学習ページで{kind}資料を登録してから戻ってください。",
+      bindSelectedCount: "{n} 件選択",
+      bindSave: "紐付けを保存",
+      bindSaving: "保存中…",
+      bindSaved: "試験の紐付けを保存しました",
+      bindMissingProfile: "このプロジェクトには学習プロフィールがありません"
+    }
+  });
+  var RESOURCE_KINDS = ["syllabus", "pastPaper", "mockPaper"];
+  var PAGE_SIZE = 100;
+  function resourceKindLabel2(kind) {
+    return t(
+      `education.resourceKind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`
+    );
+  }
+  function errorText2(error) {
+    return error && (error.userMessage || error.message) || String(error);
+  }
+  function findStudyProfile(snapshot2, projectId) {
+    const list = snapshot2 && snapshot2.data && snapshot2.data.education && snapshot2.data.education.projects;
+    if (!Array.isArray(list)) return null;
+    return list.find((entry) => entry && entry.projectId === projectId) || null;
+  }
+  async function loadResourcesByKind(projectId, kind) {
+    const all = [];
+    let offset = 0;
+    let total = Infinity;
+    while (offset < total) {
+      const page = await getProjectResources(projectId, {
+        kind,
+        offset,
+        limit: PAGE_SIZE
+      });
+      const list = Array.isArray(page && page.resources) ? page.resources : [];
+      total = Number(page && page.total) || 0;
+      if (list.length === 0) break;
+      all.push(...list);
+      offset += list.length;
+    }
+    return all;
+  }
+  function alertBox2(message) {
+    return h(
+      "div",
+      {
+        role: "alert",
+        style: {
+          padding: "9px 12px",
+          borderRadius: 10,
+          background: "var(--tomato-brand-soft)",
+          color: "var(--tomato-brand-deep)",
+          fontSize: 12.5,
+          lineHeight: 1.65,
+          wordBreak: "break-word"
+        }
+      },
+      message
+    );
+  }
+  function ResourceMultiPick({
+    kind,
+    items,
+    selected,
+    onChange,
+    disabled,
+    loading
+  }) {
+    const known = new Set(items.map((item) => item.id));
+    const missing = loading ? [] : selected.filter((id) => !known.has(id));
+    const toggle = (id) => {
+      onChange(
+        selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]
+      );
+    };
+    return h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 6 } },
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap"
+          }
+        },
+        h(
+          "span",
+          {
+            style: {
+              fontSize: 12,
+              fontWeight: 550,
+              color: "var(--tomato-ink-2)"
+            }
+          },
+          resourceKindLabel2(kind)
+        ),
+        h(
+          Chip,
+          { tone: "neutral" },
+          t("project.bindSelectedCount", { n: selected.length })
+        )
+      ),
+      items.length === 0 && missing.length === 0 ? h(
+        "div",
+        {
+          style: {
+            padding: "9px 11px",
+            borderRadius: 9,
+            background: "var(--tomato-surface-2)",
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            lineHeight: 1.65
+          }
+        },
+        t("project.bindPickNone", { kind: resourceKindLabel2(kind) }),
+        " ",
+        t("project.bindPickHint", { kind: resourceKindLabel2(kind) })
+      ) : h(
+        "div",
+        {
+          className: "t-scroll",
+          style: {
+            maxHeight: 200,
+            overflowY: "auto",
+            border: "1px solid var(--tomato-line)",
+            borderRadius: 10,
+            padding: "4px 6px"
+          }
+        },
+        items.map(
+          (item) => h(
+            "div",
+            {
+              key: item.id,
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "6px 4px",
+                borderBottom: "1px solid var(--tomato-line)"
+              }
+            },
+            h(Check, {
+              checked: selected.includes(item.id),
+              label: item.title || item.path,
+              disabled,
+              onChange: () => toggle(item.id)
+            }),
+            h(
+              "div",
+              {
+                style: {
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2
+                }
+              },
+              h(
+                "span",
+                {
+                  style: {
+                    fontSize: 12.5,
+                    color: "var(--tomato-ink)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                item.title || item.path
+              ),
+              h(
+                "span",
+                {
+                  className: "t-mono",
+                  style: {
+                    fontSize: 10.5,
+                    color: "var(--tomato-ink-3)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }
+                },
+                item.path
+              )
+            )
+          )
+        ),
+        missing.map(
+          (id) => h(
+            "div",
+            {
+              key: `missing-${id}`,
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "6px 4px",
+                color: "var(--tomato-ink-3)"
+              }
+            },
+            h(Check, {
+              checked: true,
+              label: t("project.bindMissingOption", { id }),
+              disabled,
+              onChange: () => toggle(id)
+            }),
+            h(
+              "span",
+              { style: { fontSize: 12, wordBreak: "break-all" } },
+              t("project.bindMissingOption", { id })
+            )
+          )
+        )
+      )
+    );
+  }
+  function ProjectEducationBinding({ project, profile, reloadKey }) {
+    const projectId = project.id;
+    const [syllabus, setSyllabus] = useState("");
+    const [past, setPast] = useState([]);
+    const [mock, setMock] = useState([]);
+    const [examMode, setExamMode] = useState(false);
+    const [candidates, setCandidates] = useState({
+      syllabus: [],
+      pastPaper: [],
+      mockPaper: []
+    });
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState("");
+    const profileKey = profile ? [
+      profile.syllabusId || "",
+      (Array.isArray(profile.pastPaperIds) ? profile.pastPaperIds : []).join(
+        ""
+      ),
+      (Array.isArray(profile.mockPaperIds) ? profile.mockPaperIds : []).join(
+        ""
+      ),
+      profile.examMode === true ? "1" : "0"
+    ].join("") : "";
+    useEffect(() => {
+      if (!profile) return;
+      setSyllabus(profile.syllabusId || "");
+      setPast(
+        Array.isArray(profile.pastPaperIds) ? [...profile.pastPaperIds] : []
+      );
+      setMock(
+        Array.isArray(profile.mockPaperIds) ? [...profile.mockPaperIds] : []
+      );
+      setExamMode(profile.examMode === true);
+      setSaveError("");
+    }, [projectId, profileKey]);
+    useEffect(() => {
+      if (!profile) return void 0;
+      let cancelled = false;
+      setLoading(true);
+      setLoadError("");
+      Promise.all(
+        RESOURCE_KINDS.map((kind) => loadResourcesByKind(projectId, kind))
+      ).then(([syllabusList, pastList, mockList]) => {
+        if (cancelled) return;
+        setCandidates({
+          syllabus: syllabusList,
+          pastPaper: pastList,
+          mockPaper: mockList
+        });
+      }).catch((error) => {
+        if (!cancelled) setLoadError(errorText2(error));
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId, profile !== null && profile !== void 0, reloadKey]);
+    if (!profile) return null;
+    const syllabusItems = candidates.syllabus;
+    const syllabusOptions = [
+      { value: "", label: t("project.bindSyllabusNone") },
+      ...syllabusItems.map((item) => ({
+        value: item.id,
+        label: item.title || item.path
+      }))
+    ];
+    if (syllabus !== "" && !syllabusItems.some((item) => item.id === syllabus)) {
+      syllabusOptions.push({
+        value: syllabus,
+        label: t("project.bindMissingOption", { id: syllabus })
+      });
+    }
+    async function save() {
+      if (saving || loading) return;
+      setSaving(true);
+      setSaveError("");
+      try {
+        await refresh();
+        const live = findStudyProfile(getSnapshot(), projectId) || profile;
+        const next = {
+          ...live,
+          syllabusId: syllabus || null,
+          pastPaperIds: past,
+          mockPaperIds: mock,
+          examMode: examMode === true
+        };
+        const result = await tryDispatch({
+          type: "education",
+          command: { op: "saveProject", project: next }
+        });
+        if (!result.ok) {
+          setSaveError(result.error || t("common.writeFailed"));
+          return;
+        }
+        notify(t("project.bindSaved"), "brand");
+      } catch (error) {
+        setSaveError(errorText2(error));
+      } finally {
+        setSaving(false);
+      }
+    }
+    return h(
+      Card,
+      null,
+      h(SectionTitle, {
+        icon: "education",
+        title: t("project.bindTitle"),
+        hint: t("project.bindHint"),
+        action: profile.examMode === true ? h(Chip, { tone: "brand" }, t("education.examMode")) : null
+      }),
+      loadError !== "" ? alertBox2(loadError) : null,
+      loading ? h(
+        "div",
+        { style: { marginBottom: 10 } },
+        h(Skeleton, { w: "46%", h: 13 })
+      ) : null,
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 14 } },
+        h(
+          Field,
+          {
+            label: t("project.bindSyllabus"),
+            hint: syllabusItems.length === 0 ? t("project.bindPickHint", {
+              kind: resourceKindLabel2("syllabus")
+            }) : void 0
+          },
+          h(Select2, {
+            value: syllabus,
+            options: syllabusOptions,
+            onChange: setSyllabus,
+            disabled: loading || saving,
+            width: "100%"
+          })
+        ),
+        h(ResourceMultiPick, {
+          kind: "pastPaper",
+          items: candidates.pastPaper,
+          selected: past,
+          onChange: setPast,
+          disabled: loading || saving,
+          loading
+        }),
+        h(ResourceMultiPick, {
+          kind: "mockPaper",
+          items: candidates.mockPaper,
+          selected: mock,
+          onChange: setMock,
+          disabled: loading || saving,
+          loading
+        }),
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: "var(--tomato-surface-2)"
+            }
+          },
+          h(
+            "div",
+            { style: { flex: 1, minWidth: 0 } },
+            h(
+              "div",
+              {
+                style: { fontSize: 13.5, color: "var(--tomato-ink)" }
+              },
+              t("project.bindExamMode")
+            ),
+            h(
+              "div",
+              {
+                style: {
+                  fontSize: 11.5,
+                  color: "var(--tomato-ink-3)",
+                  lineHeight: 1.6,
+                  marginTop: 3
+                }
+              },
+              t("project.bindExamModeHint")
+            )
+          ),
+          h(
+            "button",
+            {
+              type: "button",
+              role: "switch",
+              "aria-checked": examMode === true,
+              "aria-label": t("project.bindExamMode"),
+              disabled: saving,
+              onClick: () => setExamMode((value) => !value),
+              style: {
+                width: 40,
+                height: 23,
+                borderRadius: 23,
+                border: "none",
+                cursor: saving ? "default" : "pointer",
+                padding: 2,
+                flex: "none",
+                background: examMode === true ? "var(--tomato-brand)" : "var(--tomato-surface-3)",
+                display: "flex",
+                justifyContent: examMode === true ? "flex-end" : "flex-start",
+                alignItems: "center",
+                opacity: saving ? 0.6 : 1
+              }
+            },
+            h("span", {
+              style: {
+                width: 19,
+                height: 19,
+                borderRadius: "50%",
+                background: "#fffdf7",
+                boxShadow: "0 1px 3px #00000026"
+              }
+            })
+          )
+        ),
+        saveError !== "" ? alertBox2(saveError) : null,
+        h(
+          "div",
+          { style: { display: "flex", justifyContent: "flex-end" } },
+          h(
+            Btn,
+            {
+              variant: "primary",
+              icon: "check",
+              disabled: saving || loading,
+              onClick: save
+            },
+            saving ? t("project.bindSaving") : t("project.bindSave")
+          )
+        )
+      )
+    );
+  }
+
   // plugin/src/client/pages/project.js
   registerCopy("project", {
     zh: {
@@ -15333,7 +18156,7 @@ ${JSON.stringify(refs, null, 2)}`;
       perSession: "{n} 分钟/次",
       overdue: "已逾期",
       editTitle: "编辑项目",
-      editHint: "只改这个项目的名称与颜色；资料目录在应试教育页维护。",
+      editHint: "只改这个项目的名称与颜色；资料目录在下方「项目资料」里维护。",
       nameLabel: "项目名称",
       colorLabel: "颜色",
       nameRequired: "项目名称不能为空",
@@ -15349,9 +18172,9 @@ ${JSON.stringify(refs, null, 2)}`;
       libraryTitle: "项目资料",
       libraryHint: "来自共享资料库索引，按项目目录过滤。",
       libraryMissing: "资料库尚未建索引",
-      libraryMissingHint: "先在应试教育页授权资料目录，然后扫描一次；这里会列出该项目目录下的文件。",
-      libraryUnauthorized: "共享资料库尚未授权",
-      libraryUnauthorizedHint: "到应试教育页授权整个资料目录后即可扫描。",
+      libraryMissingHint: "先在本页授权资料目录，然后扫描一次；这里会列出该项目目录下的文件。",
+      libraryUnauthorized: "资料目录尚未授权",
+      libraryUnauthorizedHint: "先在本页授权共享资料库根目录或项目专属目录。",
       libraryScan: "扫描资料库",
       libraryScanning: "正在扫描…",
       libraryScanDone: "已索引 {n} 个文件",
@@ -15407,7 +18230,7 @@ ${JSON.stringify(refs, null, 2)}`;
       perSession: "{n} min per session",
       overdue: "Overdue",
       editTitle: "Edit project",
-      editHint: "Only the name and color change here; the folder lives on the study page.",
+      editHint: "Only the name and color change here; the folder lives under “Project materials” below.",
       nameLabel: "Project name",
       colorLabel: "Color",
       nameRequired: "Project name is required",
@@ -15423,9 +18246,9 @@ ${JSON.stringify(refs, null, 2)}`;
       libraryTitle: "Project materials",
       libraryHint: "From the shared library index, filtered to this project folder.",
       libraryMissing: "The library has no index yet",
-      libraryMissingHint: "Authorize the folder on the study page, then scan once; files under this project folder will show up here.",
-      libraryUnauthorized: "Shared library not authorized",
-      libraryUnauthorizedHint: "Authorize the whole materials folder on the study page to scan.",
+      libraryMissingHint: "Authorize the folder here, then scan once; files under this project folder will show up here.",
+      libraryUnauthorized: "Materials folder not authorized",
+      libraryUnauthorizedHint: "Authorize the shared library root or a project folder here first.",
       libraryScan: "Scan library",
       libraryScanning: "Scanning…",
       libraryScanDone: "Indexed {n} files",
@@ -15481,7 +18304,7 @@ ${JSON.stringify(refs, null, 2)}`;
       perSession: "{n}分/回",
       overdue: "期限切れ",
       editTitle: "プロジェクトを編集",
-      editHint: "ここでは名前と色だけを変更します。資料フォルダは学習ページで管理します。",
+      editHint: "ここでは名前と色だけを変更します。資料フォルダは下の「プロジェクト資料」で管理します。",
       nameLabel: "プロジェクト名",
       colorLabel: "色",
       nameRequired: "プロジェクト名を入力してください",
@@ -15497,9 +18320,9 @@ ${JSON.stringify(refs, null, 2)}`;
       libraryTitle: "プロジェクト資料",
       libraryHint: "共有ライブラリの索引から、このプロジェクトのフォルダで絞り込みます。",
       libraryMissing: "ライブラリの索引がまだありません",
-      libraryMissingHint: "学習ページで資料フォルダを認可してから一度スキャンしてください。このプロジェクトのフォルダ内のファイルがここに表示されます。",
-      libraryUnauthorized: "共有ライブラリが認可されていません",
-      libraryUnauthorizedHint: "学習ページで資料フォルダ全体を認可するとスキャンできます。",
+      libraryMissingHint: "このページで資料フォルダを認可してから一度スキャンしてください。このプロジェクトのフォルダ内のファイルがここに表示されます。",
+      libraryUnauthorized: "資料フォルダが未認可です",
+      libraryUnauthorizedHint: "このページで共有ライブラリのルートかプロジェクト専用フォルダを認可してください。",
       libraryScan: "ライブラリをスキャン",
       libraryScanning: "スキャン中…",
       libraryScanDone: "{n}件のファイルを索引しました",
@@ -15531,8 +18354,6 @@ ${JSON.stringify(refs, null, 2)}`;
       previewPath: "パス"
     }
   });
-  var LIBRARY_PAGE = 30;
-  var KINDS2 = ["pdf", "image", "doc", "audio", "video", "other"];
   var PROJECT_COLORS = [
     "#df7561",
     "#d5a553",
@@ -15543,42 +18364,6 @@ ${JSON.stringify(refs, null, 2)}`;
     "#8b8fc7",
     "#6fa8a0"
   ];
-  function fmtSize(bytes) {
-    const n = Number(bytes);
-    if (!Number.isFinite(n) || n < 0) return "";
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  function fmtMtime(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) return "";
-    const d = new Date(n > 1e12 ? n : n * 1e3);
-    if (Number.isNaN(d.getTime())) return "";
-    const pad3 = (v) => String(v).padStart(2, "0");
-    return `${d.getFullYear()}-${pad3(d.getMonth() + 1)}-${pad3(d.getDate())}`;
-  }
-  function normalizeItem(raw) {
-    const path = String(raw && raw.path || "");
-    const name = String(raw && raw.name || path.split("/").pop() || path);
-    const ext = String(
-      raw && raw.ext || (name.includes(".") ? name.split(".").pop() : "")
-    ).toLowerCase();
-    return {
-      path,
-      name,
-      ext,
-      sizeBytes: Number(raw && raw.sizeBytes) || 0,
-      mtime: raw && raw.mtime,
-      kind: String(raw && raw.kind || ""),
-      mimeType: String(raw && raw.mimeType || ""),
-      previewable: raw && raw.previewable !== false
-    };
-  }
-  function kindLabel(kind) {
-    const key = `project.libraryKind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
-    return t(key);
-  }
   function ProjectTaskRow({
     task,
     today,
@@ -15716,675 +18501,6 @@ ${JSON.stringify(refs, null, 2)}`;
       )
     );
   }
-  var fileTokenPromise = null;
-  function cachedFileToken() {
-    if (fileTokenPromise === null) {
-      fileTokenPromise = getFileToken().then((result) => result && result.access || "").catch((error) => {
-        fileTokenPromise = null;
-        throw error;
-      });
-    }
-    return fileTokenPromise;
-  }
-  function isTextItem(item) {
-    const mime = String(item.mimeType || "").toLowerCase();
-    if (mime.startsWith("text/")) return true;
-    return ["txt", "md", "markdown", "csv", "json", "log"].includes(item.ext);
-  }
-  function LibraryPreview({ item, onClose }) {
-    const [state, setState] = useState({
-      status: "loading",
-      text: "",
-      url: "",
-      access: "",
-      error: null
-    });
-    useEffect(() => {
-      if (!item) return void 0;
-      let cancelled = false;
-      setState({ status: "loading", text: "", url: "", access: "", error: null });
-      (async () => {
-        try {
-          const access = await cachedFileToken();
-          const url = libraryFileUrl(item.path, access);
-          const base = { text: "", url, access, error: null };
-          if (!item.previewable) {
-            if (!cancelled) setState({ ...base, status: "unsupported" });
-            return;
-          }
-          if (item.kind === "image") {
-            if (!cancelled) setState({ ...base, status: "image" });
-            return;
-          }
-          if (!isTextItem(item)) {
-            if (!cancelled) setState({ ...base, status: "unsupported" });
-            return;
-          }
-          const response = await fetch(url);
-          if (!response || !response.ok || typeof response.text !== "function")
-            throw new Error(`HTTP ${response ? response.status : "?"}`);
-          const text = await response.text();
-          if (!cancelled)
-            setState({
-              ...base,
-              status: "text",
-              text: text.length > 2e4 ? `${text.slice(0, 2e4)}…` : text
-            });
-        } catch (error) {
-          if (!cancelled)
-            setState({
-              status: "error",
-              text: "",
-              url: "",
-              access: "",
-              error: error && (error.userMessage || error.message) || String(error)
-            });
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [item && item.path]);
-    if (!item) return null;
-    const body = h(
-      "div",
-      { style: { display: "flex", flexDirection: "column", gap: 10 } },
-      h(
-        "div",
-        {
-          className: "t-mono",
-          style: {
-            fontSize: 11.5,
-            color: "var(--tomato-ink-3)",
-            wordBreak: "break-all",
-            lineHeight: 1.6
-          }
-        },
-        item.path
-      ),
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            fontSize: 11.5,
-            color: "var(--tomato-ink-3)"
-          }
-        },
-        item.sizeBytes ? h(
-          "span",
-          null,
-          `${t("project.previewSize")} ${fmtSize(item.sizeBytes)}`
-        ) : null,
-        item.mtime ? h(
-          "span",
-          null,
-          `${t("project.previewModified")} ${fmtMtime(item.mtime)}`
-        ) : null,
-        item.ext ? h(Chip, { tone: "neutral" }, item.ext.toUpperCase()) : null
-      ),
-      state.status === "loading" ? h(
-        "div",
-        { style: { fontSize: 12.5, color: "var(--tomato-ink-3)" } },
-        t("project.previewLoading")
-      ) : null,
-      state.status === "error" ? h(
-        "div",
-        {
-          role: "alert",
-          style: {
-            padding: "9px 12px",
-            borderRadius: 10,
-            background: "var(--tomato-brand-soft)",
-            color: "var(--tomato-brand-deep)",
-            fontSize: 12.5
-          }
-        },
-        t("project.previewFailed", { error: state.error })
-      ) : null,
-      state.status === "unsupported" ? h(
-        "div",
-        { style: { fontSize: 12.5, color: "var(--tomato-ink-2)" } },
-        t("project.previewUnsupported")
-      ) : null,
-      state.status === "image" ? h("img", {
-        src: state.url,
-        alt: item.name,
-        style: {
-          maxWidth: "100%",
-          maxHeight: "60vh",
-          borderRadius: 10,
-          border: "1px solid var(--tomato-line)",
-          objectFit: "contain"
-        }
-      }) : null,
-      state.status === "text" ? h(
-        "pre",
-        {
-          className: "t-scroll",
-          style: {
-            margin: 0,
-            padding: "12px 14px",
-            maxHeight: "52vh",
-            overflow: "auto",
-            borderRadius: 10,
-            background: "var(--tomato-surface-2)",
-            color: "var(--tomato-ink-2)",
-            fontSize: 12,
-            lineHeight: 1.6,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word"
-          }
-        },
-        state.text
-      ) : null
-    );
-    return h(
-      Modal,
-      {
-        open: true,
-        onClose,
-        icon: "eye",
-        title: item.name,
-        subtitle: item.kind ? kindLabel(item.kind) : void 0,
-        width: 760,
-        footer: h(
-          "div",
-          { style: { display: "flex", gap: 8, width: "100%", flexWrap: "wrap" } },
-          state.url ? h(
-            "a",
-            {
-              href: state.url,
-              target: "_blank",
-              rel: "noreferrer",
-              style: {
-                fontSize: 12.5,
-                color: "var(--tomato-brand-deep)",
-                alignSelf: "center"
-              }
-            },
-            t("project.previewOpen")
-          ) : null,
-          state.access ? h(
-            "a",
-            {
-              href: libraryFileUrl(item.path, state.access, true),
-              style: {
-                fontSize: 12.5,
-                color: "var(--tomato-ink-2)",
-                alignSelf: "center"
-              }
-            },
-            t("project.previewDownload")
-          ) : null,
-          h("div", { style: { flex: 1 } }),
-          h(
-            Btn,
-            { variant: "plain", size: "sm", onClick: onClose },
-            t("common.close")
-          )
-        )
-      },
-      body
-    );
-  }
-  function ProjectLibraryCard({ project }) {
-    const projectId = project.id;
-    const [stats, setStats] = useState(null);
-    const [statsError, setStatsError] = useState(null);
-    const [missing, setMissing] = useState(false);
-    const [items, setItems] = useState([]);
-    const [total, setTotal] = useState(0);
-    const [offset, setOffset] = useState(0);
-    const [query, setQuery] = useState("");
-    const [appliedQuery, setAppliedQuery] = useState("");
-    const [kind, setKind] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [loadError, setLoadError] = useState(null);
-    const [scanning, setScanning] = useState(false);
-    const [reloadKey, setReloadKey] = useState(0);
-    const [preview, setPreview] = useState(null);
-    useEffect(() => {
-      setOffset(0);
-      setQuery("");
-      setAppliedQuery("");
-      setKind("");
-      setMissing(false);
-      setStats(null);
-      setStatsError(null);
-      setItems([]);
-      setTotal(0);
-      setPreview(null);
-    }, [projectId]);
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        setAppliedQuery(query.trim());
-        setOffset(0);
-      }, 350);
-      return () => clearTimeout(timer);
-    }, [query]);
-    useEffect(() => {
-      let cancelled = false;
-      getLibraryStats().then((result) => {
-        if (cancelled) return;
-        setStats(result);
-        setStatsError(null);
-        if (result && result.hasIndex === false) setMissing(true);
-      }).catch((error) => {
-        if (cancelled) return;
-        if (error && error.status === 404) setMissing(true);
-        else
-          setStatsError(
-            error && (error.userMessage || error.message) || String(error)
-          );
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [projectId, reloadKey]);
-    useEffect(() => {
-      if (missing) return void 0;
-      let cancelled = false;
-      setLoading(true);
-      setLoadError(null);
-      getLibraryItems({
-        projectId,
-        q: appliedQuery,
-        kind,
-        offset,
-        limit: LIBRARY_PAGE
-      }).then((result) => {
-        if (cancelled) return;
-        if (result && result.hasIndex === false) {
-          setMissing(true);
-          setItems([]);
-          setTotal(0);
-          return;
-        }
-        const list = Array.isArray(result && result.items) ? result.items : [];
-        setItems(list.map(normalizeItem));
-        setTotal(Math.max(0, Number(result && result.total) || 0));
-      }).catch((error) => {
-        if (cancelled) return;
-        if (error && error.status === 404) setMissing(true);
-        else
-          setLoadError(
-            error && (error.userMessage || error.message) || String(error)
-          );
-      }).finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [projectId, appliedQuery, kind, offset, missing, reloadKey]);
-    async function scan() {
-      if (scanning) return;
-      setScanning(true);
-      try {
-        const result = await scanLibrary();
-        notify(
-          t("project.libraryScanDone", {
-            n: Number(result && result.count) || 0
-          }),
-          "brand"
-        );
-        setMissing(false);
-        setReloadKey((value) => value + 1);
-      } catch (error) {
-        notify(
-          t("project.libraryScanFailed", {
-            error: error && (error.userMessage || error.message) || String(error)
-          }),
-          "danger"
-        );
-      } finally {
-        setScanning(false);
-      }
-    }
-    const unauthorized = stats !== null && stats.authorized === false;
-    const kindOptions = [
-      { value: "", label: t("project.libraryKindAll") },
-      ...KINDS2.map((value) => ({
-        value,
-        label: kindLabel(value)
-      }))
-    ];
-    const pageStart = total === 0 ? 0 : offset + 1;
-    const pageEnd = Math.min(offset + LIBRARY_PAGE, total);
-    const missingBlock = h(
-      "div",
-      {
-        style: {
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          padding: "14px 16px",
-          borderRadius: 12,
-          background: "var(--tomato-surface-2)"
-        }
-      },
-      h(
-        "div",
-        {
-          style: { fontSize: 13, fontWeight: 600, color: "var(--tomato-ink)" }
-        },
-        unauthorized ? t("project.libraryUnauthorized") : t("project.libraryMissing")
-      ),
-      h(
-        "div",
-        {
-          style: { fontSize: 12, color: "var(--tomato-ink-2)", lineHeight: 1.65 }
-        },
-        unauthorized ? t("project.libraryUnauthorizedHint") : t("project.libraryMissingHint")
-      ),
-      h(
-        "div",
-        { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-        h(
-          Btn,
-          {
-            variant: "soft",
-            size: "sm",
-            icon: "refresh",
-            disabled: scanning,
-            onClick: scan
-          },
-          scanning ? t("project.libraryScanning") : t("project.libraryScan")
-        )
-      )
-    );
-    const listBlock = h(
-      "div",
-      null,
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            flexWrap: "wrap",
-            marginBottom: 10
-          }
-        },
-        h(
-          "div",
-          { style: { position: "relative", flex: "1 1 220px", minWidth: 0 } },
-          h(Icon, {
-            name: "search",
-            size: 14,
-            style: {
-              position: "absolute",
-              left: 11,
-              top: 10,
-              color: "var(--tomato-ink-3)",
-              pointerEvents: "none"
-            }
-          }),
-          h(Input, {
-            value: query,
-            onChange: setQuery,
-            placeholder: t("project.librarySearch"),
-            maxLength: 120,
-            style: { paddingLeft: 32, height: 34, fontSize: 12.5 }
-          })
-        ),
-        h(Select2, {
-          value: kind,
-          options: kindOptions,
-          onChange: (value) => {
-            setKind(value);
-            setOffset(0);
-          },
-          width: 132
-        }),
-        h(
-          Btn,
-          {
-            variant: "ghost",
-            size: "sm",
-            icon: "refresh",
-            disabled: loading,
-            onClick: () => setReloadKey((value) => value + 1)
-          },
-          t("project.libraryRefresh")
-        )
-      ),
-      loadError ? h(
-        "div",
-        {
-          role: "alert",
-          style: {
-            padding: "9px 12px",
-            borderRadius: 10,
-            background: "var(--tomato-brand-soft)",
-            color: "var(--tomato-brand-deep)",
-            fontSize: 12.5
-          }
-        },
-        t("project.libraryError", { error: loadError })
-      ) : null,
-      items.length === 0 ? h(
-        "div",
-        { style: { padding: "16px 4px" } },
-        loading ? h(Skeleton, { w: "52%", h: 13 }) : h(Empty, {
-          icon: "folder",
-          title: t("project.libraryEmpty"),
-          hint: t("project.libraryEmptyHint")
-        })
-      ) : h(
-        "div",
-        null,
-        items.map(
-          (item, index) => h(
-            "div",
-            {
-              key: item.path || index,
-              className: "t-row",
-              style: {
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                minHeight: 44,
-                padding: "6px 6px",
-                borderBottom: index === items.length - 1 ? "none" : "1px solid var(--tomato-line)"
-              }
-            },
-            h(Icon, {
-              name: "folder",
-              size: 15,
-              style: { color: "var(--tomato-ink-3)", flex: "none" }
-            }),
-            h(
-              "button",
-              {
-                type: "button",
-                onClick: () => setPreview(item),
-                style: {
-                  flex: 1,
-                  minWidth: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: 2,
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  fontFamily: "inherit",
-                  textAlign: "left",
-                  color: "inherit",
-                  cursor: "pointer"
-                }
-              },
-              h(
-                "span",
-                {
-                  style: {
-                    maxWidth: "100%",
-                    fontSize: 12.5,
-                    color: "var(--tomato-ink)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }
-                },
-                item.name
-              ),
-              h(
-                "span",
-                {
-                  className: "t-mono",
-                  style: {
-                    maxWidth: "100%",
-                    fontSize: 10.5,
-                    color: "var(--tomato-ink-3)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }
-                },
-                item.path
-              )
-            ),
-            item.sizeBytes ? h(
-              "span",
-              {
-                className: "t-mono",
-                style: {
-                  fontSize: 10.5,
-                  color: "var(--tomato-ink-3)",
-                  flex: "none"
-                }
-              },
-              fmtSize(item.sizeBytes)
-            ) : null,
-            h(IconBtn, {
-              name: "eye",
-              size: 15,
-              box: 28,
-              title: t("project.preview"),
-              onClick: () => setPreview(item)
-            })
-          )
-        ),
-        h(
-          "div",
-          {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginTop: 10,
-              flexWrap: "wrap"
-            }
-          },
-          h(
-            "span",
-            {
-              className: "t-mono",
-              style: { fontSize: 11, color: "var(--tomato-ink-3)" }
-            },
-            total > 0 ? t("project.libraryRange", {
-              a: pageStart,
-              b: pageEnd,
-              total
-            }) : t("project.libraryCount", { n: 0 })
-          ),
-          h("div", { style: { flex: 1 } }),
-          h(
-            Btn,
-            {
-              variant: "ghost",
-              size: "sm",
-              icon: "arrowLeft",
-              disabled: offset <= 0 || loading,
-              onClick: () => setOffset(Math.max(0, offset - LIBRARY_PAGE))
-            },
-            t("project.libraryPrev")
-          ),
-          h(
-            Btn,
-            {
-              variant: "ghost",
-              size: "sm",
-              iconRight: "arrowRight",
-              disabled: offset + LIBRARY_PAGE >= total || loading,
-              onClick: () => setOffset(offset + LIBRARY_PAGE)
-            },
-            t("project.libraryNext")
-          )
-        )
-      )
-    );
-    return h(
-      Card,
-      null,
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            alignItems: "baseline",
-            gap: 10,
-            marginBottom: 12,
-            flexWrap: "wrap"
-          }
-        },
-        h(Icon, {
-          name: "folder",
-          size: 17,
-          style: { color: "var(--tomato-ink-3)" }
-        }),
-        h(
-          "div",
-          {
-            style: {
-              fontSize: 14,
-              fontWeight: 620,
-              color: "var(--tomato-ink)",
-              marginRight: "auto"
-            }
-          },
-          t("project.libraryTitle")
-        ),
-        h(
-          "div",
-          { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-          stats && stats.hasIndex ? t("project.libraryCount", { n: total }) : null
-        )
-      ),
-      h(
-        "div",
-        {
-          style: {
-            fontSize: 11.5,
-            color: "var(--tomato-ink-3)",
-            marginBottom: 12,
-            lineHeight: 1.6
-          }
-        },
-        t("project.libraryHint")
-      ),
-      statsError ? h(
-        "div",
-        {
-          role: "alert",
-          style: {
-            padding: "9px 12px",
-            borderRadius: 10,
-            background: "var(--tomato-brand-soft)",
-            color: "var(--tomato-brand-deep)",
-            fontSize: 12.5
-          }
-        },
-        statsError
-      ) : missing ? missingBlock : listBlock,
-      h(LibraryPreview, { item: preview, onClose: () => setPreview(null) })
-    );
-  }
   function ProjectPage({ state, projectId }) {
     const snapshotProjectId = getActiveProjectId();
     const currentId = projectId ?? snapshotProjectId;
@@ -16405,6 +18521,10 @@ ${JSON.stringify(refs, null, 2)}`;
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteError, setDeleteError] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [materialsVersion, setMaterialsVersion] = useState(0);
+    const education = data.education || {};
+    const studyProfiles = Array.isArray(education.projects) ? education.projects : [];
+    const studyProfile = project ? studyProfiles.find((entry) => entry && entry.projectId === project.id) || null : null;
     useEffect(() => {
       setTab("active");
       setEditor(null);
@@ -16701,7 +18821,20 @@ ${JSON.stringify(refs, null, 2)}`;
           }
         },
         h(ProjectWhitelistCard, { project }),
-        h(ProjectLibraryCard, { project })
+        h(ProjectMaterialsSection, {
+          project,
+          onChanged: () => setMaterialsVersion((value) => value + 1)
+        }),
+        h(ProjectRegisteredSection, {
+          project,
+          reloadKey: materialsVersion,
+          onChanged: () => setMaterialsVersion((value) => value + 1)
+        }),
+        h(ProjectEducationBinding, {
+          project,
+          profile: studyProfile,
+          reloadKey: materialsVersion
+        })
       ),
       h(TaskDialog, {
         open: taskDialogOpen,
@@ -16887,6 +19020,14 @@ ${JSON.stringify(refs, null, 2)}`;
         )
       )
     );
+  }
+  if (typeof window !== "undefined" && window.__TOMATO_TEST__) {
+    window.__tomatoProjectParts = {
+      ProjectIndexBrowser,
+      ProjectMaterialsSection,
+      ProjectRegisteredSection,
+      ProjectEducationBinding
+    };
   }
   registerPage({
     id: "project",
@@ -19505,14 +21646,14 @@ ${JSON.stringify(refs, null, 2)}`;
                 const position = gridPosition(item.startMin, item.endMin);
                 const project = projectById(week.data, item.projectId);
                 const color = project && project.color || "var(--tomato-accent)";
-                const kindLabel2 = item.kind === "exam" ? t("calendar.exam") : t("calendar.lesson");
+                const kindLabel = item.kind === "exam" ? t("calendar.exam") : t("calendar.lesson");
                 const timeLabel = `${fmtHHMM(item.startMin * 60)}–${fmtHHMM(item.endMin * 60)}`;
                 return h(
                   GridBand,
                   {
                     key: `teaching:${item.raw.id}`,
                     position,
-                    title: `${kindLabel2} · ${item.title} · ${timeLabel}`,
+                    title: `${kindLabel} · ${item.title} · ${timeLabel}`,
                     onClick: () => onSelect({ kind: "teaching", item }),
                     style: {
                       borderLeft: `3px solid ${color}`,
@@ -19520,7 +21661,7 @@ ${JSON.stringify(refs, null, 2)}`;
                     }
                   },
                   h(BandText, {
-                    lead: `${kindLabel2} · ${fmtHHMM(item.startMin * 60)}`,
+                    lead: `${kindLabel} · ${fmtHHMM(item.startMin * 60)}`,
                     title: item.title,
                     color: "var(--tomato-ink)"
                   })
@@ -20837,7 +22978,7 @@ ${JSON.stringify(refs, null, 2)}`;
       reviewAction: "宿題を再確認"
     }
   });
-  var RESOURCE_KINDS = [
+  var RESOURCE_KINDS2 = [
     "syllabus",
     "course",
     "book",
@@ -20866,11 +23007,11 @@ ${JSON.stringify(refs, null, 2)}`;
     doc: "libraryIndexKindDoc",
     other: "libraryIndexKindOther"
   };
-  function indexKindLabel(kind) {
+  function indexKindLabel2(kind) {
     const key = INDEX_KIND_COPY[kind];
     return key ? t(`education.${key}`) : strOr(kind);
   }
-  function formatBytes(n) {
+  function formatBytes2(n) {
     const value = numOr(n, 0);
     if (value < 1024) return `${value} B`;
     if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
@@ -21023,7 +23164,7 @@ ${JSON.stringify(refs, null, 2)}`;
     if (kind === "retest") return t("education.kindRetest");
     return strOr(kind, t("education.studyTaskKind"));
   }
-  function resourceKindLabel(kind) {
+  function resourceKindLabel3(kind) {
     const key = RESOURCE_KIND_COPY[kind];
     return key ? t(`education.${key}`) : strOr(kind);
   }
@@ -21672,7 +23813,7 @@ ${JSON.stringify(refs, null, 2)}`;
         (kind) => h(
           Chip,
           { key: kind, tone: "neutral" },
-          `${indexKindLabel(kind)} ${stats.byKind[kind]}`
+          `${indexKindLabel2(kind)} ${stats.byKind[kind]}`
         )
       );
       const topChips = Object.entries(stats.byTop ?? {}).slice(0, 8).map(
@@ -22050,8 +24191,8 @@ ${JSON.stringify(refs, null, 2)}`;
         onClose,
         title: strOr(item.name, t("education.libraryIndexFileTitle")),
         subtitle: t("education.libraryIndexFileMeta", {
-          kind: indexKindLabel(item.kind),
-          size: formatBytes(item.sizeBytes)
+          kind: indexKindLabel2(item.kind),
+          size: formatBytes2(item.sizeBytes)
         }),
         icon: "eye",
         width: 920,
@@ -22187,9 +24328,9 @@ ${JSON.stringify(refs, null, 2)}`;
           { label: t("education.libraryIndexKindLabel") },
           h(Select, {
             value: kind,
-            options: RESOURCE_KINDS.map((value) => ({
+            options: RESOURCE_KINDS2.map((value) => ({
               value,
-              label: resourceKindLabel(value)
+              label: resourceKindLabel3(value)
             })),
             onChange: setKind
           })
@@ -22367,7 +24508,7 @@ ${JSON.stringify(refs, null, 2)}`;
           { value: "", label: t("education.libraryIndexAll") },
           ...INDEX_KINDS.map((value) => ({
             value,
-            label: indexKindLabel(value)
+            label: indexKindLabel2(value)
           }))
         ],
         onChange: (value) => {
@@ -22462,8 +24603,8 @@ ${JSON.stringify(refs, null, 2)}`;
               h(
                 "div",
                 { style: { ...META, overflow: "hidden" } },
-                h(Chip, { tone: "neutral" }, indexKindLabel(item.kind)),
-                h("span", null, formatBytes(item.sizeBytes)),
+                h(Chip, { tone: "neutral" }, indexKindLabel2(item.kind)),
+                h("span", null, formatBytes2(item.sizeBytes)),
                 h(
                   "span",
                   {
@@ -22586,8 +24727,8 @@ ${JSON.stringify(refs, null, 2)}`;
       (item) => item.projectId === projectId
     );
     const sortedResources = resources.slice().sort((a, b) => {
-      const ai = RESOURCE_KINDS.indexOf(a.kind);
-      const bi = RESOURCE_KINDS.indexOf(b.kind);
+      const ai = RESOURCE_KINDS2.indexOf(a.kind);
+      const bi = RESOURCE_KINDS2.indexOf(b.kind);
       return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || strOr(a.title).localeCompare(strOr(b.title));
     });
     const progress = sortDesc(
@@ -22650,7 +24791,7 @@ ${JSON.stringify(refs, null, 2)}`;
       const kind = strOr(resource.kind, "other");
       kindCounts[kind] = (kindCounts[kind] || 0) + 1;
     }
-    const resourceKindCount = RESOURCE_KINDS.filter(
+    const resourceKindCount = RESOURCE_KINDS2.filter(
       (kind) => kindCounts[kind]
     ).length;
     const headerCard = h(
@@ -22846,11 +24987,11 @@ ${JSON.stringify(refs, null, 2)}`;
               marginBottom: 10
             }
           },
-          RESOURCE_KINDS.map(
+          RESOURCE_KINDS2.map(
             (kind) => kindCounts[kind] ? h(
               Chip,
               { key: kind, tone: "neutral" },
-              `${resourceKindLabel(kind)} ${kindCounts[kind]}`
+              `${resourceKindLabel3(kind)} ${kindCounts[kind]}`
             ) : null
           )
         ),
@@ -22886,7 +25027,7 @@ ${JSON.stringify(refs, null, 2)}`;
                   h(
                     Chip,
                     { tone: "neutral" },
-                    resourceKindLabel(resource.kind)
+                    resourceKindLabel3(resource.kind)
                   ),
                   strOr(resource.source) ? h("span", null, strOr(resource.source)) : null,
                   strOr(resource.edition) ? h("span", null, strOr(resource.edition)) : null,
@@ -24062,7 +26203,7 @@ ${JSON.stringify(refs, null, 2)}`;
                   key: resource.id || `week-resource-${resourceIndex}`,
                   tone: "neutral"
                 },
-                `${strOr(resource.title)} · ${resourceKindLabel(resource.kind)}`
+                `${strOr(resource.title)} · ${resourceKindLabel3(resource.kind)}`
               )
             )
           )
