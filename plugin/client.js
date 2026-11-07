@@ -273,6 +273,9 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 @media (max-width:1100px){#tomato-persona{display:none!important}}
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
+/* 看板娘占据右侧空间：主列右侧留出立绘宽度，内容整体被挤到左边（窄屏由上一节隐藏立绘） */
+html[data-tomato-persona=on] .t-appmain{padding-right:clamp(200px, 20vw, 320px)!important}
+
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,
 html[data-tomato-persona=on] #tomato-sky .t-amb-enso,
@@ -2981,14 +2984,14 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       h(
         "main",
         {
-          className: "t-scroll t-root",
+          className: "t-scroll t-root t-appmain",
           style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" }
         },
         h(
           "div",
           {
             key: active2 ? active2.id : "empty",
-            className: "t-fadein",
+            className: "t-fadein t-appcontent",
             // 顶部留出悬浮提醒条的位置（提醒在页面最顶端居中）。
             style: { maxWidth: 1180, margin: "0 auto", padding: narrow ? "40px 18px 60px" : "44px 40px 72px" }
           },

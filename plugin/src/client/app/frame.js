@@ -325,14 +325,14 @@ export function AppShell(props) {
     h(
       "main",
       {
-        className: "t-scroll t-root",
+        className: "t-scroll t-root t-appmain",
         style: { flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" },
       },
       h(
         "div",
         {
           key: active ? active.id : "empty",
-          className: "t-fadein",
+          className: "t-fadein t-appcontent",
           // 顶部留出悬浮提醒条的位置（提醒在页面最顶端居中）。
           style: { maxWidth: 1180, margin: "0 auto", padding: narrow ? "40px 18px 60px" : "44px 40px 72px" },
         },

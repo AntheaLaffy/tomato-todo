@@ -142,6 +142,9 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 @media (max-width:1100px){#tomato-persona{display:none!important}}
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
+/* 看板娘占据右侧空间：主列右侧留出立绘宽度，内容整体被挤到左边（窄屏由上一节隐藏立绘） */
+html[data-tomato-persona=on] .t-appmain{padding-right:clamp(200px, 20vw, 320px)!important}
+
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,
 html[data-tomato-persona=on] #tomato-sky .t-amb-enso,
