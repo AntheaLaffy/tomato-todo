@@ -16,7 +16,7 @@
 //   解析并返回 { changed, snapshot }。
 
 import { createHash } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import * as core from "../vendor/core.mjs";
 import { atomicWrite, readDataFiles, writeDataFiles } from "./data-files.mjs";
@@ -722,6 +722,207 @@ export class Engine {
       bytes: Buffer.byteLength(content),
       asOf: now,
     };
+  }
+
+  // ---------- 教学与批量导入 ----------
+
+  /** MCP `education`：教学命令走 core，助手进度来源强制 assistant。 */
+  education(command: unknown, now: number = nowSecs()) {
+    if (
+      command != null &&
+      typeof command === "object" &&
+      (command as { op?: unknown }).op === "recordProgress" &&
+      (command as { record?: unknown }).record != null &&
+      typeof (command as { record: unknown }).record === "object"
+    ) {
+      const record = (
+        command as { record: { source?: unknown; confirmed?: unknown } }
+      ).record;
+      record.source = "assistant";
+      record.confirmed = false;
+    }
+    return this.dispatch({ type: "education", command } as never, now);
+  }
+
+  /** MCP `get_education`：按集合/项目/记录分页读教学记录。 */
+  getEducation(args: Record<string, unknown> = {}, now: number = nowSecs()) {
+    const collection = args.collection;
+    if (
+      typeof collection !== "string" ||
+      collection.length === 0 ||
+      collection.length > 40
+    ) {
+      throw new core.AppError("collection 需为教学记录集合名");
+    }
+    const education = this.engine.data.education;
+    const rows = (education as unknown as Record<string, unknown>)[collection];
+    if (!Array.isArray(rows)) {
+      throw new core.AppError("未知教学记录集合");
+    }
+    const projectOf = (row: Record<string, unknown>): string | null => {
+      if (typeof row.projectId === "string") return row.projectId;
+      let assessmentId =
+        typeof row.assessmentId === "string" ? row.assessmentId : null;
+      const submissionId =
+        typeof row.submissionId === "string" ? row.submissionId : null;
+      if (assessmentId === null && submissionId !== null) {
+        const sub = education.submissions.find((s) => s.id === submissionId);
+        if (sub !== undefined) assessmentId = sub.assessmentId;
+      }
+      if (assessmentId === null && typeof row.gradeId === "string") {
+        const grade = education.grades.find((g) => g.id === row.gradeId);
+        if (grade !== undefined) {
+          const sub = education.submissions.find(
+            (s) => s.id === grade.submissionId,
+          );
+          if (sub !== undefined) assessmentId = sub.assessmentId;
+        }
+      }
+      if (assessmentId !== null) {
+        const a = education.assessments.find((x) => x.id === assessmentId);
+        if (a !== undefined) return a.projectId;
+      }
+      if (typeof row.taskId === "string") {
+        const task = this.engine.data.tasks.find((t) => t.id === row.taskId);
+        if (task !== undefined) return task.projectId;
+      }
+      return null;
+    };
+    const id =
+      typeof args.id === "string" && args.id.length > 0 ? args.id : null;
+    const projectId =
+      typeof args.projectId === "string" && args.projectId.length > 0
+        ? args.projectId
+        : null;
+    const filtered = rows.filter((row) => {
+      const r = row as Record<string, unknown>;
+      return (
+        (id === null || r.id === id || r.taskId === id) &&
+        (projectId === null || projectOf(r) === projectId)
+      );
+    });
+    const offset = Number.isInteger(args.offset) ? (args.offset as number) : 0;
+    const limit = Math.min(
+      100,
+      Math.max(1, typeof args.limit === "number" ? args.limit : 30),
+    );
+    return {
+      collection,
+      asOf: now,
+      total: filtered.length,
+      offset,
+      records: filtered.slice(offset, offset + limit),
+    };
+  }
+
+  /** MCP `get_study_progress`：按科目读学情摘要与分页进度历史。 */
+  getStudyProgress(
+    args: Record<string, unknown> = {},
+    now: number = nowSecs(),
+  ) {
+    const snapshot = this.engine.snapshot(now);
+    const summaries = (snapshot.studyProgress ?? []) as Record<
+      string,
+      unknown
+    >[];
+    const projectId =
+      typeof args.projectId === "string" && args.projectId.length > 0
+        ? args.projectId
+        : null;
+    const projects =
+      projectId === null
+        ? summaries
+        : summaries.filter((s) => s.projectId === projectId);
+    const all = this.engine.data.education.progress
+      .filter((p) => projectId === null || p.projectId === projectId)
+      .slice()
+      .sort((a, b) => b.recordedAt - a.recordedAt);
+    const offset = Number.isInteger(args.offset) ? (args.offset as number) : 0;
+    const limit = Math.min(
+      100,
+      Math.max(1, typeof args.limit === "number" ? args.limit : 100),
+    );
+    return {
+      asOf: now,
+      projects,
+      progress: all.slice(offset, offset + limit),
+      total: all.length,
+      offset,
+      limit,
+      note: "计时与任务完成只说明投入或自报完成；掌握须查看答卷、批改与独立复测。空记录表示未知。",
+    };
+  }
+
+  /** MCP `get_tasks`：按项目/完成状态分页读任务。 */
+  getTasks(args: Record<string, unknown> = {}) {
+    const filter: {
+      projectId?: string | null;
+      completed?: boolean;
+      offset?: number;
+      limit?: number;
+    } = {
+      offset: Number.isInteger(args.offset) ? (args.offset as number) : 0,
+      limit: args.limit,
+    };
+    if (typeof args.projectId === "string" && args.projectId.length > 0) {
+      filter.projectId = args.projectId;
+    }
+    if (typeof args.completed === "boolean") {
+      filter.completed = args.completed;
+    }
+    return this.listTasks(filter);
+  }
+
+  /** MCP `apply_file`：读导出文件、校验哈希，导入计划 v6 / 备份 v4。 */
+  applyFile(name: string, fileHash: string, now: number = nowSecs()) {
+    if (
+      typeof name !== "string" ||
+      name.length === 0 ||
+      basename(name) !== name ||
+      name.includes("/") ||
+      name.includes("\\") ||
+      !/^[\w.-]+\.json$/.test(name)
+    ) {
+      throw new core.AppError("仅接受工作区内的 .json 文件名");
+    }
+    if (typeof fileHash !== "string" || fileHash.length === 0) {
+      throw new core.AppError("需要 fileHash");
+    }
+    const file = join(this.dataDir, "exports", name);
+    if (!existsSync(file)) {
+      throw new core.AppError("导出文件不存在，请先 export_plan/export_backup");
+    }
+    const content = readFileSync(file, "utf8");
+    const actual = createHash("sha256").update(content).digest("hex");
+    if (actual !== fileHash) {
+      throw new core.AppError("文件哈希不匹配，请重新导出后再应用");
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(content);
+    } catch {
+      throw new core.AppError("导出文件不是合法 JSON");
+    }
+    let action: { type: string };
+    if (
+      raw != null &&
+      typeof raw === "object" &&
+      (raw as { format?: unknown }).format === "tomato-todo-plan" &&
+      (raw as { version?: unknown }).version === 6
+    ) {
+      action = { type: "importPlan", plan: raw } as never;
+    } else if (
+      raw != null &&
+      typeof raw === "object" &&
+      (raw as { version?: unknown }).version === 4 &&
+      Array.isArray((raw as { tasks?: unknown }).tasks)
+    ) {
+      action = { type: "import", data: raw } as never;
+    } else {
+      throw new core.AppError("无法识别的导出文件格式（需计划 v6 或备份 v4）");
+    }
+    this.dispatch(action, now);
+    return { applied: true, name, today: this.today(now).today };
   }
 
   // ---------- 内部 ----------

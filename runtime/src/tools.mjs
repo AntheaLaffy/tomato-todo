@@ -133,6 +133,80 @@ export const TOOLS = [
     ["name"],
     false,
   ),
+  tool(
+    "education",
+    "维护应试教学体系（学期、课程、作业、考试、答卷、批改、订正与学情）。command.op：saveProject、saveResource、removeResources、saveSemester、saveLesson、setLessonResources、attendLesson、publishAssessment、confirmPrinted、startExam、endExam、submit、recordQuestionTimes、grade、saveReview、finishEvent、retryEvent、recordProgress、confirmProgress、submitCorrection、reviewCorrection（claimEvent 仅供宿主领取）。助手写入的进度来源强制为 assistant，用户在对话中明确确认后再 confirmProgress；作业/考试发布时固定答案与评分点，批改逐评分点有证据，课程 45 分钟到点结束；目录授权只能由用户在项目页设置。",
+    {
+      command: {
+        type: "object",
+        required: ["op"],
+        properties: { op: { type: "string" } },
+      },
+    },
+    ["command"],
+    false,
+  ),
+  tool(
+    "get_education",
+    "分页读取完整教学记录，支持按项目或记录 ID 查询。先查所需集合，不把整个备份塞进上下文。",
+    {
+      collection: {
+        type: "string",
+        enum: [
+          "projects",
+          "resources",
+          "semesters",
+          "semesterHistory",
+          "lessons",
+          "assessments",
+          "submissions",
+          "grades",
+          "reviews",
+          "events",
+          "completedTasks",
+          "progress",
+          "corrections",
+          "focusTasks",
+        ],
+      },
+      projectId: { type: "string" },
+      id: { type: "string" },
+      offset: { type: "integer", minimum: 0 },
+      limit: { type: "integer", minimum: 1, maximum: 100 },
+    },
+    ["collection"],
+    true,
+  ),
+  tool(
+    "get_study_progress",
+    "按科目读取最新学情摘要与分页进度历史；包含来源、时间、待交/待批改、订正与复测线索。空记录表示未知；任务完成不等于掌握。",
+    {
+      projectId: { type: "string" },
+      offset: { type: "integer", minimum: 0 },
+      limit: { type: "integer", minimum: 1, maximum: 100 },
+    },
+    [],
+    true,
+  ),
+  tool(
+    "get_tasks",
+    "按项目/完成状态分页读取任务，不重复灌入整个备份。",
+    {
+      projectId: { type: "string" },
+      completed: { type: "boolean" },
+      offset: { type: "integer", minimum: 0 },
+      limit: { type: "integer", minimum: 1, maximum: 100 },
+    },
+    [],
+    true,
+  ),
+  tool(
+    "apply_file",
+    "显式应用已导出的计划 v6 / 备份 v4 文件（按 fileHash 校验后导入）。完整备份导入会暂停计时并停用锁机；保护中拒绝应用。",
+    { name: exportName, fileHash: { type: "string" } },
+    ["name", "fileHash"],
+    false,
+  ),
 ];
 
 /** tools/call 落到引擎桩；抛错由上层包装成 isError 结果。 */
@@ -163,6 +237,16 @@ export function callTool(engine, name, args) {
       return engine.exportToFile("plan", args?.name);
     case "export_backup":
       return engine.exportToFile("backup", args?.name);
+    case "education":
+      return engine.education(args?.command);
+    case "get_education":
+      return engine.getEducation(args ?? {});
+    case "get_study_progress":
+      return engine.getStudyProgress(args ?? {});
+    case "get_tasks":
+      return engine.getTasks(args ?? {});
+    case "apply_file":
+      return engine.applyFile(args?.name, args?.fileHash);
     default:
       throw new Error(`未知工具：${name}`);
   }

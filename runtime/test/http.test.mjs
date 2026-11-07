@@ -238,12 +238,17 @@ test("/mcp initialize / tools/list：serverInfo 与中文 instructions", async (
   assert.deepEqual(
     names,
     [
+      "apply_file",
       "complete_task",
       "create_task",
       "dispatch",
+      "education",
       "export_backup",
       "export_plan",
       "get_context",
+      "get_education",
+      "get_study_progress",
+      "get_tasks",
       "move_tasks",
       "update_task",
     ].sort(),
