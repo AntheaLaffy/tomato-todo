@@ -50,6 +50,7 @@ import {
   projectColor,
 } from "../shared/derive.js";
 import { registerPage } from "../app/registry.js";
+import { AssignmentDialog, teachingTargetOf } from "./assignment-dialog.js";
 
 registerCopy("education", {
   zh: {
@@ -87,6 +88,7 @@ registerCopy("education", {
     focusStarted: "已开始专注",
     noTodayTasks: "今天没有安排学习任务。",
     lessonKind: "课程",
+    openWorkbench: "打开任务详情",
     homeworkKind: "作业",
     studyTaskKind: "学习",
     reminderLabel: "提醒 {time}",
@@ -304,6 +306,7 @@ registerCopy("education", {
     focusStarted: "Focus started",
     noTodayTasks: "No study tasks scheduled today.",
     lessonKind: "Lesson",
+    openWorkbench: "Open task details",
     homeworkKind: "Homework",
     studyTaskKind: "Study",
     reminderLabel: "Remind {time}",
@@ -860,6 +863,24 @@ const META = {
   color: "var(--tomato-ink-3)",
 };
 
+/** 任务行标题区做成按钮：教学任务点开工作台，普通任务点开编辑。 */
+const ROW_BUTTON = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: 0,
+  flex: 1,
+  minWidth: 0,
+  padding: 0,
+  margin: 0,
+  border: "none",
+  background: "transparent",
+  fontFamily: "inherit",
+  textAlign: "left",
+  color: "inherit",
+  cursor: "pointer",
+};
+
 function mutedText(text) {
   return h(
     "div",
@@ -1039,9 +1060,17 @@ function ProgressRow({ record, onConfirm }) {
   );
 }
 
-function TeachingTaskRow({ task, data, onToggle, onFocus }) {
+function TeachingTaskRow({
+  task,
+  data,
+  onToggle,
+  onFocus,
+  target = null,
+  onOpen,
+}) {
   const project = projectById(data, task.projectId);
   const projectName = project ? strOr(project.name) : "";
+  const teaching = target !== null;
   const meta = [];
   if (strOr(task.reminderTime)) {
     meta.push(t("education.reminderLabel", { time: task.reminderTime }));
@@ -1058,45 +1087,57 @@ function TeachingTaskRow({ task, data, onToggle, onFocus }) {
     meta.push(t("education.estimateLabel", { n: Number(task.estimate) }));
   }
   if (projectName) meta.push(projectName);
+  const titleBlock = [
+    h(
+      "div",
+      {
+        style: {
+          fontSize: 13.5,
+          color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+          textDecoration: task.completed ? "line-through" : "none",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        },
+      },
+      strOr(task.title),
+    ),
+    h(
+      "div",
+      { style: META },
+      h(
+        Chip,
+        { tone: "neutral" },
+        task.kind === "lesson"
+          ? t("education.lessonKind")
+          : t("education.homeworkKind"),
+      ),
+      meta.map((text, index) => h("span", { key: index }, text)),
+    ),
+  ];
   return h(
     "div",
     { style: ROW },
-    h(Check, {
-      checked: task.completed === true,
-      onChange: () => onToggle(task.id),
-      label: strOr(task.title),
-    }),
+    teaching
+      ? null
+      : h(Check, {
+          checked: task.completed === true,
+          onChange: () => onToggle(task.id),
+          label: strOr(task.title),
+        }),
     h(Dot, { color: projectColor(data, task.projectId) }),
-    h(
-      "div",
-      { style: { flex: 1, minWidth: 0 } },
-      h(
-        "div",
-        {
-          style: {
-            fontSize: 13.5,
-            color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
-            textDecoration: task.completed ? "line-through" : "none",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+    teaching
+      ? h(
+          "button",
+          {
+            type: "button",
+            title: t("education.openWorkbench"),
+            onClick: () => onOpen?.(target),
+            style: ROW_BUTTON,
           },
-        },
-        strOr(task.title),
-      ),
-      h(
-        "div",
-        { style: META },
-        h(
-          Chip,
-          { tone: "neutral" },
-          task.kind === "lesson"
-            ? t("education.lessonKind")
-            : t("education.homeworkKind"),
-        ),
-        meta.map((text, index) => h("span", { key: index }, text)),
-      ),
-    ),
+          titleBlock,
+        )
+      : h("div", { style: { flex: 1, minWidth: 0 } }, titleBlock),
     task.completed
       ? null
       : h(
@@ -1112,7 +1153,7 @@ function TeachingTaskRow({ task, data, onToggle, onFocus }) {
   );
 }
 
-function AssessmentRow({ assessment, index, at, onAssistant }) {
+function AssessmentRow({ assessment, index, at, onAssistant, onOpen }) {
   const status = assessmentStatus(assessment, index, at);
   const submission = index.submissionOf.get(assessment.id) || null;
   const grade = submission ? index.gradeOf.get(submission.id) || null : null;
@@ -1134,38 +1175,46 @@ function AssessmentRow({ assessment, index, at, onAssistant }) {
     correct: "correctAction",
     review: "reviewAction",
   };
+  const titleBlock = [
+    h(
+      "div",
+      {
+        style: {
+          fontSize: 13,
+          color: "var(--tomato-ink)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        },
+      },
+      strOr(assessment.title, t("education.unnamedProject")),
+    ),
+    h(
+      "div",
+      { style: META },
+      h(Chip, { tone: "neutral" }, assessmentKindLabel(assessment.kind)),
+      h("span", null, fmtRange(assessment.startsAt, assessment.endsAt)),
+      h(
+        "span",
+        null,
+        t("education.topicsCount", {
+          n: asArray(assessment.questions).length,
+        }),
+      ),
+    ),
+  ];
   return h(
     "div",
     { style: ROW },
     h(
-      "div",
-      { style: { flex: 1, minWidth: 0 } },
-      h(
-        "div",
-        {
-          style: {
-            fontSize: 13,
-            color: "var(--tomato-ink)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          },
-        },
-        strOr(assessment.title, t("education.unnamedProject")),
-      ),
-      h(
-        "div",
-        { style: META },
-        h(Chip, { tone: "neutral" }, assessmentKindLabel(assessment.kind)),
-        h("span", null, fmtRange(assessment.startsAt, assessment.endsAt)),
-        h(
-          "span",
-          null,
-          t("education.topicsCount", {
-            n: asArray(assessment.questions).length,
-          }),
-        ),
-      ),
+      "button",
+      {
+        type: "button",
+        title: t("education.openWorkbench"),
+        onClick: () => onOpen?.(assessment),
+        style: ROW_BUTTON,
+      },
+      titleBlock,
     ),
     score !== null
       ? h(
@@ -1198,55 +1247,68 @@ function AssessmentRow({ assessment, index, at, onAssistant }) {
   );
 }
 
-function ProjectTaskRow({ task, onToggle }) {
+function ProjectTaskRow({ task, onToggle, target = null, onOpen }) {
+  const teaching = target !== null;
+  const titleBlock = [
+    h(
+      "div",
+      {
+        style: {
+          fontSize: 13,
+          color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+          textDecoration: task.completed ? "line-through" : "none",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        },
+      },
+      strOr(task.title),
+    ),
+    h(
+      "div",
+      { style: META },
+      task.dueDate ? h("span", null, String(task.dueDate)) : null,
+      strOr(task.reminderTime)
+        ? h(
+            "span",
+            null,
+            t("education.reminderLabel", { time: task.reminderTime }),
+          )
+        : null,
+      Number.isFinite(Number(task.focusMinutes)) &&
+        Number(task.focusMinutes) > 0
+        ? h(
+            "span",
+            null,
+            t("education.focusMinutesLabel", {
+              n: Number(task.focusMinutes),
+            }),
+          )
+        : null,
+    ),
+  ];
   return h(
     "div",
     { style: ROW },
-    h(Check, {
-      checked: task.completed === true,
-      onChange: () => onToggle(task.id),
-      label: strOr(task.title),
-    }),
-    h(
-      "div",
-      { style: { flex: 1, minWidth: 0 } },
-      h(
-        "div",
-        {
-          style: {
-            fontSize: 13,
-            color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
-            textDecoration: task.completed ? "line-through" : "none",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+    teaching
+      ? null
+      : h(Check, {
+          checked: task.completed === true,
+          onChange: () => onToggle(task.id),
+          label: strOr(task.title),
+        }),
+    teaching
+      ? h(
+          "button",
+          {
+            type: "button",
+            title: t("education.openWorkbench"),
+            onClick: () => onOpen?.(target),
+            style: ROW_BUTTON,
           },
-        },
-        strOr(task.title),
-      ),
-      h(
-        "div",
-        { style: META },
-        task.dueDate ? h("span", null, String(task.dueDate)) : null,
-        strOr(task.reminderTime)
-          ? h(
-              "span",
-              null,
-              t("education.reminderLabel", { time: task.reminderTime }),
-            )
-          : null,
-        Number.isFinite(Number(task.focusMinutes)) &&
-          Number(task.focusMinutes) > 0
-          ? h(
-              "span",
-              null,
-              t("education.focusMinutesLabel", {
-                n: Number(task.focusMinutes),
-              }),
-            )
-          : null,
-      ),
-    ),
+          titleBlock,
+        )
+      : h("div", { style: { flex: 1, minWidth: 0 } }, titleBlock),
   );
 }
 
@@ -2476,6 +2538,7 @@ export function ProjectDetail({
   library,
   onBack,
   onAssistant,
+  onOpenAssignment,
 }) {
   const projectId = strOr(study.projectId);
   const color = projectColor(data, projectId);
@@ -3134,6 +3197,7 @@ export function ProjectDetail({
             index,
             at,
             onAssistant,
+            onOpen: (item) => onOpenAssignment?.({ assessmentId: item.id }),
           }),
         ),
   );
@@ -3363,23 +3427,29 @@ export function ProjectDetail({
           openTasks.length > 0
             ? subHeading(t("education.openTasks"), openTasks.length)
             : null,
-          openTasks.map((task, taskIndex) =>
-            h(ProjectTaskRow, {
+          openTasks.map((task, taskIndex) => {
+            const target = teachingTargetOf(data, task);
+            return h(ProjectTaskRow, {
               key: task.id || `open-${taskIndex}`,
               task,
               onToggle,
-            }),
-          ),
+              target,
+              onOpen: onOpenAssignment,
+            });
+          }),
           doneTasks.length > 0
             ? subHeading(t("education.doneTasks"), doneTasks.length)
             : null,
-          doneTasks.map((task, taskIndex) =>
-            h(ProjectTaskRow, {
+          doneTasks.map((task, taskIndex) => {
+            const target = teachingTargetOf(data, task);
+            return h(ProjectTaskRow, {
               key: task.id || `done-${taskIndex}`,
               task,
               onToggle,
-            }),
-          ),
+              target,
+              onOpen: onOpenAssignment,
+            });
+          }),
         ),
   );
 
@@ -3452,6 +3522,8 @@ export function EducationPage({ onAssistant } = {}) {
   const state = useSnapshot();
   const [detailId, setDetailId] = useState(null);
   const [library, setLibrary] = useState(null);
+  // 教学任务的工作台：只能从任务行/成绩行打开，普通任务不走这里。
+  const [assignment, setAssignment] = useState(null);
 
   // 资料库授权不属于快照数据（它是本机权限，不进计划 JSON）；页面单独读一次，
   // 授权/取消/重试后由 LibraryCard 回写这份状态。
@@ -3566,6 +3638,7 @@ export function EducationPage({ onAssistant } = {}) {
       library,
       onBack: () => setDetailId(null),
       onAssistant,
+      onOpenAssignment: setAssignment,
     });
   }
 
@@ -3848,15 +3921,21 @@ export function EducationPage({ onAssistant } = {}) {
           title: t("education.noTodayTasks"),
           style: { padding: "24px 12px" },
         })
-      : todayItems.map(({ link, task }) =>
-          h(TeachingTaskRow, {
+      : todayItems.map(({ link, task }) => {
+          const target =
+            link.kind === "lesson"
+              ? { lessonId: link.sourceId, taskId: task.id }
+              : { assessmentId: link.sourceId, taskId: task.id };
+          return h(TeachingTaskRow, {
             key: task.id,
             task: { ...task, kind: link.kind },
             data,
             onToggle: toggleTask,
             onFocus: startFocus,
-          }),
-        ),
+            target,
+            onOpen: setAssignment,
+          });
+        }),
   );
 
   // ---- 需要处理
@@ -4320,6 +4399,15 @@ export function EducationPage({ onAssistant } = {}) {
       weekCard,
       progressCard,
     ),
+    h(AssignmentDialog, {
+      open: assignment !== null,
+      onClose: () => setAssignment(null),
+      assessmentId: assignment ? (assignment.assessmentId ?? null) : null,
+      lessonId: assignment ? (assignment.lessonId ?? null) : null,
+      data,
+      today,
+      now: at,
+    }),
   );
 }
 

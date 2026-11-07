@@ -34,6 +34,7 @@ import { notify } from "../shared/ui.js";
 import { PersonaBackdrop } from "./persona.js";
 import "./nav-copy.js";
 import "../pages/index.js";
+import { AssignmentDialog } from "../pages/assignment-dialog.js";
 
 function localeId(locale) {
   try {
@@ -145,6 +146,8 @@ export function registerApp(ctx) {
         openProject,
         resetActivePageCache,
         openAssistant: (...args) => openAssistant(...args),
+        // 冒烟脚本直接渲染工作台：对话框挂在页面内部，没有导航钩子可用。
+        AssignmentDialog,
       };
     }
   } catch {

@@ -566,7 +566,41 @@ let sampleState = {
 if (!process.env.SMOKE_LIVE) {
   const now = sampleState.serverTime;
   sampleState.data.education = {
-    projects: [{ projectId: "p1", target: "130+", examMode: true }],
+    projects: [
+      {
+        projectId: "p1",
+        target: "130+",
+        examMode: true,
+        syllabusId: "res-syllabus",
+        pastPaperIds: [],
+        mockPaperIds: [],
+      },
+    ],
+    // 作业工作台的 fixture：题目 sourceIds 与项目考纲都指向真实的资源记录，
+    // 这样 SSR 渲染（不跑 effect、没有文件令牌）也能列出资料与下载按钮。
+    resources: [
+      {
+        id: "res-grammar",
+        projectId: "p1",
+        title: "语法练习卷",
+        kind: "attachment",
+        path: "资料/语法练习卷.pdf",
+      },
+      {
+        id: "res-sheet",
+        projectId: "p1",
+        title: "答题卡模板",
+        kind: "answerSheet",
+        path: "资料/答题卡.pdf",
+      },
+      {
+        id: "res-syllabus",
+        projectId: "p1",
+        title: "考纲",
+        kind: "syllabus",
+        path: "资料/考纲.pdf",
+      },
+    ],
     assessments: [
       {
         id: "homework-to-submit",
@@ -575,7 +609,20 @@ if (!process.env.SMOKE_LIVE) {
         title: "待交作业",
         startsAt: now - 3600,
         endsAt: now + 86400,
-        questions: [],
+        instructions: "完成语法练习卷 1–20 题。",
+        questions: [
+          {
+            id: "q1",
+            prompt: "选择正确的时态",
+            topics: [],
+            sourceIds: ["res-grammar"],
+            extension: "",
+            estimatedMinutes: 15,
+            answer: "",
+            acceptableAlternatives: [],
+            scoring: [],
+          },
+        ],
       },
       {
         id: "homework-to-grade",
@@ -586,12 +633,41 @@ if (!process.env.SMOKE_LIVE) {
         endsAt: now + 86400,
         questions: [],
       },
+      {
+        id: "exam-to-start",
+        projectId: "p1",
+        kind: "mockExam",
+        title: "模拟考试",
+        startsAt: now - 600,
+        endsAt: now + 7200,
+        instructions: "计时 60 分钟。",
+        questions: [
+          {
+            id: "q2",
+            prompt: "阅读理解",
+            topics: [],
+            sourceIds: ["res-grammar"],
+            extension: "",
+            estimatedMinutes: 40,
+            answer: "",
+            acceptableAlternatives: [],
+            scoring: [],
+          },
+        ],
+        printedAt: now - 120,
+        startedAt: null,
+        stoppedAt: null,
+      },
     ],
     submissions: [
       {
         id: "submission-to-grade",
         assessmentId: "homework-to-grade",
         submittedAt: now - 60,
+        resourceIds: ["res-sheet"],
+        answers: "1-5: ABCCD",
+        unfinished: false,
+        questionTimes: [],
       },
     ],
     grades: [],
@@ -762,7 +838,9 @@ if (typeof nav?.openProject === "function") {
     if (!process.env.SMOKE_LIVE) {
       for (const marker of ["数学一", "未完成", "项目专属白名单", "项目资料"])
         if (!markup.includes(marker))
-          failures.push(`项目页缺少「${marker}」（侧栏项目点击可能又跳回全部任务）`);
+          failures.push(
+            `项目页缺少「${marker}」（侧栏项目点击可能又跳回全部任务）`,
+          );
     }
   } catch (e) {
     failures.push(
@@ -771,6 +849,67 @@ if (typeof nav?.openProject === "function") {
   }
 } else {
   failures.push("没有暴露测试导航钩子 window.__tomatoDsh.openProject");
+}
+
+// 作业/考试工作台：对话框挂在页面内部，导航钩子切不过去，直接渲染组件。
+// fixture 里有题目 sourceIds 与项目考纲，SSR（effect 不跑）也能验证资料区。
+if (!process.env.SMOKE_LIVE) {
+  const AssignmentDialog = nav?.AssignmentDialog;
+  if (typeof AssignmentDialog !== "function") {
+    failures.push("没有暴露 AssignmentDialog 测试钩子");
+  } else {
+    const renderDialog = (props) =>
+      ReactDOMServer.renderToStaticMarkup(
+        React.createElement(AssignmentDialog, {
+          open: true,
+          onClose: () => {},
+          data: sampleState.data,
+          today: sampleState.today,
+          now: sampleState.serverTime,
+          ...props,
+        }),
+      );
+    try {
+      const homework = renderDialog({ assessmentId: "homework-to-submit" });
+      renderedBy["dialog:assignment"] = homework;
+      for (const marker of [
+        "待交作业",
+        "资料与试卷",
+        "语法练习卷",
+        "考纲",
+        "答题卡模板",
+        "答卷文件",
+        "提交作业",
+      ]) {
+        if (!homework.includes(marker))
+          failures.push(`作业工作台缺少「${marker}」`);
+      }
+      if (homework.includes("优先级") || homework.includes("子任务")) {
+        failures.push("作业工作台出现了普通任务的编辑字段");
+      }
+      const submitted = renderDialog({ assessmentId: "homework-to-grade" });
+      renderedBy["dialog:assignment-submitted"] = submitted;
+      for (const marker of [
+        "待批改作业",
+        "已提交",
+        "1-5: ABCCD",
+        "答题卡模板",
+      ]) {
+        if (!submitted.includes(marker))
+          failures.push(`已提交视图缺少「${marker}」`);
+      }
+      const exam = renderDialog({ assessmentId: "exam-to-start" });
+      renderedBy["dialog:assignment-exam"] = exam;
+      for (const marker of ["模拟考试", "考试", "开始考试"]) {
+        if (!exam.includes(marker))
+          failures.push(`考试工作台缺少「${marker}」`);
+      }
+    } catch (e) {
+      failures.push(
+        `渲染作业工作台失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`,
+      );
+    }
+  }
 }
 
 if (!process.env.SMOKE_LIVE) {

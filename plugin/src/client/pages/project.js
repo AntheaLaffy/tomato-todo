@@ -40,6 +40,7 @@ import { registerPage } from "../app/registry.js";
 import { getActiveProjectId, setActivePageId } from "../app/navigation.js";
 import { openImmersive } from "../app/immersive.js";
 import { TaskDialog } from "./task-dialog.js";
+import { AssignmentDialog, teachingTargetOf } from "./assignment-dialog.js";
 import { sortTasks } from "./tasks.js";
 import { ProjectWhitelistCard } from "../shared/project-whitelist.js";
 import {
@@ -67,6 +68,7 @@ registerCopy("project", {
     tasksTitle: "任务",
     newTaskHint: "新建的任务默认属于这个项目",
     startFocus: "开始专注",
+    openWorkbench: "打开作业详情",
     pauseFocus: "暂停专注",
     focusOn: "专注于 {title}",
     timerBusy: "请先结束当前计时",
@@ -143,6 +145,7 @@ registerCopy("project", {
     tasksTitle: "Tasks",
     newTaskHint: "New tasks belong to this project by default",
     startFocus: "Start focus",
+    openWorkbench: "Open assignment",
     pauseFocus: "Pause focus",
     focusOn: "Focus on {title}",
     timerBusy: "Finish the current timer first",
@@ -223,6 +226,7 @@ registerCopy("project", {
     tasksTitle: "タスク",
     newTaskHint: "新しいタスクはこのプロジェクトに属します",
     startFocus: "集中開始",
+    openWorkbench: "課題を開く",
     pauseFocus: "一時停止",
     focusOn: "{title} に集中",
     timerBusy: "先に現在のタイマーを終了してください",
@@ -357,14 +361,22 @@ function ProjectTaskRow({
   onToggle,
   onEdit,
   onPlay,
+  target = null,
+  onOpen,
 }) {
   const completed = !!task.completed;
+  const teaching = target !== null;
   const estimate = Math.max(1, Number(task.estimate) || 1);
   const rounds = taskRounds(data, task.id);
   const achieved = rounds >= estimate;
   const overdue = isOverdue(task, today);
   const running = !!timer.running && timer.taskId === task.id;
   const displayTitle = task.title || t("project.untitled");
+  const teachingLabel = target
+    ? target.lessonId
+      ? t("education.lessonKind")
+      : t("education.homeworkKind")
+    : "";
   return h(
     "div",
     {
@@ -379,18 +391,22 @@ function ProjectTaskRow({
         borderBottom: last ? "none" : "1px solid var(--tomato-line)",
       },
     },
-    h(Check, {
-      checked: completed,
-      label: completed
-        ? t("project.reopenTask", { title: displayTitle })
-        : t("project.completeTask", { title: displayTitle }),
-      onChange: () => onToggle(task),
-    }),
+    // 教学任务的完成由提交/参与驱动，勾选框只会绕过 core 的入口校验。
+    teaching
+      ? null
+      : h(Check, {
+          checked: completed,
+          label: completed
+            ? t("project.reopenTask", { title: displayTitle })
+            : t("project.completeTask", { title: displayTitle }),
+          onChange: () => onToggle(task),
+        }),
     h(
       "button",
       {
         type: "button",
-        onClick: () => onEdit(task),
+        title: teaching ? t("project.openWorkbench") : undefined,
+        onClick: teaching ? () => onOpen?.(target) : () => onEdit(task),
         style: {
           flex: 1,
           minWidth: 0,
@@ -437,6 +453,16 @@ function ProjectTaskRow({
             color: "var(--tomato-ink-3)",
           },
         },
+        teaching
+          ? h(
+              Chip,
+              {
+                tone: target.lessonId ? "leaf" : "brand",
+                icon: target.lessonId ? "education" : "tasks",
+              },
+              teachingLabel,
+            )
+          : null,
         task.reminderTime
           ? h(
               "span",
@@ -1264,6 +1290,8 @@ export function ProjectPage({ state, projectId }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // 教学任务打开的是作业/课程工作台；普通任务仍由 TaskDialog 编辑。
+  const [assignment, setAssignment] = useState(null);
 
   // 同一页切换项目（侧栏点另一个项目）时重挂状态，而不是把上一个项目的
   // 对话框/标签页带过去。
@@ -1273,6 +1301,7 @@ export function ProjectPage({ state, projectId }) {
     setEditProjectOpen(false);
     setDeleteOpen(false);
     setDeleteError(null);
+    setAssignment(null);
   }, [currentId]);
 
   const projectTasks = project
@@ -1570,8 +1599,9 @@ export function ProjectPage({ state, projectId }) {
                     t("project.newTask"),
                   ),
           })
-        : visible.map((task, index) =>
-            h(ProjectTaskRow, {
+        : visible.map((task, index) => {
+            const target = teachingTargetOf(viewData, task);
+            return h(ProjectTaskRow, {
               key: task.id,
               task,
               today,
@@ -1579,10 +1609,12 @@ export function ProjectPage({ state, projectId }) {
               timer,
               last: index === visible.length - 1,
               onToggle: toggleComplete,
-              onEdit: (target) => setEditor({ id: target.id }),
+              onEdit: (row) => setEditor({ id: row.id }),
               onPlay: playTask,
-            }),
-          ),
+              target,
+              onOpen: setAssignment,
+            });
+          }),
     ),
     h(
       "div",
@@ -1786,6 +1818,15 @@ export function ProjectPage({ state, projectId }) {
           : null,
       ),
     ),
+    h(AssignmentDialog, {
+      open: assignment !== null,
+      onClose: () => setAssignment(null),
+      assessmentId: assignment ? (assignment.assessmentId ?? null) : null,
+      lessonId: assignment ? (assignment.lessonId ?? null) : null,
+      data,
+      today,
+      now: (state && state.serverTime) || null,
+    }),
   );
 }
 

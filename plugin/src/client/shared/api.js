@@ -122,6 +122,32 @@ export function getFileToken(opts) {
   return request("/api/file-token", opts);
 }
 
+/**
+ * 教学资源目录（`?education=lite` 只给 id/projectId/title/kind/path）。
+ * 作业工作台按需取一次：默认 /api/state 省略资源明细，是为了轮询体积。
+ */
+export function getStateWithResources(opts) {
+  return request("/api/state?education=lite", opts);
+}
+
+/** 单条项目资源的文件信息：正文路径不返回，只给大小/预览能力。 */
+export function getResourceInfo(id, opts) {
+  return request("/api/resources/" + encodeURIComponent(id) + "/info", opts);
+}
+
+/** 项目资源原件地址：download=1 取附件，否则 inline（预览上限 20 MiB）。 */
+export function resourceFileUrl(id, access, download = false) {
+  const params = new URLSearchParams({ access });
+  if (download) params.set("download", "1");
+  return (
+    API_BASE +
+    "/api/resources/" +
+    encodeURIComponent(id) +
+    "/file?" +
+    params.toString()
+  );
+}
+
 /** 索引文件的直链；预览与下载共用，令牌随 URL 过期于 runtime 退出。 */
 export function libraryFileUrl(path, access, download = false) {
   const params = new URLSearchParams({ path, access });

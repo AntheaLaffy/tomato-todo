@@ -3374,13 +3374,16 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     getLibraryStats: () => getLibraryStats,
     getProjectGrant: () => getProjectGrant,
     getProjectResources: () => getProjectResources,
+    getResourceInfo: () => getResourceInfo,
     getState: () => getState,
+    getStateWithResources: () => getStateWithResources,
     libraryFileUrl: () => libraryFileUrl,
     ping: () => ping,
     postDispatch: () => postDispatch,
     registerProjectResource: () => registerProjectResource,
     registerResource: () => registerResource,
     repairProjectResource: () => repairProjectResource,
+    resourceFileUrl: () => resourceFileUrl,
     revokeLibraryGrant: () => revokeLibraryGrant,
     scanLibrary: () => scanLibrary,
     scanProjectLibrary: () => scanProjectLibrary,
@@ -3474,6 +3477,17 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
   function getFileToken(opts) {
     return request("/api/file-token", opts);
+  }
+  function getStateWithResources(opts) {
+    return request("/api/state?education=lite", opts);
+  }
+  function getResourceInfo(id, opts) {
+    return request("/api/resources/" + encodeURIComponent(id) + "/info", opts);
+  }
+  function resourceFileUrl(id, access, download = false) {
+    const params = new URLSearchParams({ access });
+    if (download) params.set("download", "1");
+    return API_BASE + "/api/resources/" + encodeURIComponent(id) + "/file?" + params.toString();
   }
   function libraryFileUrl(path, access, download = false) {
     const params = new URLSearchParams({ path, access });
@@ -14659,6 +14673,2001 @@ ${JSON.stringify(refs, null, 2)}`;
     }
   });
 
+  // plugin/src/client/shared/markdown.js
+  var SAFE_LINK = /^(https?:\/\/|mailto:|#|\/)/i;
+  function parseInline(text) {
+    const out = [];
+    let rest = String(text ?? "");
+    const pattern = /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)\s]+)\))/;
+    while (rest !== "") {
+      const match = pattern.exec(rest);
+      if (!match) {
+        out.push({ type: "text", text: rest });
+        break;
+      }
+      if (match.index > 0) {
+        out.push({ type: "text", text: rest.slice(0, match.index) });
+      }
+      if (match[1]) out.push({ type: "strong", text: match[2] });
+      else if (match[3]) out.push({ type: "em", text: match[4] });
+      else if (match[5]) out.push({ type: "code", text: match[6] });
+      else if (match[7]) {
+        out.push({
+          type: "link",
+          text: match[8],
+          href: SAFE_LINK.test(match[9]) ? match[9] : null
+        });
+      }
+      rest = rest.slice(match.index + match[0].length);
+    }
+    return out;
+  }
+  var TABLE_DIVIDER = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/;
+  function splitRow(line) {
+    const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+    return trimmed.split("|").map((cell) => cell.trim());
+  }
+  function parseMarkdown(text) {
+    const lines = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
+    const blocks = [];
+    let index = 0;
+    const pushParagraph = (buffer) => {
+      if (buffer.length === 0) return;
+      blocks.push({ type: "paragraph", lines: buffer.slice() });
+      buffer.length = 0;
+    };
+    const paragraph = [];
+    while (index < lines.length) {
+      const line = lines[index];
+      if (/^\s*```/.test(line)) {
+        pushParagraph(paragraph);
+        const lang = line.replace(/^\s*```/, "").trim();
+        const body = [];
+        index += 1;
+        while (index < lines.length && !/^\s*```/.test(lines[index])) {
+          body.push(lines[index]);
+          index += 1;
+        }
+        if (index < lines.length) index += 1;
+        blocks.push({ type: "code", lang, text: body.join("\n") });
+        continue;
+      }
+      if (line.trim() === "") {
+        pushParagraph(paragraph);
+        index += 1;
+        continue;
+      }
+      const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+      if (heading) {
+        pushParagraph(paragraph);
+        blocks.push({
+          type: "heading",
+          level: heading[1].length,
+          text: heading[2].trim()
+        });
+        index += 1;
+        continue;
+      }
+      if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+        pushParagraph(paragraph);
+        blocks.push({ type: "hr" });
+        index += 1;
+        continue;
+      }
+      if (line.includes("|") && index + 1 < lines.length && TABLE_DIVIDER.test(lines[index + 1])) {
+        pushParagraph(paragraph);
+        const header = splitRow(line);
+        index += 2;
+        const rows = [];
+        while (index < lines.length && lines[index].includes("|")) {
+          rows.push(splitRow(lines[index]));
+          index += 1;
+        }
+        blocks.push({ type: "table", header, rows });
+        continue;
+      }
+      if (/^\s*>\s?/.test(line)) {
+        pushParagraph(paragraph);
+        const quoted = [];
+        while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+          quoted.push(lines[index].replace(/^\s*>\s?/, ""));
+          index += 1;
+        }
+        blocks.push({ type: "quote", lines: quoted });
+        continue;
+      }
+      const bullet = /^\s*[-*+]\s+(.*)$/.exec(line);
+      const ordered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
+      if (bullet || ordered) {
+        pushParagraph(paragraph);
+        const start = ordered ? Number(ordered[1]) : null;
+        const items = [];
+        while (index < lines.length) {
+          const b = /^\s*[-*+]\s+(.*)$/.exec(lines[index]);
+          const o = /^\s*(\d+)[.)]\s+(.*)$/.exec(lines[index]);
+          if (b) items.push(b[1]);
+          else if (o) items.push(o[2]);
+          else break;
+          index += 1;
+        }
+        blocks.push({ type: "list", ordered: start !== null, start, items });
+        continue;
+      }
+      paragraph.push(line);
+      index += 1;
+    }
+    pushParagraph(paragraph);
+    return blocks;
+  }
+  function inlineNodes(text) {
+    return parseInline(text).map((node, i) => {
+      switch (node.type) {
+        case "strong":
+          return h("strong", { key: i }, node.text);
+        case "em":
+          return h("em", { key: i }, node.text);
+        case "code":
+          return h(
+            "code",
+            {
+              key: i,
+              style: {
+                padding: "1px 5px",
+                borderRadius: 5,
+                background: "var(--tomato-surface-2)",
+                fontSize: "0.92em"
+              }
+            },
+            node.text
+          );
+        case "link":
+          return node.href ? h(
+            "a",
+            {
+              key: i,
+              href: node.href,
+              target: "_blank",
+              rel: "noreferrer",
+              style: { color: "var(--tomato-brand-deep)" }
+            },
+            node.text
+          ) : h("span", { key: i }, node.text);
+        default:
+          return node.text;
+      }
+    });
+  }
+  var HEADING_SIZE = { 1: 19, 2: 16.5, 3: 15, 4: 13.5, 5: 13, 6: 12.5 };
+  function tableCellStyle(header) {
+    return {
+      padding: "6px 10px",
+      borderBottom: "1px solid var(--tomato-line)",
+      textAlign: "left",
+      fontSize: 12.5,
+      fontWeight: header ? 600 : 400,
+      color: header ? "var(--tomato-ink)" : "var(--tomato-ink-2)",
+      verticalAlign: "top"
+    };
+  }
+  function Markdown({ text, style }) {
+    const blocks = parseMarkdown(text);
+    return h(
+      "div",
+      {
+        style: {
+          fontSize: 13,
+          lineHeight: 1.75,
+          color: "var(--tomato-ink)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          ...style
+        }
+      },
+      blocks.map((block, i) => {
+        switch (block.type) {
+          case "heading":
+            return h(
+              "div",
+              {
+                key: i,
+                style: {
+                  fontSize: HEADING_SIZE[block.level] ?? 13,
+                  fontWeight: 650,
+                  marginTop: block.level <= 2 ? 8 : 4
+                }
+              },
+              inlineNodes(block.text)
+            );
+          case "code":
+            return h(
+              "pre",
+              {
+                key: i,
+                style: {
+                  margin: 0,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: "var(--tomato-surface-2)",
+                  overflow: "auto",
+                  fontSize: 12,
+                  lineHeight: 1.6
+                }
+              },
+              h("code", null, block.text)
+            );
+          case "table":
+            return h(
+              "div",
+              { key: i, style: { overflowX: "auto" } },
+              h(
+                "table",
+                {
+                  style: {
+                    borderCollapse: "collapse",
+                    width: "100%",
+                    background: "var(--tomato-surface)"
+                  }
+                },
+                h(
+                  "thead",
+                  null,
+                  h(
+                    "tr",
+                    null,
+                    block.header.map(
+                      (cell, c) => h(
+                        "th",
+                        { key: c, style: tableCellStyle(true) },
+                        inlineNodes(cell)
+                      )
+                    )
+                  )
+                ),
+                h(
+                  "tbody",
+                  null,
+                  block.rows.map(
+                    (row, r) => h(
+                      "tr",
+                      { key: r },
+                      row.map(
+                        (cell, c) => h(
+                          "td",
+                          { key: c, style: tableCellStyle(false) },
+                          inlineNodes(cell)
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            );
+          case "quote":
+            return h(
+              "div",
+              {
+                key: i,
+                style: {
+                  padding: "6px 12px",
+                  borderLeft: "3px solid var(--tomato-line)",
+                  color: "var(--tomato-ink-2)"
+                }
+              },
+              inlineNodes(block.lines.join(" "))
+            );
+          case "list":
+            return h(
+              block.ordered ? "ol" : "ul",
+              {
+                key: i,
+                style: {
+                  margin: 0,
+                  paddingLeft: 22,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4
+                }
+              },
+              block.items.map(
+                (item, li) => h("li", { key: li }, inlineNodes(item))
+              )
+            );
+          case "hr":
+            return h("hr", {
+              key: i,
+              style: {
+                border: "none",
+                borderTop: "1px solid var(--tomato-line)",
+                margin: "4px 0"
+              }
+            });
+          default:
+            return h(
+              "div",
+              { key: i, style: { whiteSpace: "pre-wrap" } },
+              block.lines.map(
+                (line, li) => h("div", { key: li }, inlineNodes(line))
+              )
+            );
+        }
+      })
+    );
+  }
+
+  // plugin/src/client/shared/file-preview.js
+  registerCopy("preview", {
+    zh: {
+      size: "大小",
+      download: "下载原件",
+      close: "关闭",
+      unsupported: "这种类型或大小不能内联预览，请下载原件。",
+      failed: "读取失败：{error}",
+      tooLarge: "文件太大，不适合内联预览"
+    },
+    en: {
+      size: "Size",
+      download: "Download",
+      close: "Close",
+      unsupported: "This type or size cannot be previewed inline; download the file.",
+      failed: "Could not read the file: {error}",
+      tooLarge: "File is too large to preview inline"
+    },
+    ja: {
+      size: "サイズ",
+      download: "Download",
+      close: "Close",
+      unsupported: "This type or size cannot be previewed inline; download the file.",
+      failed: "Could not read the file: {error}",
+      tooLarge: "File is too large to preview inline"
+    }
+  });
+  var TEXT_LIMIT = 2 * 1024 * 1024;
+  function isTextKind(kind, name) {
+    const ext = String(name ?? "").split(".").pop()?.toLowerCase() ?? "";
+    if (["md", "markdown"].includes(ext)) return "markdown";
+    if (["txt", "csv", "json", "log", "yml", "yaml"].includes(ext)) return "text";
+    if (kind === "doc" && ["md", "markdown", "txt", "csv", "json"].includes(ext)) {
+      return ext === "md" || ext === "markdown" ? "markdown" : "text";
+    }
+    return null;
+  }
+  function formatBytes(value) {
+    const bytes = Number(value);
+    if (!Number.isFinite(bytes) || bytes <= 0) return "—";
+    const units = ["B", "KiB", "MiB", "GiB"];
+    let size = bytes;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit += 1;
+    }
+    return `${size >= 10 || unit === 0 ? Math.round(size) : size.toFixed(1)} ${units[unit]}`;
+  }
+  function FilePreview({
+    open,
+    onClose,
+    name,
+    kind = "other",
+    sizeBytes,
+    viewUrl,
+    downloadUrl,
+    previewable = true,
+    emptyHint
+  }) {
+    const mode = isTextKind(kind, name);
+    const [text, setText] = useState(null);
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+      if (!open || mode === null || !previewable || !viewUrl) {
+        setText(null);
+        setError("");
+        return void 0;
+      }
+      let cancelled = false;
+      setLoading(true);
+      setError("");
+      setText(null);
+      fetch(viewUrl).then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (blob.size > TEXT_LIMIT) throw new Error(t("preview.tooLarge"));
+        return blob.text();
+      }).then((value) => {
+        if (!cancelled) setText(value);
+      }).catch((e) => {
+        if (!cancelled) setError(e && e.message ? e.message : String(e));
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [open, mode, previewable, viewUrl, name]);
+    if (!open) return null;
+    let body;
+    if (!previewable) {
+      body = h(
+        "div",
+        { style: { fontSize: 12.5, color: "var(--tomato-ink-2)" } },
+        emptyHint || t("preview.unsupported")
+      );
+    } else if (mode !== null) {
+      if (loading) body = h(Skeleton, { w: "100%", h: 240 });
+      else if (error !== "")
+        body = h(
+          "div",
+          { style: { fontSize: 12.5, color: "var(--tomato-brand-deep)" } },
+          t("preview.failed", { error })
+        );
+      else if (mode === "markdown")
+        body = h(
+          "div",
+          { style: { maxHeight: "68vh", overflow: "auto", paddingRight: 6 } },
+          h(Markdown, { text: text ?? "" })
+        );
+      else
+        body = h(
+          "pre",
+          {
+            style: {
+              maxHeight: "68vh",
+              overflow: "auto",
+              margin: 0,
+              padding: "12px 14px",
+              borderRadius: 10,
+              background: "var(--tomato-surface-2)",
+              fontSize: 12.5,
+              lineHeight: 1.7,
+              whiteSpace: "pre-wrap"
+            }
+          },
+          text ?? ""
+        );
+    } else if (kind === "image") {
+      body = h("img", {
+        src: viewUrl,
+        alt: name,
+        style: {
+          display: "block",
+          maxWidth: "100%",
+          maxHeight: "68vh",
+          margin: "0 auto",
+          borderRadius: 8
+        }
+      });
+    } else if (kind === "audio") {
+      body = h("audio", {
+        controls: true,
+        src: viewUrl,
+        style: { width: "100%" }
+      });
+    } else if (kind === "video") {
+      body = h("video", {
+        controls: true,
+        src: viewUrl,
+        style: { display: "block", maxWidth: "100%", maxHeight: "68vh" }
+      });
+    } else {
+      body = h("iframe", {
+        title: name,
+        src: viewUrl,
+        style: {
+          width: "100%",
+          height: "68vh",
+          border: "none",
+          borderRadius: 8,
+          background: "#fff"
+        }
+      });
+    }
+    return h(
+      Modal,
+      {
+        open,
+        onClose,
+        icon: "eye",
+        title: name,
+        subtitle: `${t("preview.size")} ${formatBytes(sizeBytes)}`,
+        width: 920,
+        bodyStyle: { paddingTop: 6 },
+        footer: h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 10
+            }
+          },
+          downloadUrl ? h(
+            "a",
+            {
+              href: downloadUrl,
+              style: {
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--tomato-brand-deep)",
+                textDecoration: "none",
+                padding: "6px 10px",
+                borderRadius: 9,
+                background: "var(--tomato-brand-soft)"
+              }
+            },
+            t("preview.download")
+          ) : null,
+          h(
+            Btn,
+            { variant: "ghost", size: "sm", onClick: onClose },
+            t("preview.close")
+          )
+        )
+      },
+      body
+    );
+  }
+
+  // plugin/src/client/pages/assignment-dialog.js
+  registerCopy("assignment", {
+    zh: {
+      materialsHomework: "资料与试卷",
+      materialsLesson: "课程资料",
+      materialsHint: "这次作业/考试绑定的资料与试卷；预览在弹窗内打开，下载取原件。",
+      materialsEmpty: "这次作业没有绑定资料",
+      lessonMaterialsEmpty: "这节课没有绑定资料",
+      related: "相关资料",
+      relatedHint: "项目考纲、真题与模拟题",
+      preview: "预览",
+      download: "下载",
+      previewBlocked: "超过 20 MiB 或类型不支持，请下载原件",
+      sizeUnknown: "—",
+      loading: "正在读取资料…",
+      loadFailed: "资料读取失败：{error}",
+      fileTokenFailed: "文件地址不可用：{error}",
+      instructions: "说明",
+      topics: "知识点",
+      submission: "提交",
+      submittedAt: "提交于 {time}",
+      answers: "答案",
+      answersEmpty: "没有填写答案文本",
+      attachments: "答卷附件",
+      attachmentsEmpty: "没有上传答卷文件",
+      unfinished: "标记为未完成",
+      unfinishedTag: "未完成",
+      waitingGrade: "已提交，等待批改",
+      gradedAt: "批改于 {time}",
+      needsReview: "批改待复核",
+      lockedHint: "提交不可覆盖；需要重交请让助手发布新版本。",
+      answerLabel: "答案文本",
+      answerPlaceholder: "把答案写在这里，最多 50000 字",
+      answerCount: "{n} / 50000",
+      answerSheets: "答卷文件",
+      answerSheetsHint: "从项目已登记的答卷里多选；考试至少选一份纸质答题卡。",
+      answerSheetsEmpty: "项目里还没有登记答卷文件",
+      registerSheet: "从资料库选文件并登记为答卷",
+      pickerTitle: "选择答卷文件",
+      pickerSubtitle: "选一条共享资料库索引里的文件，登记为这个项目的答卷。",
+      pickerSearch: "搜索文件",
+      pickerEmpty: "资料库里没有可用文件",
+      pickerNoIndex: "还没有共享资料库索引，请先到应试教育页扫描资料库。",
+      pickerError: "读取资料库失败：{error}",
+      register: "登记为答卷",
+      registering: "登记中…",
+      registered: "已登记为答卷",
+      registerFailed: "登记失败：{error}",
+      submitHomework: "提交作业",
+      submitExam: "提交试卷",
+      submitting: "提交中…",
+      submitDone: "已提交",
+      examStart: "开始考试",
+      examStop: "停笔",
+      examTitle: "考试",
+      examStartHint: "开始考试前需要助手已确认打印，且只能在考试安排当天开始。",
+      examRunning: "考试进行中，停笔后才能上传答题卡。",
+      examStopped: "已停笔，可以上传答题卡并提交。",
+      examNotPrinted: "试卷尚未确认打印，现在开始会被 core 拒绝。",
+      examStartedAt: "开始于 {time}",
+      examStoppedAt: "停笔于 {time}",
+      lessonProgress: "学习进度",
+      lessonProgressEmpty: "还没有记录学习进度",
+      progressPlaceholder: "这次课学到哪里、掌握到什么程度",
+      saveProgress: "记录学习进度",
+      savingProgress: "保存中…",
+      progressSaved: "学习进度已记录",
+      progressWindow: "只能在上课时间窗内记录参与。",
+      progressRequired: "请先写一句学习进度",
+      lessonAttended: "已参与",
+      lessonUpcoming: "待上课",
+      missingTitle: "记录不存在",
+      missingHint: "这条作业/课程可能已被删除，刷新后再试。"
+    },
+    en: {
+      materialsHomework: "Materials & papers",
+      materialsLesson: "Lesson materials",
+      materialsHint: "Files bound to this assignment; preview opens in a dialog, download saves the original.",
+      materialsEmpty: "No materials are bound to this assignment",
+      lessonMaterialsEmpty: "No materials are bound to this lesson",
+      related: "Related materials",
+      relatedHint: "Syllabus, past papers and mock papers for the project",
+      preview: "Preview",
+      download: "Download",
+      previewBlocked: "Over 20 MiB or not previewable — download the original instead",
+      sizeUnknown: "—",
+      loading: "Loading materials…",
+      loadFailed: "Could not load materials: {error}",
+      fileTokenFailed: "File links unavailable: {error}",
+      instructions: "Notes",
+      topics: "Topics",
+      submission: "Submission",
+      submittedAt: "Submitted {time}",
+      answers: "Answers",
+      answersEmpty: "No answer text",
+      attachments: "Answer sheets",
+      attachmentsEmpty: "No files attached",
+      unfinished: "Mark as unfinished",
+      unfinishedTag: "Unfinished",
+      waitingGrade: "Submitted, waiting to be graded",
+      gradedAt: "Graded {time}",
+      needsReview: "Grading needs review",
+      lockedHint: "A submission cannot be overwritten; ask the assistant to publish a new version to resubmit.",
+      answerLabel: "Answer text",
+      answerPlaceholder: "Write the answer here, up to 50000 characters",
+      answerCount: "{n} / 50000",
+      answerSheets: "Answer files",
+      answerSheetsHint: "Pick from the project's registered answer sheets; exams need at least one scanned sheet.",
+      answerSheetsEmpty: "No answer sheets registered for this project",
+      registerSheet: "Pick a library file and register it as an answer sheet",
+      pickerTitle: "Choose an answer sheet",
+      pickerSubtitle: "Pick a file from the shared library index and register it as this project's answer sheet.",
+      pickerSearch: "Search files",
+      pickerEmpty: "No usable files in the library",
+      pickerNoIndex: "The shared library index is missing; scan it on the Education page first.",
+      pickerError: "Could not read the library: {error}",
+      register: "Register as answer sheet",
+      registering: "Registering…",
+      registered: "Registered as an answer sheet",
+      registerFailed: "Could not register: {error}",
+      submitHomework: "Submit homework",
+      submitExam: "Submit exam",
+      submitting: "Submitting…",
+      submitDone: "Submitted",
+      examStart: "Start exam",
+      examStop: "Stop writing",
+      examTitle: "Exam",
+      examStartHint: "The assistant must confirm printing first, and the exam can only start on its scheduled day.",
+      examRunning: "Exam in progress; stop writing before uploading answer sheets.",
+      examStopped: "Stopped — you can upload answer sheets and submit.",
+      examNotPrinted: "Printing has not been confirmed; core will reject a start.",
+      examStartedAt: "Started {time}",
+      examStoppedAt: "Stopped {time}",
+      lessonProgress: "Study progress",
+      lessonProgressEmpty: "No study progress recorded yet",
+      progressPlaceholder: "Where did this lesson get to, and how well is it understood?",
+      saveProgress: "Record progress",
+      savingProgress: "Saving…",
+      progressSaved: "Study progress recorded",
+      progressWindow: "Attendance can only be recorded inside the lesson window.",
+      progressRequired: "Write one line of study progress first",
+      lessonAttended: "Attended",
+      lessonUpcoming: "Scheduled",
+      missingTitle: "Record not found",
+      missingHint: "This assignment or lesson may have been removed; refresh and try again."
+    },
+    ja: {
+      materialsHomework: "教材と問題",
+      materialsLesson: "授業資料",
+      materialsHint: "この課題に紐づく資料です。プレビューはダイアログで開き、ダウンロードは原本を保存します。",
+      materialsEmpty: "この課題には資料が紐づいていません",
+      lessonMaterialsEmpty: "この授業には資料が紐づいていません",
+      related: "関連資料",
+      relatedHint: "プロジェクトのシラバス・過去問・模擬問題",
+      preview: "プレビュー",
+      download: "ダウンロード",
+      previewBlocked: "20 MiB を超えるかプレビュー不可です。原本をダウンロードしてください",
+      sizeUnknown: "—",
+      loading: "資料を読み込み中…",
+      loadFailed: "資料を読み込めません：{error}",
+      fileTokenFailed: "ファイル URL を利用できません：{error}",
+      instructions: "説明",
+      topics: "知識点",
+      submission: "提出",
+      submittedAt: "{time} に提出",
+      answers: "解答",
+      answersEmpty: "解答テキストはありません",
+      attachments: "答案ファイル",
+      attachmentsEmpty: "添付ファイルはありません",
+      unfinished: "未完成として記録",
+      unfinishedTag: "未完成",
+      waitingGrade: "提出済み、採点待ち",
+      gradedAt: "{time} に採点",
+      needsReview: "採点の再確認待ち",
+      lockedHint: "提出は上書きできません。再提出が必要ならアシスタントに新しい版を出してもらってください。",
+      answerLabel: "解答テキスト",
+      answerPlaceholder: "ここに解答を書きます（最大 50000 文字）",
+      answerCount: "{n} / 50000",
+      answerSheets: "答案ファイル",
+      answerSheetsHint: "プロジェクトに登録済みの答案から複数選択します。試験は答案用紙が最低 1 枚必要です。",
+      answerSheetsEmpty: "このプロジェクトには答案が登録されていません",
+      registerSheet: "資料庫からファイルを選んで答案として登録",
+      pickerTitle: "答案ファイルを選択",
+      pickerSubtitle: "共有資料庫の索引から 1 件選び、このプロジェクトの答案として登録します。",
+      pickerSearch: "ファイルを検索",
+      pickerEmpty: "資料庫に使えるファイルがありません",
+      pickerNoIndex: "共有資料庫の索引がありません。先に教育ページでスキャンしてください。",
+      pickerError: "資料庫を読み込めません：{error}",
+      register: "答案として登録",
+      registering: "登録中…",
+      registered: "答案として登録しました",
+      registerFailed: "登録できません：{error}",
+      submitHomework: "宿題を提出",
+      submitExam: "答案を提出",
+      submitting: "提出中…",
+      submitDone: "提出しました",
+      examStart: "試験を開始",
+      examStop: "筆記終了",
+      examTitle: "試験",
+      examStartHint: "開始前にアシスタントの印刷確認が必要で、開始できるのは試験当日だけです。",
+      examRunning: "試験中です。筆記終了後に答案をアップロードしてください。",
+      examStopped: "筆記終了。答案をアップロードして提出できます。",
+      examNotPrinted: "印刷が未確認です。いま開始すると core に拒否されます。",
+      examStartedAt: "{time} に開始",
+      examStoppedAt: "{time} に終了",
+      lessonProgress: "学習進捗",
+      lessonProgressEmpty: "学習進捗はまだありません",
+      progressPlaceholder: "どこまで進み、どこまで理解できたか",
+      saveProgress: "学習進捗を記録",
+      savingProgress: "保存中…",
+      progressSaved: "学習進捗を記録しました",
+      progressWindow: "参加を記録できるのは授業時間内だけです。",
+      progressRequired: "学習進捗を一言書いてください",
+      lessonAttended: "参加済み",
+      lessonUpcoming: "予定",
+      missingTitle: "記録がありません",
+      missingHint: "この課題または授業は削除された可能性があります。"
+    }
+  });
+  var MAX_ANSWERS = 5e4;
+  var PICKER_LIMIT = 40;
+  var ROW = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 44,
+    padding: "7px 4px",
+    borderBottom: "1px solid var(--tomato-line)"
+  };
+  var META = {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "3px 10px",
+    marginTop: 2,
+    fontSize: 11.5,
+    lineHeight: 1.5,
+    color: "var(--tomato-ink-3)"
+  };
+  var MUTED = {
+    fontSize: 12.5,
+    lineHeight: 1.65,
+    color: "var(--tomato-ink-3)"
+  };
+  var ELLIPSIS = {
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
+  };
+  var LINK_BTN = {
+    height: 28,
+    padding: "0 10px",
+    fontSize: 12.5,
+    borderRadius: 9,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    flex: "none",
+    textDecoration: "none",
+    color: "var(--tomato-ink-2)"
+  };
+  var RESOURCE_KIND_COPY = {
+    syllabus: "resourceKindSyllabus",
+    course: "resourceKindCourse",
+    book: "resourceKindBook",
+    pastPaper: "resourceKindPastPaper",
+    mockPaper: "resourceKindMockPaper",
+    reference: "resourceKindReference",
+    attachment: "resourceKindAttachment",
+    answerSheet: "resourceKindAnswerSheet"
+  };
+  var ASSESSMENT_STATUS_COPY = {
+    upcoming: "statusUpcoming",
+    inProgress: "statusInProgress",
+    awaiting: "statusAwaiting",
+    overdue: "statusOverdue",
+    submitted: "statusSubmitted",
+    graded: "statusGraded",
+    needsReview: "statusNeedsReview"
+  };
+  function asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+  function numOr(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  function strOr(value, fallback = "") {
+    return typeof value === "string" ? value : fallback;
+  }
+  function hasTs(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 && n < 1e12;
+  }
+  function unique(values) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const value of values) {
+      if (typeof value !== "string" || value === "" || seen.has(value)) continue;
+      seen.add(value);
+      out.push(value);
+    }
+    return out;
+  }
+  function msgOf(error) {
+    if (error && typeof error.userMessage === "string") return error.userMessage;
+    if (error && typeof error.message === "string") return error.message;
+    return String(error);
+  }
+  var pad2 = (n) => String(n).padStart(2, "0");
+  function fmtDateTime(ts) {
+    if (!hasTs(ts)) return t("education.timeUnknown");
+    const d = new Date(Number(ts) * 1e3);
+    if (!Number.isFinite(d.getTime())) return t("education.timeUnknown");
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+  function fmtRange(start, end) {
+    if (!hasTs(start)) return t("education.timeUnknown");
+    const startDate = new Date(Number(start) * 1e3);
+    const startDay = `${startDate.getFullYear()}-${pad2(startDate.getMonth() + 1)}-${pad2(startDate.getDate())}`;
+    const startClock = `${pad2(startDate.getHours())}:${pad2(startDate.getMinutes())}`;
+    if (!hasTs(end)) return `${startDay} ${startClock}`;
+    const endDate = new Date(Number(end) * 1e3);
+    const endDay = `${endDate.getFullYear()}-${pad2(endDate.getMonth() + 1)}-${pad2(endDate.getDate())}`;
+    const endClock = `${pad2(endDate.getHours())}:${pad2(endDate.getMinutes())}`;
+    return endDay === startDay ? `${startDay} ${startClock}–${endClock}` : `${startDay} ${startClock} – ${endDay} ${endClock}`;
+  }
+  function fmtBytes(value) {
+    const bytes = Number(value);
+    if (!Number.isFinite(bytes) || bytes <= 0) return t("assignment.sizeUnknown");
+    const units = ["B", "KiB", "MiB", "GiB"];
+    let size = bytes;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit += 1;
+    }
+    return `${size >= 10 || unit === 0 ? Math.round(size) : size.toFixed(1)} ${units[unit]}`;
+  }
+  function basenameOf(path) {
+    const text = String(path ?? "");
+    const index = text.lastIndexOf("/");
+    return index >= 0 ? text.slice(index + 1) : text;
+  }
+  function previewKindOf(name) {
+    const ext = String(name ?? "").split(".").pop()?.toLowerCase();
+    if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif"].includes(ext))
+      return "image";
+    if (["mp3", "wav", "ogg", "m4a", "flac", "aac"].includes(ext)) return "audio";
+    if (["mp4", "webm", "mov", "mkv", "m4v"].includes(ext)) return "video";
+    if (ext === "pdf") return "pdf";
+    if (["md", "markdown", "txt", "csv", "json", "log"].includes(ext))
+      return "doc";
+    return "other";
+  }
+  function projectOf(data, projectId) {
+    return asArray(data && data.projects).find(
+      (item) => item && item.id === projectId
+    ) || null;
+  }
+  function assessmentKindLabel(kind) {
+    if (kind === "homework") return t("education.homeworkKind");
+    if (kind === "weeklyExam") return t("education.kindWeeklyExam");
+    if (kind === "mockExam") return t("education.kindMockExam");
+    if (kind === "retest") return t("education.kindRetest");
+    return strOr(kind);
+  }
+  function resourceKindLabel(kind) {
+    const key = RESOURCE_KIND_COPY[kind];
+    return key ? t(`education.${key}`) : strOr(kind);
+  }
+  function teachingTargetOf(data, task) {
+    if (!task || typeof task !== "object") return null;
+    const taskId = strOr(task.id);
+    if (taskId === "") return null;
+    const education = data && data.education || {};
+    const link = asArray(education.focusTasks).find(
+      (item) => item && item.taskId === taskId
+    );
+    if (link) {
+      const sourceId = strOr(link.sourceId);
+      if (link.kind === "lesson") {
+        const lesson = asArray(education.lessons).find(
+          (item) => item && item.id === sourceId
+        );
+        return lesson ? { lessonId: lesson.id, taskId } : null;
+      }
+      const assessment = asArray(education.assessments).find(
+        (item) => item && item.id === sourceId
+      );
+      return assessment ? { assessmentId: assessment.id, taskId } : null;
+    }
+    const byTask = asArray(education.assessments).find(
+      (item) => item && item.taskId === taskId
+    );
+    return byTask ? { assessmentId: byTask.id, taskId } : null;
+  }
+  function latestSubmissionOf(education, assessmentId) {
+    let latest = null;
+    for (const item of asArray(education.submissions)) {
+      if (!item || item.assessmentId !== assessmentId) continue;
+      if (latest === null || numOr(item.submittedAt) >= numOr(latest.submittedAt)) {
+        latest = item;
+      }
+    }
+    return latest;
+  }
+  function latestGradeOf(education, submissionId) {
+    let latest = null;
+    for (const item of asArray(education.grades)) {
+      if (!item || item.submissionId !== submissionId) continue;
+      if (latest === null || numOr(item.gradedAt) >= numOr(latest.gradedAt)) {
+        latest = item;
+      }
+    }
+    return latest;
+  }
+  function assessmentStateOf(assessment, submission, grade, at) {
+    if (grade) return grade.needsReview === true ? "needsReview" : "graded";
+    if (submission) return "submitted";
+    if (assessment.kind !== "homework") {
+      if (hasTs(assessment.stoppedAt)) return "awaiting";
+      if (hasTs(assessment.startedAt)) return "inProgress";
+      return "upcoming";
+    }
+    if (hasTs(assessment.endsAt) && at >= Number(assessment.endsAt))
+      return "overdue";
+    if (hasTs(assessment.startsAt) && at < Number(assessment.startsAt))
+      return "upcoming";
+    return "awaiting";
+  }
+  function statusChipOf(key, label) {
+    const tone = key === "overdue" || key === "missed" ? "danger" : key === "needsReview" || key === "awaiting" ? "sun" : key === "inProgress" ? "brand" : key === "graded" || key === "attended" ? "leaf" : "neutral";
+    return h(Chip, { tone }, label);
+  }
+  function errorBlock(message) {
+    if (!message) return null;
+    return h(
+      "div",
+      {
+        role: "alert",
+        style: {
+          padding: "9px 12px",
+          borderRadius: 10,
+          background: "var(--tomato-brand-soft)",
+          color: "var(--tomato-brand-deep)",
+          fontSize: 12.5,
+          lineHeight: 1.6
+        }
+      },
+      message
+    );
+  }
+  function newSubmissionId() {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+        return crypto.randomUUID();
+    } catch {
+    }
+    return `submission-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+  function AssignmentDialog({
+    open = false,
+    onClose,
+    assessmentId = null,
+    lessonId = null,
+    data = null,
+    today = "",
+    now = null
+  }) {
+    const education = data && data.education || {};
+    const assessments = asArray(education.assessments);
+    const lessons = asArray(education.lessons);
+    const assessment = assessmentId ? assessments.find((item) => item && item.id === assessmentId) || null : null;
+    const lesson = lessonId ? lessons.find((item) => item && item.id === lessonId) || null : null;
+    const subject = assessment || lesson;
+    const projectId = subject && typeof subject.projectId === "string" ? subject.projectId : "";
+    const project = projectOf(data, projectId);
+    const projectStudy = asArray(education.projects).find(
+      (item) => item && item.projectId === projectId
+    ) || null;
+    const isExam = assessment !== null && assessment.kind !== "homework";
+    const at = Number.isFinite(Number(now)) && Number(now) > 0 ? Number(now) : Math.floor(Date.now() / 1e3);
+    const submission = assessment ? latestSubmissionOf(education, assessment.id) : null;
+    const grade = submission ? latestGradeOf(education, submission.id) : null;
+    const materialIds = assessment ? unique(
+      asArray(assessment.questions).flatMap(
+        (question) => asArray(question && question.sourceIds)
+      )
+    ) : unique(asArray(lesson && lesson.resourceIds));
+    const relatedIds = projectStudy ? unique([
+      projectStudy.syllabusId,
+      ...asArray(projectStudy.pastPaperIds),
+      ...asArray(projectStudy.mockPaperIds)
+    ]) : [];
+    const submissionIds = submission ? unique(asArray(submission.resourceIds)) : [];
+    const infoIds = unique([...materialIds, ...relatedIds]);
+    const infoKey = infoIds.join("|");
+    const [access, setAccess] = useState("");
+    const [tokenError, setTokenError] = useState(null);
+    const [fetchedCatalog, setFetchedCatalog] = useState([]);
+    const [loadingCatalog, setLoadingCatalog] = useState(false);
+    const [catalogError, setCatalogError] = useState(null);
+    const [fileInfo, setFileInfo] = useState({});
+    const [answers, setAnswers] = useState("");
+    const [unfinished, setUnfinished] = useState(false);
+    const [pickedSheets, setPickedSheets] = useState([]);
+    const [submitError, setSubmitError] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [pendingId, setPendingId] = useState(null);
+    const [examBusy, setExamBusy] = useState(false);
+    const [examError, setExamError] = useState(null);
+    const [preview, setPreview] = useState(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [pickerQuery, setPickerQuery] = useState("");
+    const [pickerApplied, setPickerApplied] = useState("");
+    const [pickerItems, setPickerItems] = useState([]);
+    const [pickerLoading, setPickerLoading] = useState(false);
+    const [pickerError, setPickerError] = useState(null);
+    const [pickerNoIndex, setPickerNoIndex] = useState(false);
+    const [registeringPath, setRegisteringPath] = useState(null);
+    const [progressDraft, setProgressDraft] = useState("");
+    const [progressError, setProgressError] = useState(null);
+    const [progressBusy, setProgressBusy] = useState(false);
+    useEffect(() => {
+      if (!open) return;
+      setAnswers("");
+      setUnfinished(false);
+      setPickedSheets([]);
+      setSubmitError(null);
+      setPendingId(null);
+      setExamError(null);
+      setPreview(null);
+      setPickerOpen(false);
+      setPickerQuery("");
+      setPickerApplied("");
+      setPickerItems([]);
+      setPickerError(null);
+      setPickerNoIndex(false);
+      setRegisteringPath(null);
+      setProgressDraft(
+        lesson && typeof lesson.progress === "string" ? lesson.progress : ""
+      );
+      setProgressError(null);
+    }, [open, assessmentId, lessonId]);
+    useEffect(() => {
+      if (!open || projectId === "") return void 0;
+      let cancelled = false;
+      setAccess("");
+      setTokenError(null);
+      setFetchedCatalog([]);
+      setCatalogError(null);
+      setLoadingCatalog(true);
+      getFileToken({ timeoutMs: 5e3 }).then((result) => {
+        if (!cancelled)
+          setAccess(result && result.access ? String(result.access) : "");
+      }).catch((error) => {
+        if (!cancelled) setTokenError(msgOf(error));
+      });
+      getStateWithResources({ timeoutMs: 8e3 }).then((result) => {
+        if (cancelled) return;
+        const resources = asArray(
+          result && result.data && result.data.education ? result.data.education.resources : null
+        );
+        setFetchedCatalog(resources);
+      }).catch((error) => {
+        if (!cancelled) setCatalogError(msgOf(error));
+      }).finally(() => {
+        if (!cancelled) setLoadingCatalog(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [open, projectId]);
+    useEffect(() => {
+      if (!open || infoIds.length === 0) return void 0;
+      let cancelled = false;
+      const ids = infoIds;
+      Promise.all(
+        ids.map(
+          (id) => getResourceInfo(id, { timeoutMs: 5e3 }).then((info) => [id, info]).catch(() => [id, null])
+        )
+      ).then((pairs) => {
+        if (cancelled) return;
+        const next = {};
+        for (const [id, info] of pairs) if (info) next[id] = info;
+        setFileInfo(next);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [open, infoKey]);
+    useEffect(() => {
+      if (!pickerOpen) return void 0;
+      const timer = setTimeout(() => setPickerApplied(pickerQuery.trim()), 300);
+      return () => clearTimeout(timer);
+    }, [pickerOpen, pickerQuery]);
+    useEffect(() => {
+      if (!pickerOpen || projectId === "" || pickerNoIndex) return void 0;
+      let cancelled = false;
+      setPickerLoading(true);
+      setPickerError(null);
+      getLibraryItems(
+        { projectId, q: pickerApplied, limit: PICKER_LIMIT },
+        { timeoutMs: 15e3 }
+      ).then((result) => {
+        if (cancelled) return;
+        if (result && result.hasIndex === false) {
+          setPickerNoIndex(true);
+          setPickerItems([]);
+          return;
+        }
+        setPickerItems(
+          asArray(result && result.items).filter(
+            (item) => item && typeof item.path === "string" && item.path !== ""
+          )
+        );
+      }).catch((error) => {
+        if (!cancelled) setPickerError(msgOf(error));
+      }).finally(() => {
+        if (!cancelled) setPickerLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [pickerOpen, pickerApplied, projectId, pickerNoIndex]);
+    const catalog = useMemo(() => {
+      const map = /* @__PURE__ */ new Map();
+      for (const item of asArray(
+        data && data.education ? data.education.resources : null
+      )) {
+        if (item && typeof item.id === "string") map.set(item.id, item);
+      }
+      for (const item of fetchedCatalog) {
+        if (item && typeof item.id === "string")
+          map.set(item.id, { ...map.get(item.id) || {}, ...item });
+      }
+      return map;
+    }, [data, fetchedCatalog]);
+    const resourceOf = (id) => catalog.get(id) || { id, projectId, title: id, kind: "", path: "" };
+    const displayName = (resource) => {
+      const info = fileInfo[resource.id];
+      return strOr(resource.title) || strOr(info && info.name) || basenameOf(resource.path) || resource.id;
+    };
+    const answerSheets = Array.from(catalog.values()).filter(
+      (item) => item && item.projectId === projectId && item.kind === "answerSheet" && typeof item.id === "string"
+    ).sort((a, b) => strOr(a.title).localeCompare(strOr(b.title)));
+    const materialRows = materialIds.map(resourceOf);
+    const relatedRows = relatedIds.filter((id) => !materialIds.includes(id)).map(resourceOf);
+    const attachmentRows = submissionIds.map(resourceOf);
+    const lessonWindowOpen = lesson !== null && hasTs(lesson.startsAt) && hasTs(lesson.endsAt) && at >= Number(lesson.startsAt) && at < Number(lesson.endsAt);
+    const resourceRow = (resource) => {
+      const info = fileInfo[resource.id] || null;
+      const name = displayName(resource);
+      const previewable = info === null || info.canPreview !== false;
+      const viewUrl = access !== "" && previewable ? resourceFileUrl(resource.id, access, false) : "";
+      const downloadUrl = access !== "" ? resourceFileUrl(resource.id, access, true) : "";
+      const fileHint = access === "" ? tokenError ? t("assignment.fileTokenFailed", { error: tokenError }) : t("assignment.loading") : t("assignment.previewBlocked");
+      return h(
+        "div",
+        { key: resource.id, style: ROW },
+        h(Icon, {
+          name: "folder",
+          size: 15,
+          style: { color: "var(--tomato-ink-3)", flex: "none" }
+        }),
+        h(
+          "div",
+          { style: { flex: 1, minWidth: 0 } },
+          h(
+            "div",
+            {
+              style: {
+                ...ELLIPSIS,
+                fontSize: 12.5,
+                color: "var(--tomato-ink)"
+              }
+            },
+            name
+          ),
+          h(
+            "div",
+            { style: META },
+            resource.kind ? h(Chip, { tone: "neutral" }, resourceKindLabel(resource.kind)) : null,
+            h("span", { className: "t-mono" }, fmtBytes(info && info.sizeBytes)),
+            resource.path ? h(
+              "span",
+              { className: "t-mono", style: ELLIPSIS, title: resource.path },
+              resource.path
+            ) : null
+          )
+        ),
+        previewable && viewUrl ? h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "eye",
+            onClick: () => setPreview(resource)
+          },
+          t("assignment.preview")
+        ) : h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "eye",
+            disabled: true,
+            title: fileHint
+          },
+          t("assignment.preview")
+        ),
+        downloadUrl ? h(
+          "a",
+          {
+            href: downloadUrl,
+            title: t("assignment.download"),
+            style: LINK_BTN,
+            className: "t-root t-btn t-btn-ghost"
+          },
+          h(Icon, { name: "download", size: 15 }),
+          t("assignment.download")
+        ) : h(
+          Btn,
+          {
+            variant: "ghost",
+            size: "sm",
+            icon: "download",
+            disabled: true,
+            title: fileHint
+          },
+          t("assignment.download")
+        )
+      );
+    };
+    const openPicker = () => {
+      setPickerOpen(true);
+      setPickerQuery("");
+      setPickerApplied("");
+      setPickerItems([]);
+      setPickerError(null);
+      setPickerNoIndex(false);
+    };
+    const toggleSheet = (id) => {
+      setPickedSheets(
+        (current4) => current4.includes(id) ? current4.filter((item) => item !== id) : [...current4, id]
+      );
+      setSubmitError(null);
+    };
+    const submit = async () => {
+      if (busy || !assessment) return;
+      const id = pendingId || newSubmissionId();
+      setBusy(true);
+      setSubmitError(null);
+      const result = await tryDispatch({
+        type: "education",
+        command: {
+          op: "submit",
+          submission: {
+            id,
+            assessmentId: assessment.id,
+            submittedAt: Math.floor(Date.now() / 1e3),
+            resourceIds: pickedSheets,
+            answers,
+            unfinished: !!unfinished,
+            questionTimes: []
+          }
+        }
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setPendingId(id);
+        setSubmitError(result.error || t("common.writeFailed"));
+        return;
+      }
+      setPendingId(null);
+      setAnswers("");
+      setPickedSheets([]);
+      setUnfinished(false);
+      notify(t("assignment.submitDone"), "brand");
+    };
+    const examOp = async (op) => {
+      if (examBusy || !assessment) return;
+      setExamBusy(true);
+      setExamError(null);
+      const result = await tryDispatch({
+        type: "education",
+        command: { op, id: assessment.id }
+      });
+      setExamBusy(false);
+      if (!result.ok) setExamError(result.error || t("common.writeFailed"));
+    };
+    const saveProgress = async () => {
+      if (progressBusy || !lesson) return;
+      if (progressDraft.trim() === "") {
+        setProgressError(t("assignment.progressRequired"));
+        return;
+      }
+      setProgressBusy(true);
+      setProgressError(null);
+      const result = await tryDispatch({
+        type: "education",
+        command: { op: "attendLesson", id: lesson.id, progress: progressDraft }
+      });
+      setProgressBusy(false);
+      if (!result.ok) {
+        setProgressError(result.error || t("common.writeFailed"));
+        return;
+      }
+      notify(t("assignment.progressSaved"), "brand");
+    };
+    const registerSheet = async (item) => {
+      if (registeringPath !== null || !item) return;
+      setRegisteringPath(strOr(item.path));
+      setPickerError(null);
+      try {
+        const created = await registerResource(
+          projectId,
+          {
+            title: strOr(item.name) || basenameOf(item.path),
+            kind: "answerSheet",
+            path: String(item.path),
+            source: "",
+            edition: "",
+            topics: []
+          },
+          { timeoutMs: 8e3 }
+        );
+        const entry = created && created.resource ? created.resource : created || null;
+        if (entry && typeof entry.id === "string") {
+          setFetchedCatalog((current4) => [
+            ...current4.filter((row) => row.id !== entry.id),
+            entry
+          ]);
+          setPickedSheets((current4) => unique([...current4, entry.id]));
+        }
+        setPickerOpen(false);
+        notify(t("assignment.registered"), "brand");
+      } catch (error) {
+        setPickerError(t("assignment.registerFailed", { error: msgOf(error) }));
+      } finally {
+        setRegisteringPath(null);
+      }
+    };
+    if (!open) return null;
+    if (!subject) {
+      return h(
+        Modal,
+        {
+          open,
+          onClose,
+          icon: "tasks",
+          title: t("assignment.missingTitle"),
+          footer: h(
+            "div",
+            { style: { display: "flex", justifyContent: "flex-end" } },
+            h(
+              Btn,
+              { variant: "plain", size: "sm", onClick: onClose },
+              t("common.close")
+            )
+          )
+        },
+        h(Empty, {
+          icon: "search",
+          title: t("assignment.missingTitle"),
+          hint: t("assignment.missingHint")
+        })
+      );
+    }
+    const kindLabel2 = assessment ? assessmentKindLabel(assessment.kind) : t("education.lessonKind");
+    const statusKey = assessment ? assessmentStateOf(assessment, submission, grade, at) : lesson.attended === true ? "attended" : lesson.state === "missed" ? "missed" : "upcoming";
+    const statusLabel2 = assessment ? ASSESSMENT_STATUS_COPY[statusKey] ? t(`education.${ASSESSMENT_STATUS_COPY[statusKey]}`) : statusKey : statusKey === "attended" ? t("assignment.lessonAttended") : statusKey === "missed" ? t("education.statusMissed") : t("assignment.lessonUpcoming");
+    const canSubmit = assessment !== null && submission === null;
+    const examStarted = assessment !== null && hasTs(assessment.startedAt);
+    const examStopped = assessment !== null && hasTs(assessment.stoppedAt);
+    const examPrintable = assessment !== null && hasTs(assessment.printedAt);
+    const submitDisabled = busy || isExam && !examStopped || assessment !== null && submission !== null;
+    const header = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 6
+          }
+        },
+        h(
+          Chip,
+          { tone: isExam ? "sun" : assessment ? "brand" : "leaf", icon: "tasks" },
+          kindLabel2
+        ),
+        h(
+          Chip,
+          {
+            tone: "neutral",
+            icon: "clock",
+            style: { fontVariantNumeric: "tabular-nums" }
+          },
+          fmtRange(subject.startsAt, subject.endsAt)
+        ),
+        project ? h(
+          Chip,
+          { tone: "neutral", icon: "folder" },
+          strOr(project.name, projectId)
+        ) : null,
+        statusChipOf(statusKey, statusLabel2)
+      ),
+      assessment && strOr(assessment.instructions) !== "" ? h(
+        "div",
+        {
+          style: {
+            padding: "10px 13px",
+            borderRadius: 11,
+            background: "var(--tomato-surface-2)",
+            fontSize: 12.5,
+            lineHeight: 1.7,
+            color: "var(--tomato-ink-2)",
+            whiteSpace: "pre-wrap"
+          }
+        },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: ".04em",
+              color: "var(--tomato-ink-3)",
+              marginBottom: 4
+            }
+          },
+          t("assignment.instructions")
+        ),
+        assessment.instructions
+      ) : null,
+      lesson && asArray(lesson.topics).length > 0 ? h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 5
+          }
+        },
+        h(
+          "span",
+          { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+          t("assignment.topics")
+        ),
+        asArray(lesson.topics).map(
+          (topic, index) => h(Chip, { key: index, tone: "neutral" }, strOr(topic))
+        )
+      ) : null
+    );
+    let materialsBody;
+    if (loadingCatalog && materialRows.length === 0) {
+      materialsBody = h("div", { style: MUTED }, t("assignment.loading"));
+    } else if (materialRows.length === 0) {
+      materialsBody = h(Empty, {
+        icon: "folder",
+        title: assessment ? t("assignment.materialsEmpty") : t("assignment.lessonMaterialsEmpty"),
+        style: { padding: "22px 12px" }
+      });
+    } else {
+      materialsBody = h("div", null, materialRows.map(resourceRow));
+    }
+    const materialsSection = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 4 } },
+      h(SectionTitle, {
+        icon: "folder",
+        title: assessment ? t("assignment.materialsHomework") : t("assignment.materialsLesson"),
+        hint: t("assignment.materialsHint")
+      }),
+      materialsBody,
+      catalogError ? errorBlock(t("assignment.loadFailed", { error: catalogError })) : null
+    );
+    const relatedSection = relatedRows.length === 0 ? null : h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 4 } },
+      h(SectionTitle, {
+        icon: "tag",
+        title: t("assignment.related"),
+        hint: t("assignment.relatedHint")
+      }),
+      h("div", null, relatedRows.map(resourceRow))
+    );
+    const tokenNote = tokenError ? errorBlock(t("assignment.fileTokenFailed", { error: tokenError })) : null;
+    const examSection = !isExam ? null : h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h(SectionTitle, {
+        icon: "timer",
+        title: t("assignment.examTitle")
+      }),
+      h(
+        "div",
+        { style: MUTED },
+        !examStarted ? t("assignment.examStartHint") : !examStopped ? t("assignment.examRunning") : t("assignment.examStopped")
+      ),
+      !examPrintable && !examStarted ? errorBlock(t("assignment.examNotPrinted")) : null,
+      examStarted && !examStopped ? h(
+        "div",
+        { style: MUTED },
+        t("assignment.examStartedAt", {
+          time: fmtDateTime(assessment.startedAt)
+        })
+      ) : null,
+      examStopped ? h(
+        "div",
+        { style: MUTED },
+        t("assignment.examStartedAt", {
+          time: fmtDateTime(assessment.startedAt)
+        }),
+        " · ",
+        t("assignment.examStoppedAt", {
+          time: fmtDateTime(assessment.stoppedAt)
+        })
+      ) : null,
+      !examStarted ? h(
+        "div",
+        null,
+        h(
+          Btn,
+          {
+            variant: "soft",
+            size: "md",
+            icon: "play",
+            disabled: examBusy || !examPrintable,
+            title: examPrintable ? t("assignment.examStartHint") : t("assignment.examNotPrinted"),
+            onClick: () => examOp("startExam")
+          },
+          t("assignment.examStart")
+        )
+      ) : !examStopped ? h(
+        "div",
+        null,
+        h(
+          Btn,
+          {
+            variant: "soft",
+            size: "md",
+            icon: "stop",
+            disabled: examBusy,
+            onClick: () => examOp("endExam")
+          },
+          t("assignment.examStop")
+        )
+      ) : null,
+      errorBlock(examError)
+    );
+    let submissionSection = null;
+    if (assessment && submission !== null) {
+      submissionSection = h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 10 } },
+        h(SectionTitle, {
+          icon: "check",
+          title: t("assignment.submission"),
+          hint: t("assignment.submittedAt", {
+            time: fmtDateTime(submission.submittedAt)
+          })
+        }),
+        h(
+          "div",
+          { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+          continuationGrade(grade),
+          submission.unfinished === true ? h(
+            Chip,
+            { tone: "sun", icon: "clock" },
+            t("assignment.unfinishedTag")
+          ) : null
+        ),
+        h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 5 } },
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink-2)"
+              }
+            },
+            t("assignment.answers")
+          ),
+          strOr(submission.answers) === "" ? h("div", { style: MUTED }, t("assignment.answersEmpty")) : h(
+            "div",
+            {
+              className: "t-scroll",
+              style: {
+                maxHeight: 180,
+                overflowY: "auto",
+                padding: "10px 13px",
+                borderRadius: 10,
+                background: "var(--tomato-surface-2)",
+                fontSize: 12.5,
+                lineHeight: 1.7,
+                color: "var(--tomato-ink-2)",
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere"
+              }
+            },
+            submission.answers
+          )
+        ),
+        h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 5 } },
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink-2)"
+              }
+            },
+            t("assignment.attachments")
+          ),
+          attachmentRows.length === 0 ? h("div", { style: MUTED }, t("assignment.attachmentsEmpty")) : h("div", null, attachmentRows.map(resourceRow))
+        ),
+        h("div", { style: MUTED }, t("assignment.lockedHint")),
+        errorBlock(submitError)
+      );
+    } else if (assessment) {
+      submissionSection = h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 12 } },
+        h(SectionTitle, {
+          icon: "upload",
+          title: t("assignment.submission"),
+          hint: t("assignment.lockedHint")
+        }),
+        h(
+          Field,
+          {
+            label: t("assignment.answerLabel"),
+            hint: t("assignment.answerCount", { n: answers.length })
+          },
+          h(TextArea, {
+            value: answers,
+            rows: 5,
+            placeholder: t("assignment.answerPlaceholder"),
+            onChange: (value) => {
+              setAnswers(String(value ?? "").slice(0, MAX_ANSWERS));
+              setSubmitError(null);
+            }
+          })
+        ),
+        h(Toggle, {
+          checked: unfinished,
+          onChange: setUnfinished,
+          label: t("assignment.unfinished")
+        }),
+        h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 7 } },
+          h(
+            "div",
+            {
+              style: {
+                fontSize: 12,
+                fontWeight: 550,
+                color: "var(--tomato-ink-2)"
+              }
+            },
+            t("assignment.answerSheets")
+          ),
+          h("div", { style: MUTED }, t("assignment.answerSheetsHint")),
+          answerSheets.length === 0 ? h("div", { style: MUTED }, t("assignment.answerSheetsEmpty")) : h(
+            "div",
+            null,
+            answerSheets.map(
+              (resource) => h(
+                "div",
+                {
+                  key: resource.id,
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    minHeight: 38,
+                    padding: "4px 2px",
+                    borderBottom: "1px solid var(--tomato-line)"
+                  }
+                },
+                h(Check, {
+                  checked: pickedSheets.includes(resource.id),
+                  label: displayName(resource),
+                  onChange: () => toggleSheet(resource.id)
+                }),
+                h(
+                  "div",
+                  { style: { flex: 1, minWidth: 0 } },
+                  h(
+                    "div",
+                    { style: { ...ELLIPSIS, fontSize: 12.5 } },
+                    displayName(resource)
+                  ),
+                  resource.path ? h(
+                    "div",
+                    {
+                      className: "t-mono",
+                      style: { ...META, marginTop: 1 }
+                    },
+                    resource.path
+                  ) : null
+                )
+              )
+            )
+          ),
+          h(
+            "div",
+            null,
+            h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                icon: "plus",
+                onClick: openPicker
+              },
+              t("assignment.registerSheet")
+            )
+          )
+        ),
+        errorBlock(submitError)
+      );
+    }
+    const lessonSection = lesson ? h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h(SectionTitle, {
+        icon: "education",
+        title: t("assignment.lessonProgress"),
+        hint: lesson.attended === true ? t("assignment.lessonAttended") : t("assignment.progressWindow")
+      }),
+      strOr(lesson.progress) === "" ? h("div", { style: MUTED }, t("assignment.lessonProgressEmpty")) : h(
+        "div",
+        {
+          style: {
+            padding: "10px 13px",
+            borderRadius: 10,
+            background: "var(--tomato-surface-2)",
+            fontSize: 12.5,
+            lineHeight: 1.7,
+            color: "var(--tomato-ink-2)",
+            whiteSpace: "pre-wrap"
+          }
+        },
+        lesson.progress
+      ),
+      h(TextArea, {
+        value: progressDraft,
+        rows: 3,
+        placeholder: t("assignment.progressPlaceholder"),
+        onChange: (value) => {
+          setProgressDraft(String(value ?? ""));
+          setProgressError(null);
+        }
+      }),
+      !lessonWindowOpen ? h("div", { style: MUTED }, t("assignment.progressWindow")) : null,
+      h(
+        "div",
+        null,
+        h(
+          Btn,
+          {
+            variant: "primary",
+            size: "md",
+            icon: "check",
+            disabled: progressBusy || !lessonWindowOpen,
+            onClick: saveProgress
+          },
+          progressBusy ? t("assignment.savingProgress") : t("assignment.saveProgress")
+        )
+      ),
+      errorBlock(progressError)
+    ) : null;
+    const footer = h(
+      "div",
+      { style: { display: "flex", alignItems: "center", gap: 9, width: "100%" } },
+      h(
+        "div",
+        { style: { flex: 1, fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+        isExam && !examStopped ? t("assignment.examRunning") : ""
+      ),
+      h(
+        Btn,
+        {
+          variant: "plain",
+          size: "sm",
+          onClick: onClose,
+          disabled: busy
+        },
+        t("common.close")
+      ),
+      canSubmit ? h(
+        Btn,
+        {
+          variant: "primary",
+          size: "sm",
+          icon: "check",
+          disabled: submitDisabled,
+          title: isExam && !examStopped ? t("assignment.examRunning") : t("assignment.lockedHint"),
+          onClick: submit
+        },
+        busy ? t("assignment.submitting") : isExam ? t("assignment.submitExam") : t("assignment.submitHomework")
+      ) : null
+    );
+    return h(
+      "div",
+      null,
+      h(
+        Modal,
+        {
+          open,
+          onClose: () => {
+            if (!busy && !progressBusy) onClose?.();
+          },
+          icon: isExam ? "timer" : assessment ? "tasks" : "education",
+          title: strOr(subject.title, kindLabel2),
+          subtitle: `${kindLabel2} · ${fmtRange(subject.startsAt, subject.endsAt)}`,
+          width: 760,
+          footer
+        },
+        h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 16 } },
+          header,
+          materialsSection,
+          relatedSection,
+          tokenNote,
+          examSection ? h(Divider, null) : null,
+          examSection,
+          submissionSection ? h(Divider, null) : null,
+          submissionSection,
+          lessonSection ? h(Divider, null) : null,
+          lessonSection
+        )
+      ),
+      h(FilePreview, {
+        open: preview !== null,
+        onClose: () => setPreview(null),
+        name: preview ? displayName(preview) : "",
+        kind: preview ? previewKindOf(displayName(preview)) : "other",
+        sizeBytes: preview ? fileInfo[preview.id]?.sizeBytes : void 0,
+        viewUrl: preview && access !== "" ? resourceFileUrl(preview.id, access, false) : "",
+        downloadUrl: preview && access !== "" ? resourceFileUrl(preview.id, access, true) : "",
+        previewable: preview === null || fileInfo[preview.id] === void 0 || fileInfo[preview.id].canPreview !== false,
+        emptyHint: t("assignment.previewBlocked")
+      }),
+      pickerOpen ? h(
+        Modal,
+        {
+          open: pickerOpen,
+          onClose: registeringPath === null ? () => setPickerOpen(false) : void 0,
+          icon: "search",
+          title: t("assignment.pickerTitle"),
+          subtitle: t("assignment.pickerSubtitle"),
+          width: 680
+        },
+        h(
+          "div",
+          { style: { display: "flex", flexDirection: "column", gap: 10 } },
+          h(Input, {
+            value: pickerQuery,
+            onChange: (value) => setPickerQuery(String(value ?? "")),
+            placeholder: t("assignment.pickerSearch"),
+            maxLength: 120
+          }),
+          pickerError ? errorBlock(pickerError) : null,
+          pickerNoIndex ? h("div", { style: MUTED }, t("assignment.pickerNoIndex")) : null,
+          pickerLoading ? h("div", { style: MUTED }, t("assignment.loading")) : pickerItems.length === 0 ? h(Empty, {
+            icon: "folder",
+            title: t("assignment.pickerEmpty")
+          }) : h(
+            "div",
+            {
+              className: "t-scroll",
+              style: { maxHeight: 360, overflowY: "auto" }
+            },
+            pickerItems.map(
+              (item, index) => h(
+                "div",
+                {
+                  key: strOr(item.path) || index,
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "6px 2px",
+                    borderBottom: "1px solid var(--tomato-line)"
+                  }
+                },
+                h(
+                  "div",
+                  { style: { flex: 1, minWidth: 0 } },
+                  h(
+                    "div",
+                    { style: { ...ELLIPSIS, fontSize: 12.5 } },
+                    strOr(item.name) || basenameOf(item.path)
+                  ),
+                  h(
+                    "div",
+                    {
+                      className: "t-mono",
+                      style: { ...META, marginTop: 1 }
+                    },
+                    strOr(item.path),
+                    item.sizeBytes ? ` · ${fmtBytes(item.sizeBytes)}` : ""
+                  )
+                ),
+                h(
+                  Btn,
+                  {
+                    variant: "soft",
+                    size: "sm",
+                    icon: "plus",
+                    disabled: registeringPath !== null,
+                    onClick: () => registerSheet(item)
+                  },
+                  registeringPath === strOr(item.path) ? t("assignment.registering") : t("assignment.register")
+                )
+              )
+            )
+          )
+        )
+      ) : null
+    );
+  }
+  function continuationGrade(grade) {
+    if (!grade)
+      return h(
+        Chip,
+        { tone: "sun", icon: "clock" },
+        t("assignment.waitingGrade")
+      );
+    return h(
+      "div",
+      { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+      h(
+        Chip,
+        { tone: "leaf", icon: "check" },
+        t("assignment.gradedAt", { time: fmtDateTime(grade.gradedAt) })
+      ),
+      grade.needsReview === true ? h(Chip, { tone: "sun", icon: "bell" }, t("assignment.needsReview")) : null
+    );
+  }
+
   // plugin/src/client/shared/project-whitelist.js
   registerCopy("pw", {
     zh: {
@@ -15317,6 +17326,7 @@ ${JSON.stringify(refs, null, 2)}`;
       tasksTitle: "任务",
       newTaskHint: "新建的任务默认属于这个项目",
       startFocus: "开始专注",
+      openWorkbench: "打开作业详情",
       pauseFocus: "暂停专注",
       focusOn: "专注于 {title}",
       timerBusy: "请先结束当前计时",
@@ -15391,6 +17401,7 @@ ${JSON.stringify(refs, null, 2)}`;
       tasksTitle: "Tasks",
       newTaskHint: "New tasks belong to this project by default",
       startFocus: "Start focus",
+      openWorkbench: "Open assignment",
       pauseFocus: "Pause focus",
       focusOn: "Focus on {title}",
       timerBusy: "Finish the current timer first",
@@ -15465,6 +17476,7 @@ ${JSON.stringify(refs, null, 2)}`;
       tasksTitle: "タスク",
       newTaskHint: "新しいタスクはこのプロジェクトに属します",
       startFocus: "集中開始",
+      openWorkbench: "課題を開く",
       pauseFocus: "一時停止",
       focusOn: "{title} に集中",
       timerBusy: "先に現在のタイマーを終了してください",
@@ -15580,15 +17592,19 @@ ${JSON.stringify(refs, null, 2)}`;
     last,
     onToggle,
     onEdit,
-    onPlay
+    onPlay,
+    target = null,
+    onOpen
   }) {
     const completed = !!task.completed;
+    const teaching = target !== null;
     const estimate = Math.max(1, Number(task.estimate) || 1);
     const rounds = taskRounds(data, task.id);
     const achieved = rounds >= estimate;
     const overdue = isOverdue(task, today);
     const running = !!timer.running && timer.taskId === task.id;
     const displayTitle = task.title || t("project.untitled");
+    const teachingLabel2 = target ? target.lessonId ? t("education.lessonKind") : t("education.homeworkKind") : "";
     return h(
       "div",
       {
@@ -15603,7 +17619,8 @@ ${JSON.stringify(refs, null, 2)}`;
           borderBottom: last ? "none" : "1px solid var(--tomato-line)"
         }
       },
-      h(Check, {
+      // 教学任务的完成由提交/参与驱动，勾选框只会绕过 core 的入口校验。
+      teaching ? null : h(Check, {
         checked: completed,
         label: completed ? t("project.reopenTask", { title: displayTitle }) : t("project.completeTask", { title: displayTitle }),
         onChange: () => onToggle(task)
@@ -15612,7 +17629,8 @@ ${JSON.stringify(refs, null, 2)}`;
         "button",
         {
           type: "button",
-          onClick: () => onEdit(task),
+          title: teaching ? t("project.openWorkbench") : void 0,
+          onClick: teaching ? () => onOpen?.(target) : () => onEdit(task),
           style: {
             flex: 1,
             minWidth: 0,
@@ -15659,6 +17677,14 @@ ${JSON.stringify(refs, null, 2)}`;
               color: "var(--tomato-ink-3)"
             }
           },
+          teaching ? h(
+            Chip,
+            {
+              tone: target.lessonId ? "leaf" : "brand",
+              icon: target.lessonId ? "education" : "tasks"
+            },
+            teachingLabel2
+          ) : null,
           task.reminderTime ? h(
             "span",
             {
@@ -16398,12 +18424,14 @@ ${JSON.stringify(refs, null, 2)}`;
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteError, setDeleteError] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [assignment, setAssignment] = useState(null);
     useEffect(() => {
       setTab("active");
       setEditor(null);
       setEditProjectOpen(false);
       setDeleteOpen(false);
       setDeleteError(null);
+      setAssignment(null);
     }, [currentId]);
     const projectTasks = project ? tasks.filter((task) => task.projectId === project.id) : [];
     const counts = {
@@ -16670,8 +18698,9 @@ ${JSON.stringify(refs, null, 2)}`;
             },
             t("project.newTask")
           )
-        }) : visible.map(
-          (task, index) => h(ProjectTaskRow, {
+        }) : visible.map((task, index) => {
+          const target = teachingTargetOf(viewData, task);
+          return h(ProjectTaskRow, {
             key: task.id,
             task,
             today,
@@ -16679,10 +18708,12 @@ ${JSON.stringify(refs, null, 2)}`;
             timer,
             last: index === visible.length - 1,
             onToggle: toggleComplete,
-            onEdit: (target) => setEditor({ id: target.id }),
-            onPlay: playTask
-          })
-        )
+            onEdit: (row) => setEditor({ id: row.id }),
+            onPlay: playTask,
+            target,
+            onOpen: setAssignment
+          });
+        })
       ),
       h(
         "div",
@@ -16878,7 +18909,16 @@ ${JSON.stringify(refs, null, 2)}`;
             deleteError
           ) : null
         )
-      )
+      ),
+      h(AssignmentDialog, {
+        open: assignment !== null,
+        onClose: () => setAssignment(null),
+        assessmentId: assignment ? assignment.assessmentId ?? null : null,
+        lessonId: assignment ? assignment.lessonId ?? null : null,
+        data,
+        today,
+        now: state && state.serverTime || null
+      })
     );
   }
   registerPage({
@@ -18321,13 +20361,13 @@ ${JSON.stringify(refs, null, 2)}`;
       noDaysHint: "Stats build up day by day; check back soon."
     }
   });
-  var pad2 = (n) => String(n).padStart(2, "0");
+  var pad22 = (n) => String(n).padStart(2, "0");
   var DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
   function fmtSessionTime(unixSecs) {
     const secs = Number(unixSecs);
     if (!Number.isFinite(secs) || secs <= 0) return "—";
     const d = new Date(secs * 1e3);
-    return `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return `${d.getMonth() + 1}/${d.getDate()} ${pad22(d.getHours())}:${pad22(d.getMinutes())}`;
   }
   function NumCell({ value, color }) {
     const n = Number(value) || 0;
@@ -20438,6 +22478,7 @@ ${JSON.stringify(refs, null, 2)}`;
       focusStarted: "已开始专注",
       noTodayTasks: "今天没有安排学习任务。",
       lessonKind: "课程",
+      openWorkbench: "打开任务详情",
       homeworkKind: "作业",
       studyTaskKind: "学习",
       reminderLabel: "提醒 {time}",
@@ -20646,6 +22687,7 @@ ${JSON.stringify(refs, null, 2)}`;
       focusStarted: "Focus started",
       noTodayTasks: "No study tasks scheduled today.",
       lessonKind: "Lesson",
+      openWorkbench: "Open task details",
       homeworkKind: "Homework",
       studyTaskKind: "Study",
       reminderLabel: "Remind {time}",
@@ -20840,7 +22882,7 @@ ${JSON.stringify(refs, null, 2)}`;
     "attachment",
     "answerSheet"
   ];
-  var RESOURCE_KIND_COPY = {
+  var RESOURCE_KIND_COPY2 = {
     syllabus: "resourceKindSyllabus",
     course: "resourceKindCourse",
     book: "resourceKindBook",
@@ -20861,57 +22903,57 @@ ${JSON.stringify(refs, null, 2)}`;
   };
   function indexKindLabel(kind) {
     const key = INDEX_KIND_COPY[kind];
-    return key ? t(`education.${key}`) : strOr(kind);
+    return key ? t(`education.${key}`) : strOr2(kind);
   }
-  function formatBytes(n) {
-    const value = numOr(n, 0);
+  function formatBytes2(n) {
+    const value = numOr2(n, 0);
     if (value < 1024) return `${value} B`;
     if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
     return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
   }
-  function asArray(value) {
+  function asArray2(value) {
     return Array.isArray(value) ? value : [];
   }
-  function numOr(value, fallback) {
+  function numOr2(value, fallback) {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
   }
-  function strOr(value, fallback = "") {
+  function strOr2(value, fallback = "") {
     return typeof value === "string" ? value : fallback;
   }
-  function hasTs(value) {
+  function hasTs2(value) {
     const n = Number(value);
     return Number.isFinite(n) && n > 0 && n < 1e12;
   }
-  var pad22 = (n) => String(n).padStart(2, "0");
+  var pad23 = (n) => String(n).padStart(2, "0");
   function clockOf(ts) {
-    if (!hasTs(ts)) return "";
+    if (!hasTs2(ts)) return "";
     const d = new Date(Number(ts) * 1e3);
     if (!Number.isFinite(d.getTime())) return "";
-    return `${pad22(d.getHours())}:${pad22(d.getMinutes())}`;
+    return `${pad23(d.getHours())}:${pad23(d.getMinutes())}`;
   }
-  function fmtDateTime(ts) {
-    if (!hasTs(ts)) return t("education.timeUnknown");
+  function fmtDateTime2(ts) {
+    if (!hasTs2(ts)) return t("education.timeUnknown");
     return `${dayKey(Number(ts))} ${clockOf(ts)}`;
   }
-  function fmtRange(startSecs, endSecs) {
-    if (!hasTs(startSecs)) return t("education.timeUnknown");
+  function fmtRange2(startSecs, endSecs) {
+    if (!hasTs2(startSecs)) return t("education.timeUnknown");
     const startDay = dayKey(Number(startSecs));
     const start = clockOf(startSecs);
-    if (!hasTs(endSecs)) return `${startDay} ${start}`;
+    if (!hasTs2(endSecs)) return `${startDay} ${start}`;
     const endDay = dayKey(Number(endSecs));
     const end = clockOf(endSecs);
     return endDay === startDay ? `${startDay} ${start}–${end}` : `${startDay} ${start} – ${endDay} ${end}`;
   }
   function sortDesc(list, key) {
-    return asArray(list).slice().sort((a, b) => numOr(b && b[key], 0) - numOr(a && a[key], 0));
+    return asArray2(list).slice().sort((a, b) => numOr2(b && b[key], 0) - numOr2(a && a[key], 0));
   }
   function sortAsc(list, key) {
-    return asArray(list).slice().sort((a, b) => numOr(a && a[key], 0) - numOr(b && b[key], 0));
+    return asArray2(list).slice().sort((a, b) => numOr2(a && a[key], 0) - numOr2(b && b[key], 0));
   }
   function normalizeEducation(raw) {
     const src = raw && typeof raw === "object" ? raw : {};
-    const list = (key) => asArray(src[key]).filter((item) => item && typeof item === "object");
+    const list = (key) => asArray2(src[key]).filter((item) => item && typeof item === "object");
     return {
       focusTasks: list("focusTasks"),
       projects: list("projects"),
@@ -20933,14 +22975,14 @@ ${JSON.stringify(refs, null, 2)}`;
     const submissionOf = /* @__PURE__ */ new Map();
     for (const submission of edu.submissions) {
       const old = submissionOf.get(submission.assessmentId);
-      if (old === void 0 || numOr(submission.submittedAt, 0) >= numOr(old.submittedAt, 0)) {
+      if (old === void 0 || numOr2(submission.submittedAt, 0) >= numOr2(old.submittedAt, 0)) {
         submissionOf.set(submission.assessmentId, submission);
       }
     }
     const gradeOf = /* @__PURE__ */ new Map();
     for (const grade of edu.grades) {
       const old = gradeOf.get(grade.submissionId);
-      if (old === void 0 || numOr(grade.gradedAt, 0) >= numOr(old.gradedAt, 0)) {
+      if (old === void 0 || numOr2(grade.gradedAt, 0) >= numOr2(old.gradedAt, 0)) {
         gradeOf.set(grade.submissionId, grade);
       }
     }
@@ -20953,16 +22995,16 @@ ${JSON.stringify(refs, null, 2)}`;
     return { submissionOf, gradeOf, accepted };
   }
   function examDeadline(assessment) {
-    const starts = numOr(assessment.startsAt, 0);
-    const ends = numOr(assessment.endsAt, 0);
-    return hasTs(assessment.startedAt) ? Number(assessment.startedAt) + (ends - starts) : ends;
+    const starts = numOr2(assessment.startsAt, 0);
+    const ends = numOr2(assessment.endsAt, 0);
+    return hasTs2(assessment.startedAt) ? Number(assessment.startedAt) + (ends - starts) : ends;
   }
   function assessmentStatus(assessment, index, at) {
     const submission = index.submissionOf.get(assessment.id) || null;
     const grade = submission ? index.gradeOf.get(submission.id) || null : null;
     if (grade !== null) {
       if (grade.needsReview === true) return "needsReview";
-      const errors = asArray(grade.errors);
+      const errors = asArray2(grade.errors);
       const pending = errors.some(
         (error) => error && !index.accepted.has(`${grade.id}|${error.questionId}`)
       );
@@ -20970,19 +23012,19 @@ ${JSON.stringify(refs, null, 2)}`;
     }
     if (submission !== null) return "submitted";
     const kind = assessment.kind;
-    const started = hasTs(assessment.startedAt);
-    if (kind !== "homework" && !started && hasTs(assessment.startsAt) && dayKey(at) > dayKey(Number(assessment.startsAt))) {
+    const started = hasTs2(assessment.startedAt);
+    if (kind !== "homework" && !started && hasTs2(assessment.startsAt) && dayKey(at) > dayKey(Number(assessment.startsAt))) {
       return "missed";
     }
-    if (kind !== "homework" && started && !hasTs(assessment.stoppedAt) && at < examDeadline(assessment)) {
+    if (kind !== "homework" && started && !hasTs2(assessment.stoppedAt) && at < examDeadline(assessment)) {
       return "inProgress";
     }
-    if (kind !== "homework" && started && (hasTs(assessment.stoppedAt) || at >= examDeadline(assessment))) {
+    if (kind !== "homework" && started && (hasTs2(assessment.stoppedAt) || at >= examDeadline(assessment))) {
       return "awaitingSubmission";
     }
-    if (kind === "homework" && at >= numOr(assessment.endsAt, 0))
+    if (kind === "homework" && at >= numOr2(assessment.endsAt, 0))
       return "overdue";
-    if (at < numOr(assessment.startsAt, 0) || kind !== "homework" && !started)
+    if (at < numOr2(assessment.startsAt, 0) || kind !== "homework" && !started)
       return "upcoming";
     return "awaitingSubmission";
   }
@@ -21009,22 +23051,22 @@ ${JSON.stringify(refs, null, 2)}`;
     if (status === "graded") return "leaf";
     return "neutral";
   }
-  function assessmentKindLabel(kind) {
+  function assessmentKindLabel2(kind) {
     if (kind === "homework") return t("education.homeworkKind");
     if (kind === "weeklyExam") return t("education.kindWeeklyExam");
     if (kind === "mockExam") return t("education.kindMockExam");
     if (kind === "retest") return t("education.kindRetest");
-    return strOr(kind, t("education.studyTaskKind"));
+    return strOr2(kind, t("education.studyTaskKind"));
   }
-  function resourceKindLabel(kind) {
-    const key = RESOURCE_KIND_COPY[kind];
-    return key ? t(`education.${key}`) : strOr(kind);
+  function resourceKindLabel2(kind) {
+    const key = RESOURCE_KIND_COPY2[kind];
+    return key ? t(`education.${key}`) : strOr2(kind);
   }
   function progressStateLabel(state) {
     if (state === "studied") return t("education.stateStudied");
     if (state === "practicing") return t("education.statePracticing");
     if (state === "needsReview") return t("education.stateNeedsReview");
-    return strOr(state);
+    return strOr2(state);
   }
   function progressStateTone(state) {
     if (state === "studied") return "leaf";
@@ -21040,7 +23082,7 @@ ${JSON.stringify(refs, null, 2)}`;
     if (state === "pending") return t("education.eventPending");
     if (state === "running") return t("education.eventRunning");
     if (state === "done") return t("education.eventDone");
-    return t("education.eventState", { state: strOr(state) });
+    return t("education.eventState", { state: strOr2(state) });
   }
   function eventStateTone(state) {
     if (state === "done") return "leaf";
@@ -21049,28 +23091,28 @@ ${JSON.stringify(refs, null, 2)}`;
   }
   function gradeScore(grade) {
     let total = 0;
-    for (const award of asArray(grade && grade.awards)) {
-      total += numOr(award && award.awarded, 0);
+    for (const award of asArray2(grade && grade.awards)) {
+      total += numOr2(award && award.awarded, 0);
     }
     return total;
   }
   function assessmentTotal(assessment) {
     let total = 0;
-    for (const question of asArray(assessment && assessment.questions)) {
-      for (const point of asArray(question && question.scoring)) {
-        total += numOr(point && point.points, 0);
+    for (const question of asArray2(assessment && assessment.questions)) {
+      for (const point of asArray2(question && question.scoring)) {
+        total += numOr2(point && point.points, 0);
       }
     }
     return total;
   }
   function pendingCorrections(grade, index) {
     if (grade === null || grade === void 0) return [];
-    return asArray(grade.errors).filter(
+    return asArray2(grade.errors).filter(
       (error) => error && !index.accepted.has(`${grade.id}|${error.questionId}`)
     );
   }
   function dateValue(key) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(strOr(key));
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(strOr2(key));
     if (!match) return null;
     const year = Number(match[1]);
     const month = Number(match[2]);
@@ -21086,19 +23128,19 @@ ${JSON.stringify(refs, null, 2)}`;
   }
   function semesterWeeks(semester, today) {
     const span = daysFromTo(semester.startDate, semester.endDate);
-    const total = Math.max(1, Math.ceil(numOr(span, 0) / 7));
-    const elapsed = numOr(daysFromTo(semester.startDate, today), 0);
+    const total = Math.max(1, Math.ceil(numOr2(span, 0) / 7));
+    const elapsed = numOr2(daysFromTo(semester.startDate, today), 0);
     const done = Math.max(0, Math.min(total, Math.floor(elapsed / 7)));
     return { total, done };
   }
-  var ROW = {
+  var ROW2 = {
     display: "flex",
     alignItems: "center",
     gap: 10,
     padding: "9px 0",
     borderBottom: "1px solid var(--tomato-line)"
   };
-  var META = {
+  var META2 = {
     display: "flex",
     alignItems: "center",
     gap: 7,
@@ -21106,6 +23148,22 @@ ${JSON.stringify(refs, null, 2)}`;
     marginTop: 3,
     fontSize: 11,
     color: "var(--tomato-ink-3)"
+  };
+  var ROW_BUTTON = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 0,
+    flex: 1,
+    minWidth: 0,
+    padding: 0,
+    margin: 0,
+    border: "none",
+    background: "transparent",
+    fontFamily: "inherit",
+    textAlign: "left",
+    color: "inherit",
+    cursor: "pointer"
   };
   function mutedText(text) {
     return h(
@@ -21228,11 +23286,11 @@ ${JSON.stringify(refs, null, 2)}`;
     );
   }
   function ProgressRow({ record, onConfirm }) {
-    const topic = strOr(record.topic, t("education.unnamedTopic"));
-    const position = strOr(record.position);
+    const topic = strOr2(record.topic, t("education.unnamedTopic"));
+    const position = strOr2(record.position);
     return h(
       "div",
-      { style: ROW },
+      { style: ROW2 },
       h(
         Chip,
         { tone: progressStateTone(record.state) },
@@ -21256,9 +23314,9 @@ ${JSON.stringify(refs, null, 2)}`;
         ),
         h(
           "div",
-          { style: META },
+          { style: META2 },
           position ? h("span", { style: { color: "var(--tomato-ink-2)" } }, position) : null,
-          h("span", null, fmtDateTime(record.recordedAt)),
+          h("span", null, fmtDateTime2(record.recordedAt)),
           h("span", null, progressSourceLabel(record.source)),
           record.confirmed === true ? h(Badge, { tone: "leaf" }, t("education.confirmed")) : null
         )
@@ -21275,11 +23333,19 @@ ${JSON.stringify(refs, null, 2)}`;
       )
     );
   }
-  function TeachingTaskRow({ task, data, onToggle, onFocus }) {
+  function TeachingTaskRow({
+    task,
+    data,
+    onToggle,
+    onFocus,
+    target = null,
+    onOpen
+  }) {
     const project = projectById(data, task.projectId);
-    const projectName = project ? strOr(project.name) : "";
+    const projectName = project ? strOr2(project.name) : "";
+    const teaching = target !== null;
     const meta = [];
-    if (strOr(task.reminderTime)) {
+    if (strOr2(task.reminderTime)) {
       meta.push(t("education.reminderLabel", { time: task.reminderTime }));
     }
     if (Number.isFinite(Number(task.focusMinutes)) && Number(task.focusMinutes) > 0) {
@@ -21291,43 +23357,51 @@ ${JSON.stringify(refs, null, 2)}`;
       meta.push(t("education.estimateLabel", { n: Number(task.estimate) }));
     }
     if (projectName) meta.push(projectName);
-    return h(
-      "div",
-      { style: ROW },
-      h(Check, {
-        checked: task.completed === true,
-        onChange: () => onToggle(task.id),
-        label: strOr(task.title)
-      }),
-      h(Dot, { color: projectColor(data, task.projectId) }),
+    const titleBlock = [
       h(
         "div",
-        { style: { flex: 1, minWidth: 0 } },
-        h(
-          "div",
-          {
-            style: {
-              fontSize: 13.5,
-              color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
-              textDecoration: task.completed ? "line-through" : "none",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap"
-            }
-          },
-          strOr(task.title)
-        ),
-        h(
-          "div",
-          { style: META },
-          h(
-            Chip,
-            { tone: "neutral" },
-            task.kind === "lesson" ? t("education.lessonKind") : t("education.homeworkKind")
-          ),
-          meta.map((text, index) => h("span", { key: index }, text))
-        )
+        {
+          style: {
+            fontSize: 13.5,
+            color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+            textDecoration: task.completed ? "line-through" : "none",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }
+        },
+        strOr2(task.title)
       ),
+      h(
+        "div",
+        { style: META2 },
+        h(
+          Chip,
+          { tone: "neutral" },
+          task.kind === "lesson" ? t("education.lessonKind") : t("education.homeworkKind")
+        ),
+        meta.map((text, index) => h("span", { key: index }, text))
+      )
+    ];
+    return h(
+      "div",
+      { style: ROW2 },
+      teaching ? null : h(Check, {
+        checked: task.completed === true,
+        onChange: () => onToggle(task.id),
+        label: strOr2(task.title)
+      }),
+      h(Dot, { color: projectColor(data, task.projectId) }),
+      teaching ? h(
+        "button",
+        {
+          type: "button",
+          title: t("education.openWorkbench"),
+          onClick: () => onOpen?.(target),
+          style: ROW_BUTTON
+        },
+        titleBlock
+      ) : h("div", { style: { flex: 1, minWidth: 0 } }, titleBlock),
       task.completed ? null : h(
         Btn,
         {
@@ -21340,7 +23414,7 @@ ${JSON.stringify(refs, null, 2)}`;
       )
     );
   }
-  function AssessmentRow({ assessment, index, at, onAssistant }) {
+  function AssessmentRow({ assessment, index, at, onAssistant, onOpen }) {
     const status = assessmentStatus(assessment, index, at);
     const submission = index.submissionOf.get(assessment.id) || null;
     const grade = submission ? index.gradeOf.get(submission.id) || null : null;
@@ -21353,38 +23427,46 @@ ${JSON.stringify(refs, null, 2)}`;
       correct: "correctAction",
       review: "reviewAction"
     };
-    return h(
-      "div",
-      { style: ROW },
+    const titleBlock = [
       h(
         "div",
-        { style: { flex: 1, minWidth: 0 } },
+        {
+          style: {
+            fontSize: 13,
+            color: "var(--tomato-ink)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }
+        },
+        strOr2(assessment.title, t("education.unnamedProject"))
+      ),
+      h(
+        "div",
+        { style: META2 },
+        h(Chip, { tone: "neutral" }, assessmentKindLabel2(assessment.kind)),
+        h("span", null, fmtRange2(assessment.startsAt, assessment.endsAt)),
         h(
-          "div",
-          {
-            style: {
-              fontSize: 13,
-              color: "var(--tomato-ink)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap"
-            }
-          },
-          strOr(assessment.title, t("education.unnamedProject"))
-        ),
-        h(
-          "div",
-          { style: META },
-          h(Chip, { tone: "neutral" }, assessmentKindLabel(assessment.kind)),
-          h("span", null, fmtRange(assessment.startsAt, assessment.endsAt)),
-          h(
-            "span",
-            null,
-            t("education.topicsCount", {
-              n: asArray(assessment.questions).length
-            })
-          )
+          "span",
+          null,
+          t("education.topicsCount", {
+            n: asArray2(assessment.questions).length
+          })
         )
+      )
+    ];
+    return h(
+      "div",
+      { style: ROW2 },
+      h(
+        "button",
+        {
+          type: "button",
+          title: t("education.openWorkbench"),
+          onClick: () => onOpen?.(assessment),
+          style: ROW_BUTTON
+        },
+        titleBlock
       ),
       score !== null ? h(
         "span",
@@ -21411,50 +23493,59 @@ ${JSON.stringify(refs, null, 2)}`;
       ) : null
     );
   }
-  function ProjectTaskRow2({ task, onToggle }) {
-    return h(
-      "div",
-      { style: ROW },
-      h(Check, {
-        checked: task.completed === true,
-        onChange: () => onToggle(task.id),
-        label: strOr(task.title)
-      }),
+  function ProjectTaskRow2({ task, onToggle, target = null, onOpen }) {
+    const teaching = target !== null;
+    const titleBlock = [
       h(
         "div",
-        { style: { flex: 1, minWidth: 0 } },
-        h(
-          "div",
-          {
-            style: {
-              fontSize: 13,
-              color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
-              textDecoration: task.completed ? "line-through" : "none",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap"
-            }
-          },
-          strOr(task.title)
-        ),
-        h(
-          "div",
-          { style: META },
-          task.dueDate ? h("span", null, String(task.dueDate)) : null,
-          strOr(task.reminderTime) ? h(
-            "span",
-            null,
-            t("education.reminderLabel", { time: task.reminderTime })
-          ) : null,
-          Number.isFinite(Number(task.focusMinutes)) && Number(task.focusMinutes) > 0 ? h(
-            "span",
-            null,
-            t("education.focusMinutesLabel", {
-              n: Number(task.focusMinutes)
-            })
-          ) : null
-        )
+        {
+          style: {
+            fontSize: 13,
+            color: task.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+            textDecoration: task.completed ? "line-through" : "none",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }
+        },
+        strOr2(task.title)
+      ),
+      h(
+        "div",
+        { style: META2 },
+        task.dueDate ? h("span", null, String(task.dueDate)) : null,
+        strOr2(task.reminderTime) ? h(
+          "span",
+          null,
+          t("education.reminderLabel", { time: task.reminderTime })
+        ) : null,
+        Number.isFinite(Number(task.focusMinutes)) && Number(task.focusMinutes) > 0 ? h(
+          "span",
+          null,
+          t("education.focusMinutesLabel", {
+            n: Number(task.focusMinutes)
+          })
+        ) : null
       )
+    ];
+    return h(
+      "div",
+      { style: ROW2 },
+      teaching ? null : h(Check, {
+        checked: task.completed === true,
+        onChange: () => onToggle(task.id),
+        label: strOr2(task.title)
+      }),
+      teaching ? h(
+        "button",
+        {
+          type: "button",
+          title: t("education.openWorkbench"),
+          onClick: () => onOpen?.(target),
+          style: ROW_BUTTON
+        },
+        titleBlock
+      ) : h("div", { style: { flex: 1, minWidth: 0 } }, titleBlock)
     );
   }
   function LibraryCard({ library, projectIds, onChange, onReload }) {
@@ -21469,7 +23560,7 @@ ${JSON.stringify(refs, null, 2)}`;
     const loading = library === null || library === void 0;
     const authorized = library !== null && library !== void 0 && library.authorized === true;
     const unavailable = library !== null && library !== void 0 && library.unavailable === true;
-    const path = strOr(library?.directory);
+    const path = strOr2(library?.directory);
     useEffect(() => {
       if (!authorized) {
         setStats(null);
@@ -21660,7 +23751,7 @@ ${JSON.stringify(refs, null, 2)}`;
           )
         );
       const kindChips = INDEX_KINDS.filter(
-        (kind) => numOr(stats.byKind?.[kind], 0) > 0
+        (kind) => numOr2(stats.byKind?.[kind], 0) > 0
       ).map(
         (kind) => h(
           Chip,
@@ -21683,7 +23774,7 @@ ${JSON.stringify(refs, null, 2)}`;
           { style: { fontSize: 12, color: "var(--tomato-ink-2)" } },
           t("education.libraryIndexScanned", {
             n: stats.count,
-            time: fmtDateTime(stats.scannedAt)
+            time: fmtDateTime2(stats.scannedAt)
           })
         ),
         h(
@@ -21773,7 +23864,7 @@ ${JSON.stringify(refs, null, 2)}`;
         h(
           "span",
           { style: { fontSize: 12, color: "#b8503f" } },
-          strOr(library.reason) || t("education.libraryUnavailable")
+          strOr2(library.reason) || t("education.libraryUnavailable")
         ),
         onReload ? h(
           Btn,
@@ -21955,7 +24046,7 @@ ${JSON.stringify(refs, null, 2)}`;
   }
   function FilePreviewDialog({ item, onClose }) {
     const open = item !== null && item !== void 0;
-    const path = strOr(item?.path);
+    const path = strOr2(item?.path);
     const [access, setAccess] = useState("");
     const [error, setError] = useState("");
     const [reloadKey, setReloadKey] = useState(0);
@@ -21965,7 +24056,7 @@ ${JSON.stringify(refs, null, 2)}`;
       setAccess("");
       setError("");
       getFileToken({ timeoutMs: 5e3 }).then((next) => {
-        if (!cancelled) setAccess(strOr(next?.access));
+        if (!cancelled) setAccess(strOr2(next?.access));
       }).catch((e) => {
         if (!cancelled)
           setError(e && e.userMessage ? e.userMessage : String(e));
@@ -22002,7 +24093,7 @@ ${JSON.stringify(refs, null, 2)}`;
     } else if (item.kind === "image") {
       body = h("img", {
         src: viewUrl,
-        alt: strOr(item.name),
+        alt: strOr2(item.name),
         style: {
           display: "block",
           maxWidth: "100%",
@@ -22025,7 +24116,7 @@ ${JSON.stringify(refs, null, 2)}`;
       });
     } else {
       body = h("iframe", {
-        title: strOr(item.name),
+        title: strOr2(item.name),
         src: viewUrl,
         style: {
           width: "100%",
@@ -22041,10 +24132,10 @@ ${JSON.stringify(refs, null, 2)}`;
       {
         open,
         onClose,
-        title: strOr(item.name, t("education.libraryIndexFileTitle")),
+        title: strOr2(item.name, t("education.libraryIndexFileTitle")),
         subtitle: t("education.libraryIndexFileMeta", {
           kind: indexKindLabel(item.kind),
-          size: formatBytes(item.sizeBytes)
+          size: formatBytes2(item.sizeBytes)
         }),
         icon: "eye",
         width: 920,
@@ -22105,12 +24196,12 @@ ${JSON.stringify(refs, null, 2)}`;
     const [error, setError] = useState("");
     useEffect(() => {
       if (!open) return;
-      setTitle(strOr(item?.name));
+      setTitle(strOr2(item?.name));
       setKind("attachment");
       setSource("");
       setEdition("");
       setError("");
-    }, [open, strOr(item?.path)]);
+    }, [open, strOr2(item?.path)]);
     if (!open) return null;
     const submit = async () => {
       if (title.trim() === "") {
@@ -22182,7 +24273,7 @@ ${JSON.stringify(refs, null, 2)}`;
             value: kind,
             options: RESOURCE_KINDS.map((value) => ({
               value,
-              label: resourceKindLabel(value)
+              label: resourceKindLabel2(value)
             })),
             onChange: setKind
           })
@@ -22210,7 +24301,7 @@ ${JSON.stringify(refs, null, 2)}`;
               wordBreak: "break-all"
             }
           },
-          strOr(item.path)
+          strOr2(item.path)
         ),
         error ? h("div", { style: { fontSize: 12, color: "#b8503f" } }, error) : null
       )
@@ -22310,11 +24401,11 @@ ${JSON.stringify(refs, null, 2)}`;
         ) : null
       );
     }
-    const items = asArray(data?.items);
-    const total = numOr(data?.total, 0);
+    const items = asArray2(data?.items);
+    const total = numOr2(data?.total, 0);
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.floor(offset / limit) + 1;
-    const matchedDirs = asArray(data?.matchedDirs);
+    const matchedDirs = asArray2(data?.matchedDirs);
     const filterHint = data ? data.filtered === true ? t("education.libraryIndexFiltered", {
       dirs: matchedDirs.join("、")
     }) : t("education.libraryIndexNoFilter") : "";
@@ -22435,7 +24526,7 @@ ${JSON.stringify(refs, null, 2)}`;
         items.map(
           (item) => h(
             "div",
-            { key: strOr(item.path), style: ROW },
+            { key: strOr2(item.path), style: ROW2 },
             h(
               "div",
               { style: { flex: 1, minWidth: 0 } },
@@ -22450,13 +24541,13 @@ ${JSON.stringify(refs, null, 2)}`;
                     whiteSpace: "nowrap"
                   }
                 },
-                strOr(item.name)
+                strOr2(item.name)
               ),
               h(
                 "div",
-                { style: { ...META, overflow: "hidden" } },
+                { style: { ...META2, overflow: "hidden" } },
                 h(Chip, { tone: "neutral" }, indexKindLabel(item.kind)),
-                h("span", null, formatBytes(item.sizeBytes)),
+                h("span", null, formatBytes2(item.sizeBytes)),
                 h(
                   "span",
                   {
@@ -22466,7 +24557,7 @@ ${JSON.stringify(refs, null, 2)}`;
                       whiteSpace: "nowrap"
                     }
                   },
-                  strOr(item.path)
+                  strOr2(item.path)
                 )
               )
             ),
@@ -22564,13 +24655,14 @@ ${JSON.stringify(refs, null, 2)}`;
     index,
     library,
     onBack,
-    onAssistant
+    onAssistant,
+    onOpenAssignment
   }) {
-    const projectId = strOr(study.projectId);
+    const projectId = strOr2(study.projectId);
     const color = projectColor(data, projectId);
-    const name = project && strOr(project.name) ? project.name : t("education.unnamedProject");
-    const sharedLibrary = library && library.authorized === true ? strOr(library.directory) : "";
-    const projectDirectory = strOr(study.directory);
+    const name = project && strOr2(project.name) ? project.name : t("education.unnamedProject");
+    const sharedLibrary = library && library.authorized === true ? strOr2(library.directory) : "";
+    const projectDirectory = strOr2(study.directory);
     const sharedIds = library && Array.isArray(library.sharedProjects) ? library.sharedProjects : null;
     const usesSharedLibrary = sharedLibrary !== "" && (sharedIds !== null ? sharedIds.includes(projectId) : projectDirectory === "" || projectDirectory === sharedLibrary);
     const settings = data.settings && typeof data.settings === "object" ? data.settings : {};
@@ -22581,7 +24673,7 @@ ${JSON.stringify(refs, null, 2)}`;
     const sortedResources = resources.slice().sort((a, b) => {
       const ai = RESOURCE_KINDS.indexOf(a.kind);
       const bi = RESOURCE_KINDS.indexOf(b.kind);
-      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || strOr(a.title).localeCompare(strOr(b.title));
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || strOr2(a.title).localeCompare(strOr2(b.title));
     });
     const progress = sortDesc(
       edu.progress.filter((item) => item.projectId === projectId),
@@ -22598,7 +24690,7 @@ ${JSON.stringify(refs, null, 2)}`;
       edu.assessments.filter((item) => item.projectId === projectId),
       "startsAt"
     );
-    const reviews = edu.reviews.filter((item) => item.projectId === projectId).slice().sort((a, b) => strOr(b.date).localeCompare(strOr(a.date)));
+    const reviews = edu.reviews.filter((item) => item.projectId === projectId).slice().sort((a, b) => strOr2(b.date).localeCompare(strOr2(a.date)));
     const events = sortDesc(
       edu.events.filter((item) => item.projectId === projectId),
       "createdAt"
@@ -22607,19 +24699,19 @@ ${JSON.stringify(refs, null, 2)}`;
     const attendedLessons = lessons.filter(
       (item) => item.attended === true || item.state === "ended"
     ).length;
-    const projectTasks = asArray(data.tasks).filter(
+    const projectTasks = asArray2(data.tasks).filter(
       (task) => task.projectId === projectId
     );
-    const openTasks = projectTasks.filter((task) => task.completed !== true).sort((a, b) => strOr(a.dueDate).localeCompare(strOr(b.dueDate)));
+    const openTasks = projectTasks.filter((task) => task.completed !== true).sort((a, b) => strOr2(a.dueDate).localeCompare(strOr2(b.dueDate)));
     const doneTasks = sortDesc(
       projectTasks.filter((task) => task.completed === true),
       "completedAt"
     );
-    const visions = asArray(data.visions).filter(
+    const visions = asArray2(data.visions).filter(
       (vision) => vision && (vision.projectId === projectId || study.visionId !== null && study.visionId !== void 0 && vision.id === study.visionId)
     );
     const projectWhitelist = project && Array.isArray(project.appWhitelist) ? project.appWhitelist : null;
-    const genericWhitelist = asArray(protection.whitelist);
+    const genericWhitelist = asArray2(protection.whitelist);
     const onConfirm = async (id) => {
       const result = await tryDispatch({
         type: "education",
@@ -22640,7 +24732,7 @@ ${JSON.stringify(refs, null, 2)}`;
     };
     const kindCounts = {};
     for (const resource of resources) {
-      const kind = strOr(resource.kind, "other");
+      const kind = strOr2(resource.kind, "other");
       kindCounts[kind] = (kindCounts[kind] || 0) + 1;
     }
     const resourceKindCount = RESOURCE_KINDS.filter(
@@ -22804,14 +24896,14 @@ ${JSON.stringify(refs, null, 2)}`;
           Chip,
           { tone: "neutral" },
           t("education.pastPapersCount", {
-            n: asArray(study.pastPaperIds).length
+            n: asArray2(study.pastPaperIds).length
           })
         ),
         h(
           Chip,
           { tone: "neutral" },
           t("education.mockPapersCount", {
-            n: asArray(study.mockPaperIds).length
+            n: asArray2(study.mockPaperIds).length
           })
         )
       ),
@@ -22843,7 +24935,7 @@ ${JSON.stringify(refs, null, 2)}`;
             (kind) => kindCounts[kind] ? h(
               Chip,
               { key: kind, tone: "neutral" },
-              `${resourceKindLabel(kind)} ${kindCounts[kind]}`
+              `${resourceKindLabel2(kind)} ${kindCounts[kind]}`
             ) : null
           )
         ),
@@ -22856,7 +24948,7 @@ ${JSON.stringify(refs, null, 2)}`;
           sortedResources.map(
             (resource, resourceIndex) => h(
               "div",
-              { key: resource.id || `resource-${resourceIndex}`, style: ROW },
+              { key: resource.id || `resource-${resourceIndex}`, style: ROW2 },
               h(
                 "div",
                 { style: { flex: 1, minWidth: 0 } },
@@ -22871,27 +24963,27 @@ ${JSON.stringify(refs, null, 2)}`;
                       whiteSpace: "nowrap"
                     }
                   },
-                  strOr(resource.title)
+                  strOr2(resource.title)
                 ),
                 h(
                   "div",
-                  { style: META },
+                  { style: META2 },
                   h(
                     Chip,
                     { tone: "neutral" },
-                    resourceKindLabel(resource.kind)
+                    resourceKindLabel2(resource.kind)
                   ),
-                  strOr(resource.source) ? h("span", null, strOr(resource.source)) : null,
-                  strOr(resource.edition) ? h("span", null, strOr(resource.edition)) : null,
+                  strOr2(resource.source) ? h("span", null, strOr2(resource.source)) : null,
+                  strOr2(resource.edition) ? h("span", null, strOr2(resource.edition)) : null,
                   h(
                     "span",
                     null,
                     t("education.topicsCount", {
-                      n: asArray(resource.topics).length
+                      n: asArray2(resource.topics).length
                     })
                   )
                 ),
-                asArray(resource.topics).length > 0 ? h(
+                asArray2(resource.topics).length > 0 ? h(
                   "div",
                   {
                     style: {
@@ -22903,7 +24995,7 @@ ${JSON.stringify(refs, null, 2)}`;
                       whiteSpace: "nowrap"
                     }
                   },
-                  asArray(resource.topics).join(" · ")
+                  asArray2(resource.topics).join(" · ")
                 ) : null
               )
             )
@@ -22937,7 +25029,7 @@ ${JSON.stringify(refs, null, 2)}`;
       completedTasks.length === 0 ? mutedText(t("education.completedTasksEmpty")) : completedTasks.map(
         (item, itemIndex) => h(
           "div",
-          { key: item.id || `completed-${itemIndex}`, style: ROW },
+          { key: item.id || `completed-${itemIndex}`, style: ROW2 },
           h(
             "div",
             { style: { flex: 1, minWidth: 0 } },
@@ -22952,21 +25044,21 @@ ${JSON.stringify(refs, null, 2)}`;
                   whiteSpace: "nowrap"
                 }
               },
-              strOr(item.title, t("education.unnamedProject"))
+              strOr2(item.title, t("education.unnamedProject"))
             ),
             h(
               "div",
-              { style: META },
-              h("span", null, fmtDateTime(item.completedAt)),
-              asArray(item.topics).length > 0 ? h(
+              { style: META2 },
+              h("span", null, fmtDateTime2(item.completedAt)),
+              asArray2(item.topics).length > 0 ? h(
                 "span",
                 null,
                 t("education.topicsCount", {
-                  n: asArray(item.topics).length
+                  n: asArray2(item.topics).length
                 })
               ) : null
             ),
-            strOr(item.notes) ? h(
+            strOr2(item.notes) ? h(
               "div",
               {
                 style: {
@@ -23017,13 +25109,13 @@ ${JSON.stringify(refs, null, 2)}`;
                   minWidth: 0
                 }
               },
-              strOr(semester.title, t("education.unnamedProject"))
+              strOr2(semester.title, t("education.unnamedProject"))
             ),
             h(
               Chip,
               { tone: "neutral" },
               t("education.revisionLabel", {
-                n: numOr(semester.revision, 1)
+                n: numOr2(semester.revision, 1)
               })
             ),
             h(
@@ -23044,7 +25136,7 @@ ${JSON.stringify(refs, null, 2)}`;
                 marginTop: 3
               }
             },
-            `${strOr(semester.startDate)} – ${strOr(semester.endDate)}`
+            `${strOr2(semester.startDate)} – ${strOr2(semester.endDate)}`
           ),
           h(Bar, {
             value: weeks.done,
@@ -23052,7 +25144,7 @@ ${JSON.stringify(refs, null, 2)}`;
             height: 6,
             style: { marginTop: 8, marginBottom: 8 }
           }),
-          asArray(semester.milestones).map(
+          asArray2(semester.milestones).map(
             (milestone, milestoneIndex) => h(
               "div",
               {
@@ -23068,7 +25160,7 @@ ${JSON.stringify(refs, null, 2)}`;
               h(
                 Chip,
                 { tone: "brand" },
-                t("education.weekLabel", { n: numOr(milestone.week, 0) })
+                t("education.weekLabel", { n: numOr2(milestone.week, 0) })
               ),
               h(
                 "div",
@@ -23082,9 +25174,9 @@ ${JSON.stringify(refs, null, 2)}`;
                       lineHeight: 1.5
                     }
                   },
-                  asArray(milestone.topics).join(" · ")
+                  asArray2(milestone.topics).join(" · ")
                 ),
-                strOr(milestone.objective) ? h(
+                strOr2(milestone.objective) ? h(
                   "div",
                   {
                     style: {
@@ -23107,7 +25199,7 @@ ${JSON.stringify(refs, null, 2)}`;
                   }
                 },
                 t("education.milestoneLessons", {
-                  n: numOr(milestone.lessonCount, 0)
+                  n: numOr2(milestone.lessonCount, 0)
                 })
               )
             )
@@ -23138,7 +25230,8 @@ ${JSON.stringify(refs, null, 2)}`;
           assessment,
           index,
           at,
-          onAssistant
+          onAssistant,
+          onOpen: (item) => onOpenAssignment?.({ assessmentId: item.id })
         })
       )
     );
@@ -23172,7 +25265,7 @@ ${JSON.stringify(refs, null, 2)}`;
                 className: "t-mono",
                 style: { fontSize: 11.5, color: "var(--tomato-ink-3)" }
               },
-              strOr(review.date)
+              strOr2(review.date)
             ),
             h(
               "span",
@@ -23190,9 +25283,9 @@ ${JSON.stringify(refs, null, 2)}`;
                 marginTop: 3
               }
             },
-            strOr(review.findings)
+            strOr2(review.findings)
           ),
-          asArray(review.actions).length > 0 ? h(
+          asArray2(review.actions).length > 0 ? h(
             "div",
             {
               style: {
@@ -23208,11 +25301,11 @@ ${JSON.stringify(refs, null, 2)}`;
               { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
               t("education.actionsLabel")
             ),
-            asArray(review.actions).map(
+            asArray2(review.actions).map(
               (action, actionIndex) => h(
                 Chip,
                 { key: actionIndex, tone: "neutral" },
-                strOr(action)
+                strOr2(action)
               )
             )
           ) : null
@@ -23226,7 +25319,7 @@ ${JSON.stringify(refs, null, 2)}`;
       events.length === 0 ? mutedText(t("education.eventsEmpty")) : events.map(
         (event, eventIndex) => h(
           "div",
-          { key: event.id || `event-${eventIndex}`, style: ROW },
+          { key: event.id || `event-${eventIndex}`, style: ROW2 },
           h(
             Chip,
             { tone: eventStateTone(event.state) },
@@ -23246,12 +25339,12 @@ ${JSON.stringify(refs, null, 2)}`;
                   whiteSpace: "nowrap"
                 }
               },
-              strOr(event.kind, t("education.unnamedTopic"))
+              strOr2(event.kind, t("education.unnamedTopic"))
             ),
             h(
               "div",
-              { style: META },
-              h("span", null, fmtDateTime(event.createdAt))
+              { style: META2 },
+              h("span", null, fmtDateTime2(event.createdAt))
             )
           ),
           event.state !== "done" ? h(
@@ -23283,11 +25376,11 @@ ${JSON.stringify(refs, null, 2)}`;
           (appId, appIndex) => h(
             Chip,
             {
-              key: `${strOr(appId)}-${appIndex}`,
+              key: `${strOr2(appId)}-${appIndex}`,
               tone: "neutral",
               style: { fontFamily: "ui-monospace, monospace" }
             },
-            strOr(appId)
+            strOr2(appId)
           )
         )
       )
@@ -23312,9 +25405,9 @@ ${JSON.stringify(refs, null, 2)}`;
                 color: "var(--tomato-ink)"
               }
             },
-            strOr(vision.name, t("education.unnamedProject"))
+            strOr2(vision.name, t("education.unnamedProject"))
           ),
-          strOr(vision.notes) ? h(
+          strOr2(vision.notes) ? h(
             "div",
             {
               style: {
@@ -23344,21 +25437,27 @@ ${JSON.stringify(refs, null, 2)}`;
           style: { maxHeight: 320, overflowY: "auto", paddingRight: 4 }
         },
         openTasks.length > 0 ? subHeading(t("education.openTasks"), openTasks.length) : null,
-        openTasks.map(
-          (task, taskIndex) => h(ProjectTaskRow2, {
+        openTasks.map((task, taskIndex) => {
+          const target = teachingTargetOf(data, task);
+          return h(ProjectTaskRow2, {
             key: task.id || `open-${taskIndex}`,
             task,
-            onToggle
-          })
-        ),
+            onToggle,
+            target,
+            onOpen: onOpenAssignment
+          });
+        }),
         doneTasks.length > 0 ? subHeading(t("education.doneTasks"), doneTasks.length) : null,
-        doneTasks.map(
-          (task, taskIndex) => h(ProjectTaskRow2, {
+        doneTasks.map((task, taskIndex) => {
+          const target = teachingTargetOf(data, task);
+          return h(ProjectTaskRow2, {
             key: task.id || `done-${taskIndex}`,
             task,
-            onToggle
-          })
-        )
+            onToggle,
+            target,
+            onOpen: onOpenAssignment
+          });
+        })
       )
     );
     return h(
@@ -23427,6 +25526,7 @@ ${JSON.stringify(refs, null, 2)}`;
     const state = useSnapshot();
     const [detailId, setDetailId] = useState(null);
     const [library, setLibrary] = useState(null);
+    const [assignment, setAssignment] = useState(null);
     const loadLibrary = () => {
       getLibraryGrant({ timeoutMs: 4e3 }).then((next) => setLibrary(next)).catch(
         (error) => setLibrary({
@@ -23473,8 +25573,8 @@ ${JSON.stringify(refs, null, 2)}`;
     }
     const data = state.data && typeof state.data === "object" ? state.data : {};
     const edu = normalizeEducation(data.education);
-    const at = hasTs(state.serverTime) ? Number(state.serverTime) : Math.floor(Date.now() / 1e3);
-    const today = strOr(state.today) || dayKey(at);
+    const at = hasTs2(state.serverTime) ? Number(state.serverTime) : Math.floor(Date.now() / 1e3);
+    const today = strOr2(state.today) || dayKey(at);
     const index = buildIndex(edu);
     const header = h(PageHeader, {
       eyebrow: t("education.eyebrow"),
@@ -23527,7 +25627,8 @@ ${JSON.stringify(refs, null, 2)}`;
         index,
         library,
         onBack: () => setDetailId(null),
-        onAssistant
+        onAssistant,
+        onOpenAssignment: setAssignment
       });
     }
     const startFocus = async (taskId) => {
@@ -23555,8 +25656,8 @@ ${JSON.stringify(refs, null, 2)}`;
       if (!result.ok) notify(result.error, "danger");
     };
     const projectCards = edu.projects.map((study, projectIndex) => {
-      const project = projectById(data, strOr(study.projectId));
-      const name = project && strOr(project.name) ? project.name : t("education.unnamedProject");
+      const project = projectById(data, strOr2(study.projectId));
+      const name = project && strOr2(project.name) ? project.name : t("education.unnamedProject");
       const color = projectColor(data, study.projectId);
       const resources = edu.resources.filter(
         (item) => item.projectId === study.projectId
@@ -23567,7 +25668,7 @@ ${JSON.stringify(refs, null, 2)}`;
       )[0];
       return h(
         Card,
-        { key: strOr(study.projectId) || `project-${projectIndex}`, pad: 18 },
+        { key: strOr2(study.projectId) || `project-${projectIndex}`, pad: 18 },
         h(
           "div",
           { style: { display: "flex", flexDirection: "column", gap: 12 } },
@@ -23683,7 +25784,7 @@ ${JSON.stringify(refs, null, 2)}`;
                   whiteSpace: "nowrap"
                 }
               },
-              `${strOr(latest.topic, t("education.unnamedTopic"))}${strOr(latest.position) ? ` · ${latest.position}` : ""}`
+              `${strOr2(latest.topic, t("education.unnamedTopic"))}${strOr2(latest.position) ? ` · ${latest.position}` : ""}`
             ) : h(
               "div",
               { style: { fontSize: 12, color: "var(--tomato-ink-3)" } },
@@ -23718,7 +25819,7 @@ ${JSON.stringify(refs, null, 2)}`;
     });
     const librarySection = h(LibraryCard, {
       library,
-      projectIds: edu.projects.map((item) => strOr(item.projectId)).filter(Boolean),
+      projectIds: edu.projects.map((item) => strOr2(item.projectId)).filter(Boolean),
       onChange: (next) => setLibrary(next),
       onReload: loadLibrary
     });
@@ -23754,7 +25855,7 @@ ${JSON.stringify(refs, null, 2)}`;
     for (const link of edu.focusTasks) {
       const task = taskById(data, link.taskId);
       if (!task) continue;
-      const due = strOr(task.dueDate);
+      const due = strOr2(task.dueDate);
       if (due === today || due !== "" && due < today && task.completed !== true) {
         todayItems.push({ link, task });
       }
@@ -23763,7 +25864,7 @@ ${JSON.stringify(refs, null, 2)}`;
       const ac = a.task.completed === true ? 1 : 0;
       const bc = b.task.completed === true ? 1 : 0;
       if (ac !== bc) return ac - bc;
-      return strOr(a.task.reminderTime).localeCompare(strOr(b.task.reminderTime));
+      return strOr2(a.task.reminderTime).localeCompare(strOr2(b.task.reminderTime));
     });
     const todayCard = h(
       Card,
@@ -23777,15 +25878,18 @@ ${JSON.stringify(refs, null, 2)}`;
         icon: "focus",
         title: t("education.noTodayTasks"),
         style: { padding: "24px 12px" }
-      }) : todayItems.map(
-        ({ link, task }) => h(TeachingTaskRow, {
+      }) : todayItems.map(({ link, task }) => {
+        const target = link.kind === "lesson" ? { lessonId: link.sourceId, taskId: task.id } : { assessmentId: link.sourceId, taskId: task.id };
+        return h(TeachingTaskRow, {
           key: task.id,
           task: { ...task, kind: link.kind },
           data,
           onToggle: toggleTask,
-          onFocus: startFocus
-        })
-      )
+          onFocus: startFocus,
+          target,
+          onOpen: setAssignment
+        });
+      })
     );
     const pendingSubmit = [];
     const pendingGrade = [];
@@ -23809,7 +25913,7 @@ ${JSON.stringify(refs, null, 2)}`;
     }
     const attentionRow = (key, color, title, kind, timeText, note, status, action, onAction) => h(
       "div",
-      { key, style: ROW },
+      { key, style: ROW2 },
       h(Dot, { color: color || "var(--tomato-ink-3)" }),
       h(
         "div",
@@ -23829,7 +25933,7 @@ ${JSON.stringify(refs, null, 2)}`;
         ),
         h(
           "div",
-          { style: META },
+          { style: META2 },
           h(Chip, { tone: "neutral" }, kind),
           timeText ? h("span", null, timeText) : null,
           note ? h("span", { style: { color: "var(--tomato-ink-2)" } }, note) : null
@@ -23858,10 +25962,10 @@ ${JSON.stringify(refs, null, 2)}`;
             ({ assessment, status }, submitIndex) => attentionRow(
               `submit-${assessment.id || submitIndex}`,
               projectColor(data, assessment.projectId),
-              strOr(assessment.title, t("education.unnamedProject")),
-              assessmentKindLabel(assessment.kind),
+              strOr2(assessment.title, t("education.unnamedProject")),
+              assessmentKindLabel2(assessment.kind),
               t("education.deadlineLabel", {
-                date: fmtDateTime(assessment.endsAt)
+                date: fmtDateTime2(assessment.endsAt)
               }),
               "",
               status,
@@ -23881,9 +25985,9 @@ ${JSON.stringify(refs, null, 2)}`;
             ({ assessment, submission }, gradeIndex) => attentionRow(
               `grade-${submission.id || gradeIndex}`,
               projectColor(data, assessment.projectId),
-              strOr(assessment.title, t("education.unnamedProject")),
-              assessmentKindLabel(assessment.kind),
-              fmtDateTime(submission.submittedAt),
+              strOr2(assessment.title, t("education.unnamedProject")),
+              assessmentKindLabel2(assessment.kind),
+              fmtDateTime2(submission.submittedAt),
               "",
               "submitted",
               t("education.gradeAction"),
@@ -23905,15 +26009,15 @@ ${JSON.stringify(refs, null, 2)}`;
           pendingCorrection.map(
             ({ assessment, grade, error }, errorIndex) => {
               const note = [
-                strOr(error.cause) ? `${t("education.causeLabel")} ${error.cause}` : "",
-                strOr(error.retestDate) ? t("education.retestLabel", { date: error.retestDate }) : ""
+                strOr2(error.cause) ? `${t("education.causeLabel")} ${error.cause}` : "",
+                strOr2(error.retestDate) ? t("education.retestLabel", { date: error.retestDate }) : ""
               ].filter(Boolean).join(" · ");
               return attentionRow(
                 `correction-${grade.id}-${error.questionId}-${errorIndex}`,
                 projectColor(data, assessment.projectId),
-                strOr(assessment.title, t("education.unnamedProject")),
-                assessmentKindLabel(assessment.kind),
-                fmtDateTime(grade.gradedAt),
+                strOr2(assessment.title, t("education.unnamedProject")),
+                assessmentKindLabel2(assessment.kind),
+                fmtDateTime2(grade.gradedAt),
                 note,
                 "correctionDue",
                 t("education.correctAction"),
@@ -23936,9 +26040,9 @@ ${JSON.stringify(refs, null, 2)}`;
             ({ assessment, grade }, reviewIndex) => attentionRow(
               `review-${grade.id || reviewIndex}`,
               projectColor(data, assessment.projectId),
-              strOr(assessment.title, t("education.unnamedProject")),
-              assessmentKindLabel(assessment.kind),
-              fmtDateTime(grade.gradedAt),
+              strOr2(assessment.title, t("education.unnamedProject")),
+              assessmentKindLabel2(assessment.kind),
+              fmtDateTime2(grade.gradedAt),
               "",
               "needsReview",
               t("education.reviewAction"),
@@ -23955,7 +26059,7 @@ ${JSON.stringify(refs, null, 2)}`;
     );
     const weekEnd = addDays(today, 7);
     const inWeek = (ts) => {
-      if (!hasTs(ts)) return false;
+      if (!hasTs2(ts)) return false;
       const key = dayKey(Number(ts));
       return key >= today && key < weekEnd;
     };
@@ -23969,7 +26073,7 @@ ${JSON.stringify(refs, null, 2)}`;
     );
     const relatedResourceIds = /* @__PURE__ */ new Set();
     for (const lesson of weekLessons) {
-      for (const resourceId of asArray(lesson.resourceIds))
+      for (const resourceId of asArray2(lesson.resourceIds))
         relatedResourceIds.add(resourceId);
     }
     const weekResources = edu.resources.filter(
@@ -23989,7 +26093,7 @@ ${JSON.stringify(refs, null, 2)}`;
           weekLessons.map(
             (lesson, lessonIndex) => h(
               "div",
-              { key: lesson.id || `lesson-${lessonIndex}`, style: ROW },
+              { key: lesson.id || `lesson-${lessonIndex}`, style: ROW2 },
               h(
                 "span",
                 {
@@ -24000,7 +26104,7 @@ ${JSON.stringify(refs, null, 2)}`;
                     flex: "none"
                   }
                 },
-                fmtRange(lesson.startsAt, lesson.endsAt)
+                fmtRange2(lesson.startsAt, lesson.endsAt)
               ),
               h(
                 "div",
@@ -24016,17 +26120,17 @@ ${JSON.stringify(refs, null, 2)}`;
                       whiteSpace: "nowrap"
                     }
                   },
-                  strOr(lesson.title, t("education.unnamedTopic"))
+                  strOr2(lesson.title, t("education.unnamedTopic"))
                 ),
                 h(
                   "div",
-                  { style: META },
+                  { style: META2 },
                   h(Chip, { tone: "neutral" }, t("education.lessonKind")),
                   h(
                     "span",
                     null,
                     t("education.topicsCount", {
-                      n: asArray(lesson.topics).length
+                      n: asArray2(lesson.topics).length
                     })
                   )
                 )
@@ -24055,7 +26159,7 @@ ${JSON.stringify(refs, null, 2)}`;
                   key: resource.id || `week-resource-${resourceIndex}`,
                   tone: "neutral"
                 },
-                `${strOr(resource.title)} · ${resourceKindLabel(resource.kind)}`
+                `${strOr2(resource.title)} · ${resourceKindLabel2(resource.kind)}`
               )
             )
           )
@@ -24072,7 +26176,7 @@ ${JSON.stringify(refs, null, 2)}`;
               "div",
               {
                 key: assessment.id || `week-assessment-${assessmentIndex}`,
-                style: ROW
+                style: ROW2
               },
               h(
                 "span",
@@ -24084,7 +26188,7 @@ ${JSON.stringify(refs, null, 2)}`;
                     flex: "none"
                   }
                 },
-                fmtRange(assessment.startsAt, assessment.endsAt)
+                fmtRange2(assessment.startsAt, assessment.endsAt)
               ),
               h(
                 "div",
@@ -24100,21 +26204,21 @@ ${JSON.stringify(refs, null, 2)}`;
                       whiteSpace: "nowrap"
                     }
                   },
-                  strOr(assessment.title, t("education.unnamedProject"))
+                  strOr2(assessment.title, t("education.unnamedProject"))
                 ),
                 h(
                   "div",
-                  { style: META },
+                  { style: META2 },
                   h(
                     Chip,
                     { tone: "neutral" },
-                    assessmentKindLabel(assessment.kind)
+                    assessmentKindLabel2(assessment.kind)
                   ),
                   h(
                     "span",
                     null,
                     t("education.topicsCount", {
-                      n: asArray(assessment.questions).length
+                      n: asArray2(assessment.questions).length
                     })
                   )
                 )
@@ -24173,7 +26277,16 @@ ${JSON.stringify(refs, null, 2)}`;
         },
         weekCard,
         progressCard
-      )
+      ),
+      h(AssignmentDialog, {
+        open: assignment !== null,
+        onClose: () => setAssignment(null),
+        assessmentId: assignment ? assignment.assessmentId ?? null : null,
+        lessonId: assignment ? assignment.lessonId ?? null : null,
+        data,
+        today,
+        now: at
+      })
     );
   }
   registerPage({
@@ -26167,12 +28280,12 @@ ${JSON.stringify(refs, null, 2)}`;
     if (raw > 0 && raw <= 1) return Math.round(raw * 100);
     return Math.max(0, Math.min(100, Math.round(raw)));
   }
-  function pad23(n) {
+  function pad24(n) {
     return String(n).padStart(2, "0");
   }
   function localDateKey() {
     const d = /* @__PURE__ */ new Date();
-    return `${d.getFullYear()}-${pad23(d.getMonth() + 1)}-${pad23(d.getDate())}`;
+    return `${d.getFullYear()}-${pad24(d.getMonth() + 1)}-${pad24(d.getDate())}`;
   }
   function downloadJson(filename, payload) {
     const text = JSON.stringify(payload, null, 2);
@@ -27049,7 +29162,9 @@ ${JSON.stringify(refs, null, 2)}`;
           getActiveProjectId,
           openProject,
           resetActivePageCache,
-          openAssistant: (...args) => openAssistant(...args)
+          openAssistant: (...args) => openAssistant(...args),
+          // 冒烟脚本直接渲染工作台：对话框挂在页面内部，没有导航钩子可用。
+          AssignmentDialog
         };
       }
     } catch {
