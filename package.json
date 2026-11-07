@@ -19,11 +19,12 @@
     "test:tools": "node --test scripts/export-sqlite.test.mjs scripts/import-backup.test.mjs scripts/install.test.mjs scripts/persona-switch.test.mjs scripts/modal-ssr.test.mjs scripts/navigation-filter.test.mjs scripts/attention.test.mjs scripts/refresh-navigation.test.mjs scripts/plugin-host.test.mjs scripts/markdown.test.mjs scripts/install-dsh.test.mjs"
   },
   "devDependencies": {
+    "@deepseek-ai/schemastery": "^3.19.0",
     "esbuild": "^0.28.2",
     "prettier": "^3.9.9",
-    "typescript": "^5.9.3",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "typescript": "^5.9.3"
   },
   "workspaces": [
     "packages/*",

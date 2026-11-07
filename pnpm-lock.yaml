@@ -166,6 +166,9 @@ importers:
 
   .:
     devDependencies:
+      '@deepseek-ai/schemastery':
+        specifier: ^3.19.0
+        version: 3.19.0
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -197,6 +200,12 @@ importers:
         version: 0.25.12
 
 packages:
+
+  '@deepseek-ai/cosmokit@1.9.0':
+    resolution: {integrity: sha512-5O1S53mZiJyZYcvxxD0Qv1EY7qFPSxbGyD8CbVK6gw7W9FvcXZj2YIX1ZkOqyQQ3Xt2rFkZDHJv0+V3Zmmp8CA==}
+
+  '@deepseek-ai/schemastery@3.19.0':
+    resolution: {integrity: sha512-bDXoYQa7ghAhmdYD5VPlzKxEzJV/aKkz5l4V5h1u06z8GAPN1ROewSjvR9WiXhpa52E9fng8lpH5QdCRIQgnyQ==}
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -656,6 +665,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -1015,6 +1027,13 @@ packages:
 
 snapshots:
 
+  '@deepseek-ai/cosmokit@1.9.0': {}
+
+  '@deepseek-ai/schemastery@3.19.0':
+    dependencies:
+      '@deepseek-ai/cosmokit': 1.9.0
+      '@standard-schema/spec': 1.1.0
+
   '@esbuild/aix-ppc64@0.25.12':
     optional: true
 
@@ -1250,6 +1269,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.67.5':
     optional: true
+
+  '@standard-schema/spec@1.1.0': {}
 
   '@types/chai@5.2.3':
     dependencies:
