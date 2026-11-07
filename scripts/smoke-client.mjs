@@ -259,6 +259,8 @@ let sampleState = {
     identities: [],
     tasks: [
       { id: "t1", title: "语法加强 Day05（下）", completed: false, dueDate: new Date().toISOString().slice(0, 10), reminderTime: "20:00", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 45, focusMinutes: 25, priority: 1, scrapMinutes: 0, kind: "plain" },
+      // 逾期任务：只该出现在「全部任务」，不该混进今日专注
+      { id: "t3", title: "高数 1-5 极限运算法则", completed: false, dueDate: "2026-11-04", reminderTime: "09:40", projectId: "p1", tags: [], subtasks: [], notes: "", estimate: 1, focusMinutes: 45, priority: 1, scrapMinutes: 30, reminderPending: false, reminderFired: true, reminderExpired: true, completedAt: null, createdAt: 1700000000 },
       // reminderPending：验证提醒横幅（core reminders.pendingReminder 语义）
       { id: "t2", title: "408 真题：数据结构错题回顾", completed: false, dueDate: new Date().toISOString().slice(0, 10), reminderTime: "21:30", projectId: "p1", tags: ["408"], subtasks: [], notes: "", estimate: 2, focusMinutes: 25, priority: 2, scrapMinutes: 30, reminderPending: true, reminderFired: true, reminderExpired: false, completedAt: null, createdAt: 1700000000 },
     ],
@@ -422,6 +424,11 @@ for (const pageId of PAGE_IDS) {
     if (!markup || markup.length < 500) failures.push(`页面 ${pageId} 渲染为空`);
     const marker = PAGE_MARKERS[pageId];
     if (marker && !markup.includes(marker)) failures.push(`页面 ${pageId} 缺少标记「${marker}」（切页可能失效）`);
+    if (pageId === "focus" && !process.env.SMOKE_LIVE) {
+      // 今日专注只该列今天计划的任务；逾期任务只能作为底部提示出现。
+      if (!markup.includes("另有 1 件逾期任务")) failures.push("今日专注没有逾期提示");
+      if (markup.includes("已逾期")) failures.push("今日专注混入了逾期任务行");
+    }
   } catch (e) {
     failures.push(`渲染页面 ${pageId} 失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`);
   }

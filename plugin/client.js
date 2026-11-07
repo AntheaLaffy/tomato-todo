@@ -101,6 +101,10 @@
     calendarClock: [P("M3.6 8.6h16.8"), P("M6.4 4.6v2.6M17.6 4.6v2.6"), R(3.6, 5.4, 16.8, 14.2, 2.8), P("M12 11.4v3l2 1.4")],
     sun: [C(12, 12, 4.2), P("M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M5.9 5.9l1.6 1.6M16.5 16.5l1.6 1.6M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6")],
     leaf: [P("M4.6 19.4c0-8 5-13.2 14.8-14.8C17.2 14 12.6 19.4 4.6 19.4Z"), P("M4.6 19.4l9-8.6")],
+    chat: [
+      ["path", { d: "M4.4 6.6c0-1.2 1-2.2 2.2-2.2h10.8c1.2 0 2.2 1 2.2 2.2v7.2c0 1.2-1 2.2-2.2 2.2H9.6l-4 3.4v-3.4h-.2c-.6 0-1-.4-1-1V6.6Z" }],
+      P("M8.4 9.4h7.2M8.4 12.6h4.4")
+    ],
     grip: [C(9, 6.4, 1.1), C(15, 6.4, 1.1), C(9, 12, 1.1), C(15, 12, 1.1), C(9, 17.6, 1.1), C(15, 17.6, 1.1)],
     tomato: [
       ["path", { d: "M12 7.2c-3.6 0-6.2 2.7-6.2 6.2 0 3.7 2.8 6.1 6.2 6.1s6.2-2.4 6.2-6.1c0-3.5-2.6-6.2-6.2-6.2Z" }],
@@ -2396,23 +2400,19 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const project = projectById(data, projectId);
     return project && project.color ? project.color : "var(--tomato-ink-3)";
   }
-  function isDueByToday(task, today) {
-    if (!task || task.completed) return false;
-    const due = task.dueDate || null;
-    return due !== null && due <= today;
+  function todayTasks(data, today) {
+    const tasks = data && data.tasks || [];
+    return tasks.filter((task) => !task.completed && task.dueDate === today);
+  }
+  function overdueTasks(data, today) {
+    const tasks = data && data.tasks || [];
+    return tasks.filter(
+      (task) => !task.completed && task.dueDate !== null && task.dueDate !== void 0 && task.dueDate < today
+    );
   }
   function isOverdue(task, today) {
     if (!task || task.completed) return false;
     return task.dueDate !== null && task.dueDate !== void 0 && task.dueDate < today;
-  }
-  function dueTasks(data, today) {
-    const tasks = data && data.tasks || [];
-    return tasks.filter((task) => isDueByToday(task, today)).sort((a, b) => {
-      const oa = isOverdue(a, today) ? 0 : 1;
-      const ob = isOverdue(b, today) ? 0 : 1;
-      if (oa !== ob) return oa - ob;
-      return String(a.dueDate).localeCompare(String(b.dueDate));
-    });
   }
   function recentDays(stats, n = 7, today) {
     const days = stats && Array.isArray(stats.days) && stats.days || [];
@@ -2682,6 +2682,29 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       ) : null
     );
   }
+  function AssistantItem({ compact, onLeave }) {
+    if (!onLeave) return null;
+    return h(
+      "button",
+      {
+        type: "button",
+        className: "t-navitem",
+        onClick: onLeave,
+        title: t("nav.assistantHint"),
+        style: {
+          marginTop: compact ? 0 : 10,
+          flex: "none",
+          borderTop: compact ? "none" : "1px solid var(--tomato-line)",
+          borderRadius: compact ? 11 : "0 0 11px 11px",
+          paddingTop: compact ? void 0 : 12,
+          color: "var(--tomato-ink-2)"
+        }
+      },
+      h(Icon, { name: "chat", size: 17 }),
+      h("span", { style: { flex: 1, minWidth: 0 } }, t("nav.assistant")),
+      h(Icon, { name: "arrowRight", size: 13, style: { opacity: 0.55 } })
+    );
+  }
   function NavFooter({ state, compact }) {
     const data = state && state.data || {};
     const settings = data.settings || {};
@@ -2750,7 +2773,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       )
     );
   }
-  function NavColumn({ pages, activeId, onSelect, state, compact, badges }) {
+  function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave }) {
     return h(
       "aside",
       {
@@ -2784,6 +2807,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           badge: page.badge ? page.badge(state) : null
         })
       ),
+      h(AssistantItem, { compact, onLeave }),
       h(NavFooter, { state, compact })
     );
   }
@@ -2811,6 +2835,12 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         style: {
           display: "flex",
           flexDirection: narrow ? "column" : "row",
+          // 全屏接管：番茄主视图固定铺满视口，盖住 DSH 的侧栏与顶部栏；
+          // 点「学习助手」切回对话面板时本组件卸载，DSH 界面自然恢复。
+          // 不设 z-index：保持 z-auto，让 shell.overlay（DSH 固定 z20：HUD/提醒/沉浸）
+          // 与自家对话框（z60）仍在正确的层级里。
+          position: "fixed",
+          inset: 0,
           height: "100%",
           width: "100%",
           minHeight: 0,
@@ -2824,7 +2854,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         onSelect: setActivePageId,
         state,
         compact: narrow,
-        badges
+        badges,
+        onLeave: props.onLeave
       }),
       h(
         "main",
@@ -4590,7 +4621,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       skipped: "Dismissed — it stays in your tasks"
     }
   });
-  var BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 8px)";
+  var BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 64px)";
   var dismissed = /* @__PURE__ */ new Set();
   function reminderKey(task) {
     return `${task.id}|${task.dueDate}|${task.reminderTime}`;
@@ -4655,10 +4686,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
         style: {
           position: "fixed",
           top: BANNER_TOP,
-          left: "50%",
-          transform: "translateX(-50%)",
+          right: 18,
           zIndex: 45,
-          width: "min(560px, calc(100vw - 32px))",
+          width: "min(320px, calc(100vw - 36px))",
           pointerEvents: "auto"
         }
       },
@@ -4668,42 +4698,44 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           className: "t-card",
           style: {
             display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "9px 10px 9px 14px",
+            flexDirection: "column",
+            gap: 8,
+            padding: "12px 13px",
             borderRadius: 15,
-            background: "color-mix(in srgb, var(--tomato-surface) 92%, transparent)",
+            background: "color-mix(in srgb, var(--tomato-surface) 94%, transparent)",
             backdropFilter: "blur(12px)"
           }
         },
         h(
           "div",
-          {
-            style: {
-              width: 30,
-              height: 30,
-              borderRadius: 10,
-              background: "var(--tomato-brand-soft)",
-              color: "var(--tomato-accent-fg)",
-              display: "grid",
-              placeItems: "center",
-              flex: "none"
-            }
-          },
-          h(Icon, { name: "bell", size: 16 })
-        ),
-        h(
-          "div",
-          { style: { flex: 1, minWidth: 0 } },
+          { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
+          h(
+            "div",
+            {
+              style: {
+                width: 26,
+                height: 26,
+                borderRadius: 9,
+                background: "var(--tomato-brand-soft)",
+                color: "var(--tomato-accent-fg)",
+                display: "grid",
+                placeItems: "center",
+                flex: "none"
+              }
+            },
+            h(Icon, { name: "bell", size: 14 })
+          ),
           h(
             "div",
             {
               style: {
                 display: "flex",
                 alignItems: "baseline",
-                gap: 8,
-                fontSize: 12,
-                color: "var(--tomato-ink-3)"
+                gap: 7,
+                fontSize: 11.5,
+                color: "var(--tomato-ink-3)",
+                minWidth: 0,
+                flexWrap: "wrap"
               }
             },
             t("reminder.now"),
@@ -4722,46 +4754,48 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
               project.name
             ) : null,
             task.reminderTime ? h("span", { className: "t-mono" }, task.reminderTime) : null
-          ),
+          )
+        ),
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 13.5,
+              fontWeight: 600,
+              lineHeight: 1.35,
+              color: "var(--tomato-ink)"
+            }
+          },
+          task.title
+        ),
+        h(
+          "div",
+          { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
           h(
-            "div",
-            {
-              style: {
-                fontSize: 13.5,
-                fontWeight: 600,
-                color: "var(--tomato-ink)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap"
-              }
-            },
-            task.title
+            "span",
+            { style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+            t("reminder.minutes", { n: minutes, round: rounds })
           ),
-          h(
-            "div",
-            { style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
-            t("reminder.minutes", { n: minutes, round: rounds }),
-            pendingCount > 1 ? h(
-              "span",
-              { style: { marginLeft: 8, color: "var(--tomato-accent-fg)" } },
-              t("reminder.more", { n: pendingCount - 1 })
-            ) : null
-          ),
+          pendingCount > 1 ? h(
+            "span",
+            { style: { fontSize: 11, color: "var(--tomato-accent-fg)" } },
+            t("reminder.more", { n: pendingCount - 1 })
+          ) : null,
           error ? h(
-            "div",
-            { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)", marginTop: 2 } },
+            "span",
+            { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)" } },
             error
           ) : null
         ),
         h(
-          Btn,
-          { size: "sm", variant: "primary", icon: "play", disabled: busy, onClick: start },
-          t("reminder.start")
-        ),
-        h(
-          Btn,
-          { size: "sm", variant: "plain", disabled: busy, onClick: later },
-          t("reminder.later")
+          "div",
+          { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 2 } },
+          h(Btn, { size: "sm", variant: "plain", disabled: busy, onClick: later }, t("reminder.later")),
+          h(
+            Btn,
+            { size: "sm", variant: "primary", icon: "play", disabled: busy, onClick: start },
+            t("reminder.start")
+          )
         )
       )
     );
@@ -4805,7 +4839,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const stats = state && state.stats || {};
     const today = todayKey(state && state.serverTime);
     const view = timerView(state);
-    const due = dueTasks(data, today).length;
+    const due = todayTasks(data, today).length;
     const focusMinutes = Math.round((Number(stats.todaySeconds) || 0) / 60);
     const start = async () => {
       setBusy(true);
@@ -4892,7 +4926,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       education: "应试教育",
       guard: "专注保护",
       schedule: "定时锁机",
-      preferences: "偏好设置"
+      preferences: "偏好设置",
+      assistant: "学习助手",
+      assistantHint: "回到 DSH 对话（番茄界面会收起）"
     },
     en: {
       focus: "Today",
@@ -4903,7 +4939,9 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       education: "Study projects",
       guard: "Focus guard",
       schedule: "Scheduled lock",
-      preferences: "Preferences"
+      preferences: "Preferences",
+      assistant: "Learning assistant",
+      assistantHint: "Back to the DSH conversation (Tomato view folds away)"
     }
   });
 
@@ -5849,6 +5887,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       minutesPerSession: "{n} 分钟/次",
       overdue: "已逾期",
       catchUpBadge: "待补",
+      overdueHint: "另有 {n} 件逾期任务",
+      goTasks: "去全部任务",
       untitled: "（无标题）",
       taskCheck: "标记「{title}」为完成",
       taskUncheck: "重新打开「{title}」",
@@ -6568,7 +6608,8 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     );
   }
   function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp }) {
-    const pending = dueTasks(data, today);
+    const pending = todayTasks(data, today);
+    const overdue = overdueTasks(data, today);
     const catchUps = catchUpTasks(data, today);
     const catchIds = new Set(catchUps.map((task) => task.id));
     const timed = pending.filter((task) => task.reminderTime && !catchIds.has(task.id));
@@ -6630,7 +6671,28 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
           view,
           busy,
           actions
-        })
+        }),
+        overdue.length > 0 ? h(
+          "button",
+          {
+            type: "button",
+            className: "t-btn t-btn-plain",
+            onClick: () => setActivePageId("tasks"),
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              alignSelf: "flex-start",
+              fontSize: 12,
+              color: "var(--tomato-ink-3)",
+              padding: "4px 2px"
+            }
+          },
+          h(Icon, { name: "clock", size: 13 }),
+          t("focus.overdueHint", { n: overdue.length }),
+          h(Icon, { name: "arrowRight", size: 12 }),
+          t("focus.goTasks")
+        ) : null
       );
     }
     return h(
@@ -7100,7 +7162,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     const today = state && state.today || todayKey(state && state.serverTime);
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const view = timerView(state);
-    const pending = dueTasks(data, today);
+    const pending = todayTasks(data, today);
     const run = async (action, message) => {
       setBusy(true);
       const result = await tryDispatch(action);
@@ -7325,7 +7387,7 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
     badge: (snapshot2) => {
       if (!snapshot2 || !snapshot2.data) return 0;
       const today = snapshot2.today || todayKey(snapshot2.serverTime);
-      return dueTasks(snapshot2.data, today).length;
+      return todayTasks(snapshot2.data, today).length;
     }
   });
 
@@ -18730,7 +18792,13 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       }
     } catch {
     }
-    const pageProps = { dispatch, api: api_exports };
+    const leaveToConversation = () => {
+      try {
+        if (layout && typeof layout.selectPanel === "function") layout.selectPanel(null);
+      } catch {
+      }
+    };
+    const pageProps = { dispatch, api: api_exports, onLeave: leaveToConversation };
     const safeInject2 = (key, options, Component) => {
       try {
         ctx.slots.inject(key, () => ctx.slots.register(options, Component));

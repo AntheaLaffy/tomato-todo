@@ -8,7 +8,7 @@ import { Icon } from "../shared/icons.js";
 import { Chip, notify } from "../shared/ui.js";
 import { registerCopy } from "../shared/copy.js";
 import { useSnapshot, tryDispatch } from "../shared/store.js";
-import { timerView, fmtClock, dueTasks, todayKey } from "../shared/derive.js";
+import { timerView, fmtClock, todayTasks, todayKey } from "../shared/derive.js";
 import { openImmersive } from "./immersive.js";
 
 registerCopy("dock", {
@@ -37,7 +37,7 @@ export function DockCard({ openPanel }) {
   const stats = (state && state.stats) || {};
   const today = todayKey(state && state.serverTime);
   const view = timerView(state);
-  const due = dueTasks(data, today).length;
+  const due = todayTasks(data, today).length;
   const focusMinutes = Math.round((Number(stats.todaySeconds) || 0) / 60);
 
   const start = async () => {

@@ -12,6 +12,8 @@ registerCopy("nav", {
     guard: "专注保护",
     schedule: "定时锁机",
     preferences: "偏好设置",
+    assistant: "学习助手",
+    assistantHint: "回到 DSH 对话（番茄界面会收起）",
   },
   en: {
     focus: "Today",
@@ -23,5 +25,7 @@ registerCopy("nav", {
     guard: "Focus guard",
     schedule: "Scheduled lock",
     preferences: "Preferences",
+    assistant: "Learning assistant",
+    assistantHint: "Back to the DSH conversation (Tomato view folds away)",
   },
 });

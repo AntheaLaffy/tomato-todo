@@ -114,6 +114,30 @@ function NavItem({ page, active, onSelect, badge }) {
   );
 }
 
+function AssistantItem({ compact, onLeave }) {
+  if (!onLeave) return null;
+  return h(
+    "button",
+    {
+      type: "button",
+      className: "t-navitem",
+      onClick: onLeave,
+      title: t("nav.assistantHint"),
+      style: {
+        marginTop: compact ? 0 : 10,
+        flex: "none",
+        borderTop: compact ? "none" : "1px solid var(--tomato-line)",
+        borderRadius: compact ? 11 : "0 0 11px 11px",
+        paddingTop: compact ? undefined : 12,
+        color: "var(--tomato-ink-2)",
+      },
+    },
+    h(Icon, { name: "chat", size: 17 }),
+    h("span", { style: { flex: 1, minWidth: 0 } }, t("nav.assistant")),
+    h(Icon, { name: "arrowRight", size: 13, style: { opacity: 0.55 } }),
+  );
+}
+
 function NavFooter({ state, compact }) {
   const data = (state && state.data) || {};
   const settings = data.settings || {};
@@ -183,7 +207,7 @@ function NavFooter({ state, compact }) {
   );
 }
 
-function NavColumn({ pages, activeId, onSelect, state, compact, badges }) {
+function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave }) {
   return h(
     "aside",
     {
@@ -219,6 +243,7 @@ function NavColumn({ pages, activeId, onSelect, state, compact, badges }) {
         badge: page.badge ? page.badge(state) : null,
       }),
     ),
+    h(AssistantItem, { compact, onLeave }),
     h(NavFooter, { state, compact }),
   );
 }
@@ -257,6 +282,12 @@ export function AppShell(props) {
       style: {
         display: "flex",
         flexDirection: narrow ? "column" : "row",
+        // 全屏接管：番茄主视图固定铺满视口，盖住 DSH 的侧栏与顶部栏；
+        // 点「学习助手」切回对话面板时本组件卸载，DSH 界面自然恢复。
+        // 不设 z-index：保持 z-auto，让 shell.overlay（DSH 固定 z20：HUD/提醒/沉浸）
+        // 与自家对话框（z60）仍在正确的层级里。
+        position: "fixed",
+        inset: 0,
         height: "100%",
         width: "100%",
         minHeight: 0,
@@ -271,6 +302,7 @@ export function AppShell(props) {
       state,
       compact: narrow,
       badges,
+      onLeave: props.onLeave,
     }),
     h(
       "main",

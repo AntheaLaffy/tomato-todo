@@ -31,8 +31,8 @@ registerCopy("reminder", {
   },
 });
 
-// 与 HUD 同一套顶部偏移：横幅落在 DSH 顶部栏之下，不压住窗口按钮。
-const BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 8px)";
+// 落在 HUD 正下方、右侧对齐：既不压 DSH 顶部栏，也不盖住页面大标题。
+const BANNER_TOP = "calc(var(--dsh-frame-overlay-top, 48px) + 64px)";
 
 const dismissed = new Set();
 
@@ -116,10 +116,9 @@ export function ReminderBanner() {
       style: {
         position: "fixed",
         top: BANNER_TOP,
-        left: "50%",
-        transform: "translateX(-50%)",
+        right: 18,
         zIndex: 45,
-        width: "min(560px, calc(100vw - 32px))",
+        width: "min(320px, calc(100vw - 36px))",
         pointerEvents: "auto",
       },
     },
@@ -129,42 +128,44 @@ export function ReminderBanner() {
         className: "t-card",
         style: {
           display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "9px 10px 9px 14px",
+          flexDirection: "column",
+          gap: 8,
+          padding: "12px 13px",
           borderRadius: 15,
-          background: "color-mix(in srgb, var(--tomato-surface) 92%, transparent)",
+          background: "color-mix(in srgb, var(--tomato-surface) 94%, transparent)",
           backdropFilter: "blur(12px)",
         },
       },
       h(
         "div",
-        {
-          style: {
-            width: 30,
-            height: 30,
-            borderRadius: 10,
-            background: "var(--tomato-brand-soft)",
-            color: "var(--tomato-accent-fg)",
-            display: "grid",
-            placeItems: "center",
-            flex: "none",
+        { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
+        h(
+          "div",
+          {
+            style: {
+              width: 26,
+              height: 26,
+              borderRadius: 9,
+              background: "var(--tomato-brand-soft)",
+              color: "var(--tomato-accent-fg)",
+              display: "grid",
+              placeItems: "center",
+              flex: "none",
+            },
           },
-        },
-        h(Icon, { name: "bell", size: 16 }),
-      ),
-      h(
-        "div",
-        { style: { flex: 1, minWidth: 0 } },
+          h(Icon, { name: "bell", size: 14 }),
+        ),
         h(
           "div",
           {
             style: {
               display: "flex",
               alignItems: "baseline",
-              gap: 8,
-              fontSize: 12,
+              gap: 7,
+              fontSize: 11.5,
               color: "var(--tomato-ink-3)",
+              minWidth: 0,
+              flexWrap: "wrap",
             },
           },
           t("reminder.now"),
@@ -186,49 +187,51 @@ export function ReminderBanner() {
             : null,
           task.reminderTime ? h("span", { className: "t-mono" }, task.reminderTime) : null,
         ),
-        h(
-          "div",
-          {
-            style: {
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: "var(--tomato-ink)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            },
+      ),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 13.5,
+            fontWeight: 600,
+            lineHeight: 1.35,
+            color: "var(--tomato-ink)",
           },
-          task.title,
-        ),
+        },
+        task.title,
+      ),
+      h(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
         h(
-          "div",
-          { style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
+          "span",
+          { style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
           t("reminder.minutes", { n: minutes, round: rounds }),
-          pendingCount > 1
-            ? h(
-                "span",
-                { style: { marginLeft: 8, color: "var(--tomato-accent-fg)" } },
-                t("reminder.more", { n: pendingCount - 1 }),
-              )
-            : null,
         ),
+        pendingCount > 1
+          ? h(
+              "span",
+              { style: { fontSize: 11, color: "var(--tomato-accent-fg)" } },
+              t("reminder.more", { n: pendingCount - 1 }),
+            )
+          : null,
         error
           ? h(
-              "div",
-              { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)", marginTop: 2 } },
+              "span",
+              { style: { fontSize: 11, color: "var(--dsw-alias-state-error-primary, #b8503f)" } },
               error,
             )
           : null,
       ),
       h(
-        Btn,
-        { size: "sm", variant: "primary", icon: "play", disabled: busy, onClick: start },
-        t("reminder.start"),
-      ),
-      h(
-        Btn,
-        { size: "sm", variant: "plain", disabled: busy, onClick: later },
-        t("reminder.later"),
+        "div",
+        { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 2 } },
+        h(Btn, { size: "sm", variant: "plain", disabled: busy, onClick: later }, t("reminder.later")),
+        h(
+          Btn,
+          { size: "sm", variant: "primary", icon: "play", disabled: busy, onClick: start },
+          t("reminder.start"),
+        ),
       ),
     ),
   );

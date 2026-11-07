@@ -146,6 +146,28 @@ export function isDueByToday(task, today) {
   return due !== null && due <= today;
 }
 
+/**
+ * 今日计划任务：到期日就是今天、未完成。
+ * 「今日专注」只认这一组——逾期任务是另一件事，放在全部任务的逾期视图里，
+ * 绝不混进今天的时间线（否则今天会被历史债务压满）。
+ */
+export function todayTasks(data, today) {
+  const tasks = (data && data.tasks) || [];
+  return tasks.filter((task) => !task.completed && task.dueDate === today);
+}
+
+/** 逾期任务：到期日早于今天、未完成。 */
+export function overdueTasks(data, today) {
+  const tasks = (data && data.tasks) || [];
+  return tasks.filter(
+    (task) =>
+      !task.completed &&
+      task.dueDate !== null &&
+      task.dueDate !== undefined &&
+      task.dueDate < today,
+  );
+}
+
 export function isOverdue(task, today) {
   if (!task || task.completed) return false;
   return task.dueDate !== null && task.dueDate !== undefined && task.dueDate < today;

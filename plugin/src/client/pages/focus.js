@@ -33,6 +33,8 @@ import {
   completedOn,
   dayLabel,
   dueTasks,
+  overdueTasks,
+  todayTasks,
   fmtClock,
   fmtMinutes,
   greeting,
@@ -130,6 +132,8 @@ registerCopy("focus", {
     minutesPerSession: "{n} 分钟/次",
     overdue: "已逾期",
     catchUpBadge: "待补",
+    overdueHint: "另有 {n} 件逾期任务",
+    goTasks: "去全部任务",
     untitled: "（无标题）",
     taskCheck: "标记「{title}」为完成",
     taskUncheck: "重新打开「{title}」",
@@ -910,7 +914,9 @@ function TaskGroup({ title, tasks, data, today, view, busy, actions, onHelp }) {
 }
 
 function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp }) {
-  const pending = dueTasks(data, today);
+  // 今日专注只呈现「今天计划」的任务；逾期任务在全部任务里单独处理。
+  const pending = todayTasks(data, today);
+  const overdue = overdueTasks(data, today);
   const catchUps = catchUpTasks(data, today);
   const catchIds = new Set(catchUps.map((task) => task.id));
   const timed = pending.filter((task) => task.reminderTime && !catchIds.has(task.id));
@@ -978,6 +984,29 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
         busy,
         actions,
       }),
+      overdue.length > 0
+        ? h(
+            "button",
+            {
+              type: "button",
+              className: "t-btn t-btn-plain",
+              onClick: () => setActivePageId("tasks"),
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                alignSelf: "flex-start",
+                fontSize: 12,
+                color: "var(--tomato-ink-3)",
+                padding: "4px 2px",
+              },
+            },
+            h(Icon, { name: "clock", size: 13 }),
+            t("focus.overdueHint", { n: overdue.length }),
+            h(Icon, { name: "arrowRight", size: 12 }),
+            t("focus.goTasks"),
+          )
+        : null,
     );
   }
 
@@ -1487,7 +1516,7 @@ export function FocusPage() {
   const today = (state && state.today) || todayKey(state && state.serverTime);
   const projects = Array.isArray(data.projects) ? data.projects : [];
   const view = timerView(state);
-  const pending = dueTasks(data, today);
+  const pending = todayTasks(data, today);
 
   const run = async (action, message) => {
     setBusy(true);
@@ -1730,6 +1759,6 @@ registerPage({
   badge: (snapshot) => {
     if (!snapshot || !snapshot.data) return 0;
     const today = snapshot.today || todayKey(snapshot.serverTime);
-    return dueTasks(snapshot.data, today).length;
+    return todayTasks(snapshot.data, today).length;
   },
 });

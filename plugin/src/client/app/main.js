@@ -90,7 +90,15 @@ export function registerApp(ctx) {
     /* 非浏览器环境忽略 */
   }
 
-  const pageProps = { dispatch, api };
+  const leaveToConversation = () => {
+    try {
+      if (layout && typeof layout.selectPanel === "function") layout.selectPanel(null);
+    } catch {
+      /* DSH 版本差异时忽略 */
+    }
+  };
+
+  const pageProps = { dispatch, api, onLeave: leaveToConversation };
 
   // 逐个 slot 容错：任何一个槽位在 DSH 版本差异下不存在，都不该让整块插件挂掉
   // （皮肤与 HUD 仍是独立的可用部分）。
