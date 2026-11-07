@@ -27,17 +27,19 @@ import {
 import { addDays, fmtHHMM, parseHHMM, projectById, todayKey, weekStart, weekdayIndex } from "../shared/derive.js";
 import { tryDispatch } from "../shared/store.js";
 import { registerPage } from "../app/registry.js";
+import { TaskDialog } from "./task-dialog.js";
 
 registerCopy("calendar", {
   zh: {
     eyebrow: "WEEK AT A GLANCE",
-    subtitle: "横轴星期、纵轴时间，色块是这一周已经被占用的时间。",
+    subtitle: "横轴星期、纵轴时间：实心块是任务，斜纹块是固定占用。",
     prev: "上一周",
     next: "下一周",
     thisWeek: "回到本周",
     summary: "{range} · 共 {items} 个时段 · {teaching} 节课/考试",
     addBlock: "添加时段",
     legendTeaching: "课程 / 考试",
+    legendTask: "任务",
     legendRequired: "需专心",
     legendLight: "水课（可并行）",
     legendRest: "休息锁机",
@@ -100,13 +102,14 @@ registerCopy("calendar", {
   },
   en: {
     eyebrow: "WEEK AT A GLANCE",
-    subtitle: "Weekdays across, time down; each band is time already spoken for.",
+    subtitle: "Weekdays across, time down: solid blocks are tasks, hatched bands are fixed time.",
     prev: "Previous week",
     next: "Next week",
     thisWeek: "This week",
     summary: "{range} · {items} slots · {teaching} lessons/exams",
     addBlock: "Add slot",
     legendTeaching: "Lesson / exam",
+    legendTask: "Task",
     legendRequired: "Needs focus",
     legendLight: "Light class (parallel OK)",
     legendRest: "Scheduled rest",
@@ -209,10 +212,10 @@ function fmtBand(start, end) {
   return `${start} – ${end}`;
 }
 
-/** 项目色 12% 底：数据色是 hex 时加 0x1f alpha；否则退回纸面。 */
+/** 项目色 10% 底：与纸面混合成不透明色，压在下面的斜纹带不会透上来。 */
 function tint(color, fallback = "var(--tomato-surface-2)") {
   return typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)
-    ? `${color}1f`
+    ? `color-mix(in srgb, ${color} 10%, var(--tomato-surface))`
     : fallback;
 }
 
@@ -233,6 +236,16 @@ function buildWeek(state, offset) {
   const education = data.education || {};
   const lessons = Array.isArray(education.lessons) ? education.lessons : [];
   const assessments = Array.isArray(education.assessments) ? education.assessments : [];
+  const allTasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const settings = data.settings || {};
+  const focusMinutes = Math.max(1, Number(settings.focusMinutes) || 45);
+  const breakMinutes = Math.max(0, Number(settings.shortBreakMinutes) || 5);
+  // 课程已经由 teaching 块表示；旧版同样跳过「课程生成的专注任务」，避免同一条课出现两次。
+  const lessonTaskIds = new Set(
+    (Array.isArray(education.focusTasks) ? education.focusTasks : [])
+      .filter((link) => link && link.kind === "lesson")
+      .map((link) => link.taskId),
+  );
 
   const days = Array.from({ length: 7 }, (_, index) => {
     const date = addDays(monday, index);
@@ -281,7 +294,34 @@ function buildWeek(state, offset) {
         schedule.days.includes(weekday),
     );
 
-    return { date, weekday, teaching, blocks: dayBlocks, rests: dayRests };
+    // 当天有提醒时刻的任务：实心块，高度按预计番茄 + 休息估算（旧版同款）。
+    const dayTasks = allTasks
+      .filter(
+        (task) =>
+          task &&
+          task.dueDate === date &&
+          task.reminderTime &&
+          !lessonTaskIds.has(task.id),
+      )
+      .sort((a, b) => String(a.reminderTime).localeCompare(String(b.reminderTime)))
+      .map((task) => {
+        const startSecs = parseHHMM(task.reminderTime);
+        if (startSecs === null) return null;
+        const estimate = Math.max(1, Number(task.estimate) || 1);
+        const focus = Math.max(1, Number(task.focusMinutes) || focusMinutes);
+        const minutes = Math.max(30, estimate * focus + (estimate - 1) * breakMinutes);
+        return {
+          raw: task,
+          title: task.title || t("calendar.untitled"),
+          projectId: task.projectId ?? null,
+          startMin: Math.floor(startSecs / 60),
+          endMin: Math.floor(startSecs / 60) + minutes,
+          completed: !!task.completed,
+        };
+      })
+      .filter(Boolean);
+
+    return { date, weekday, teaching, blocks: dayBlocks, rests: dayRests, tasks: dayTasks };
   });
 
   return { today, monday, days, data };
@@ -457,15 +497,33 @@ function GridBand({ position, style, title, onClick, children }) {
   );
 }
 
-function BandText({ title, meta, color }) {
+function BandText({ title, meta, color, lead, band = false }) {
   return [
+    lead
+      ? h(
+          "span",
+          {
+            key: "lead",
+            className: "t-mono",
+            style: {
+              fontSize: 9,
+              lineHeight: 1.2,
+              color: "var(--tomato-brand-deep)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            },
+          },
+          lead,
+        )
+      : null,
     h(
       "span",
       {
         key: "title",
         style: {
-          fontSize: 10.5,
-          fontWeight: 600,
+          fontSize: band ? 9.5 : 10.5,
+          fontWeight: band ? 550 : 600,
           color: color || "var(--tomato-ink)",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -480,7 +538,7 @@ function BandText({ title, meta, color }) {
           {
             key: "meta",
             style: {
-              fontSize: 9.5,
+              fontSize: band ? 9 : 9.5,
               color: "var(--tomato-ink-3)",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -493,7 +551,7 @@ function BandText({ title, meta, color }) {
   ];
 }
 
-function WeekGrid({ week, conflicts, onSelect, onEmptyClick }) {
+function WeekGrid({ week, conflicts, onSelect, onEmptyClick, onTask }) {
   const hourLabels = [];
   for (let hour = 7; hour <= 24; hour += 1) hourLabels.push(hour);
 
@@ -637,13 +695,18 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick }) {
                   title: `${rest.name || t("calendar.rest")} · ${fmtBand(rest.start, rest.end)}`,
                   onClick: () => onSelect({ kind: "rest", item: rest }),
                   style: {
+                    left: 0,
+                    right: 0,
+                    borderRadius: 0,
                     borderLeft: "3px solid var(--tomato-plum)",
                     background:
                       "repeating-linear-gradient(135deg, color-mix(in srgb, var(--tomato-plum) 16%, transparent) 0 5px, transparent 5px 11px)",
                     color: "var(--tomato-ink-2)",
+                    zIndex: 1,
                   },
                 },
                 h(BandText, {
+                  band: true,
                   title: rest.name || t("calendar.rest"),
                   meta: fmtBand(rest.start, rest.end),
                 }),
@@ -662,20 +725,57 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick }) {
                   position,
                   title: `${block.title || t("calendar.untitled")} · ${fmtBand(block.start, block.end)}`,
                   onClick: () => onSelect({ kind: "block", item: block }),
+                  // 固定占用是「底纹带」：斜纹 + 直角，和实心圆角的任务块分开。
                   style: light
                     ? {
+                        left: 0,
+                        right: 0,
+                        borderRadius: 0,
                         borderLeft: "3px dashed var(--tomato-leaf)",
                         background: "var(--tomato-surface-2)",
+                        zIndex: 1,
                       }
                     : {
+                        left: 0,
+                        right: 0,
+                        borderRadius: 0,
                         borderLeft: "3px solid var(--tomato-brand)",
-                        background: "color-mix(in srgb, var(--tomato-brand) 12%, transparent)",
+                        background:
+                          "repeating-linear-gradient(135deg, color-mix(in srgb, var(--tomato-brand) 16%, transparent) 0 6px, transparent 6px 12px)",
+                        zIndex: 1,
                       },
                 },
                 h(BandText, {
+                  band: true,
                   title: block.title || t("calendar.untitled"),
                   meta: `${fmtBand(block.start, block.end)}${light ? ` · ${t("calendar.legendLight")}` : ""}`,
                   color: light ? "var(--tomato-ink-2)" : "var(--tomato-brand-deep)",
+                }),
+              );
+            }),
+            // 任务（实心块，最上层）：高度按预计番茄 + 休息估算，点击打开任务。
+            ...day.tasks.map((task) => {
+              const position = gridPosition(task.startMin, task.endMin);
+              const project = projectById(week.data, task.projectId);
+              const color = (project && project.color) || "var(--tomato-ink-3)";
+              return h(
+                GridBand,
+                {
+                  key: `task:${task.raw.id}`,
+                  position,
+                  title: `${task.title} · ${fmtHHMM(task.startMin * 60)}`,
+                  onClick: () => onTask?.(task.raw),
+                  style: {
+                    borderLeft: `3px solid ${color}`,
+                    background: "var(--tomato-surface)",
+                    opacity: task.completed ? 0.5 : 1,
+                    zIndex: 3,
+                  },
+                },
+                h(BandText, {
+                  lead: fmtHHMM(task.startMin * 60),
+                  title: task.title,
+                  color: "var(--tomato-ink)",
                 }),
               );
             }),
@@ -699,8 +799,8 @@ function WeekGrid({ week, conflicts, onSelect, onEmptyClick }) {
                   },
                 },
                 h(BandText, {
-                  title: `${kindLabel} · ${item.title}`,
-                  meta: timeLabel,
+                  lead: `${kindLabel} · ${fmtHHMM(item.startMin * 60)}`,
+                  title: item.title,
                   color: "var(--tomato-ink)",
                 }),
               );
@@ -726,7 +826,20 @@ function Legend() {
     "div",
     { style: { display: "flex", gap: 16, flexWrap: "wrap", padding: "0 18px 12px" } },
     item("teaching", { background: "var(--tomato-surface-2)", borderLeftColor: "var(--tomato-accent)" }, t("calendar.legendTeaching")),
-    item("required", { background: "color-mix(in srgb, var(--tomato-brand) 12%, transparent)", borderLeftColor: "var(--tomato-brand)" }, t("calendar.legendRequired")),
+    item(
+      "task",
+      { background: "var(--tomato-surface)", borderLeftColor: "var(--tomato-ink-3)" },
+      t("calendar.legendTask"),
+    ),
+    item(
+      "required",
+      {
+        background:
+          "repeating-linear-gradient(135deg, color-mix(in srgb, var(--tomato-brand) 26%, transparent) 0 3px, transparent 3px 6px)",
+        borderLeftColor: "var(--tomato-brand)",
+      },
+      t("calendar.legendRequired"),
+    ),
     item("light", { background: "var(--tomato-surface-2)", borderLeftColor: "var(--tomato-leaf)", borderLeftStyle: "dashed" }, t("calendar.legendLight")),
     item(
       "rest",
@@ -884,11 +997,15 @@ function CalendarPage({ state }) {
   const [detail, setDetail] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [saving, setSaving] = useState(false);
+  // 网格里的任务块点击后直接打开任务编辑框（课程/占用仍走详情面板）。
+  const [taskId, setTaskId] = useState(null);
 
   const week = buildWeek(state, weekOffset);
   const data = week.data;
   const conflicts = findConflicts(week.days);
   const allBlocks = Array.isArray(data.blocks) ? data.blocks : [];
+  const allTasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const taskEditing = taskId ? allTasks.find((task) => task.id === taskId) || null : null;
 
   const itemCount =
     week.days.reduce(
@@ -1058,7 +1175,13 @@ function CalendarPage({ state }) {
         }),
       ),
       h(Legend, null),
-      h(WeekGrid, { week, conflicts, onSelect: selectItem, onEmptyClick }),
+          h(WeekGrid, {
+        week,
+        conflicts,
+        onSelect: selectItem,
+        onEmptyClick,
+        onTask: (task) => setTaskId(task.id),
+      }),
     ),
 
     // 冲突与并行
@@ -1218,6 +1341,17 @@ function CalendarPage({ state }) {
               );
             }),
     ),
+
+    // 任务块 → 任务编辑框
+    h(TaskDialog, {
+      open: !!taskEditing,
+      task: taskEditing,
+      today: week.today,
+      projects: Array.isArray(data.projects) ? data.projects : [],
+      settings: data.settings || {},
+      initialTitle: "",
+      onClose: () => setTaskId(null),
+    }),
 
     // 编辑/新建固定占用
     h(BlockEditor, {
