@@ -2,17 +2,15 @@
 //
 // 页面只读 store 快照，写操作全部走 tryDispatch；计时、待补窗口与保护状态
 // 的判定都以 @tomato/core 和 shared/derive.js 为唯一权威，这里不复制规则。
-// 布局：页头 → 三张统计卡 → 左番茄钟 / 右今日待办 + 本周节奏 + 每日目标。
+// 布局：页头 → 三张统计卡 → 上排左番茄钟 / 右今日待办 → 整行本周节奏（旧版结构）。
 import { h, useState, useEffect } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import {
-  Bar,
   Btn,
   Card,
   Check,
   Chip,
-  Divider,
   Dropdown,
   Empty,
   IconBtn,
@@ -36,7 +34,6 @@ import {
   overdueTasks,
   todayTasks,
   fmtClock,
-  fmtMinutes,
   greeting,
   isCatchUp,
   isOverdue,
@@ -72,6 +69,10 @@ registerCopy("focus", {
     statStreak: "连续专注",
     statStreakHint: "小小坚持，慢慢积累",
     unitDays: "天",
+    timerTitle: "我的番茄钟",
+    expand: "沉浸模式",
+    allTasks: "全部任务",
+    weekdays: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
     modeFocus: "专注",
     modeShort: "短休息",
     modeLong: "长休息",
@@ -97,12 +98,12 @@ registerCopy("focus", {
     loop: "循环",
     loopHint: "一轮结束后自动开始下一轮",
     whitelistOn: "白名单保护中 · 允许 {n} 个应用",
-    whitelistReady: "白名单保护已开启 · 专注时允许 {n} 个应用",
+    whitelistReady: "白名单保护已配置 · 允许 {n} 个应用",
     locked: "界面锁定中",
     lockReady: "界面锁定已开启 · 专注时生效",
     protectOff: "给自己一段不被打扰的时间",
     guardUnavailable: "专注保护不可用（后台 guard 未运行）",
-    sound: "背景音",
+    soundChoose: "选择背景音",
     soundTitle: "背景音",
     soundSubtitle: "选一种声音，让注意力有个落点。",
     timerBusy: "请先结束当前计时，再开始新的专注",
@@ -148,12 +149,7 @@ registerCopy("focus", {
     deleted: "任务已删除",
     weekTitle: "这一周的专注节奏",
     viewStats: "查看统计",
-    weekTotal: "本周共 {time}",
     weekBarTitle: "{date} · {n} 分钟",
-    goalTitle: "每日番茄目标",
-    goalHint: "番茄按完成轮次计",
-    goalDone: "已达成",
-    goalReached: "今天的目标达成了，去休息一下",
     loadingTitle: "正在读取今天的计划…",
     loadingHint: "读不到时会自动重试，不需要刷新页面。",
   },
@@ -170,6 +166,10 @@ registerCopy("focus", {
     statStreak: "Focus streak",
     statStreakHint: "Small steps, kept up",
     unitDays: "days",
+    timerTitle: "My pomodoro",
+    expand: "Immersive mode",
+    allTasks: "All tasks",
+    weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     modeFocus: "Focus",
     modeShort: "Short break",
     modeLong: "Long break",
@@ -195,12 +195,12 @@ registerCopy("focus", {
     loop: "Loop",
     loopHint: "Start the next round automatically when this one ends",
     whitelistOn: "Whitelist active · {n} apps allowed",
-    whitelistReady: "Whitelist on · {n} apps allowed during focus",
+    whitelistReady: "Whitelist configured · {n} apps allowed",
     locked: "Screen locked",
     lockReady: "Screen lock on · applies during focus",
     protectOff: "Give yourself an undisturbed stretch",
     guardUnavailable: "Focus guard unavailable (background guard isn't running)",
-    sound: "Ambient sound",
+    soundChoose: "Choose ambience",
     soundTitle: "Ambient sound",
     soundSubtitle: "Pick a sound to give your attention somewhere to land.",
     timerBusy: "Finish the current timer before starting a new focus round",
@@ -247,10 +247,6 @@ registerCopy("focus", {
     viewStats: "View stats",
     weekTotal: "{time} this week",
     weekBarTitle: "{date} · {n} min",
-    goalTitle: "Daily pomodoro goal",
-    goalHint: "Pomodoros count completed rounds",
-    goalDone: "Reached",
-    goalReached: "Goal reached — take a rest",
     loadingTitle: "Reading today's plan…",
     loadingHint: "It retries automatically; no need to refresh.",
   },
@@ -366,7 +362,16 @@ function ProtectionLine({ state, view, protection }) {
   if (parts.length === 0) return null;
   return h(
     "div",
-    { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginTop: 12,
+      },
+    },
     parts,
   );
 }
@@ -385,6 +390,7 @@ function TimerCard({
   onPickTask,
   onToggleLoop,
   onSound,
+  onExpand,
 }) {
   const every = Math.max(1, Number(settings.longBreakEvery) || 4);
   const cycle = cycleOf(view);
@@ -411,27 +417,56 @@ function TimerCard({
         : t("focus.startFocus");
 
   const modeItems = [
-    { value: "focus", label: t("focus.modeFocus"), icon: "focus" },
-    { value: "shortBreak", label: t("focus.modeShort"), icon: "coffee" },
-    { value: "longBreak", label: t("focus.modeLong"), icon: "moon" },
+    { value: "focus", label: t("focus.modeFocus") },
+    { value: "shortBreak", label: t("focus.modeShort") },
+    { value: "longBreak", label: t("focus.modeLong") },
   ];
 
   const soundKind = (amb && amb.kind) || "silent";
 
   return h(
     Card,
-    { pad: 22, style: { display: "flex", flexDirection: "column", gap: 14 } },
+    {
+      pad: 0,
+      id: "focus-timer",
+      style: { display: "flex", flexDirection: "column", overflow: "hidden" },
+    },
+    // 标题行（与旧版一致：卡片名 + 沉浸入口）
     h(
       "div",
-      { style: { display: "flex", justifyContent: "center" } },
-      h(Segmented, { items: modeItems, value: view.mode, onChange: onMode, size: "sm" }),
+      { style: { display: "flex", alignItems: "center", gap: 8, padding: "16px 22px 0" } },
+      h(Icon, { name: "clock", size: 15, style: { color: "var(--tomato-ink-3)" } }),
+      h(
+        "div",
+        { style: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)" } },
+        t("focus.timerTitle"),
+      ),
+      h(IconBtn, { name: "expand", size: 15, box: 28, title: t("focus.expand"), onClick: onExpand }),
+    ),
+    // 模式切换：占满卡片宽度，三段等分
+    h(
+      "div",
+      { style: { padding: "14px 22px 0" } },
+      h(Segmented, {
+        items: modeItems,
+        value: view.mode,
+        onChange: onMode,
+        size: "sm",
+        style: { width: "100%" },
+      }),
     ),
     h(
       "div",
-      { style: { display: "flex", justifyContent: "center", marginTop: 4 } },
+      { style: { display: "flex", justifyContent: "center", padding: "12px 22px 0" } },
       h(
         Ring,
-        { value: view.progress, size: 268, stroke: 12, color: ringColor, pulse: view.running },
+        {
+          value: view.running || view.paused ? 1 - view.progress : 1,
+          size: 280,
+          stroke: 10,
+          color: ringColor,
+          pulse: view.running,
+        },
         h(
           "div",
           {
@@ -439,18 +474,21 @@ function TimerCard({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 8,
+              gap: 9,
               textAlign: "center",
             },
           },
-          h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, status),
+          // 旧版只在计时进行/暂停/休息时显示状态，空闲时不占一行。
+          view.running || view.paused || resting
+            ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, status)
+            : null,
           h(
             "div",
             {
               className: "t-mono",
               style: {
-                fontSize: 58,
-                fontWeight: 620,
+                fontSize: 66,
+                fontWeight: 600,
                 lineHeight: 1,
                 letterSpacing: "-.02em",
                 color: "var(--tomato-ink)",
@@ -468,44 +506,58 @@ function TimerCard({
       ),
     ),
     h(
-      "button",
-      {
-        type: "button",
-        className: "t-row",
-        onClick: onPickTask,
-        title: t("focus.pickTaskTitle"),
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 9,
-          width: "100%",
-          minHeight: 40,
-          padding: "8px 12px",
-          borderRadius: 12,
-          border: "1px solid var(--tomato-line)",
-          background: "transparent",
-          color: "var(--tomato-ink)",
-          cursor: "pointer",
-          fontFamily: "inherit",
-          fontSize: 13,
-          textAlign: "left",
-        },
-      },
-      h(Icon, {
-        name: resting ? "coffee" : "tasks",
-        size: 16,
-        style: { color: "var(--tomato-ink-3)" },
-      }),
+      "div",
+      { style: { padding: "14px 22px 0" } },
       h(
-        "span",
-        { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-        selected ? selected.title : t("focus.freeFocus"),
+        "button",
+        {
+          type: "button",
+          className: "t-row",
+          onClick: onPickTask,
+          title: t("focus.pickTaskTitle"),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            width: "100%",
+            minHeight: 38,
+            padding: "6px 10px",
+            borderRadius: 10,
+            border: "none",
+            background: "transparent",
+            color: "var(--tomato-ink-2)",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: 13,
+            textAlign: "left",
+          },
+        },
+        h(Icon, {
+          name: resting ? "coffee" : "tasks",
+          size: 16,
+          style: { color: "var(--tomato-ink-3)" },
+        }),
+        h(
+          "span",
+          {
+            style: {
+              minWidth: 0,
+              maxWidth: "78%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            },
+          },
+          selected ? selected.title : t("focus.freeFocus"),
+        ),
+        h(Icon, { name: "chevronDown", size: 15, style: { color: "var(--tomato-ink-3)" } }),
       ),
-      h(Icon, { name: "chevronDown", size: 15, style: { color: "var(--tomato-ink-3)" } }),
     ),
+    // 旧版的按钮组是居中的一小簇：重置 / 开始 / 跳过，不拉满整行。
     h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 10 } },
+      { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "16px 22px 0" } },
       h(IconBtn, {
         name: "refresh",
         size: 17,
@@ -522,7 +574,7 @@ function TimerCard({
           icon: view.running ? "pause" : "play",
           onClick: onStart,
           disabled: busy,
-          style: { flex: 1 },
+          style: { width: 200 },
         },
         startLabel,
       ),
@@ -535,13 +587,22 @@ function TimerCard({
         disabled: busy,
       }),
     ),
+    h("div", { style: { padding: "0 22px" } }, h(ProtectionLine, { state, view, protection })),
     h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          padding: "2px 22px 0",
+        },
+      },
       h(
         Btn,
         {
-          variant: "ghost",
+          variant: "plain",
           size: "sm",
           icon: "refresh",
           title: t("focus.loopHint"),
@@ -551,7 +612,6 @@ function TimerCard({
             ? {
                 background: "var(--tomato-brand-soft)",
                 color: "var(--tomato-brand-deep)",
-                borderColor: "transparent",
               }
             : undefined,
         },
@@ -559,38 +619,50 @@ function TimerCard({
       ),
       h(
         "span",
-        { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", minWidth: 0 } },
+        {
+          style: {
+            fontSize: 11,
+            color: "var(--tomato-ink-3)",
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          },
+        },
         t("focus.loopHint"),
       ),
     ),
-    h(ProtectionLine, { state, view, protection }),
-    h(Divider, { style: { margin: "2px 0 0" } }),
+    // 背景音是卡片底部的通栏（旧版样式），不再和内容挤在一起。
     h(
-      "button",
-      {
-        type: "button",
-        className: "t-row",
-        onClick: onSound,
-        title: t("focus.soundTitle"),
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: "100%",
-          padding: "8px 4px",
-          border: "none",
-          background: "transparent",
-          borderRadius: 10,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          fontSize: 12.5,
-          color: "var(--tomato-ink-2)",
+      "div",
+      { style: { marginTop: 16 } },
+      h(
+        "button",
+        {
+          type: "button",
+          className: "t-row",
+          onClick: onSound,
+          title: t("focus.soundTitle"),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            width: "100%",
+            padding: "13px 22px",
+            border: "none",
+            borderTop: "1px solid var(--tomato-line)",
+            background: "color-mix(in srgb, var(--tomato-surface-2) 45%, transparent)",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: 12.5,
+            color: "var(--tomato-ink-2)",
+          },
         },
-      },
-      h(Icon, { name: "sound", size: 16, style: { color: "var(--tomato-ink-3)" } }),
-      h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.sound")),
-      h("span", { style: { color: "var(--tomato-ink-3)" } }, t(`sound.${soundKind}`)),
-      h(Icon, { name: "chevronRight", size: 14, style: { color: "var(--tomato-ink-3)" } }),
+        h(Icon, { name: "sound", size: 16, style: { color: "var(--tomato-ink-3)" } }),
+        h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.soundChoose")),
+        h("span", { style: { color: "var(--tomato-ink-3)" } }, t(`sound.${soundKind}`)),
+        h(Icon, { name: "chevronRight", size: 14, style: { color: "var(--tomato-ink-3)" } }),
+      ),
     ),
   );
 }
@@ -665,12 +737,28 @@ function TaskMeta({ task, project, color, today, catchUpFlag, overdue, settings 
       ),
     );
   }
-  if (tags.length > 0) {
+  for (const tag of tags.slice(0, 2)) {
     items.push(
       h(
         "span",
-        { key: "tags", style: { color: "var(--tomato-ink-3)", overflow: "hidden", textOverflow: "ellipsis" } },
-        `#${tags.slice(0, 2).join(" #")}`,
+        {
+          key: `tag-${tag}`,
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            height: 17,
+            padding: "0 6px",
+            borderRadius: 5,
+            background: "var(--tomato-surface-2)",
+            color: "var(--tomato-ink-3)",
+            fontSize: 10.5,
+            maxWidth: 96,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          },
+        },
+        tag,
       ),
     );
   }
@@ -716,6 +804,12 @@ function TaskRow({ task, data, today, view, busy, actions }) {
         minHeight: 56,
         padding: "9px 8px",
         borderRadius: 12,
+        // 待补任务用淡粉底 + 左侧细杆标出来（旧版样式），仍可正常勾选/开始。
+        background:
+          catchUpFlag && !done
+            ? "color-mix(in srgb, var(--tomato-brand-soft) 62%, transparent)"
+            : undefined,
+        boxShadow: catchUpFlag && !done ? "inset 3px 0 0 var(--tomato-brand)" : undefined,
       },
     },
     h(Check, {
@@ -771,6 +865,16 @@ function TaskRow({ task, data, today, view, busy, actions }) {
     h(
       "div",
       { style: { position: "relative", display: "flex", alignItems: "center", gap: 2, flex: "none" } },
+      h("span", {
+        style: {
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          background: "var(--tomato-surface-3)",
+          marginLeft: 4,
+          flex: "none",
+        },
+      }),
       h(
         "span",
         {
@@ -841,32 +945,24 @@ function TaskGroup({ title, tasks, data, today, view, busy, actions, onHelp }) {
   if (!tasks || tasks.length === 0) return null;
   return h(
     "section",
-    null,
+    { style: { minWidth: 0 } },
     h(
       "div",
       {
         style: {
           display: "flex",
           alignItems: "center",
-          gap: 6,
+          gap: 7,
           padding: "0 2px",
-          marginBottom: 3,
+          marginBottom: 2,
         },
       },
+      h("span", { style: { fontSize: 12.5, fontWeight: 550, color: "var(--tomato-ink-2)" } }, title),
       h(
         "span",
-        {
-          style: {
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: ".08em",
-            textTransform: "uppercase",
-            color: "var(--tomato-ink-3)",
-          },
-        },
-        title,
+        { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+        tasks.length,
       ),
-      h("span", { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } }, tasks.length),
       onHelp
         ? h(
             "button",
@@ -897,17 +993,16 @@ function TaskGroup({ title, tasks, data, today, view, busy, actions, onHelp }) {
     ),
     h(
       "div",
-      { style: { display: "flex", flexDirection: "column", gap: 2 } },
-      tasks.map((task) =>
-        h(TaskRow, {
-          key: task.id,
-          task,
-          data,
-          today,
-          view,
-          busy,
-          actions,
-        }),
+      { style: { display: "flex", flexDirection: "column" } },
+      tasks.map((task, index) =>
+        h(
+          "div",
+          {
+            key: task.id,
+            style: index === 0 ? undefined : { borderTop: "1px solid var(--tomato-line)" },
+          },
+          h(TaskRow, { task, data, today, view, busy, actions }),
+        ),
       ),
     ),
   );
@@ -924,8 +1019,8 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
   const completed = completedOn(data, today);
 
   const tabs = [
-    { value: "active", label: `${t("focus.tabActive")} ${pending.length}` },
-    { value: "done", label: `${t("focus.tabDone")} ${completed.length}` },
+    { value: "active", label: t("focus.tabActive"), count: pending.length },
+    { value: "done", label: t("focus.tabDone"), count: completed.length },
   ];
 
   let body = null;
@@ -934,9 +1029,16 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
       completed.length > 0
         ? h(
             "div",
-            { style: { display: "flex", flexDirection: "column", gap: 2 } },
-            completed.map((task) =>
-              h(TaskRow, { key: task.id, task, data, today, view, busy, actions }),
+            { style: { display: "flex", flexDirection: "column" } },
+            completed.map((task, index) =>
+              h(
+                "div",
+                {
+                  key: task.id,
+                  style: index === 0 ? undefined : { borderTop: "1px solid var(--tomato-line)" },
+                },
+                h(TaskRow, { task, data, today, view, busy, actions }),
+              ),
             ),
           )
         : h(Empty, {
@@ -1016,31 +1118,78 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
     h(SectionTitle, {
       icon: "tasks",
       title: t("focus.todayTasks"),
+      style: { marginBottom: 6 },
       action: h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 8 } },
-        h(IconBtn, {
-          name: "sparkle",
-          size: 15,
-          box: 26,
-          title: t("focus.catchUpHelp"),
-          onClick: onCatchUpHelp,
-        }),
-        h(Chip, { tone: "brand" }, t("common.itemsCount", { n: pending.length })),
-        h(Segmented, { items: tabs, value: tab, onChange: onTab, size: "sm" }),
+        { style: { display: "flex", alignItems: "center", gap: 10 } },
+        h(
+          Chip,
+          { tone: "neutral", style: { height: 20, fontSize: 10.5, padding: "0 7px" } },
+          String(pending.length),
+        ),
+        h(
+          Btn,
+          {
+            variant: "plain",
+            size: "sm",
+            iconRight: "arrowRight",
+            onClick: () => setActivePageId("tasks"),
+          },
+          t("focus.allTasks"),
+        ),
       ),
     }),
-    body,
+    // 旧版的下划线 tab：待完成 / 已完成，数字跟着标签走。
     h(
-      Btn,
+      "div",
+      { className: "t-tabline-row" },
+      tabs.map((item) =>
+        h(
+          "button",
+          {
+            key: item.value,
+            type: "button",
+            className: "t-tabline",
+            "data-active": item.value === tab,
+            onClick: () => onTab(item.value),
+          },
+          item.label,
+          h(
+            "span",
+            { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+            item.count,
+          ),
+        ),
+      ),
+    ),
+    h("div", { style: { marginTop: 14 } }, body),
+    // 虚线的快速添加行（旧版样式），N 是打开新建对话框的快捷键。
+    h(
+      "button",
       {
-        block: true,
-        variant: "ghost",
-        icon: "plus",
-        style: { marginTop: 14 },
+        type: "button",
+        className: "t-row",
         onClick: actions.quickAdd,
+        title: `${t("focus.quickAdd")} · N`,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          width: "100%",
+          marginTop: 14,
+          padding: "10px 12px",
+          border: "1px dashed var(--tomato-line-strong)",
+          borderRadius: 12,
+          background: "transparent",
+          color: "var(--tomato-ink-3)",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          fontSize: 12.5,
+        },
       },
-      t("focus.quickAdd"),
+      h(Icon, { name: "plus", size: 15 }),
+      h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.quickAdd")),
+      h(Kbd, null, "N"),
     ),
   );
 }
@@ -1050,8 +1199,9 @@ function TodayCard({ data, today, tab, onTab, view, busy, actions, onCatchUpHelp
 function WeekCard({ stats, today }) {
   const days = recentDays(stats, 7, today);
   const max = Math.max(1, ...days.map((day) => day.minutes || 0));
-  const total = days.reduce((sum, day) => sum + (day.minutes || 0), 0);
-  const week = t("common.week");
+  const names = t("focus.weekdays");
+  const CHART = 118;
+  const ticks = [max, Math.round(max / 2), 0];
 
   return h(
     Card,
@@ -1072,134 +1222,145 @@ function WeekCard({ stats, today }) {
     }),
     h(
       "div",
-      { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, alignItems: "end" } },
-      days.map((day) => {
-        const isToday = day.date === today;
-        const minutes = Math.max(0, Number(day.minutes) || 0);
-        const barHeight = minutes > 0 ? Math.max(4, Math.round((minutes / max) * 90)) : 2;
-        const label = Array.isArray(week) ? week[weekdayIndex(day.date)] : day.date;
-        return h(
-          "div",
-          {
-            key: day.date,
-            title: t("focus.weekBarTitle", { date: dayLabel(day.date, today), n: minutes }),
-            style: {
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 5,
-              minWidth: 0,
-            },
+      { style: { paddingLeft: 40, marginTop: 4 } },
+      // 数值行：旧版把每天的数字固定排在最上面一排。
+      h(
+        "div",
+        {
+          style: {
+            display: "grid",
+            gridTemplateColumns: "repeat(7, 1fr)",
+            gap: 8,
+            marginBottom: 6,
           },
-          h(
-            "span",
+        },
+        days.map((day) => {
+          const minutes = Math.max(0, Number(day.minutes) || 0);
+          const isToday = day.date === today;
+          return h(
+            "div",
             {
+              key: day.date,
               className: "t-mono",
               style: {
+                textAlign: "center",
                 fontSize: 10,
                 color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
               },
             },
             minutes,
-          ),
+          );
+        }),
+      ),
+      // 图表主体：左侧刻度 + 虚线网格 + 细柱
+      h(
+        "div",
+        { style: { position: "relative", height: CHART } },
+        ticks.map((value) =>
           h(
             "div",
             {
+              key: value,
               style: {
-                width: "100%",
-                height: 94,
-                display: "flex",
-                alignItems: "flex-end",
-                justifyContent: "center",
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: `${max > 0 ? (value / max) * CHART : 0}px`,
+                borderTop: "1px dashed var(--tomato-line)",
+                pointerEvents: "none",
               },
             },
-            h("div", {
-              style: {
-                width: "100%",
-                maxWidth: 24,
-                height: barHeight,
-                borderRadius: "5px 5px 2px 2px",
-                background: isToday ? "var(--tomato-brand)" : "var(--tomato-accent)",
-                opacity: isToday ? 1 : 0.78,
-                transition: "height .5s cubic-bezier(.3,.7,.3,1)",
+            h(
+              "span",
+              {
+                className: "t-mono",
+                style: {
+                  position: "absolute",
+                  left: -40,
+                  top: -6,
+                  width: 34,
+                  textAlign: "right",
+                  fontSize: 10,
+                  color: "var(--tomato-ink-3)",
+                },
               },
-            }),
+              value === 0 ? "0" : `${value}分`,
+            ),
           ),
-          h(
-            "span",
+        ),
+        h(
+          "div",
+          {
+            style: {
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 8,
+              alignItems: "end",
+            },
+          },
+          days.map((day) => {
+            const minutes = Math.max(0, Number(day.minutes) || 0);
+            const isToday = day.date === today;
+            const height = minutes > 0 ? Math.max(3, Math.round((minutes / max) * CHART)) : 2;
+            return h(
+              "div",
+              {
+                key: day.date,
+                title: t("focus.weekBarTitle", { date: dayLabel(day.date, today), n: minutes }),
+                style: { display: "flex", justifyContent: "center", alignItems: "flex-end", height: "100%" },
+              },
+              h("div", {
+                style: {
+                  width: 22,
+                  height,
+                  borderRadius: "4px 4px 2px 2px",
+                  background: isToday ? "var(--tomato-brand)" : "var(--tomato-leaf)",
+                  opacity: isToday ? 1 : 0.5,
+                  transition: "height .5s cubic-bezier(.3,.7,.3,1)",
+                },
+              }),
+            );
+          }),
+        ),
+      ),
+      // 周几 / 今天
+      h(
+        "div",
+        {
+          style: {
+            display: "grid",
+            gridTemplateColumns: "repeat(7, 1fr)",
+            gap: 8,
+            marginTop: 8,
+          },
+        },
+        days.map((day) => {
+          const isToday = day.date === today;
+          const label = Array.isArray(names)
+            ? names[(weekdayIndex(day.date) + 1) % 7]
+            : day.date;
+          return h(
+            "div",
             {
+              key: day.date,
               style: {
-                fontSize: 10.5,
+                textAlign: "center",
+                fontSize: 11,
                 color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
                 fontWeight: isToday ? 600 : 400,
               },
             },
-            label,
-          ),
-        );
-      }),
-    ),
-    h(Divider, { style: { margin: "14px 0 10px" } }),
-    h(
-      "div",
-      { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-      t("focus.weekTotal", { time: fmtMinutes(total) }),
+            isToday ? t("common.today") : label,
+          );
+        }),
+      ),
     ),
   );
 }
 
 // ---------------------------------------------------------------- 每日目标
-
-function GoalCard({ stats, settings }) {
-  const goal = Math.max(1, Number(settings.dailyGoal) || 8);
-  const done = Math.max(0, Number(stats.todayPomodoros) || 0);
-  const reached = done >= goal;
-
-  return h(
-    Card,
-    { pad: 20 },
-    h(SectionTitle, { icon: "tomato", title: t("focus.goalTitle") }),
-    h(
-      "div",
-      { style: { display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 } },
-      h(
-        "span",
-        {
-          className: "t-mono",
-          style: {
-            fontSize: 30,
-            fontWeight: 620,
-            lineHeight: 1,
-            color: reached ? "var(--tomato-leaf)" : "var(--tomato-ink)",
-          },
-        },
-        String(done),
-      ),
-      h("span", { style: { fontSize: 13, color: "var(--tomato-ink-3)" } }, `/ ${goal}`),
-      reached
-        ? h(Chip, { tone: "leaf", icon: "check", style: { marginLeft: "auto" } }, t("focus.goalDone"))
-        : null,
-    ),
-    h(Bar, {
-      value: done,
-      max: goal,
-      height: 8,
-      color: reached ? "var(--tomato-leaf)" : "var(--tomato-brand)",
-    }),
-    h(
-      "div",
-      {
-        style: {
-          marginTop: 9,
-          fontSize: 11.5,
-          color: reached ? "var(--tomato-leaf)" : "var(--tomato-ink-3)",
-          lineHeight: 1.6,
-        },
-      },
-      reached ? t("focus.goalReached") : t("focus.goalHint"),
-    ),
-  );
-}
 
 // ---------------------------------------------------------------- 任务选择器
 
@@ -1507,6 +1668,22 @@ export function FocusPage() {
 
   useSearchHotkey(() => setSearchOpen(true));
 
+  // 快速新建：N（旧版同款）。输入框/对话框里不抢键，避免打字时弹出表单。
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "n" && e.key !== "N") return;
+      const el = e.target;
+      const tag = (el && el.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (el && el.isContentEditable)) return;
+      if (editor || searchOpen || pickerOpen || soundOpen || catchUpOpen || deleteTarget) return;
+      e.preventDefault();
+      setEditor({ title: "" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editor, searchOpen, pickerOpen, soundOpen, catchUpOpen, deleteTarget]);
+
   const data = (state && state.data) || {};
   // derive.isCatchUp 读 data.taskKinds，而快照把 taskKinds 放在 state 顶层；
   // 合并一份视图数据，任务行与今日分组共用同一份判定。
@@ -1666,7 +1843,7 @@ export function FocusPage() {
       { style: { display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" } },
       h(
         "div",
-        { style: { flex: "1 1 340px", maxWidth: 430, minWidth: 0 } },
+        { style: { flex: "1 1 420px", maxWidth: 500, minWidth: 0 } },
         h(TimerCard, {
           state,
           data,
@@ -1681,19 +1858,12 @@ export function FocusPage() {
           onPickTask: () => setPickerOpen(true),
           onToggleLoop: toggleLoop,
           onSound: () => setSoundOpen(true),
+          onExpand: () => openImmersive(),
         }),
       ),
       h(
         "div",
-        {
-          style: {
-            flex: "2 1 420px",
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 20,
-          },
-        },
+        { style: { flex: "2 1 460px", minWidth: 0 } },
         h(TodayCard, {
           data: viewData,
           today,
@@ -1704,10 +1874,10 @@ export function FocusPage() {
           actions,
           onCatchUpHelp: () => setCatchUpOpen(true),
         }),
-        h(WeekCard, { stats, today }),
-        h(GoalCard, { stats, settings }),
       ),
     ),
+    // 本周节奏占满整行（旧版结构），不挤在右列里。
+    h("div", { style: { marginTop: 20 } }, h(WeekCard, { stats, today })),
     h(TaskDialog, {
       open: !!editor,
       task: editorTask,

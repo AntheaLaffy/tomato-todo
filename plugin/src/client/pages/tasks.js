@@ -8,7 +8,7 @@
 // 因为 core 的 saveTask/deleteTask 才是唯一权威，失败时停在第一个错误上并说明。
 // 模板 tab 的编辑/印刷/同步接在 template-dialog.js 与 print-dialog.js：列表只负责
 // 展示规则摘要与行内入口，表单语义与 Action 字段都在对话框里，避免两处漂移。
-import { h, Fragment, useState } from "../runtime.js";
+import { h, Fragment, useEffect, useState } from "../runtime.js";
 import { t, registerCopy } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
 import {
@@ -43,6 +43,7 @@ import {
   todayKey,
 } from "../shared/derive.js";
 import { registerPage } from "../app/registry.js";
+import { subscribeTasksFilter, takeTasksFilter } from "../app/navigation.js";
 import { openImmersive } from "../app/immersive.js";
 import { TaskDialog } from "./task-dialog.js";
 import { TemplateDialog } from "./template-dialog.js";
@@ -1119,6 +1120,18 @@ function TasksPage() {
   const [syncingId, setSyncingId] = useState(null);
 
   useSearchHotkey(() => setSearchOpen(true));
+
+  // 侧栏「我的项目」点了某个项目：挂载时取走挂起的筛选值，之后订阅继续响应
+  // （已经在本页时 setActivePageId 不会重挂，所以要订阅而不是只读一次）。
+  useEffect(() => {
+    const apply = (value) => {
+      if (value === undefined) return;
+      setProjectId(value === null ? "all" : value);
+      setTab("active");
+    };
+    apply(takeTasksFilter());
+    return subscribeTasksFilter(apply);
+  }, []);
 
   const data = (state && state.data) || {};
   const tasks = Array.isArray(data.tasks) ? data.tasks : [];

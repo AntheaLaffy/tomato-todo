@@ -87,7 +87,7 @@ registerCopy("common", {
     none: "无",
     week: ["一", "二", "三", "四", "五", "六", "日"],
     weekFull: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
-    monthDay: "{m} 月 {d} 日",
+    monthDay: "{m}月{d}日",
     daypartMorning: "早上好",
     daypartNoon: "中午好",
     daypartAfternoon: "下午好",

@@ -777,7 +777,7 @@ export function Divider({ style }) {
   return h("div", { style: { height: 1, background: "var(--tomato-line)", ...style } });
 }
 
-/** 圆形勾选：任务完成。 */
+/** 圆角方形勾选：任务完成（旧版样式）。 */
 export function Check({ checked, onChange, label, disabled = false, style }) {
   return h(
     "button",

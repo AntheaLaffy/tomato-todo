@@ -86,8 +86,22 @@ body[data-ds-dark-theme] .t-btn-danger{color:#e07f6a}
 .t-tab[data-active=true]{background:var(--tomato-surface);color:var(--tomato-ink);
   font-weight:600;box-shadow:0 1px 3px #00000012}
 .t-seg{display:inline-flex;gap:2px;padding:3px;border-radius:11px;background:var(--tomato-surface-2)}
+/* 番茄钟卡片里的模式切换：占满整行，三段等分。 */
+#focus-timer .t-seg{display:flex;width:100%}
+#focus-timer .t-seg .t-tab{flex:1;justify-content:center;min-width:0}
 
-.t-check{width:20px;height:20px;border-radius:50%;border:1.6px solid var(--tomato-line-strong);
+/* 下划线标签（今日待办：待完成 / 已完成），旧版样式。 */
+.t-tabline-row{display:flex;gap:22px;border-bottom:1px solid var(--tomato-line);margin-top:10px}
+.t-tabline{position:relative;display:inline-flex;align-items:center;gap:6px;
+  padding:8px 2px 9px;border:none;background:transparent;font-family:inherit;
+  font-size:12.5px;color:var(--tomato-ink-3);cursor:pointer;transition:color .16s ease}
+.t-tabline:hover{color:var(--tomato-ink)}
+.t-tabline[data-active=true]{color:var(--tomato-brand-deep);font-weight:600}
+.t-tabline[data-active=true]:after{content:'';position:absolute;left:0;right:0;bottom:-1px;
+  height:2px;border-radius:2px;background:var(--tomato-brand)}
+.t-tabline:focus-visible{outline:2px solid var(--tomato-brand);outline-offset:2px}
+
+.t-check{width:20px;height:20px;border-radius:6px;border:1.6px solid var(--tomato-line-strong);
   background:transparent;cursor:pointer;display:inline-flex;align-items:center;
   justify-content:center;flex:none;padding:0;color:transparent;
   transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease}
@@ -220,13 +234,7 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 }
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
-/* 看板娘是悬浮半透明背景板：卡片区整体略往左让一点，右缘与立绘留出缝隙。 */
-html[data-tomato-persona=on] .t-appcontent{
-  /* 在「居中」的基础上右移 60px 的右外边距，等效内容整体左移 30px；
-     容器变窄时退化为普通居中。 */
-  margin-right:max(24px, calc((100% - 1180px) / 2 + 60px))!important;
-  margin-left:auto!important;
-}
+/* 内容列左对齐（旧版布局）：卡片从侧栏右侧开始，右侧空余留给看板娘。 */
 
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,

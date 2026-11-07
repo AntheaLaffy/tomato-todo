@@ -95,6 +95,12 @@
     sound: [P("M4.4 9.6h3.4l4.2-3.8v12.4L7.8 14.4H4.4V9.6Z"), P("M15.4 9.2a4 4 0 0 1 0 5.6M17.8 6.8a7.4 7.4 0 0 1 0 10.4")],
     mute: [P("M4.4 9.6h3.4l4.2-3.8v12.4L7.8 14.4H4.4V9.6Z"), P("M15.6 9.8l4.2 4.4M19.8 9.8l-4.2 4.4")],
     minimize: [P("M6 6.6h12M8 6.6v7.2h8V6.6")],
+    expand: [
+      P("M9.2 4.8H4.8v4.4"),
+      P("M14.8 4.8h4.4v4.4"),
+      P("M14.8 19.2h4.4v-4.4"),
+      P("M9.2 19.2H4.8v-4.4")
+    ],
     sparkle: [P("M12 3.8l1.9 5.3 5.3 1.9-5.3 1.9L12 18.2l-1.9-5.3L4.8 11l5.3-1.9L12 3.8Z")],
     edit: [P("M4.6 19.4l.8-4 9.4-9.4 3.2 3.2-9.4 9.4-4 .8Z"), P("M13.2 7.4l3.2 3.2")],
     trash: [P("M4.8 7.2h14.4M9.4 7.2V4.8h5.2v2.4M6.6 7.2l.9 12h9l.9-12")],
@@ -228,8 +234,22 @@ body[data-ds-dark-theme] .t-btn-danger{color:#e07f6a}
 .t-tab[data-active=true]{background:var(--tomato-surface);color:var(--tomato-ink);
   font-weight:600;box-shadow:0 1px 3px #00000012}
 .t-seg{display:inline-flex;gap:2px;padding:3px;border-radius:11px;background:var(--tomato-surface-2)}
+/* 番茄钟卡片里的模式切换：占满整行，三段等分。 */
+#focus-timer .t-seg{display:flex;width:100%}
+#focus-timer .t-seg .t-tab{flex:1;justify-content:center;min-width:0}
 
-.t-check{width:20px;height:20px;border-radius:50%;border:1.6px solid var(--tomato-line-strong);
+/* 下划线标签（今日待办：待完成 / 已完成），旧版样式。 */
+.t-tabline-row{display:flex;gap:22px;border-bottom:1px solid var(--tomato-line);margin-top:10px}
+.t-tabline{position:relative;display:inline-flex;align-items:center;gap:6px;
+  padding:8px 2px 9px;border:none;background:transparent;font-family:inherit;
+  font-size:12.5px;color:var(--tomato-ink-3);cursor:pointer;transition:color .16s ease}
+.t-tabline:hover{color:var(--tomato-ink)}
+.t-tabline[data-active=true]{color:var(--tomato-brand-deep);font-weight:600}
+.t-tabline[data-active=true]:after{content:'';position:absolute;left:0;right:0;bottom:-1px;
+  height:2px;border-radius:2px;background:var(--tomato-brand)}
+.t-tabline:focus-visible{outline:2px solid var(--tomato-brand);outline-offset:2px}
+
+.t-check{width:20px;height:20px;border-radius:6px;border:1.6px solid var(--tomato-line-strong);
   background:transparent;cursor:pointer;display:inline-flex;align-items:center;
   justify-content:center;flex:none;padding:0;color:transparent;
   transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease}
@@ -362,13 +382,7 @@ html[data-tomato-takeover] #tomato-top-reminder{top:6px!important}
 }
 
 /* 看板娘开启时，线描书桌插画/圆相退场（两套画风不叠加）。 */
-/* 看板娘是悬浮半透明背景板：卡片区整体略往左让一点，右缘与立绘留出缝隙。 */
-html[data-tomato-persona=on] .t-appcontent{
-  /* 在「居中」的基础上右移 60px 的右外边距，等效内容整体左移 30px；
-     容器变窄时退化为普通居中。 */
-  margin-right:max(24px, calc((100% - 1180px) / 2 + 60px))!important;
-  margin-left:auto!important;
-}
+/* 内容列左对齐（旧版布局）：卡片从侧栏右侧开始，右侧空余留给看板娘。 */
 
 html[data-tomato-persona=on] #tomato-sky .t-amb-art,
 html[data-tomato-persona=on] #tomato-ambient .t-amb-art,
@@ -1037,7 +1051,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       none: "无",
       week: ["一", "二", "三", "四", "五", "六", "日"],
       weekFull: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
-      monthDay: "{m} 月 {d} 日",
+      monthDay: "{m}月{d}日",
       daypartMorning: "早上好",
       daypartNoon: "中午好",
       daypartAfternoon: "下午好",
@@ -2884,6 +2898,27 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     listeners4.add(fn);
     return () => listeners4.delete(fn);
   }
+  var pendingTasksFilter = null;
+  var filterListeners = /* @__PURE__ */ new Set();
+  function openTasksForProject(projectId = null) {
+    pendingTasksFilter = projectId;
+    for (const fn of Array.from(filterListeners)) {
+      try {
+        fn(projectId);
+      } catch {
+      }
+    }
+    setActivePageId("tasks");
+  }
+  function takeTasksFilter() {
+    const value = pendingTasksFilter;
+    pendingTasksFilter = null;
+    return value;
+  }
+  function subscribeTasksFilter(fn) {
+    filterListeners.add(fn);
+    return () => filterListeners.delete(fn);
+  }
   function bindPanelOpener(fn) {
     openPanelFn = typeof fn === "function" ? fn : null;
   }
@@ -2920,7 +2955,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           display: "flex",
           alignItems: "center",
           gap: 11,
-          padding: compact ? "0" : "4px 8px 18px",
+          padding: compact ? "0" : "4px 8px 6px",
           flex: "none"
         }
       },
@@ -2969,14 +3004,26 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       },
       h(Icon, { name: page.icon, size: 18 }),
       h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, t(page.titleKey)),
-      badge !== null && badge !== void 0 && badge !== 0 ? h(
+      badge !== null && badge !== void 0 && badge !== 0 ? active2 ? (
+        // 选中项用一颗小红点（旧版样式），未选中项才显示数字。
+        h("span", {
+          style: {
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "var(--tomato-brand)",
+            flex: "none",
+            marginRight: 2
+          }
+        })
+      ) : h(
         "span",
         {
           className: "t-mono",
           style: {
             fontSize: 11,
-            color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
-            background: active2 ? "transparent" : "var(--tomato-surface-2)",
+            color: "var(--tomato-ink-3)",
+            background: "var(--tomato-surface-2)",
             borderRadius: 6,
             padding: "1px 5px",
             minWidth: 18,
@@ -3010,48 +3057,99 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       h(Icon, { name: "arrowRight", size: 13, style: { opacity: 0.55 } })
     );
   }
-  function NavFooter({ state, compact }) {
+  function SideCaption({ title, right, style }) {
+    return h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 8,
+          padding: "0 9px",
+          margin: "12px 0 6px",
+          ...style
+        }
+      },
+      h(
+        "span",
+        { style: { fontSize: 11, color: "var(--tomato-ink-3)", letterSpacing: ".02em" } },
+        title
+      ),
+      right ? h(
+        "span",
+        {
+          style: {
+            fontSize: 9,
+            letterSpacing: ".16em",
+            color: "var(--tomato-ink-3)",
+            opacity: 0.75
+          }
+        },
+        right
+      ) : null
+    );
+  }
+  function NavFooter({ state, compact, activeId, onSelect }) {
+    if (compact) return null;
     const data = state && state.data || {};
     const settings = data.settings || {};
     const stats = state && state.stats || {};
-    const goal = Number(settings.dailyGoal) || 8;
-    const done = Number(stats.todayPomodoros) || 0;
+    const goal = Math.max(1, Number(settings.dailyGoal) || 8);
+    const done = Math.max(0, Number(stats.todayPomodoros) || 0);
+    const completedTasks = Math.max(0, Number(stats.todayCompleted) || 0);
+    const reached = done >= goal;
     const online = state !== null;
-    if (compact) return null;
     return h(
       "div",
-      { style: { marginTop: "auto", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 } },
+      { style: { marginTop: "auto", paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 } },
+      // 每日番茄目标（旧版侧栏卡片）：数值 + 细进度条 + 说明。
       h(
         "div",
-        {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "11px 12px",
-            borderRadius: 13,
-            background: "var(--tomato-surface-2)"
-          }
-        },
+        { style: { padding: "0 9px" } },
         h(
-          Ring,
-          { value: goal > 0 ? done / goal : 0, size: 34, stroke: 4, color: "var(--tomato-brand)" },
+          "div",
+          { style: { display: "flex", alignItems: "center", gap: 7 } },
+          h(Icon, { name: "leaf", size: 14, style: { color: "var(--tomato-ink-3)" } }),
           h(
             "span",
-            { className: "t-mono", style: { fontSize: 10.5, fontWeight: 600, color: "var(--tomato-ink-2)" } },
-            `${done}`
+            { style: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: 550, color: "var(--tomato-ink)" } },
+            t("nav.goalTitle")
+          ),
+          h(
+            "span",
+            { className: "t-mono", style: { fontSize: 12, fontWeight: 600, color: "var(--tomato-ink)" } },
+            `${done} / ${goal}`
           )
         ),
         h(
           "div",
-          { style: { minWidth: 0 } },
-          h("div", { style: { fontSize: 12, color: "var(--tomato-ink)", fontWeight: 550 } }, "今日番茄"),
-          h(
-            "div",
-            { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
-            `${done} / ${goal}`
-          )
+          { style: { marginTop: 9 } },
+          h(Bar, {
+            value: done,
+            max: goal,
+            height: 4,
+            color: reached ? "var(--tomato-leaf)" : "var(--tomato-brand)"
+          })
+        ),
+        h(
+          "div",
+          { style: { marginTop: 7, fontSize: 10.5, lineHeight: 1.5, color: "var(--tomato-ink-3)" } },
+          t("nav.goalHint", { n: completedTasks })
         )
+      ),
+      h("div", { style: { height: 1, background: "var(--tomato-line)", margin: "2px 9px" } }),
+      h(
+        "button",
+        {
+          type: "button",
+          className: "t-navitem",
+          "data-active": activeId === "preferences",
+          onClick: () => onSelect?.("preferences"),
+          style: { padding: "9px 12px" }
+        },
+        h(Icon, { name: "settings", size: 17 }),
+        h("span", { style: { flex: 1, minWidth: 0 } }, t("nav.preferences"))
       ),
       h(
         "div",
@@ -3060,9 +3158,9 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             display: "flex",
             alignItems: "center",
             gap: 7,
-            fontSize: 11,
+            fontSize: 10.5,
             color: online ? "var(--tomato-ink-3)" : "#b8503f",
-            padding: "0 4px"
+            padding: "0 10px"
           }
         },
         h("span", {
@@ -3074,21 +3172,86 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             flex: "none"
           }
         }),
-        online ? t("common.savedLocal") : t("common.offline")
+        online ? t("nav.storage") : t("common.offline")
+      )
+    );
+  }
+  function ProjectList({ projects, counts }) {
+    if (!projects || projects.length === 0) return null;
+    return h(
+      "div",
+      { style: { marginTop: 18 } },
+      h(SideCaption, { title: t("nav.projects") }),
+      projects.map(
+        (project) => h(
+          "button",
+          {
+            key: project.id,
+            type: "button",
+            className: "t-navitem",
+            title: project.name,
+            onClick: () => openTasksForProject(project.id),
+            style: { padding: "8px 12px", fontSize: 13 }
+          },
+          h(Dot, { color: project.color || "var(--tomato-ink-3)", size: 8 }),
+          h(
+            "span",
+            {
+              style: {
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }
+            },
+            project.name
+          ),
+          h(
+            "span",
+            { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+            counts.get(project.id) || 0
+          )
+        )
       )
     );
   }
   function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave }) {
+    const data = state && state.data || {};
+    const projects = Array.isArray(data.projects) ? data.projects : [];
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    const counts = /* @__PURE__ */ new Map();
+    for (const task of tasks) {
+      if (!task || task.completed || !task.projectId) continue;
+      counts.set(task.projectId, (counts.get(task.projectId) || 0) + 1);
+    }
+    const navPages = compact ? pages : pages.filter((page) => page.id !== "preferences");
+    const items = [];
+    for (const page of navPages) {
+      items.push(
+        h(NavItem, {
+          key: page.id,
+          page,
+          active: page.id === activeId,
+          onSelect,
+          badge: page.badge ? page.badge(state) : null
+        })
+      );
+      if (!compact && page.id === "education") {
+        items.push(h(AssistantItem, { key: "assistant", compact, onLeave }));
+      }
+    }
+    if (compact) items.push(h(AssistantItem, { key: "assistant", compact, onLeave }));
     return h(
       "aside",
       {
         style: {
-          width: compact ? "auto" : 236,
+          width: compact ? "auto" : 228,
           flex: "none",
           display: "flex",
           flexDirection: compact ? "row" : "column",
           gap: 3,
-          padding: compact ? "12px 16px" : "22px 16px 18px",
+          padding: compact ? "12px 16px" : "22px 14px 18px",
           borderRight: compact ? "none" : "1px solid var(--tomato-line)",
           borderBottom: compact ? "1px solid var(--tomato-line)" : "none",
           background: compact ? "transparent" : "color-mix(in srgb, var(--tomato-surface-2) 55%, transparent)",
@@ -3106,17 +3269,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         { style: { display: "flex", alignItems: "center", gap: 8, paddingRight: 10, flex: "none" } },
         h(BrandBlock, { compact: true })
       ) : h(BrandBlock, { compact: false }),
-      pages.map(
-        (page) => h(NavItem, {
-          key: page.id,
-          page,
-          active: page.id === activeId,
-          onSelect,
-          badge: page.badge ? page.badge(state) : null
-        })
-      ),
-      h(AssistantItem, { compact, onLeave }),
-      h(NavFooter, { state, compact })
+      compact ? null : h(SideCaption, { title: t("nav.space"), right: t("nav.personal"), style: { marginTop: 8 } }),
+      items,
+      compact ? null : h(ProjectList, { projects, counts }),
+      h(NavFooter, { state, compact, activeId, onSelect })
     );
   }
   function AppShell(props) {
@@ -3191,7 +3347,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             key: active2 ? active2.id : "empty",
             className: "t-fadein t-appcontent",
             // 顶部留出悬浮提醒条的位置（提醒在页面最顶端居中）。
-            style: { maxWidth: 1180, margin: "0 auto", padding: narrow ? "40px 18px 60px" : "44px 40px 72px" }
+            style: { maxWidth: 1270, margin: 0, padding: narrow ? "40px 18px 60px" : "44px 28px 72px" }
           },
           active2 ? h(active2.Component, { state, dispatch: props.dispatch, refresh, api: props.api }) : null
         )
@@ -5386,7 +5542,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       schedule: "定时锁机",
       preferences: "偏好设置",
       assistant: "学习助手",
-      assistantHint: "回到 DSH 对话（番茄界面会收起）"
+      assistantHint: "回到 DSH 对话（番茄界面会收起）",
+      space: "我的空间",
+      personal: "PERSONAL",
+      projects: "我的项目",
+      goalTitle: "每日番茄目标",
+      goalHint: "已完成 {n} 项任务 · 番茄按完成轮次计",
+      storage: "本地存储 · 安心专注"
     },
     en: {
       focus: "Today",
@@ -5399,7 +5561,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       schedule: "Scheduled lock",
       preferences: "Preferences",
       assistant: "Learning assistant",
-      assistantHint: "Back to the DSH conversation (Tomato view folds away)"
+      assistantHint: "Back to the DSH conversation (Tomato view folds away)",
+      space: "My space",
+      personal: "PERSONAL",
+      projects: "My projects",
+      goalTitle: "Daily pomodoro goal",
+      goalHint: "{n} tasks done · pomodoros count completed rounds",
+      storage: "Local storage · calm focus"
     }
   });
 
@@ -6287,6 +6455,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       statStreak: "连续专注",
       statStreakHint: "小小坚持，慢慢积累",
       unitDays: "天",
+      timerTitle: "我的番茄钟",
+      expand: "沉浸模式",
+      allTasks: "全部任务",
+      weekdays: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
       modeFocus: "专注",
       modeShort: "短休息",
       modeLong: "长休息",
@@ -6312,12 +6484,12 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       loop: "循环",
       loopHint: "一轮结束后自动开始下一轮",
       whitelistOn: "白名单保护中 · 允许 {n} 个应用",
-      whitelistReady: "白名单保护已开启 · 专注时允许 {n} 个应用",
+      whitelistReady: "白名单保护已配置 · 允许 {n} 个应用",
       locked: "界面锁定中",
       lockReady: "界面锁定已开启 · 专注时生效",
       protectOff: "给自己一段不被打扰的时间",
       guardUnavailable: "专注保护不可用（后台 guard 未运行）",
-      sound: "背景音",
+      soundChoose: "选择背景音",
       soundTitle: "背景音",
       soundSubtitle: "选一种声音，让注意力有个落点。",
       timerBusy: "请先结束当前计时，再开始新的专注",
@@ -6361,12 +6533,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       deleted: "任务已删除",
       weekTitle: "这一周的专注节奏",
       viewStats: "查看统计",
-      weekTotal: "本周共 {time}",
       weekBarTitle: "{date} · {n} 分钟",
-      goalTitle: "每日番茄目标",
-      goalHint: "番茄按完成轮次计",
-      goalDone: "已达成",
-      goalReached: "今天的目标达成了，去休息一下",
       loadingTitle: "正在读取今天的计划…",
       loadingHint: "读不到时会自动重试，不需要刷新页面。"
     },
@@ -6383,6 +6550,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       statStreak: "Focus streak",
       statStreakHint: "Small steps, kept up",
       unitDays: "days",
+      timerTitle: "My pomodoro",
+      expand: "Immersive mode",
+      allTasks: "All tasks",
+      weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
       modeFocus: "Focus",
       modeShort: "Short break",
       modeLong: "Long break",
@@ -6408,12 +6579,12 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       loop: "Loop",
       loopHint: "Start the next round automatically when this one ends",
       whitelistOn: "Whitelist active · {n} apps allowed",
-      whitelistReady: "Whitelist on · {n} apps allowed during focus",
+      whitelistReady: "Whitelist configured · {n} apps allowed",
       locked: "Screen locked",
       lockReady: "Screen lock on · applies during focus",
       protectOff: "Give yourself an undisturbed stretch",
       guardUnavailable: "Focus guard unavailable (background guard isn't running)",
-      sound: "Ambient sound",
+      soundChoose: "Choose ambience",
       soundTitle: "Ambient sound",
       soundSubtitle: "Pick a sound to give your attention somewhere to land.",
       timerBusy: "Finish the current timer before starting a new focus round",
@@ -6457,10 +6628,6 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       viewStats: "View stats",
       weekTotal: "{time} this week",
       weekBarTitle: "{date} · {n} min",
-      goalTitle: "Daily pomodoro goal",
-      goalHint: "Pomodoros count completed rounds",
-      goalDone: "Reached",
-      goalReached: "Goal reached — take a rest",
       loadingTitle: "Reading today's plan…",
       loadingHint: "It retries automatically; no need to refresh."
     }
@@ -6560,7 +6727,16 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     if (parts.length === 0) return null;
     return h(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          flexWrap: "wrap",
+          marginTop: 12
+        }
+      },
       parts
     );
   }
@@ -6577,7 +6753,8 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     onSkip,
     onPickTask,
     onToggleLoop,
-    onSound
+    onSound,
+    onExpand
   }) {
     const every = Math.max(1, Number(settings.longBreakEvery) || 4);
     const cycle = cycleOf(view);
@@ -6589,25 +6766,54 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const status = resting ? t("focus.stateBreak") : view.running ? t("focus.stateFocusing") : view.paused ? t("focus.statePaused") : t("focus.stateIdle");
     const startLabel = view.running ? t("focus.pauseFocus") : view.paused ? t("focus.resumeTimer") : resting ? t("focus.startBreak") : t("focus.startFocus");
     const modeItems = [
-      { value: "focus", label: t("focus.modeFocus"), icon: "focus" },
-      { value: "shortBreak", label: t("focus.modeShort"), icon: "coffee" },
-      { value: "longBreak", label: t("focus.modeLong"), icon: "moon" }
+      { value: "focus", label: t("focus.modeFocus") },
+      { value: "shortBreak", label: t("focus.modeShort") },
+      { value: "longBreak", label: t("focus.modeLong") }
     ];
     const soundKind = amb && amb.kind || "silent";
     return h(
       Card,
-      { pad: 22, style: { display: "flex", flexDirection: "column", gap: 14 } },
+      {
+        pad: 0,
+        id: "focus-timer",
+        style: { display: "flex", flexDirection: "column", overflow: "hidden" }
+      },
+      // 标题行（与旧版一致：卡片名 + 沉浸入口）
       h(
         "div",
-        { style: { display: "flex", justifyContent: "center" } },
-        h(Segmented, { items: modeItems, value: view.mode, onChange: onMode, size: "sm" })
+        { style: { display: "flex", alignItems: "center", gap: 8, padding: "16px 22px 0" } },
+        h(Icon, { name: "clock", size: 15, style: { color: "var(--tomato-ink-3)" } }),
+        h(
+          "div",
+          { style: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 620, color: "var(--tomato-ink)" } },
+          t("focus.timerTitle")
+        ),
+        h(IconBtn, { name: "expand", size: 15, box: 28, title: t("focus.expand"), onClick: onExpand })
+      ),
+      // 模式切换：占满卡片宽度，三段等分
+      h(
+        "div",
+        { style: { padding: "14px 22px 0" } },
+        h(Segmented, {
+          items: modeItems,
+          value: view.mode,
+          onChange: onMode,
+          size: "sm",
+          style: { width: "100%" }
+        })
       ),
       h(
         "div",
-        { style: { display: "flex", justifyContent: "center", marginTop: 4 } },
+        { style: { display: "flex", justifyContent: "center", padding: "12px 22px 0" } },
         h(
           Ring,
-          { value: view.progress, size: 268, stroke: 12, color: ringColor, pulse: view.running },
+          {
+            value: view.running || view.paused ? 1 - view.progress : 1,
+            size: 280,
+            stroke: 10,
+            color: ringColor,
+            pulse: view.running
+          },
           h(
             "div",
             {
@@ -6615,18 +6821,19 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 8,
+                gap: 9,
                 textAlign: "center"
               }
             },
-            h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, status),
+            // 旧版只在计时进行/暂停/休息时显示状态，空闲时不占一行。
+            view.running || view.paused || resting ? h("div", { style: { fontSize: 12, color: "var(--tomato-ink-3)" } }, status) : null,
             h(
               "div",
               {
                 className: "t-mono",
                 style: {
-                  fontSize: 58,
-                  fontWeight: 620,
+                  fontSize: 66,
+                  fontWeight: 600,
                   lineHeight: 1,
                   letterSpacing: "-.02em",
                   color: "var(--tomato-ink)"
@@ -6644,44 +6851,58 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         )
       ),
       h(
-        "button",
-        {
-          type: "button",
-          className: "t-row",
-          onClick: onPickTask,
-          title: t("focus.pickTaskTitle"),
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            width: "100%",
-            minHeight: 40,
-            padding: "8px 12px",
-            borderRadius: 12,
-            border: "1px solid var(--tomato-line)",
-            background: "transparent",
-            color: "var(--tomato-ink)",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            fontSize: 13,
-            textAlign: "left"
-          }
-        },
-        h(Icon, {
-          name: resting ? "coffee" : "tasks",
-          size: 16,
-          style: { color: "var(--tomato-ink-3)" }
-        }),
+        "div",
+        { style: { padding: "14px 22px 0" } },
         h(
-          "span",
-          { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-          selected ? selected.title : t("focus.freeFocus")
-        ),
-        h(Icon, { name: "chevronDown", size: 15, style: { color: "var(--tomato-ink-3)" } })
+          "button",
+          {
+            type: "button",
+            className: "t-row",
+            onClick: onPickTask,
+            title: t("focus.pickTaskTitle"),
+            style: {
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              width: "100%",
+              minHeight: 38,
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "none",
+              background: "transparent",
+              color: "var(--tomato-ink-2)",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 13,
+              textAlign: "left"
+            }
+          },
+          h(Icon, {
+            name: resting ? "coffee" : "tasks",
+            size: 16,
+            style: { color: "var(--tomato-ink-3)" }
+          }),
+          h(
+            "span",
+            {
+              style: {
+                minWidth: 0,
+                maxWidth: "78%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }
+            },
+            selected ? selected.title : t("focus.freeFocus")
+          ),
+          h(Icon, { name: "chevronDown", size: 15, style: { color: "var(--tomato-ink-3)" } })
+        )
       ),
+      // 旧版的按钮组是居中的一小簇：重置 / 开始 / 跳过，不拉满整行。
       h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 10 } },
+        { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "16px 22px 0" } },
         h(IconBtn, {
           name: "refresh",
           size: 17,
@@ -6698,7 +6919,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             icon: view.running ? "pause" : "play",
             onClick: onStart,
             disabled: busy,
-            style: { flex: 1 }
+            style: { width: 200 }
           },
           startLabel
         ),
@@ -6711,13 +6932,22 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           disabled: busy
         })
       ),
+      h("div", { style: { padding: "0 22px" } }, h(ProtectionLine, { state, view, protection })),
       h(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            padding: "2px 22px 0"
+          }
+        },
         h(
           Btn,
           {
-            variant: "ghost",
+            variant: "plain",
             size: "sm",
             icon: "refresh",
             title: t("focus.loopHint"),
@@ -6725,46 +6955,57 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             disabled: busy,
             style: settings.autoFocus ? {
               background: "var(--tomato-brand-soft)",
-              color: "var(--tomato-brand-deep)",
-              borderColor: "transparent"
+              color: "var(--tomato-brand-deep)"
             } : void 0
           },
           t("focus.loop")
         ),
         h(
           "span",
-          { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", minWidth: 0 } },
+          {
+            style: {
+              fontSize: 11,
+              color: "var(--tomato-ink-3)",
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }
+          },
           t("focus.loopHint")
         )
       ),
-      h(ProtectionLine, { state, view, protection }),
-      h(Divider, { style: { margin: "2px 0 0" } }),
+      // 背景音是卡片底部的通栏（旧版样式），不再和内容挤在一起。
       h(
-        "button",
-        {
-          type: "button",
-          className: "t-row",
-          onClick: onSound,
-          title: t("focus.soundTitle"),
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            width: "100%",
-            padding: "8px 4px",
-            border: "none",
-            background: "transparent",
-            borderRadius: 10,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            fontSize: 12.5,
-            color: "var(--tomato-ink-2)"
-          }
-        },
-        h(Icon, { name: "sound", size: 16, style: { color: "var(--tomato-ink-3)" } }),
-        h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.sound")),
-        h("span", { style: { color: "var(--tomato-ink-3)" } }, t(`sound.${soundKind}`)),
-        h(Icon, { name: "chevronRight", size: 14, style: { color: "var(--tomato-ink-3)" } })
+        "div",
+        { style: { marginTop: 16 } },
+        h(
+          "button",
+          {
+            type: "button",
+            className: "t-row",
+            onClick: onSound,
+            title: t("focus.soundTitle"),
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              width: "100%",
+              padding: "13px 22px",
+              border: "none",
+              borderTop: "1px solid var(--tomato-line)",
+              background: "color-mix(in srgb, var(--tomato-surface-2) 45%, transparent)",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 12.5,
+              color: "var(--tomato-ink-2)"
+            }
+          },
+          h(Icon, { name: "sound", size: 16, style: { color: "var(--tomato-ink-3)" } }),
+          h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.soundChoose")),
+          h("span", { style: { color: "var(--tomato-ink-3)" } }, t(`sound.${soundKind}`)),
+          h(Icon, { name: "chevronRight", size: 14, style: { color: "var(--tomato-ink-3)" } })
+        )
       )
     );
   }
@@ -6834,12 +7075,28 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         )
       );
     }
-    if (tags.length > 0) {
+    for (const tag of tags.slice(0, 2)) {
       items.push(
         h(
           "span",
-          { key: "tags", style: { color: "var(--tomato-ink-3)", overflow: "hidden", textOverflow: "ellipsis" } },
-          `#${tags.slice(0, 2).join(" #")}`
+          {
+            key: `tag-${tag}`,
+            style: {
+              display: "inline-flex",
+              alignItems: "center",
+              height: 17,
+              padding: "0 6px",
+              borderRadius: 5,
+              background: "var(--tomato-surface-2)",
+              color: "var(--tomato-ink-3)",
+              fontSize: 10.5,
+              maxWidth: 96,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }
+          },
+          tag
         )
       );
     }
@@ -6881,7 +7138,10 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
           gap: 10,
           minHeight: 56,
           padding: "9px 8px",
-          borderRadius: 12
+          borderRadius: 12,
+          // 待补任务用淡粉底 + 左侧细杆标出来（旧版样式），仍可正常勾选/开始。
+          background: catchUpFlag && !done ? "color-mix(in srgb, var(--tomato-brand-soft) 62%, transparent)" : void 0,
+          boxShadow: catchUpFlag && !done ? "inset 3px 0 0 var(--tomato-brand)" : void 0
         }
       },
       h(Check, {
@@ -6935,6 +7195,16 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       h(
         "div",
         { style: { position: "relative", display: "flex", alignItems: "center", gap: 2, flex: "none" } },
+        h("span", {
+          style: {
+            width: 5,
+            height: 5,
+            borderRadius: "50%",
+            background: "var(--tomato-surface-3)",
+            marginLeft: 4,
+            flex: "none"
+          }
+        }),
         h(
           "span",
           {
@@ -6996,32 +7266,24 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     if (!tasks || tasks.length === 0) return null;
     return h(
       "section",
-      null,
+      { style: { minWidth: 0 } },
       h(
         "div",
         {
           style: {
             display: "flex",
             alignItems: "center",
-            gap: 6,
+            gap: 7,
             padding: "0 2px",
-            marginBottom: 3
+            marginBottom: 2
           }
         },
+        h("span", { style: { fontSize: 12.5, fontWeight: 550, color: "var(--tomato-ink-2)" } }, title),
         h(
           "span",
-          {
-            style: {
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: ".08em",
-              textTransform: "uppercase",
-              color: "var(--tomato-ink-3)"
-            }
-          },
-          title
+          { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+          tasks.length
         ),
-        h("span", { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } }, tasks.length),
         onHelp ? h(
           "button",
           {
@@ -7050,17 +7312,16 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       ),
       h(
         "div",
-        { style: { display: "flex", flexDirection: "column", gap: 2 } },
+        { style: { display: "flex", flexDirection: "column" } },
         tasks.map(
-          (task) => h(TaskRow, {
-            key: task.id,
-            task,
-            data,
-            today,
-            view,
-            busy,
-            actions
-          })
+          (task, index) => h(
+            "div",
+            {
+              key: task.id,
+              style: index === 0 ? void 0 : { borderTop: "1px solid var(--tomato-line)" }
+            },
+            h(TaskRow, { task, data, today, view, busy, actions })
+          )
         )
       )
     );
@@ -7074,16 +7335,23 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const untimed = pending.filter((task) => !task.reminderTime && !catchIds.has(task.id));
     const completed = completedOn(data, today);
     const tabs = [
-      { value: "active", label: `${t("focus.tabActive")} ${pending.length}` },
-      { value: "done", label: `${t("focus.tabDone")} ${completed.length}` }
+      { value: "active", label: t("focus.tabActive"), count: pending.length },
+      { value: "done", label: t("focus.tabDone"), count: completed.length }
     ];
     let body = null;
     if (tab === "done") {
       body = completed.length > 0 ? h(
         "div",
-        { style: { display: "flex", flexDirection: "column", gap: 2 } },
+        { style: { display: "flex", flexDirection: "column" } },
         completed.map(
-          (task) => h(TaskRow, { key: task.id, task, data, today, view, busy, actions })
+          (task, index) => h(
+            "div",
+            {
+              key: task.id,
+              style: index === 0 ? void 0 : { borderTop: "1px solid var(--tomato-line)" }
+            },
+            h(TaskRow, { task, data, today, view, busy, actions })
+          )
         )
       ) : h(Empty, {
         icon: "check",
@@ -7159,39 +7427,87 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       h(SectionTitle, {
         icon: "tasks",
         title: t("focus.todayTasks"),
+        style: { marginBottom: 6 },
         action: h(
           "div",
-          { style: { display: "flex", alignItems: "center", gap: 8 } },
-          h(IconBtn, {
-            name: "sparkle",
-            size: 15,
-            box: 26,
-            title: t("focus.catchUpHelp"),
-            onClick: onCatchUpHelp
-          }),
-          h(Chip, { tone: "brand" }, t("common.itemsCount", { n: pending.length })),
-          h(Segmented, { items: tabs, value: tab, onChange: onTab, size: "sm" })
+          { style: { display: "flex", alignItems: "center", gap: 10 } },
+          h(
+            Chip,
+            { tone: "neutral", style: { height: 20, fontSize: 10.5, padding: "0 7px" } },
+            String(pending.length)
+          ),
+          h(
+            Btn,
+            {
+              variant: "plain",
+              size: "sm",
+              iconRight: "arrowRight",
+              onClick: () => setActivePageId("tasks")
+            },
+            t("focus.allTasks")
+          )
         )
       }),
-      body,
+      // 旧版的下划线 tab：待完成 / 已完成，数字跟着标签走。
       h(
-        Btn,
+        "div",
+        { className: "t-tabline-row" },
+        tabs.map(
+          (item) => h(
+            "button",
+            {
+              key: item.value,
+              type: "button",
+              className: "t-tabline",
+              "data-active": item.value === tab,
+              onClick: () => onTab(item.value)
+            },
+            item.label,
+            h(
+              "span",
+              { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+              item.count
+            )
+          )
+        )
+      ),
+      h("div", { style: { marginTop: 14 } }, body),
+      // 虚线的快速添加行（旧版样式），N 是打开新建对话框的快捷键。
+      h(
+        "button",
         {
-          block: true,
-          variant: "ghost",
-          icon: "plus",
-          style: { marginTop: 14 },
-          onClick: actions.quickAdd
+          type: "button",
+          className: "t-row",
+          onClick: actions.quickAdd,
+          title: `${t("focus.quickAdd")} · N`,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            width: "100%",
+            marginTop: 14,
+            padding: "10px 12px",
+            border: "1px dashed var(--tomato-line-strong)",
+            borderRadius: 12,
+            background: "transparent",
+            color: "var(--tomato-ink-3)",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: 12.5
+          }
         },
-        t("focus.quickAdd")
+        h(Icon, { name: "plus", size: 15 }),
+        h("span", { style: { flex: 1, textAlign: "left" } }, t("focus.quickAdd")),
+        h(Kbd, null, "N")
       )
     );
   }
   function WeekCard({ stats, today }) {
     const days = recentDays(stats, 7, today);
     const max = Math.max(1, ...days.map((day) => day.minutes || 0));
-    const total = days.reduce((sum, day) => sum + (day.minutes || 0), 0);
-    const week = t("common.week");
+    const names = t("focus.weekdays");
+    const CHART = 118;
+    const ticks = [max, Math.round(max / 2), 0];
     return h(
       Card,
       { pad: 20 },
@@ -7211,125 +7527,138 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       }),
       h(
         "div",
-        { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, alignItems: "end" } },
-        days.map((day) => {
-          const isToday = day.date === today;
-          const minutes = Math.max(0, Number(day.minutes) || 0);
-          const barHeight = minutes > 0 ? Math.max(4, Math.round(minutes / max * 90)) : 2;
-          const label = Array.isArray(week) ? week[weekdayIndex(day.date)] : day.date;
-          return h(
-            "div",
-            {
-              key: day.date,
-              title: t("focus.weekBarTitle", { date: dayLabel(day.date, today), n: minutes }),
-              style: {
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 5,
-                minWidth: 0
-              }
-            },
-            h(
-              "span",
+        { style: { paddingLeft: 40, marginTop: 4 } },
+        // 数值行：旧版把每天的数字固定排在最上面一排。
+        h(
+          "div",
+          {
+            style: {
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 8,
+              marginBottom: 6
+            }
+          },
+          days.map((day) => {
+            const minutes = Math.max(0, Number(day.minutes) || 0);
+            const isToday = day.date === today;
+            return h(
+              "div",
               {
+                key: day.date,
                 className: "t-mono",
                 style: {
+                  textAlign: "center",
                   fontSize: 10,
                   color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)"
                 }
               },
               minutes
-            ),
-            h(
+            );
+          })
+        ),
+        // 图表主体：左侧刻度 + 虚线网格 + 细柱
+        h(
+          "div",
+          { style: { position: "relative", height: CHART } },
+          ticks.map(
+            (value) => h(
               "div",
               {
+                key: value,
                 style: {
-                  width: "100%",
-                  height: 94,
-                  display: "flex",
-                  alignItems: "flex-end",
-                  justifyContent: "center"
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: `${max > 0 ? value / max * CHART : 0}px`,
+                  borderTop: "1px dashed var(--tomato-line)",
+                  pointerEvents: "none"
                 }
               },
-              h("div", {
-                style: {
-                  width: "100%",
-                  maxWidth: 24,
-                  height: barHeight,
-                  borderRadius: "5px 5px 2px 2px",
-                  background: isToday ? "var(--tomato-brand)" : "var(--tomato-accent)",
-                  opacity: isToday ? 1 : 0.78,
-                  transition: "height .5s cubic-bezier(.3,.7,.3,1)"
-                }
-              })
-            ),
-            h(
-              "span",
+              h(
+                "span",
+                {
+                  className: "t-mono",
+                  style: {
+                    position: "absolute",
+                    left: -40,
+                    top: -6,
+                    width: 34,
+                    textAlign: "right",
+                    fontSize: 10,
+                    color: "var(--tomato-ink-3)"
+                  }
+                },
+                value === 0 ? "0" : `${value}分`
+              )
+            )
+          ),
+          h(
+            "div",
+            {
+              style: {
+                position: "absolute",
+                inset: 0,
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                gap: 8,
+                alignItems: "end"
+              }
+            },
+            days.map((day) => {
+              const minutes = Math.max(0, Number(day.minutes) || 0);
+              const isToday = day.date === today;
+              const height = minutes > 0 ? Math.max(3, Math.round(minutes / max * CHART)) : 2;
+              return h(
+                "div",
+                {
+                  key: day.date,
+                  title: t("focus.weekBarTitle", { date: dayLabel(day.date, today), n: minutes }),
+                  style: { display: "flex", justifyContent: "center", alignItems: "flex-end", height: "100%" }
+                },
+                h("div", {
+                  style: {
+                    width: 22,
+                    height,
+                    borderRadius: "4px 4px 2px 2px",
+                    background: isToday ? "var(--tomato-brand)" : "var(--tomato-leaf)",
+                    opacity: isToday ? 1 : 0.5,
+                    transition: "height .5s cubic-bezier(.3,.7,.3,1)"
+                  }
+                })
+              );
+            })
+          )
+        ),
+        // 周几 / 今天
+        h(
+          "div",
+          {
+            style: {
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 8,
+              marginTop: 8
+            }
+          },
+          days.map((day) => {
+            const isToday = day.date === today;
+            const label = Array.isArray(names) ? names[(weekdayIndex(day.date) + 1) % 7] : day.date;
+            return h(
+              "div",
               {
+                key: day.date,
                 style: {
-                  fontSize: 10.5,
+                  textAlign: "center",
+                  fontSize: 11,
                   color: isToday ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
                   fontWeight: isToday ? 600 : 400
                 }
               },
-              label
-            )
-          );
-        })
-      ),
-      h(Divider, { style: { margin: "14px 0 10px" } }),
-      h(
-        "div",
-        { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
-        t("focus.weekTotal", { time: fmtMinutes(total) })
-      )
-    );
-  }
-  function GoalCard({ stats, settings }) {
-    const goal = Math.max(1, Number(settings.dailyGoal) || 8);
-    const done = Math.max(0, Number(stats.todayPomodoros) || 0);
-    const reached = done >= goal;
-    return h(
-      Card,
-      { pad: 20 },
-      h(SectionTitle, { icon: "tomato", title: t("focus.goalTitle") }),
-      h(
-        "div",
-        { style: { display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 } },
-        h(
-          "span",
-          {
-            className: "t-mono",
-            style: {
-              fontSize: 30,
-              fontWeight: 620,
-              lineHeight: 1,
-              color: reached ? "var(--tomato-leaf)" : "var(--tomato-ink)"
-            }
-          },
-          String(done)
-        ),
-        h("span", { style: { fontSize: 13, color: "var(--tomato-ink-3)" } }, `/ ${goal}`),
-        reached ? h(Chip, { tone: "leaf", icon: "check", style: { marginLeft: "auto" } }, t("focus.goalDone")) : null
-      ),
-      h(Bar, {
-        value: done,
-        max: goal,
-        height: 8,
-        color: reached ? "var(--tomato-leaf)" : "var(--tomato-brand)"
-      }),
-      h(
-        "div",
-        {
-          style: {
-            marginTop: 9,
-            fontSize: 11.5,
-            color: reached ? "var(--tomato-leaf)" : "var(--tomato-ink-3)",
-            lineHeight: 1.6
-          }
-        },
-        reached ? t("focus.goalReached") : t("focus.goalHint")
+              isToday ? t("common.today") : label
+            );
+          })
+        )
       )
     );
   }
@@ -7613,6 +7942,20 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const [busy, setBusy] = useState(false);
     const amb = useAmbience();
     useSearchHotkey(() => setSearchOpen(true));
+    useEffect(() => {
+      const onKey = (e) => {
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key !== "n" && e.key !== "N") return;
+        const el = e.target;
+        const tag = el && el.tagName || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el && el.isContentEditable) return;
+        if (editor || searchOpen || pickerOpen || soundOpen || catchUpOpen || deleteTarget) return;
+        e.preventDefault();
+        setEditor({ title: "" });
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [editor, searchOpen, pickerOpen, soundOpen, catchUpOpen, deleteTarget]);
     const data = state && state.data || {};
     const viewData = { ...data, taskKinds: state && state.taskKinds || {} };
     const settings = data.settings || {};
@@ -7753,7 +8096,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         { style: { display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" } },
         h(
           "div",
-          { style: { flex: "1 1 340px", maxWidth: 430, minWidth: 0 } },
+          { style: { flex: "1 1 420px", maxWidth: 500, minWidth: 0 } },
           h(TimerCard, {
             state,
             data,
@@ -7767,20 +8110,13 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             onSkip: () => run({ type: "skipTimer" }),
             onPickTask: () => setPickerOpen(true),
             onToggleLoop: toggleLoop,
-            onSound: () => setSoundOpen(true)
+            onSound: () => setSoundOpen(true),
+            onExpand: () => openImmersive()
           })
         ),
         h(
           "div",
-          {
-            style: {
-              flex: "2 1 420px",
-              minWidth: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 20
-            }
-          },
+          { style: { flex: "2 1 460px", minWidth: 0 } },
           h(TodayCard, {
             data: viewData,
             today,
@@ -7790,11 +8126,11 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
             busy,
             actions,
             onCatchUpHelp: () => setCatchUpOpen(true)
-          }),
-          h(WeekCard, { stats, today }),
-          h(GoalCard, { stats, settings })
+          })
         )
       ),
+      // 本周节奏占满整行（旧版结构），不挤在右列里。
+      h("div", { style: { marginTop: 20 } }, h(WeekCard, { stats, today })),
       h(TaskDialog, {
         open: !!editor,
         task: editorTask,
@@ -10866,6 +11202,15 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
     const [printDialog, setPrintDialog] = useState(null);
     const [syncingId, setSyncingId] = useState(null);
     useSearchHotkey(() => setSearchOpen(true));
+    useEffect(() => {
+      const apply2 = (value) => {
+        if (value === void 0) return;
+        setProjectId(value === null ? "all" : value);
+        setTab("active");
+      };
+      apply2(takeTasksFilter());
+      return subscribeTasksFilter(apply2);
+    }, []);
     const data = state && state.data || {};
     const tasks = Array.isArray(data.tasks) ? data.tasks : [];
     const projects = Array.isArray(data.projects) ? data.projects : [];

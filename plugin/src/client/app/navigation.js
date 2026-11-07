@@ -51,6 +51,36 @@ export function subscribeActivePage(fn) {
   return () => listeners.delete(fn);
 }
 
+// 侧栏项目列表 → 全部任务的项目筛选。导航信号只负责「切页」，筛选值单独走这里：
+// 全部任务页挂载时取一次，切页后仍停在项目筛选上，用户可在页内改回全部项目。
+let pendingTasksFilter = null;
+const filterListeners = new Set();
+
+/** 请全部任务页切到某个项目（null = 全部项目），并跳到该页。 */
+export function openTasksForProject(projectId = null) {
+  pendingTasksFilter = projectId;
+  for (const fn of Array.from(filterListeners)) {
+    try {
+      fn(projectId);
+    } catch {
+      /* 订阅者异常不影响其他订阅者 */
+    }
+  }
+  setActivePageId("tasks");
+}
+
+/** 全部任务页取走挂起的筛选值（消费一次）。 */
+export function takeTasksFilter() {
+  const value = pendingTasksFilter;
+  pendingTasksFilter = null;
+  return value;
+}
+
+export function subscribeTasksFilter(fn) {
+  filterListeners.add(fn);
+  return () => filterListeners.delete(fn);
+}
+
 /** app/main.js 在插件 apply 时把 ctx.layout.selectPanel("tomato") 绑进来。 */
 export function bindPanelOpener(fn) {
   openPanelFn = typeof fn === "function" ? fn : null;

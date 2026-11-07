@@ -5,12 +5,13 @@
 import { h, useState, useEffect, useRef } from "../runtime.js";
 import { t } from "../shared/copy.js";
 import { Icon } from "../shared/icons.js";
-import { IconBtn, Ring, ToastHost } from "../shared/ui.js";
+import { Bar, Dot, IconBtn, Ring, ToastHost } from "../shared/ui.js";
 import { useSnapshot, refresh as refreshStore } from "../shared/store.js";
 import { todayKey, timerView, greeting } from "../shared/derive.js";
 import { pageList } from "./registry.js";
 import {
   getActivePageId,
+  openTasksForProject,
   setActivePageId,
   subscribeActivePage,
 } from "./navigation.js";
@@ -41,7 +42,7 @@ function BrandBlock({ compact }) {
         display: "flex",
         alignItems: "center",
         gap: 11,
-        padding: compact ? "0" : "4px 8px 18px",
+        padding: compact ? "0" : "4px 8px 6px",
         flex: "none",
       },
     },
@@ -94,22 +95,34 @@ function NavItem({ page, active, onSelect, badge }) {
     h(Icon, { name: page.icon, size: 18 }),
     h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, t(page.titleKey)),
     badge !== null && badge !== undefined && badge !== 0
-      ? h(
-          "span",
-          {
-            className: "t-mono",
+      ? active
+        ? // 选中项用一颗小红点（旧版样式），未选中项才显示数字。
+          h("span", {
             style: {
-              fontSize: 11,
-              color: active ? "var(--tomato-brand-deep)" : "var(--tomato-ink-3)",
-              background: active ? "transparent" : "var(--tomato-surface-2)",
-              borderRadius: 6,
-              padding: "1px 5px",
-              minWidth: 18,
-              textAlign: "center",
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "var(--tomato-brand)",
+              flex: "none",
+              marginRight: 2,
             },
-          },
-          badge,
-        )
+          })
+        : h(
+            "span",
+            {
+              className: "t-mono",
+              style: {
+                fontSize: 11,
+                color: "var(--tomato-ink-3)",
+                background: "var(--tomato-surface-2)",
+                borderRadius: 6,
+                padding: "1px 5px",
+                minWidth: 18,
+                textAlign: "center",
+              },
+            },
+            badge,
+          )
       : null,
   );
 }
@@ -138,48 +151,102 @@ function AssistantItem({ compact, onLeave }) {
   );
 }
 
-function NavFooter({ state, compact }) {
+function SideCaption({ title, right, style }) {
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        gap: 8,
+        padding: "0 9px",
+        margin: "12px 0 6px",
+        ...style,
+      },
+    },
+    h(
+      "span",
+      { style: { fontSize: 11, color: "var(--tomato-ink-3)", letterSpacing: ".02em" } },
+      title,
+    ),
+    right
+      ? h(
+          "span",
+          {
+            style: {
+              fontSize: 9,
+              letterSpacing: ".16em",
+              color: "var(--tomato-ink-3)",
+              opacity: 0.75,
+            },
+          },
+          right,
+        )
+      : null,
+  );
+}
+
+function NavFooter({ state, compact, activeId, onSelect }) {
+  if (compact) return null;
   const data = (state && state.data) || {};
   const settings = data.settings || {};
   const stats = (state && state.stats) || {};
-  const goal = Number(settings.dailyGoal) || 8;
-  const done = Number(stats.todayPomodoros) || 0;
+  const goal = Math.max(1, Number(settings.dailyGoal) || 8);
+  const done = Math.max(0, Number(stats.todayPomodoros) || 0);
+  const completedTasks = Math.max(0, Number(stats.todayCompleted) || 0);
+  const reached = done >= goal;
   const online = state !== null;
-  if (compact) return null;
   return h(
     "div",
-    { style: { marginTop: "auto", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 } },
+    { style: { marginTop: "auto", paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 } },
+    // 每日番茄目标（旧版侧栏卡片）：数值 + 细进度条 + 说明。
     h(
       "div",
-      {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "11px 12px",
-          borderRadius: 13,
-          background: "var(--tomato-surface-2)",
-        },
-      },
+      { style: { padding: "0 9px" } },
       h(
-        Ring,
-        { value: goal > 0 ? done / goal : 0, size: 34, stroke: 4, color: "var(--tomato-brand)" },
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 7 } },
+        h(Icon, { name: "leaf", size: 14, style: { color: "var(--tomato-ink-3)" } }),
         h(
           "span",
-          { className: "t-mono", style: { fontSize: 10.5, fontWeight: 600, color: "var(--tomato-ink-2)" } },
-          `${done}`,
+          { style: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: 550, color: "var(--tomato-ink)" } },
+          t("nav.goalTitle"),
+        ),
+        h(
+          "span",
+          { className: "t-mono", style: { fontSize: 12, fontWeight: 600, color: "var(--tomato-ink)" } },
+          `${done} / ${goal}`,
         ),
       ),
       h(
         "div",
-        { style: { minWidth: 0 } },
-        h("div", { style: { fontSize: 12, color: "var(--tomato-ink)", fontWeight: 550 } }, "今日番茄"),
-        h(
-          "div",
-          { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)", marginTop: 1 } },
-          `${done} / ${goal}`,
-        ),
+        { style: { marginTop: 9 } },
+        h(Bar, {
+          value: done,
+          max: goal,
+          height: 4,
+          color: reached ? "var(--tomato-leaf)" : "var(--tomato-brand)",
+        }),
       ),
+      h(
+        "div",
+        { style: { marginTop: 7, fontSize: 10.5, lineHeight: 1.5, color: "var(--tomato-ink-3)" } },
+        t("nav.goalHint", { n: completedTasks }),
+      ),
+    ),
+    h("div", { style: { height: 1, background: "var(--tomato-line)", margin: "2px 9px" } }),
+    h(
+      "button",
+      {
+        type: "button",
+        className: "t-navitem",
+        "data-active": activeId === "preferences",
+        onClick: () => onSelect?.("preferences"),
+        style: { padding: "9px 12px" },
+      },
+      h(Icon, { name: "settings", size: 17 }),
+      h("span", { style: { flex: 1, minWidth: 0 } }, t("nav.preferences")),
     ),
     h(
       "div",
@@ -188,9 +255,9 @@ function NavFooter({ state, compact }) {
           display: "flex",
           alignItems: "center",
           gap: 7,
-          fontSize: 11,
+          fontSize: 10.5,
           color: online ? "var(--tomato-ink-3)" : "#b8503f",
-          padding: "0 4px",
+          padding: "0 10px",
         },
       },
       h("span", {
@@ -202,22 +269,90 @@ function NavFooter({ state, compact }) {
           flex: "none",
         },
       }),
-      online ? t("common.savedLocal") : t("common.offline"),
+      online ? t("nav.storage") : t("common.offline"),
+    ),
+  );
+}
+
+function ProjectList({ projects, counts }) {
+  if (!projects || projects.length === 0) return null;
+  return h(
+    "div",
+    { style: { marginTop: 18 } },
+    h(SideCaption, { title: t("nav.projects") }),
+    projects.map((project) =>
+      h(
+        "button",
+        {
+          key: project.id,
+          type: "button",
+          className: "t-navitem",
+          title: project.name,
+          onClick: () => openTasksForProject(project.id),
+          style: { padding: "8px 12px", fontSize: 13 },
+        },
+        h(Dot, { color: project.color || "var(--tomato-ink-3)", size: 8 }),
+        h(
+          "span",
+          {
+            style: {
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            },
+          },
+          project.name,
+        ),
+        h(
+          "span",
+          { className: "t-mono", style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+          counts.get(project.id) || 0,
+        ),
+      ),
     ),
   );
 }
 
 function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave }) {
+  const data = (state && state.data) || {};
+  const projects = Array.isArray(data.projects) ? data.projects : [];
+  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const counts = new Map();
+  for (const task of tasks) {
+    if (!task || task.completed || !task.projectId) continue;
+    counts.set(task.projectId, (counts.get(task.projectId) || 0) + 1);
+  }
+  // 偏好设置从导航列表移到页脚（旧版位置）；窄屏保持扁平列表。
+  const navPages = compact ? pages : pages.filter((page) => page.id !== "preferences");
+  const items = [];
+  for (const page of navPages) {
+    items.push(
+      h(NavItem, {
+        key: page.id,
+        page,
+        active: page.id === activeId,
+        onSelect,
+        badge: page.badge ? page.badge(state) : null,
+      }),
+    );
+    if (!compact && page.id === "education") {
+      items.push(h(AssistantItem, { key: "assistant", compact, onLeave }));
+    }
+  }
+  if (compact) items.push(h(AssistantItem, { key: "assistant", compact, onLeave }));
+
   return h(
     "aside",
     {
       style: {
-        width: compact ? "auto" : 236,
+        width: compact ? "auto" : 228,
         flex: "none",
         display: "flex",
         flexDirection: compact ? "row" : "column",
         gap: 3,
-        padding: compact ? "12px 16px" : "22px 16px 18px",
+        padding: compact ? "12px 16px" : "22px 14px 18px",
         borderRight: compact ? "none" : "1px solid var(--tomato-line)",
         borderBottom: compact ? "1px solid var(--tomato-line)" : "none",
         background: compact ? "transparent" : "color-mix(in srgb, var(--tomato-surface-2) 55%, transparent)",
@@ -237,17 +372,10 @@ function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave 
           h(BrandBlock, { compact: true }),
         )
       : h(BrandBlock, { compact: false }),
-    pages.map((page) =>
-      h(NavItem, {
-        key: page.id,
-        page,
-        active: page.id === activeId,
-        onSelect,
-        badge: page.badge ? page.badge(state) : null,
-      }),
-    ),
-    h(AssistantItem, { compact, onLeave }),
-    h(NavFooter, { state, compact }),
+    compact ? null : h(SideCaption, { title: t("nav.space"), right: t("nav.personal"), style: { marginTop: 8 } }),
+    items,
+    compact ? null : h(ProjectList, { projects, counts }),
+    h(NavFooter, { state, compact, activeId, onSelect }),
   );
 }
 
@@ -337,7 +465,7 @@ export function AppShell(props) {
           key: active ? active.id : "empty",
           className: "t-fadein t-appcontent",
           // 顶部留出悬浮提醒条的位置（提醒在页面最顶端居中）。
-          style: { maxWidth: 1180, margin: "0 auto", padding: narrow ? "40px 18px 60px" : "44px 40px 72px" },
+          style: { maxWidth: 1270, margin: 0, padding: narrow ? "40px 18px 60px" : "44px 28px 72px" },
         },
         active
           ? h(active.Component, { state, dispatch: props.dispatch, refresh: refreshStore, api: props.api })

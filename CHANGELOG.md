@@ -10,6 +10,9 @@
 - 番茄应用成为 DSH 主视图 `main` panel `tomato`：左侧九页导航（今日专注/全部任务/习惯愿景/数据统计/本周日程/应试教育/专注保护/定时锁机/偏好设置），页面源码按 `pages/` 分文件自注册；侧栏 `sidebar.panellist` 提供番茄入口。
 - 客户端改为模块化 + esbuild 构建（`plugin/src/client/` → `plugin/client.js`，`pnpm build:client`），新增无浏览器冒烟 `pnpm check:client`（假 DOM + 真 React 逐页渲染）与 `SMOKE_LIVE=1` 实时数据联调；视觉基准见 `docs/SKIN.md`。
 - UI 数据面改为「全量状态 + Action」：`GET /api/state`（engine 快照 + guard/education 摘要）与 `POST /api/dispatch`（`@tomato/core` 的 Action union，返回新快照），页面不再按功能堆端点；新增 `GET /api/export/plan`、`GET /api/export/backup` 供偏好设置导出。
+- 今日专注页对齐旧版：番茄钟卡补回标题/沉浸入口、三段模式切换、整圈计时环与居中按钮组，背景音改为卡片底部通栏；今日待办改成下划线 tab（待完成/已完成）+ 细线分行 + 虚线快速添加（N 快捷键）；「这一周的专注节奏」移到整行并补回左侧刻度与虚线网格、数值行、周日…今天。
+- 侧栏补回旧版结构：「我的空间 / PERSONAL」分区标题、学习助手回到列表内、我的项目（色点 + 未完成数，点击进全部任务并预设项目筛选）、页脚「每日番茄目标」进度卡与偏好设置入口；内容列改为左对齐、宽 1270。
+- 勾选框改为 20px 圆角方形、任务标签改为浅底 chip，与旧版一致。
 - 恢复旧版「角色背景板」：内置立绘随插件分发（`plugin/assets/personas/`，ATRI 官方立绘，按原 README 保留权利说明），在 DSH 每个界面右下角显示，四角色可选、受 `settings.personaBackdrop` 开关控制，沉浸与专注保护时隐藏。指针靠近立绘时左侧浮出 Q 版头像列可直接换人，触摸设备点立绘开合；与设置里的下拉框共用 `localStorage` 偏好。
 - 整体重写为 DSH 插件架构：TypeScript 领域核心（`packages/core`，唯一权威实现）+ Node 本地 runtime（`runtime/`，计划 JSON 原子写、计时与提醒、HTTP API 与 MCP）+ Rust 原生守卫（`crates/guard`，专注保护/通知/托盘）。
 - 界面迁入 DSH：composer.dock 入口卡与 shell.overlay 面板提供今日专注、任务、统计与设置，数据直连 runtime 只读 API；沿用奶油白 + 番茄红设计语言。
