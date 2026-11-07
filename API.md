@@ -29,10 +29,12 @@
 - `GET /api/apps` — 当前有窗口的应用（白名单建议用）：`{"apps":[{"id":"code","name":"Visual Studio Code"}],"count":1,"cached":false}`。
   `id` 来自 guard 实际窗口的 `app_id`；桌面入口仅补充可读名称，缓存 30 秒。guard 不可达时返回 503，不退回全机安装列表
 - `GET /api/state`、`GET /api/export/plan`、`GET /api/export/backup` — 见下节（UI 数据面与导出）
+- `GET /api/library/grant` — 共享资料库授权状态（见「资料目录授权」）
 
 浏览器写端点（同 Origin 白名单；写路径也必须经 @tomato/core 的校验与保护规则）：
 - `POST /api/tasks`、`PATCH /api/tasks/:id`、`POST /api/tasks/:id/complete`、`POST /api/tasks/move`
 - `POST /api/focus/start`、`POST /api/focus/stop`、`POST /api/focus/pause`
+- `POST /api/library/authorize`、`DELETE /api/library/grant` — 只给界面上的用户操作，见「资料目录授权」
 - 其余写操作走 MCP（助手代劳），UI 不直接暴露
 
 ### UI 数据面（插件 UI 的唯一数据入口）
@@ -65,6 +67,23 @@ UI 不再按页面堆端点，而是「取一份全量状态 + 提交 Action」�
   写路径同样经过 core 的校验与保护规则；`emergencyUnlock` 在严格模式下仍被拒绝。
 - 写端点在保护生效时同步驱动 guard（lock/unlock/whitelist），并每秒 tick 计时器。
 - `POST /api/desktop/fullscreen` `{ "enabled": true|false }`：沉浸层进入/退出时控制 DSH 原生全屏；沿用 UI Origin 校验，失败返回 503 与可读 `error`。仅改变视图，不修改计时与保护规则；保护期间退出沉浸不会解除全屏。
+
+**资料目录授权（共享资料库 / 项目目录，只能由用户设置）**：
+
+- `GET /api/library/grant` — `{"authorized":true,"directory":"/home/fuurin/exam","projects":6,"sharedProjects":["..."]}`；
+  未授权时 `{"authorized":false,"directory":null,"projects":0,"sharedProjects":[]}`。授权目录已失联或不再安全时
+  仍返回 200，但 `authorized:false` 并带 `reason`，让界面提示重新授权。`projects` 是应试项目数，
+  `sharedProjects` 是没有单独授权、直接使用共享库的项目 ID。
+- `POST /api/library/authorize` — body `{"directory":"/home/fuurin/exam"}`，返回同形状态。目录必须是已存在的
+  绝对路径、不经过符号链接，且不是根目录、整个主目录或 runtime 数据目录（400）。已有项目单独授权的目录
+  必须都在新共享库内，否则 400 并点名项目。授权后所有应试项目默认挂载共享库；项目单独授权只能收窄到
+  它内部的子目录（`POST /api/projects/:id/authorize` 越界 → 400）。
+- `DELETE /api/library/grant` — 返回 `{"authorized":false,...}`。只删除共享授权；`project-grants.json` 里的
+  项目单独授权原样保留，没有单独授权的项目立即回落到 403「项目目录尚未由用户授权」。
+- 三个端点只服务插件界面「应试教育 → 资料库」卡片；**不映射成 MCP 工具，也不接进 `/api/dispatch` 的
+  Action union**，保持「目录授权只能由用户设置」这条不变量。授权存 `dataDir/library-grant.json`
+  （0600、同目录临时文件 + rename 原子写，内容 `{directory, grantedAt}`），不进入计划/备份；
+  导入备份也不会扩大本机授权。
 
 **导出端点（偏好设置页用）**：
 

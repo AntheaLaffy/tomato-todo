@@ -47,8 +47,10 @@ DOMAINS = [
         "运行时 API/MCP",
         [
             "runtime/test/api-state.test.mjs",
+            "runtime/test/connection.test.mjs",
             "runtime/test/engine.test.mjs",
             "runtime/test/http.test.mjs",
+            "runtime/test/library.test.mjs",
             "runtime/test/mcp-stdio.test.mjs",
         ],
         "`cd runtime && node --test`",
@@ -79,6 +81,7 @@ DOMAINS = [
             "scripts/export-sqlite.test.mjs",
             "scripts/import-backup.test.mjs",
             "scripts/install.test.mjs",
+            "scripts/plugin-host.test.mjs",
         ],
         "`pnpm test:tools`",
     ),
@@ -90,6 +93,7 @@ CHAPTER_TESTS = {
     "06-安全与隐私边界": [
         "runtime/test/http.test.mjs",
         "runtime/test/api-state.test.mjs",
+        "runtime/test/library.test.mjs",
     ],
     "10-锁与专注保护": [
         "crates/guard/src",
@@ -121,8 +125,10 @@ CHAPTER_TESTS = {
     ],
     "21-安装与桌面集成": ["scripts/install.test.mjs"],
     "22-架构与工程": [
+        "runtime/test/connection.test.mjs",
         "runtime/test/engine.test.mjs",
         "runtime/test/http.test.mjs",
+        "scripts/plugin-host.test.mjs",
         "packages/core/test/engine-store.test.ts",
         "runtime/test/supervise.test.mjs",
     ],

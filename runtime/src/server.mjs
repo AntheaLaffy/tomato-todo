@@ -5,6 +5,9 @@
 // - 写端点 POST /api/dispatch（UI 数据面，body {action}）与旧写端点
 //   POST/PATCH /api/tasks*、/api/focus*、/api/tasks/move：同 Origin 白名单
 //   （无 Origin 的非浏览器客户端放行；有 Origin 且不在白名单 → 403）。
+// - 资料目录授权：GET /api/library/grant、POST /api/library/authorize、
+//   DELETE /api/library/grant，仅供界面用户操作；不暴露 MCP/助手入口
+//   （目录授权只能由用户设置）。
 // - /mcp：Streamable HTTP 桩（POST JSON-RPC），Bearer token 认证（数据目录
 //   agent/connection.json），拒绝任何带 Origin 的请求；GET/SSE 未实现。
 import { createServer } from "node:http";
@@ -103,7 +106,7 @@ function handlePreflight(req, res) {
   ensureWriteOrigin(req);
   res.writeHead(204, {
     "Access-Control-Allow-Origin": UI_ORIGIN,
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "600",
     Vary: "Origin",
@@ -154,17 +157,20 @@ function sendResourceFile(req, res, url, library, id, fileToken) {
     }
   }
   const filename = encodeURIComponent(file.name.replace(/[\r\n]/g, "_"));
-  res.writeHead(range === undefined ? 200 : 206, {
+  const headers = {
     "Content-Type": file.mimeType,
     "Content-Length": end - start + 1,
     "Content-Disposition": (download ? "attachment" : "inline") + "; filename*=UTF-8''" + filename,
-    "Content-Range": range === undefined ? undefined : "bytes " + start + "-" + end + "/" + size,
     "Accept-Ranges": "bytes",
     "Access-Control-Allow-Origin": UI_ORIGIN,
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
-  });
+  };
+  // 只有 Range 请求才写 Content-Range：Node 的 writeHead 会把 undefined
+  // 当成非法头值整体报错，普通读取不能带这个键。
+  if (range !== undefined) headers["Content-Range"] = "bytes " + start + "-" + end + "/" + size;
+  res.writeHead(range === undefined ? 200 : 206, headers);
   const stream = createReadStream(null, { fd, autoClose: true, start, end });
   stream.on("error", () => res.destroy());
   stream.pipe(res);
@@ -392,6 +398,7 @@ async function handleApi(req, res, url, ctx) {
     }
     match = /^\/api\/projects\/([^/]+)\/grant$/.exec(path);
     if (match) return sendApi(res, 200, library.grantStatus(decodeId(match[1])));
+    if (path === "/api/library/grant") return sendApi(res, 200, library.libraryStatus());
     match = /^\/api\/projects\/([^/]+)\/resources\/scan$/.exec(path);
     if (match) return sendApi(res, 200, library.scan(decodeId(match[1])));
     match = /^\/api\/projects\/([^/]+)\/resources$/.exec(path);
@@ -451,6 +458,13 @@ async function handleApi(req, res, url, ctx) {
   }
 
   ensureWriteOrigin(req);
+  if (method === "POST" && path === "/api/library/authorize") {
+    const body = await parseJson(req);
+    return sendApi(res, 200, library.authorizeLibrary(body.directory, Date.now()));
+  }
+  if (method === "DELETE" && path === "/api/library/grant") {
+    return sendApi(res, 200, library.revokeLibrary());
+  }
   if (method === "POST" && path === "/api/projects") {
     const result = library.create(await parseJson(req));
     return sendApi(res, 201, result);

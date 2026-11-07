@@ -3028,13 +3028,17 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   __export(api_exports, {
     API_BASE: () => API_BASE,
     ApiError: () => ApiError,
+    authorizeLibrary: () => authorizeLibrary,
     getApps: () => getApps,
     getExportBackup: () => getExportBackup,
     getExportPlan: () => getExportPlan,
     getHealth: () => getHealth,
+    getLibraryGrant: () => getLibraryGrant,
     getState: () => getState,
     ping: () => ping,
     postDispatch: () => postDispatch,
+    revokeLibraryGrant: () => revokeLibraryGrant,
+    scanProjectLibrary: () => scanProjectLibrary,
     setDesktopFullscreen: () => setDesktopFullscreen
   });
   var API_BASE = "http://127.0.0.1:43987";
@@ -3082,6 +3086,25 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
   }
   function postDispatch(action, opts) {
     return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
+  }
+  function getLibraryGrant(opts) {
+    return request("/api/library/grant", opts);
+  }
+  function authorizeLibrary(directory, opts) {
+    return request("/api/library/authorize", {
+      ...opts,
+      method: "POST",
+      body: { directory }
+    });
+  }
+  function revokeLibraryGrant(opts) {
+    return request("/api/library/grant", { ...opts, method: "DELETE" });
+  }
+  function scanProjectLibrary(id, opts) {
+    return request("/api/projects/" + encodeURIComponent(id) + "/resources/scan", {
+      timeoutMs: 3e4,
+      ...opts
+    });
   }
   function getExportPlan(opts) {
     return request("/api/export/plan", { timeoutMs: 15e3, ...opts });
@@ -15878,6 +15901,35 @@ ${JSON.stringify(refs, null, 2)}`;
       projectMissing: "这个学习项目已不存在。",
       directory: "资料目录",
       directoryEmpty: "未绑定资料目录",
+      directorySharedLabel: "共享资料库",
+      libraryTitle: "资料库",
+      libraryAuthorized: "已授权",
+      libraryUnauthorized: "未授权",
+      libraryProjects: "{n} 个项目可用",
+      librarySharedHint: "一次授权后所有学习项目共用；项目单独授权只能指向它里面的子目录。",
+      libraryMissingHint: "授权一次，所有学习项目共用同一份资料，不必逐个项目绑定。",
+      libraryAuthorize: "授权目录",
+      libraryChange: "更换",
+      libraryScan: "扫描",
+      libraryRevoke: "取消授权",
+      libraryScanning: "正在检查资料…",
+      libraryScanNone: "还没有学习项目可扫描。",
+      libraryScanDone: "已检查 {n} 份资料：可用 {a}，缺失 {m}，不可用 {u}",
+      libraryDialogTitle: "授权共享资料库",
+      libraryDialogSubtitle: "输入本机绝对路径，例如 /home/fuurin/exam。一次授权后所有学习项目共用；项目单独授权只能收窄到它里面的子目录。",
+      libraryDialogLabel: "目录绝对路径",
+      libraryDialogPlaceholder: "/home/fuurin/exam",
+      libraryDialogHint: "只能选真实存在的普通目录；根目录、整个主目录、应用数据目录和经过符号链接的路径都会被拒绝。",
+      libraryPathRequired: "请先输入资料库的绝对路径",
+      librarySaving: "正在授权…",
+      librarySaved: "共享资料库已授权",
+      libraryRevoking: "正在取消…",
+      libraryRevoked: "已取消共享资料库授权",
+      libraryRevokeTitle: "取消共享资料库授权？",
+      libraryRevokeWarning: "取消后，没有单独授权的项目会立即失去资料访问；按项目的单独授权会保留，并继续按原目录挂载。",
+      libraryLoading: "正在读取资料库授权…",
+      libraryUnavailable: "无法读取资料库状态，runtime 可能未连接。",
+      libraryRetry: "重试",
       syllabusLabel: "考纲",
       pastPapersCount: "真题 {n} 份",
       mockPapersCount: "模拟题 {n} 份",
@@ -16009,6 +16061,35 @@ ${JSON.stringify(refs, null, 2)}`;
       projectMissing: "This study project no longer exists.",
       directory: "Resource folder",
       directoryEmpty: "No folder bound",
+      directorySharedLabel: "Shared library",
+      libraryTitle: "Resource library",
+      libraryAuthorized: "Authorized",
+      libraryUnauthorized: "Not authorized",
+      libraryProjects: "{n} projects available",
+      librarySharedHint: "Authorize once and every study project shares it; per-project grants can only narrow to a subfolder.",
+      libraryMissingHint: "Authorize one folder and every study project shares it — no per-project binding needed.",
+      libraryAuthorize: "Authorize folder",
+      libraryChange: "Change",
+      libraryScan: "Scan",
+      libraryRevoke: "Revoke",
+      libraryScanning: "Checking resources…",
+      libraryScanNone: "No study projects to scan yet.",
+      libraryScanDone: "Checked {n} resources: {a} available, {m} missing, {u} unavailable",
+      libraryDialogTitle: "Authorize shared library",
+      libraryDialogSubtitle: "Enter an absolute path on this machine, e.g. /home/fuurin/exam. One authorization covers every study project; per-project grants can only narrow to a subfolder.",
+      libraryDialogLabel: "Absolute folder path",
+      libraryDialogPlaceholder: "/home/fuurin/exam",
+      libraryDialogHint: "Must be an existing ordinary folder; root, your whole home, app data folders and paths through symlinks are rejected.",
+      libraryPathRequired: "Enter the absolute path of the library first",
+      librarySaving: "Authorizing…",
+      librarySaved: "Shared library authorized",
+      libraryRevoking: "Revoking…",
+      libraryRevoked: "Shared library authorization revoked",
+      libraryRevokeTitle: "Revoke shared library authorization?",
+      libraryRevokeWarning: "Projects without their own grant immediately lose resource access; per-project grants stay and keep mounting their own folders.",
+      libraryLoading: "Reading library authorization…",
+      libraryUnavailable: "Could not read the library state; runtime may be offline.",
+      libraryRetry: "Retry",
       syllabusLabel: "Syllabus",
       pastPapersCount: "{n} past papers",
       mockPapersCount: "{n} mock papers",
@@ -16685,6 +16766,202 @@ ${JSON.stringify(refs, null, 2)}`;
       )
     );
   }
+  function LibraryCard({ library, projectIds, onChange, onReload }) {
+    const [dialog, setDialog] = useState(null);
+    const [directory, setDirectory] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+    const [scan, setScan] = useState("");
+    const loading = library === null || library === void 0;
+    const authorized = library !== null && library !== void 0 && library.authorized === true;
+    const unavailable = library !== null && library !== void 0 && library.unavailable === true;
+    const path = strOr(library?.directory);
+    const openAuthorize = () => {
+      setDirectory(path || "");
+      setError("");
+      setDialog("authorize");
+    };
+    const openRevoke = () => {
+      setError("");
+      setDialog("revoke");
+    };
+    const closeDialog = () => {
+      if (busy) return;
+      setDialog(null);
+      setError("");
+    };
+    const submit = async () => {
+      const value = directory.trim();
+      if (!value) {
+        setError(t("education.libraryPathRequired"));
+        return;
+      }
+      setBusy(true);
+      setError("");
+      try {
+        const next = await authorizeLibrary(value);
+        onChange(next);
+        setDialog(null);
+        notify(t("education.librarySaved"), "brand");
+      } catch (e) {
+        setError(e && e.userMessage ? e.userMessage : String(e));
+      } finally {
+        setBusy(false);
+      }
+    };
+    const revoke = async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const next = await revokeLibraryGrant();
+        onChange(next);
+        setDialog(null);
+        notify(t("education.libraryRevoked"), "neutral");
+      } catch (e) {
+        setError(e && e.userMessage ? e.userMessage : String(e));
+      } finally {
+        setBusy(false);
+      }
+    };
+    const scanAll = async () => {
+      if (projectIds.length === 0) {
+        notify(t("education.libraryScanNone"), "neutral");
+        return;
+      }
+      setBusy(true);
+      setScan(t("education.libraryScanning"));
+      try {
+        const results = await Promise.all(
+          projectIds.map((id) => scanProjectLibrary(id))
+        );
+        const items = results.flatMap(
+          (result) => result && Array.isArray(result.resources) ? result.resources : []
+        );
+        const count = (state) => items.filter((item) => item.state === state).length;
+        const available = count("available");
+        const missing = count("missing");
+        setScan(
+          t("education.libraryScanDone", {
+            n: items.length,
+            a: available,
+            m: missing,
+            u: items.length - available - missing
+          })
+        );
+      } catch (e) {
+        setScan("");
+        notify(e && e.userMessage ? e.userMessage : String(e), "danger");
+      } finally {
+        setBusy(false);
+      }
+    };
+    const statusChip = loading ? h(Chip, { tone: "neutral" }, t("education.libraryLoading")) : authorized ? h(Chip, { tone: "brand" }, t("education.libraryAuthorized")) : h(Chip, { tone: "neutral" }, t("education.libraryUnauthorized"));
+    const pathBox = h(
+      "div",
+      {
+        className: "t-mono",
+        style: {
+          fontSize: 12,
+          lineHeight: 1.6,
+          color: "var(--tomato-ink-2)",
+          background: "var(--tomato-surface-2)",
+          borderRadius: 9,
+          padding: "9px 11px",
+          wordBreak: "break-all"
+        }
+      },
+      loading ? t("education.libraryLoading") : path || (unavailable ? t("education.libraryUnavailable") : t("education.directoryEmpty"))
+    );
+    const card = h(
+      Card,
+      { pad: 20 },
+      h(SectionTitle, {
+        icon: "folder",
+        title: t("education.libraryTitle"),
+        hint: authorized ? t("education.libraryProjects", { n: library.projects ?? 0 }) : null,
+        action: statusChip
+      }),
+      pathBox,
+      h(
+        "div",
+        { style: { fontSize: 12, color: "var(--tomato-ink-3)", lineHeight: 1.6, marginTop: 9 } },
+        authorized ? t("education.librarySharedHint") : t("education.libraryMissingHint")
+      ),
+      unavailable ? h(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 9 } },
+        h("span", { style: { fontSize: 12, color: "#b8503f" } }, strOr(library.reason) || t("education.libraryUnavailable")),
+        onReload ? h(Btn, { variant: "ghost", size: "sm", icon: "refresh", onClick: onReload }, t("education.libraryRetry")) : null
+      ) : null,
+      h(
+        "div",
+        { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 } },
+        loading ? null : authorized ? [
+          h(Btn, { key: "change", variant: "soft", size: "sm", icon: "folder", onClick: openAuthorize }, t("education.libraryChange")),
+          h(Btn, { key: "scan", variant: "ghost", size: "sm", icon: "refresh", onClick: scanAll, disabled: busy }, t("education.libraryScan")),
+          h(Btn, { key: "revoke", variant: "ghost", size: "sm", icon: "trash", onClick: openRevoke }, t("education.libraryRevoke"))
+        ] : h(Btn, { variant: "primary", size: "sm", icon: "folder", onClick: openAuthorize }, t("education.libraryAuthorize"))
+      ),
+      scan ? h("div", { style: { fontSize: 11.5, color: "var(--tomato-ink-3)", marginTop: 9 } }, scan) : null
+    );
+    const errorLine = error ? h("div", { style: { fontSize: 12, color: "#b8503f", lineHeight: 1.55, marginTop: 10 } }, error) : null;
+    const authorizeDialog = h(
+      Modal,
+      {
+        open: dialog === "authorize",
+        onClose: closeDialog,
+        title: t("education.libraryDialogTitle"),
+        subtitle: t("education.libraryDialogSubtitle"),
+        icon: "folder",
+        footer: h(
+          "div",
+          { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+          h(Btn, { variant: "ghost", onClick: closeDialog, disabled: busy }, t("common.cancel")),
+          h(Btn, { variant: "primary", onClick: submit, disabled: busy }, busy ? t("education.librarySaving") : t("education.libraryAuthorize"))
+        )
+      },
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 10 } },
+        h(
+          Field,
+          { label: t("education.libraryDialogLabel"), hint: t("education.libraryDialogHint") },
+          h(Input, {
+            value: directory,
+            onChange: (value) => {
+              setDirectory(value);
+              setError("");
+            },
+            placeholder: t("education.libraryDialogPlaceholder"),
+            mono: true,
+            autoFocus: true,
+            onKeyDown: (e) => {
+              if (e.key === "Enter") void submit();
+            }
+          })
+        ),
+        errorLine
+      )
+    );
+    const revokeDialog = h(
+      Modal,
+      {
+        open: dialog === "revoke",
+        onClose: closeDialog,
+        title: t("education.libraryRevokeTitle"),
+        subtitle: t("education.libraryRevokeWarning"),
+        icon: "trash",
+        footer: h(
+          "div",
+          { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+          h(Btn, { variant: "ghost", onClick: closeDialog, disabled: busy }, t("common.cancel")),
+          h(Btn, { variant: "danger", onClick: revoke, disabled: busy }, busy ? t("education.libraryRevoking") : t("education.libraryRevoke"))
+        )
+      },
+      errorLine ? h("div", null, errorLine) : null
+    );
+    return h("div", { style: { marginBottom: 16 } }, card, authorizeDialog, revokeDialog);
+  }
   function ProjectDetail({
     data,
     edu,
@@ -16693,12 +16970,17 @@ ${JSON.stringify(refs, null, 2)}`;
     today,
     at,
     index,
+    library,
     onBack,
     onAssistant
   }) {
     const projectId = strOr(study.projectId);
     const color = projectColor(data, projectId);
     const name = project && strOr(project.name) ? project.name : t("education.unnamedProject");
+    const sharedLibrary = library && library.authorized === true ? strOr(library.directory) : "";
+    const projectDirectory = strOr(study.directory);
+    const sharedIds = library && Array.isArray(library.sharedProjects) ? library.sharedProjects : null;
+    const usesSharedLibrary = sharedLibrary !== "" && (sharedIds !== null ? sharedIds.includes(projectId) : projectDirectory === "" || projectDirectory === sharedLibrary);
     const settings = data.settings && typeof data.settings === "object" ? data.settings : {};
     const protection = settings.protection && typeof settings.protection === "object" ? settings.protection : {};
     const resources = edu.resources.filter(
@@ -16902,7 +17184,7 @@ ${JSON.stringify(refs, null, 2)}`;
             wordBreak: "break-all"
           }
         },
-        strOr(study.directory) || t("education.directoryEmpty")
+        usesSharedLibrary ? `${t("education.directorySharedLabel")} · ${sharedLibrary}` : projectDirectory || t("education.directoryEmpty")
       ),
       h(
         "div",
@@ -16916,6 +17198,7 @@ ${JSON.stringify(refs, null, 2)}`;
           }
         },
         study.examMode === true ? h(Chip, { tone: "brand" }, t("education.examMode")) : null,
+        usesSharedLibrary ? h(Chip, { tone: "neutral", icon: "folder" }, t("education.directorySharedLabel")) : null,
         study.syllabusId ? h(
           Chip,
           { tone: "neutral", icon: "tag" },
@@ -17542,6 +17825,22 @@ ${JSON.stringify(refs, null, 2)}`;
   function EducationPage({ onAssistant } = {}) {
     const state = useSnapshot();
     const [detailId, setDetailId] = useState(null);
+    const [library, setLibrary] = useState(null);
+    const loadLibrary = () => {
+      getLibraryGrant({ timeoutMs: 4e3 }).then((next) => setLibrary(next)).catch(
+        (error) => setLibrary({
+          authorized: false,
+          directory: null,
+          projects: 0,
+          sharedProjects: [],
+          unavailable: true,
+          reason: error && error.userMessage ? error.userMessage : String(error)
+        })
+      );
+    };
+    useEffect(() => {
+      loadLibrary();
+    }, []);
     if (state === null) {
       return h(
         "div",
@@ -17625,6 +17924,7 @@ ${JSON.stringify(refs, null, 2)}`;
         today,
         at,
         index,
+        library,
         onBack: () => setDetailId(null),
         onAssistant
       });
@@ -17806,6 +18106,12 @@ ${JSON.stringify(refs, null, 2)}`;
           )
         )
       );
+    });
+    const librarySection = h(LibraryCard, {
+      library,
+      projectIds: edu.projects.map((item) => strOr(item.projectId)).filter(Boolean),
+      onChange: (next) => setLibrary(next),
+      onReload: loadLibrary
     });
     const projectsSection = h(
       "div",
@@ -18229,6 +18535,7 @@ ${JSON.stringify(refs, null, 2)}`;
       "div",
       { className: "t-root" },
       header,
+      librarySection,
       projectsSection,
       h(
         "div",

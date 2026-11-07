@@ -60,6 +60,33 @@ export function postDispatch(action, opts) {
   return request("/api/dispatch", { ...opts, method: "POST", body: { action } });
 }
 
+// 共享资料库：只在应试教育页给用户点选；不存在助手/MCP 入口（目录授权
+// 只能由用户设置）。GET / POST 返回同一形状：{authorized, directory,
+// projects, sharedProjects}；DELETE 只取消共享授权，保留项目单独授权。
+export function getLibraryGrant(opts) {
+  return request("/api/library/grant", opts);
+}
+
+export function authorizeLibrary(directory, opts) {
+  return request("/api/library/authorize", {
+    ...opts,
+    method: "POST",
+    body: { directory },
+  });
+}
+
+export function revokeLibraryGrant(opts) {
+  return request("/api/library/grant", { ...opts, method: "DELETE" });
+}
+
+/** 检查一个项目资料是否仍在授权目录里（GET /api/projects/:id/resources/scan）。 */
+export function scanProjectLibrary(id, opts) {
+  return request("/api/projects/" + encodeURIComponent(id) + "/resources/scan", {
+    timeoutMs: 30000,
+    ...opts,
+  });
+}
+
 /**
  * 导出计划 v6 / 备份 v4（JSON，浏览器端由页面负责 Blob 下载）。
  * 端点在 data-runtime 落地前会 404，页面用 typeof fn === "function" + 错误行降级。
