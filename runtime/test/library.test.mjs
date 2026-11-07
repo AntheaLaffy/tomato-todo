@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   mkdirSync,
   mkdtempSync,
+  unlinkSync,
   readFileSync,
   renameSync,
   statSync,
@@ -453,4 +454,42 @@ test("按索引整批登记：只登记本项目目录下的文件，已登记�
 
   engine.flushNow();
   assert.ok(dataDir);
+});
+
+test("项目只授权库内子目录时，按索引导入会剥掉目录前缀", async () => {
+  const { exam, engine, library } = fixture();
+  const { scanLibrary, writeIndex } = await import("../src/library-index.mjs");
+  library.authorizeLibrary(exam, 1_800_000_000_000);
+  mkdirSync(join(exam, "math"), { recursive: true });
+  writeFileSync(join(exam, "math", "book.pdf"), "book");
+  writeFileSync(join(exam, "math", "notes.md"), "notes");
+  // 项目只挂载子目录：索引仍相对库根。
+  const project = library.create({
+    name: "数学一",
+    color: "#b8503f",
+    directory: join(exam, "math"),
+  });
+  writeFileSync(join(exam, "eng.txt"), "eng");
+  const scanned = await scanLibrary(exam);
+  writeIndex(library.dataDir, {
+    root: exam,
+    scannedAt: 1_800_000_000,
+    items: scanned.items,
+  });
+
+  const result = library.importFromIndex(project.projectId);
+  assert.equal(result.registered, 2);
+  const resources = engine.data.education.resources.filter(
+    (r) => r.projectId === project.projectId,
+  );
+  assert.deepEqual(resources.map((r) => r.path).sort(), [
+    "book.pdf",
+    "notes.md",
+  ]);
+  // 存的是项目相对路径，因此读取校验能通过。
+  for (const resource of resources) {
+    const file = library.resolveFile(project.projectId, resource.path);
+    assert.ok(file.sizeBytes > 0);
+  }
+  engine.flushNow();
 });

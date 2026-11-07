@@ -20,6 +20,7 @@ import {
   isAbsolute,
   join,
   parse,
+  relative,
   resolve,
   sep,
 } from "node:path";
@@ -747,18 +748,50 @@ export class ProjectLibrary {
     const index = readIndex(this.dataDir);
     if (!index || !Array.isArray(index.items))
       fail(409, "资料库索引尚未建立，请先扫描");
-    if (index.root !== root) fail(409, "资料库索引属于另一个目录，请重新扫描");
 
-    let candidates = index.items;
+    // 索引永远相对共享库根；项目可能只授权了库里的一个子目录（例如
+    // /exam/math）。这种情况下把索引路径的前缀剥掉再存，因为 resolveFile
+    // 是以项目挂载点为基准解析的。
+    const libraryRoot = this.libraryRoot();
+    const indexRoot = libraryRoot ?? root;
+    if (index.root !== indexRoot)
+      fail(409, "资料库索引属于另一个目录，请重新扫描");
+    let prefix = "";
+    if (libraryRoot !== null && root !== libraryRoot) {
+      const relativePath = relative(libraryRoot, root);
+      if (relativePath.startsWith(".."))
+        fail(403, "项目目录不在共享资料库内，无法按索引导入");
+      prefix = relativePath.split(sep).filter(Boolean).join("/");
+    }
+    const strip = (path) =>
+      prefix === ""
+        ? path
+        : path === prefix
+          ? ""
+          : path.startsWith(prefix + "/")
+            ? path.slice(prefix.length + 1)
+            : null;
+
+    let candidates = [];
+    for (const item of index.items) {
+      const local = strip(item.path);
+      if (local === null || local === "") continue;
+      candidates.push({ ...item, path: local });
+    }
     if (Array.isArray(paths)) {
+      // 显式路径按索引里的写法（相对共享库根）；也接受已剥前缀的项目相对
+      // 路径，方便前端把当前列表原样回传。
       const wanted = new Set(
         paths.filter((p) => typeof p === "string" && p !== ""),
       );
       if (wanted.size === 0) fail(400, "请选择要登记的资料");
-      candidates = candidates.filter((item) => wanted.has(item.path));
-      if (candidates.length !== wanted.size)
-        fail(404, "有资料不在索引中，请先重新扫描");
-    } else {
+      candidates = candidates.filter(
+        (item) =>
+          wanted.has(prefix === "" ? item.path : `${prefix}/${item.path}`) ||
+          wanted.has(item.path),
+      );
+      if (candidates.length === 0) fail(404, "有资料不在索引中，请先重新扫描");
+    } else if (prefix === "") {
       const tops = [
         ...new Set(
           index.items.map((item) => item.path.split("/")[0]).filter(Boolean),

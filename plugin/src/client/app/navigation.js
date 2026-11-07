@@ -390,9 +390,19 @@ export function bindPanelInfo(observer) {
   panelInfoObs =
     observer && typeof observer.subscribe === "function" ? observer : null;
   if (panelInfoObs === null) return;
+  // 第一次同步只建立基线：DSH 的面板选择在加载时初始为 null，而用户可能
+  // 上次就停在番茄面板。把这次 null 写进存储，等于每次刷新都先把「在番茄」
+  // 改写成「在对话」——这正是「刷新掉回助手页」的根因。
+  let last = undefined;
   const sync = () => {
-    const snapshot = panelInfoObs.getSnapshot?.() ?? null;
-    setPanelVisible(snapshot?.activePanelId === "tomato");
+    const panelId = panelInfoObs.getSnapshot?.()?.activePanelId ?? null;
+    if (last === undefined) {
+      last = panelId;
+      return;
+    }
+    if (panelId === last) return;
+    last = panelId;
+    setPanelVisible(panelId === "tomato");
   };
   sync();
   panelInfoObs.subscribe(sync);

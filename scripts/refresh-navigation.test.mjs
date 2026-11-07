@@ -269,3 +269,27 @@ test("selectPanel 暂时抛错（面板未注册）时会重试到成功", async
   nav.bindPanelOpener(null);
   nav.bindPanelInfo(null);
 });
+
+test("面板真值源：加载时那次 null 只当基线，不覆盖存储里的「在番茄」", () => {
+  // 上次停在番茄面板。
+  assert.equal(nav.isColdStart(), true);
+  nav.navigate({ page: "focus", reason: "user" });
+  assert.equal(nav.isPanelVisible(), true);
+
+  // 刷新：DSH 的面板初始为 null，bindPanelInfo 第一次同步绝不能把它写回去。
+  nav.resetActivePageCache();
+  const info = fakePanelInfo(null);
+  nav.bindPanelInfo(info);
+  assert.equal(
+    nav.isPanelVisible(),
+    true,
+    "初始 null 不应把 panel 改写成 conversation",
+  );
+
+  // 用户真的切到对话时（真值源变化）才写。
+  info.set(null);
+  info.set("tomato");
+  info.set(null);
+  assert.equal(nav.isPanelVisible(), false);
+  nav.bindPanelInfo(null);
+});
