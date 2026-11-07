@@ -5,6 +5,7 @@
 // ESM 的 live binding 足以让整套组件在打包后保持正常（也避免了给每个
 // 组件传一个 react 参数）。
 let React = null;
+let ReactDOM = null;
 
 export let h = null;
 export let Fragment = null;
@@ -31,6 +32,25 @@ export function installRuntime(require) {
   useReducer = React.useReducer;
   createContext = React.createContext;
   useContext = React.useContext;
+  // react-dom 只在需要把对话框挂到 body 时用得到；冒烟/SSR 环境拿不到就退化为内联渲染。
+  try {
+    ReactDOM = require("react-dom");
+  } catch {
+    ReactDOM = null;
+  }
+}
+
+/**
+ * 把节点挂到 body 上（对话框用）。
+ *
+ * 为什么需要：DSH 的页面内容在可滚动容器里，祖先上的 transform/filter/animation
+ * 会让 position:fixed 以祖先为包含块——对话框就会跑到页面中段、遮罩只盖住内容列。
+ * 挂到 body 之后，遮罩与居中始终以视口为准。SSR/无 react-dom 时退化为内联节点。
+ */
+export function createPortal(node, container) {
+  if (!ReactDOM || typeof ReactDOM.createPortal !== "function") return node;
+  if (!container) return node;
+  return ReactDOM.createPortal(node, container);
 }
 
 /** 已安装的 React 命名空间（只有需要 React.Children 之类时才用）。 */

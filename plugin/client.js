@@ -11,6 +11,7 @@
 
   // plugin/src/client/runtime.js
   var React = null;
+  var ReactDOM = null;
   var h = null;
   var Fragment = null;
   var useState = null;
@@ -34,6 +35,16 @@
     useReducer = React.useReducer;
     createContext = React.createContext;
     useContext = React.useContext;
+    try {
+      ReactDOM = require2("react-dom");
+    } catch {
+      ReactDOM = null;
+    }
+  }
+  function createPortal(node, container) {
+    if (!ReactDOM || typeof ReactDOM.createPortal !== "function") return node;
+    if (!container) return node;
+    return ReactDOM.createPortal(node, container);
   }
 
   // plugin/src/client/shared/icons.js
@@ -1506,7 +1517,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       return () => document.removeEventListener("keydown", onKey, true);
     }, [open, onClose]);
     if (!open) return null;
-    return h(
+    const mask = h(
       "div",
       {
         className: "t-mask t-root",
@@ -1557,6 +1568,7 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
         footer ? h("div", { className: "t-modal-foot" }, footer) : null
       )
     );
+    return createPortal(mask, typeof document !== "undefined" ? document.body : null);
   }
   function Dropdown({ open, items, onClose, align = "right", width = 200, style }) {
     const ref = useRef(null);

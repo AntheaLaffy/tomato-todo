@@ -3,7 +3,7 @@
 // 约定：布局用 inline style（页面可以按需覆盖），状态样式（hover/focus/选中/
 // 动画）走 ui.css.js 的 `t-` 类；颜色只用 var(--tomato-*) 与 var(--dsw-alias-*)。
 // 组件不写死中文，文案通过 props 或 copy 传入。
-import { h, useState, useEffect, useRef, Fragment } from "../runtime.js";
+import { h, useState, useEffect, useRef, Fragment, createPortal } from "../runtime.js";
 import { t } from "./copy.js";
 import { Icon } from "./icons.js";
 
@@ -477,7 +477,7 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
   if (!open) return null;
-  return h(
+  const mask = h(
     "div",
     {
       className: "t-mask t-root",
@@ -532,6 +532,9 @@ export function Modal({
       footer ? h("div", { className: "t-modal-foot" }, footer) : null,
     ),
   );
+  // 挂到 body：页面在可滚动容器里，祖先的 transform/animation 会把 position:fixed
+  // 的包含块变成内容列，导致对话框偏下、遮罩只盖住内容区（见 runtime.createPortal）。
+  return createPortal(mask, typeof document !== "undefined" ? document.body : null);
 }
 
 /** 下拉菜单：放在 position:relative 的父容器里，向右/左展开。 */
