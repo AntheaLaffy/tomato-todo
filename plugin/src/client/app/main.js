@@ -27,6 +27,7 @@ import {
   setPanelVisible,
 } from "./navigation.js";
 import { AppOverlay } from "./overlay.js";
+import { AgendaDialog } from "./immersive.js";
 import { DockCard } from "./dock.js";
 import { SidebarTomatoIcon } from "./sidebar-progress.js";
 import { ReminderStrip } from "./reminders.js";
@@ -146,8 +147,9 @@ export function registerApp(ctx) {
         openProject,
         resetActivePageCache,
         openAssistant: (...args) => openAssistant(...args),
-        // 冒烟脚本直接渲染工作台：对话框挂在页面内部，没有导航钩子可用。
+        // 冒烟脚本直接渲染工作台/日程弹层：它们在页面与沉浸层内部。
         AssignmentDialog,
+        AgendaDialog,
       };
     }
   } catch {

@@ -1171,6 +1171,20 @@ html[data-tomato-skin=off] #tomato-ambient{display:none!important}
       allowHint: "{n}個のアプリが許可されています。他のアプリは切り替えられています",
       cycle: "ポモドーロ{n}/{total}",
       schedule: "今日のスケジュール",
+      agendaTitle: "今日・スケジュール",
+      agendaSubtitle: "{date}・現在 {time}",
+      agendaNowTask: "集中中：{title}",
+      agendaEmpty: "今日の予定はありません。",
+      agendaUntitled: "無題",
+      agendaBlock: "固定予定",
+      agendaLesson: "授業",
+      agendaExam: "試験",
+      agendaTask: "タスク",
+      agendaRequired: "集中が必要",
+      agendaLight: "軽い授業",
+      agendaDone: "完了",
+      agendaOpenFull: "週間スケジュールを開く",
+      agendaClose: "フォーカスに戻る",
       sound: "アンビエントサウンド",
       endEarly: "緊急—早めに終了",
       exit: "フォーカスモードを終了",
@@ -6200,6 +6214,20 @@ ${JSON.stringify(refs, null, 2)}`;
       allowHint: "允许使用 {n} 个应用，其他应用会被切回",
       cycle: "第 {n} / {total} 个番茄",
       schedule: "查看今天日程",
+      agendaTitle: "今天 · 日程",
+      agendaSubtitle: "{date} · 现在 {time}",
+      agendaNowTask: "当前专注：{title}",
+      agendaEmpty: "今天没有排定的日程。",
+      agendaUntitled: "未命名",
+      agendaBlock: "固定占用",
+      agendaLesson: "课程",
+      agendaExam: "考试",
+      agendaTask: "任务",
+      agendaRequired: "需专心",
+      agendaLight: "水课",
+      agendaDone: "已完成",
+      agendaOpenFull: "打开完整本周日程",
+      agendaClose: "回到专注",
       sound: "选择背景音",
       endEarly: "有急事，提前结束",
       exit: "退出沉浸模式",
@@ -6234,6 +6262,20 @@ ${JSON.stringify(refs, null, 2)}`;
       allowHint: "{n} apps allowed; others are switched away",
       cycle: "Pomodoro {n} of {total}",
       schedule: "Today's schedule",
+      agendaTitle: "Today · schedule",
+      agendaSubtitle: "{date} · now {time}",
+      agendaNowTask: "Focusing on: {title}",
+      agendaEmpty: "Nothing scheduled for today.",
+      agendaUntitled: "Untitled",
+      agendaBlock: "Fixed block",
+      agendaLesson: "Lesson",
+      agendaExam: "Exam",
+      agendaTask: "Task",
+      agendaRequired: "Needs focus",
+      agendaLight: "Light class",
+      agendaDone: "Done",
+      agendaOpenFull: "Open the full week",
+      agendaClose: "Back to focus",
       sound: "Ambient sound",
       endEarly: "Something urgent — end early",
       exit: "Leave focus mode",
@@ -6481,6 +6523,330 @@ ${JSON.stringify(refs, null, 2)}`;
       )
     );
   }
+  function todayAgenda(state, atSecs) {
+    const data = state && state.data || {};
+    const today = state && state.today || todayKey(state && state.serverTime);
+    const at = Number.isFinite(Number(atSecs)) && Number(atSecs) > 0 ? Number(atSecs) : state && Number.isFinite(Number(state.serverTime)) ? Number(state.serverTime) : Date.now() / 1e3;
+    const dayStart = (/* @__PURE__ */ new Date(`${today}T00:00:00`)).getTime() / 1e3;
+    const weekday = weekdayIndex(today) + 1;
+    const education = data.education || {};
+    const lessonTaskIds = new Set(
+      (Array.isArray(education.focusTasks) ? education.focusTasks : []).filter((link) => link && link.kind === "lesson").map((link) => link.taskId)
+    );
+    const rows = [];
+    const minutesOf2 = (seconds) => Math.floor(Number(seconds) / 60);
+    const clockOfTs = (ts) => {
+      const seconds = Number(ts) - dayStart;
+      return seconds >= 0 && seconds < 86400 ? fmtHHMM(seconds) : "";
+    };
+    for (const block of Array.isArray(data.blocks) ? data.blocks : []) {
+      if (!block || !Array.isArray(block.days) || !block.days.includes(weekday))
+        continue;
+      const start = parseHHMM(block.start);
+      const end = parseHHMM(block.end);
+      if (start === null) continue;
+      rows.push({
+        key: `block-${block.id || block.title}-${block.start}`,
+        kind: "block",
+        title: block.title || t("imm.agendaUntitled"),
+        startMin: minutesOf2(start),
+        endMin: end === null ? null : minutesOf2(end),
+        startLabel: fmtHHMM(start),
+        endLabel: end === null ? "" : fmtHHMM(end),
+        attention: block.attention === "light" ? "light" : "required",
+        completed: false
+      });
+    }
+    for (const lesson of Array.isArray(education.lessons) ? education.lessons : []) {
+      if (!lesson || typeof lesson.startsAt !== "number") continue;
+      if (dayKey(lesson.startsAt) !== today) continue;
+      rows.push({
+        key: `lesson-${lesson.id}`,
+        kind: "lesson",
+        title: lesson.title || t("imm.agendaUntitled"),
+        startMin: minutesOf2(lesson.startsAt - dayStart),
+        endMin: minutesOf2(lesson.endsAt - dayStart),
+        startLabel: clockOfTs(lesson.startsAt),
+        endLabel: clockOfTs(lesson.endsAt),
+        attended: lesson.attended === true,
+        completed: false
+      });
+    }
+    for (const exam of Array.isArray(education.assessments) ? education.assessments : []) {
+      if (!exam || exam.kind === "homework" || typeof exam.startsAt !== "number")
+        continue;
+      if (dayKey(exam.startsAt) !== today) continue;
+      rows.push({
+        key: `exam-${exam.id}`,
+        kind: "exam",
+        title: exam.title || t("imm.agendaUntitled"),
+        startMin: minutesOf2(exam.startsAt - dayStart),
+        endMin: minutesOf2(exam.endsAt - dayStart),
+        startLabel: clockOfTs(exam.startsAt),
+        endLabel: clockOfTs(exam.endsAt),
+        completed: false
+      });
+    }
+    for (const task of Array.isArray(data.tasks) ? data.tasks : []) {
+      if (!task || task.dueDate !== today || !task.reminderTime) continue;
+      if (lessonTaskIds.has(task.id)) continue;
+      const start = parseHHMM(task.reminderTime);
+      if (start === null) continue;
+      rows.push({
+        key: `task-${task.id}`,
+        kind: "task",
+        title: task.title || t("imm.agendaUntitled"),
+        startMin: minutesOf2(start),
+        endMin: null,
+        startLabel: fmtHHMM(start),
+        endLabel: "",
+        completed: task.completed === true
+      });
+    }
+    rows.sort((a, b) => a.startMin - b.startMin);
+    const nowMin = Math.max(0, Math.min(1439, minutesOf2(at - dayStart)));
+    return {
+      today,
+      nowMin,
+      nowLabel: fmtHHMM(nowMin * 60),
+      rows
+    };
+  }
+  function AgendaRow({ item, active: active2 }) {
+    const kindLabel = item.kind === "block" ? t("imm.agendaBlock") : item.kind === "lesson" ? t("imm.agendaLesson") : item.kind === "exam" ? t("imm.agendaExam") : t("imm.agendaTask");
+    return h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+          padding: "8px 10px",
+          borderRadius: 10,
+          background: active2 ? "color-mix(in srgb, var(--tomato-brand-soft) 70%, transparent)" : void 0,
+          borderBottom: "1px solid var(--tomato-line)"
+        }
+      },
+      h(
+        "div",
+        {
+          className: "t-mono",
+          style: {
+            width: 92,
+            flex: "none",
+            fontSize: 12,
+            color: active2 ? "var(--tomato-brand-deep)" : "var(--tomato-ink-2)",
+            fontVariantNumeric: "tabular-nums",
+            paddingTop: 1
+          }
+        },
+        item.endLabel ? `${item.startLabel}–${item.endLabel}` : item.startLabel
+      ),
+      h(
+        "div",
+        { style: { flex: 1, minWidth: 0 } },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 13,
+              color: item.completed ? "var(--tomato-ink-3)" : "var(--tomato-ink)",
+              textDecoration: item.completed ? "line-through" : "none",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }
+          },
+          item.title
+        ),
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 5,
+              marginTop: 3
+            }
+          },
+          h(Chip, { tone: "neutral" }, kindLabel),
+          item.attention === "required" ? h(Chip, { tone: "sun" }, t("imm.agendaRequired")) : null,
+          item.attention === "light" ? h(Chip, { tone: "leaf" }, t("imm.agendaLight")) : null,
+          item.kind === "lesson" && item.attended ? h(Chip, { tone: "brand" }, t("imm.agendaDone")) : null,
+          item.completed ? h(Chip, { tone: "leaf" }, t("imm.agendaDone")) : null
+        )
+      )
+    );
+  }
+  function AgendaDialog({ open, onClose, onOpenFull, state, atSecs, task }) {
+    if (!open) return null;
+    const agenda = todayAgenda(state, atSecs);
+    const nodes = [];
+    let insertedNow = false;
+    for (const item of agenda.rows) {
+      if (!insertedNow && item.startMin > agenda.nowMin) {
+        nodes.push(
+          h(
+            "div",
+            {
+              key: "now",
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "5px 2px"
+              }
+            },
+            h("div", {
+              style: {
+                flex: 1,
+                height: 1,
+                background: "var(--tomato-brand)",
+                opacity: 0.5
+              }
+            }),
+            h(
+              "span",
+              {
+                style: {
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--tomato-brand-deep)",
+                  fontVariantNumeric: "tabular-nums"
+                }
+              },
+              t("imm.agendaSubtitle", {
+                date: agenda.today,
+                time: agenda.nowLabel
+              })
+            ),
+            h("div", {
+              style: {
+                flex: 1,
+                height: 1,
+                background: "var(--tomato-brand)",
+                opacity: 0.5
+              }
+            })
+          )
+        );
+        insertedNow = true;
+      }
+      const active2 = item.startMin <= agenda.nowMin && (item.endMin === null ? item.startMin + 30 > agenda.nowMin : item.endMin > agenda.nowMin);
+      nodes.push(h(AgendaRow, { key: item.key, item, active: active2 }));
+    }
+    if (!insertedNow && agenda.rows.length > 0) {
+      nodes.push(
+        h(
+          "div",
+          {
+            key: "now",
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "5px 2px"
+            }
+          },
+          h("div", {
+            style: {
+              flex: 1,
+              height: 1,
+              background: "var(--tomato-brand)",
+              opacity: 0.5
+            }
+          }),
+          h(
+            "span",
+            {
+              style: {
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--tomato-brand-deep)"
+              }
+            },
+            t("imm.agendaSubtitle", {
+              date: agenda.today,
+              time: agenda.nowLabel
+            })
+          ),
+          h("div", {
+            style: {
+              flex: 1,
+              height: 1,
+              background: "var(--tomato-brand)",
+              opacity: 0.5
+            }
+          })
+        )
+      );
+    }
+    const body = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 2 } },
+      task && task.title ? h(
+        "div",
+        {
+          style: {
+            padding: "8px 10px 10px",
+            fontSize: 12.5,
+            color: "var(--tomato-brand-deep)"
+          }
+        },
+        t("imm.agendaNowTask", { title: task.title })
+      ) : null,
+      agenda.rows.length === 0 ? h(
+        "div",
+        {
+          style: {
+            padding: "28px 12px",
+            textAlign: "center",
+            fontSize: 12.5,
+            color: "var(--tomato-ink-3)"
+          }
+        },
+        t("imm.agendaEmpty")
+      ) : nodes
+    );
+    return h(
+      Modal,
+      {
+        open,
+        onClose,
+        icon: "calendar",
+        title: t("imm.agendaTitle"),
+        subtitle: t("imm.agendaSubtitle", {
+          date: agenda.today,
+          time: agenda.nowLabel
+        }),
+        width: 620,
+        footer: h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              width: "100%",
+              flexWrap: "wrap"
+            }
+          },
+          h("div", { style: { flex: 1 } }),
+          h(
+            Btn,
+            { variant: "ghost", size: "sm", onClick: onOpenFull },
+            t("imm.agendaOpenFull")
+          ),
+          h(
+            Btn,
+            { variant: "primary", size: "sm", onClick: onClose },
+            t("imm.agendaClose")
+          )
+        )
+      },
+      body
+    );
+  }
   function Immersive() {
     const open = useImmersiveOpen();
     const endRequest = useEndTick();
@@ -6488,6 +6854,7 @@ ${JSON.stringify(refs, null, 2)}`;
     const narrow = useNarrow();
     const ambience = useAmbience();
     const [ending, setEnding] = useState(false);
+    const [scheduleOpen, setScheduleOpen] = useState(false);
     const [soundMenu, setSoundMenu] = useState(false);
     const [busy, setBusy] = useState(false);
     const seenEndRef = useRef(endRequest);
@@ -6531,6 +6898,7 @@ ${JSON.stringify(refs, null, 2)}`;
     useEffect(() => {
       if (!open) {
         setEnding(false);
+        setScheduleOpen(false);
         setSoundMenu(false);
       }
     }, [open]);
@@ -6566,7 +6934,8 @@ ${JSON.stringify(refs, null, 2)}`;
       closeImmersive();
       notify(t("imm.notifyInterrupted"), "neutral");
     });
-    const goSchedule = () => {
+    const goCalendar = () => {
+      setScheduleOpen(false);
       closeImmersive();
       navigate({ page: "calendar", reason: "user" });
     };
@@ -6837,7 +7206,7 @@ ${JSON.stringify(refs, null, 2)}`;
               background: "transparent",
               border: `1px solid ${HAIRLINE}`
             },
-            onClick: goSchedule
+            onClick: () => setScheduleOpen(true)
           },
           t("imm.schedule")
         ),
@@ -6956,6 +7325,14 @@ ${JSON.stringify(refs, null, 2)}`;
           onClick: closeImmersive
         })
       ),
+      h(AgendaDialog, {
+        open: scheduleOpen,
+        onClose: () => setScheduleOpen(false),
+        onOpenFull: goCalendar,
+        state,
+        atSecs: Math.floor(now / 1e3),
+        task
+      }),
       ending ? h(EndDialog, {
         strictActive,
         canEarly,
@@ -30797,8 +31174,9 @@ ${JSON.stringify(refs, null, 2)}`;
           openProject,
           resetActivePageCache,
           openAssistant: (...args) => openAssistant(...args),
-          // 冒烟脚本直接渲染工作台：对话框挂在页面内部，没有导航钩子可用。
-          AssignmentDialog
+          // 冒烟脚本直接渲染工作台/日程弹层：它们在页面与沉浸层内部。
+          AssignmentDialog,
+          AgendaDialog
         };
       }
     } catch {

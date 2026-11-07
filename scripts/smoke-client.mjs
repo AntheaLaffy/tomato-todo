@@ -1045,6 +1045,44 @@ if (typeof AssignmentDialog !== "function") {
   }
 }
 
+// 沉浸层的「查看今天日程」：弹层不结束计时，SSR 里验证它列出今天的任务。
+if (!process.env.SMOKE_LIVE) {
+  const AgendaDialog = nav?.AgendaDialog;
+  if (typeof AgendaDialog !== "function") {
+    failures.push("没有暴露 AgendaDialog 测试钩子");
+  } else {
+    try {
+      const markup = ReactDOMServer.renderToStaticMarkup(
+        React.createElement(AgendaDialog, {
+          open: true,
+          onClose: () => {},
+          onOpenFull: () => {},
+          state: sampleState,
+          atSecs: sampleState.serverTime,
+          task: sampleState.data.tasks.find((task) => task.id === "t1"),
+        }),
+      );
+      renderedBy["dialog:agenda"] = markup;
+      for (const marker of [
+        "今天 · 日程",
+        "语法加强 Day05（下）",
+        "408 真题",
+        "打开完整本周日程",
+        "回到专注",
+      ]) {
+        if (!markup.includes(marker))
+          failures.push(`今日日程弹层缺少「${marker}」`);
+      }
+      if (!markup.includes("现在"))
+        failures.push("今日日程弹层没有「现在」标记");
+    } catch (e) {
+      failures.push(
+        `渲染今日日程失败：${e && e.message ? e.message : e}${process.env.SMOKE_TRACE && e && e.stack ? "\n" + e.stack : ""}`,
+      );
+    }
+  }
+}
+
 if (!process.env.SMOKE_LIVE) {
   const education = renderedBy["page:education"] || "";
   for (const label of ["布置作业", "提交作业", "批改作业"]) {
