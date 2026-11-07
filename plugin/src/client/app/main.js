@@ -98,7 +98,36 @@ export function registerApp(ctx) {
     }
   };
 
-  const pageProps = { dispatch, api, onLeave: leaveToConversation };
+  // 进入番茄页时收起 DSH 侧栏（若本来就收起则不重复切换）；离开时还原。
+  const collapseSidebar = () => {
+    try {
+      if (typeof document !== "undefined" && document.querySelector("[data-sidebar-collapsed]")) {
+        return false;
+      }
+      if (layout && typeof layout.toggleSidebar === "function") {
+        layout.toggleSidebar();
+        return true;
+      }
+    } catch {
+      /* DSH 版本差异时忽略 */
+    }
+    return false;
+  };
+  const restoreSidebar = () => {
+    try {
+      if (layout && typeof layout.toggleSidebar === "function") layout.toggleSidebar();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const pageProps = {
+    dispatch,
+    api,
+    onLeave: leaveToConversation,
+    collapseSidebar,
+    restoreSidebar,
+  };
 
   // 逐个 slot 容错：任何一个槽位在 DSH 版本差异下不存在，都不该让整块插件挂掉
   // （皮肤与 HUD 仍是独立的可用部分）。

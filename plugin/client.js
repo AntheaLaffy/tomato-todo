@@ -2814,6 +2814,15 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
   function AppShell(props) {
     const state = useSnapshot();
     useEffect(() => {
+      const collapse = props.collapseSidebar;
+      const restore = props.restoreSidebar;
+      if (typeof collapse !== "function") return void 0;
+      const collapsedByUs = collapse();
+      return () => {
+        if (collapsedByUs && typeof restore === "function") restore();
+      };
+    }, []);
+    useEffect(() => {
       refresh();
     }, []);
     const pages = pageList();
@@ -18798,7 +18807,32 @@ html[data-tomato-backdrop=off] #tomato-ambient .t-amb-enso{display:none!importan
       } catch {
       }
     };
-    const pageProps = { dispatch, api: api_exports, onLeave: leaveToConversation };
+    const collapseSidebar = () => {
+      try {
+        if (typeof document !== "undefined" && document.querySelector("[data-sidebar-collapsed]")) {
+          return false;
+        }
+        if (layout && typeof layout.toggleSidebar === "function") {
+          layout.toggleSidebar();
+          return true;
+        }
+      } catch {
+      }
+      return false;
+    };
+    const restoreSidebar = () => {
+      try {
+        if (layout && typeof layout.toggleSidebar === "function") layout.toggleSidebar();
+      } catch {
+      }
+    };
+    const pageProps = {
+      dispatch,
+      api: api_exports,
+      onLeave: leaveToConversation,
+      collapseSidebar,
+      restoreSidebar
+    };
     const safeInject2 = (key, options, Component) => {
       try {
         ctx.slots.inject(key, () => ctx.slots.register(options, Component));

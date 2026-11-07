@@ -204,6 +204,10 @@ const services = {
   },
   layout: {
     selectPanel() {},
+    toggleSidebar() {
+      services.layout.sidebarToggles += 1;
+    },
+    sidebarToggles: 0,
   },
 };
 const ctx = {

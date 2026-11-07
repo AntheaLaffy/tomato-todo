@@ -254,6 +254,17 @@ function NavColumn({ pages, activeId, onSelect, state, compact, badges, onLeave 
  */
 export function AppShell(props) {
   const state = useSnapshot();
+
+  // 兜底：即使 fixed 接管受祖先裁剪影响，也把 DSH 侧栏收起来（离开时还原）。
+  useEffect(() => {
+    const collapse = props.collapseSidebar;
+    const restore = props.restoreSidebar;
+    if (typeof collapse !== "function") return undefined;
+    const collapsedByUs = collapse();
+    return () => {
+      if (collapsedByUs && typeof restore === "function") restore();
+    };
+  }, []);
   useEffect(() => {
     // apply 生命周期里也会启动轮询；这里只保证面板打开时数据是新的。
     refreshStore();
