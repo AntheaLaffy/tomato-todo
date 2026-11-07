@@ -721,3 +721,55 @@ test("POST /api/dispatch：习惯可带多个时段，撞在同一 (day|time) �
   });
   assert.equal(clash.status, 400);
 });
+
+test("POST /api/dispatch：项目专属白名单可设可清，非法 app id 被 core 拒绝", async () => {
+  const post = (action) =>
+    fetch(`${base}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    }).then(async (res) => ({ status: res.status, body: await res.json() }));
+
+  const created = await post({
+    type: "saveProject",
+    id: null,
+    name: "白名单测试项目",
+    color: "#8899aa",
+    directory: tmp(),
+  });
+  assert.equal(created.status, 200);
+  const project = created.body.snapshot.data.projects.find(
+    (item) => item.name === "白名单测试项目",
+  );
+  assert.ok(project);
+
+  const set = await post({
+    type: "setProjectWhitelist",
+    id: project.id,
+    whitelist: ["code", "firefox"],
+  });
+  assert.equal(set.status, 200);
+  const updated = set.body.snapshot.data.projects.find(
+    (item) => item.id === project.id,
+  );
+  assert.deepEqual(updated.appWhitelist, ["code", "firefox"]);
+
+  const cleared = await post({
+    type: "setProjectWhitelist",
+    id: project.id,
+    whitelist: null,
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal(
+    cleared.body.snapshot.data.projects.find((item) => item.id === project.id)
+      .appWhitelist,
+    null,
+  );
+
+  const invalid = await post({
+    type: "setProjectWhitelist",
+    id: project.id,
+    whitelist: ["\u0007"],
+  });
+  assert.equal(invalid.status, 400);
+});
