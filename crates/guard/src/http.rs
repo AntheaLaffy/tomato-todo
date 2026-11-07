@@ -1,7 +1,7 @@
 //! 极简 HTTP 服务：127.0.0.1 单客户端、每连接一线程、Connection: close，
 //! 不依赖任何 HTTP crate。鉴权：`Authorization: Bearer <token>`（token 见 token.rs）。
 //! 路由与解析均为纯函数，用 mock backend 做无桌面单测。
-use crate::protocol::{Command, ErrorReply, OkReply, Status, valid_whitelist};
+use crate::protocol::{FocusReply, Command, ErrorReply, OkReply, Status, valid_whitelist};
 use crate::token;
 use serde::Serialize;
 use std::io::{Read, Write};
@@ -20,6 +20,8 @@ pub trait CommandBackend: Send + Sync {
     fn lock(&self, whitelist: Vec<String>) -> Result<(), String>;
     fn unlock(&self) -> Result<(), String>;
     fn notify(&self, title: String, body: String) -> Result<(), String>;
+    /// 找到 DSH 窗口并切到前台；返回窗口标题（没找到时 None）。
+    fn focus(&self) -> Result<Option<String>, String>;
     fn status(&self) -> Status;
 }
 
@@ -92,23 +94,37 @@ pub fn route(request: Request, expected_token: &str, backend: &dyn CommandBacken
     }
     match (request.method.as_str(), request.path.as_str()) {
         ("POST", "/guard") => match serde_json::from_slice::<Command>(&request.body) {
-            Ok(command) => {
-                let result = match command {
-                    Command::Lock { whitelist } => {
-                        if valid_whitelist(&whitelist) {
-                            backend.lock(whitelist)
-                        } else {
-                            Err("白名单无效：最多 100 项，每项非空白、无控制字符".into())
-                        }
-                    }
-                    Command::Unlock => backend.unlock(),
-                    Command::Notify { title, body } => backend.notify(title, body),
-                };
-                match result {
-                    Ok(()) => (200, json(&OkReply { ok: true })),
+            Ok(command) => match command {
+                Command::Focus => match backend.focus() {
+                    Ok(found) => (
+                        200,
+                        json(&FocusReply {
+                            ok: true,
+                            focused: found.is_some(),
+                            window: found,
+                        }),
+                    ),
                     Err(error) => (500, json(&ErrorReply { error })),
+                },
+                command => {
+                    let result = match command {
+                        Command::Lock { whitelist } => {
+                            if valid_whitelist(&whitelist) {
+                                backend.lock(whitelist)
+                            } else {
+                                Err("白名单无效：最多 100 项，每项非空白、无控制字符".into())
+                            }
+                        }
+                        Command::Unlock => backend.unlock(),
+                        Command::Notify { title, body } => backend.notify(title, body),
+                        Command::Focus => unreachable!(),
+                    };
+                    match result {
+                        Ok(()) => (200, json(&OkReply { ok: true })),
+                        Err(error) => (500, json(&ErrorReply { error })),
+                    }
                 }
-            }
+            },
             Err(error) => (400, json(&ErrorReply { error: format!("无效命令：{error}") })),
         },
         ("GET", "/guard/status") => (200, json(&backend.status())),
@@ -241,6 +257,9 @@ mod tests {
             self.notifications.lock().unwrap().push((title, body));
             Ok(())
         }
+        fn focus(&self) -> Result<Option<String>, String> {
+            Ok(Some("DeepSeek Harness".into()))
+        }
         fn status(&self) -> Status {
             Status {
                 locked: *self.locked.lock().unwrap(),
@@ -305,6 +324,21 @@ mod tests {
         );
         assert_eq!(status, 200);
         assert_eq!(mock.notifications.lock().unwrap().as_slice(), &[("t".into(), "b".into())]);
+
+        let (status, body) = route(
+            Request {
+                method: "POST".into(),
+                path: "/guard".into(),
+                bearer: bearer(),
+                body: br#"{"command":"focus"}"#.to_vec(),
+            },
+            token,
+            &*mock,
+        );
+        assert_eq!(status, 200);
+        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(value["focused"], true);
+        assert_eq!(value["window"], "DeepSeek Harness");
 
         let (status, body) = route(
             Request {

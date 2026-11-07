@@ -163,7 +163,7 @@ export function Hud({ openPanel }) {
   };
 
   // 关键节点音效：开始 / 暂停 / 完成 / 提醒。只看状态跃迁，轮询重复渲染不重复响。
-  // 完成与提醒还会把 DSH 面板切到今日专注（浏览器无法抢系统窗口焦点，只切页面）。
+  // 完成与提醒还会把 DSH 面板切到今日专注；窗口置前由 runtime → guard 的原生 focus 完成。
   const prevRef = useRef(null);
   useEffect(() => {
     const next = {
@@ -187,7 +187,7 @@ export function Hud({ openPanel }) {
       sound.playCue("reminder");
     }
     // 一轮计时自然结束 / 新提醒到点：把 DSH 面板切回今日专注（用户明确要的行为）。
-    // 浏览器抢不到系统窗口焦点，能做的只是切 DSH 内部视图。
+    // 前端只切视图；系统级置前由 runtime 调 guard focus（原生后端）。
     if (grab && canGrabAttention()) openPanelAt("focus");
     // 音效只在状态跃迁时触发；sound 的引用稳定，不参与依赖以免重复播放。
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -209,8 +209,10 @@
   专注进行中时环缓慢呼吸（4s），数字每分钟更新；沉浸模式时隐藏。
   HUD 是唯一常驻的番茄组件，除音效外还负责「注意力切换」：一轮计时自然结束、或新提醒
   到点（`reminderPending` 计数增加）时，调用 `openPanelAt("focus")` 把 DSH 面板切到
-  番茄 → 今日专注；有 `[role=dialog]` 开着时不抢页面（避免丢未保存草稿）。浏览器无法
-  抢系统窗口焦点，所以只切 DSH 内部视图，不弹系统通知、不置顶窗口。
+  番茄 → 今日专注；有 `[role=dialog]` 开着时不抢页面（避免丢未保存草稿）。
+  系统级「把窗口拉到前台」由 runtime 调 guard 的 `focus` 命令完成（`crates/guard`：
+  niri/Sway/Hyprland/GNOME/KWin/X11、Windows Win32、macOS Accessibility）；浏览器标签
+  和 `dsh-desktop` 窗口都按标题/应用 ID 识别，找不到窗口时静默跳过。
 - **入口卡**（`conversation.composer.dock`）：沿用现有 DockCard 的位置与信息，
   改成一句话 + 两个 chip：「现在专注 45 分钟」/「查看今天」。hover 上浮 1px。
 - **Toast**：底部居中、纸色卡、8s 淡出；同一时刻最多 1 条。

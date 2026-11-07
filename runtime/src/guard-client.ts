@@ -128,6 +128,14 @@ export class GuardClient {
     });
   }
 
+  /** 把 DeepSeek Harness 的窗口切到前台；返回 { ok, focused, window }。 */
+  focus(): Promise<GuardResult> {
+    return this.#request("/guard", {
+      method: "POST",
+      body: { command: "focus" },
+    });
+  }
+
   status(): Promise<GuardResult> {
     return this.#request("/guard/status");
   }

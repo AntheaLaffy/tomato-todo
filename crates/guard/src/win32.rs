@@ -194,6 +194,7 @@ impl Drop for InputLink {
 }
 fn activate(window: HWND) -> bool {
     unsafe {
+        let target = pid(window);
         if SetForegroundWindow(window) != 0 {
             // Foreground activation across input queues is asynchronous. Give
             // the UI a short chance to handle it before confirming a redirect.
@@ -207,16 +208,17 @@ fn activate(window: HWND) -> bool {
                 std::ptr::null_mut(),
             );
         }
-        pid(GetForegroundWindow()) == std::process::id()
+        pid(GetForegroundWindow()) == target
     }
 }
 pub fn focus(id: u64) -> AppResult<bool> {
     let window = usize::try_from(id).map_err(|e| e.to_string())? as HWND;
     unsafe {
-        if IsWindow(window) == 0 || pid(window) != std::process::id() {
-            return Err("专注窗口已关闭或进程已变化".into());
+        if IsWindow(window) == 0 {
+            return Err("目标窗口已关闭".into());
         }
-        if pid(GetForegroundWindow()) == std::process::id() {
+        let target = pid(window);
+        if pid(GetForegroundWindow()) == target {
             return Ok(true);
         }
         if modifier_pressed() {

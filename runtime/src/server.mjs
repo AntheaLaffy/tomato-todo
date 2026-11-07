@@ -495,6 +495,8 @@ export async function startServer({
     port: actualPort,
     // 每秒 tick 之后由 main 调用：让 guard 跟上计时/锁机状态。
     syncGuard: syncGuard.fire,
+    // 提醒/计时结束时 runtime 让 guard 把 DSH 窗口拉到前台（同一份 token/client）。
+    guard,
     close: () => new Promise((resolve) => server.close(resolve)),
   };
 }

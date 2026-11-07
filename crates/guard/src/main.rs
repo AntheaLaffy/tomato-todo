@@ -135,6 +135,9 @@ impl crate::http::CommandBackend for state::State {
     fn notify(&self, title: String, body: String) -> Result<(), String> {
         notify::show(&title, &body)
     }
+    fn focus(&self) -> Result<Option<String>, String> {
+        state::State::focus(self)
+    }
     fn status(&self) -> Status {
         state::State::status(self)
     }

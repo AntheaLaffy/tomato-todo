@@ -100,7 +100,7 @@ MCP 端点：`/mcp` streamable HTTP，Bearer token（数据目录 `agent/connect
 
 ## MCP 工具（--mcp 与 /mcp 同源）
 
-沿用旧 crates/agent/src/external.rs 的工具语义（名称不变），实现全部重写为 @tomato/core 之上的调用：
+沿用旧版外部工具清单的语义（名称不变），实现全部在 `runtime/src/tools.mjs` 里重写为 @tomato/core 之上的调用：
 `get_context`、`get_control_status`、`set_external_control`、`create_task`、`update_task`、
 `move_tasks`、`complete_task`、`dispatch`、`export_plan`、`export_backup`、`review_file`、
 `apply_file`、`get_education` 及 education 写工具。初始化返回 serverInfo name=tomato-todo，
@@ -111,6 +111,10 @@ instructions 简述接管入口（不再有 Pi 提示词与技能资源）。
 - `POST /guard`，body `{ "command": "lock", "whitelist": ["app-id", ...] }` → 全屏锁定 + 白名单
 - `POST /guard` `{ "command": "unlock" }`
 - `POST /guard` `{ "command": "notify", "title": ..., "body": ... }`
+- `POST /guard` `{ "command": "focus" }` → 把 DeepSeek Harness 窗口切到前台（提醒/一轮结束
+  时由 runtime 调用；锁机期间不抢）。响应 `{ "ok": true, "focused": bool, "window": string|null }`。
+  窗口识别：应用 ID `dsh-desktop`（桌面窗口）或标题含 `DeepSeek Harness`（浏览器标签）；
+  没有 DSH 窗口时 `focused=false`，不是错误。
 - `GET /guard/status` → `{ "locked": bool, "whitelist": [...], "pid": ..., "backend": "<实际后端名>" }`
   （backend 取 guard 实际检测到的后端显示名，如 "Sway / Wayland"、"EWMH / X11"，供 runtime 诊断）
 - guard 无长期状态；runtime 每次专注会话重发锁屏命令（guard 崩溃由 runtime 重启并重发）。
@@ -118,8 +122,8 @@ instructions 简述接管入口（不再有 Pi 提示词与技能资源）。
 ## 数据形状
 
 - 计划/任务/习惯/模板/阻塞时段：语义以 docs/PLAN_FORMAT.md、docs/BACKUP_FORMAT.md 与
-  docs/HANDBOOK/ 为准；JSON 字段名 camelCase，形状以旧 src/types.ts 为起点，
-  @tomato/core（packages/core/src/index.ts）是唯一权威实现。
+  docs/HANDBOOK/ 为准；JSON 字段名 camelCase，`@tomato/core`
+  （`packages/core/src/index.ts`）是唯一权威实现。
 - 日期 `YYYY-MM-DD`、时间 `HH:MM`、时间戳 Unix 秒。
 
 ## 插件（plugin/）契约

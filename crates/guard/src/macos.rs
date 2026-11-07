@@ -219,15 +219,15 @@ pub fn windows() -> Result<Vec<Window>, String> {
 /// 注意：guard 守护进程在 macOS 上没有宿主窗口，若本进程没有任何窗口，
 /// 所有权检查会给出明确错误（`拒绝激活不存在或不属于番茄 Todo 的 macOS 窗口`）。
 pub fn focus(id: u64) -> Result<bool, String> {
-    let own_pid = std::process::id();
-    if id == 0
-        || !windows()?
-            .iter()
-            .any(|w| w.id == id && w.pid == Some(own_pid))
-    {
-        return Err("拒绝激活不存在或不属于番茄 Todo 的 macOS 窗口".into());
+    if id == 0 {
+        return Err("拒绝激活不存在的 macOS 窗口".into());
     }
-    let app = Owned::new(unsafe { AXUIElementCreateApplication(own_pid as i32) })?;
+    let target = windows()?
+        .into_iter()
+        .find(|w| w.id == id)
+        .ok_or("拒绝激活不存在的 macOS 窗口")?;
+    let target_pid = target.pid.ok_or("无法读取目标窗口的进程 ID")?;
+    let app = Owned::new(unsafe { AXUIElementCreateApplication(target_pid as i32) })?;
     let window =
         attribute(app.0, "AXMainWindow").or_else(|_| attribute(app.0, "AXFocusedWindow"))?;
     let minimized = string("AXMinimized")?;
@@ -247,12 +247,12 @@ pub fn focus(id: u64) -> Result<bool, String> {
     loop {
         if windows()?
             .iter()
-            .any(|w| w.id != 0 && w.pid == Some(own_pid) && w.is_focused)
+            .any(|w| w.id != 0 && w.pid == Some(target_pid) && w.is_focused)
         {
             return Ok(true);
         }
         if Instant::now() >= deadline {
-            return Err("macOS 未将专注窗口切换到前台".into());
+            return Err("macOS 未将目标窗口切换到前台".into());
         }
         std::thread::sleep(Duration::from_millis(20));
     }

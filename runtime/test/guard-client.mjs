@@ -139,6 +139,26 @@ test('unlock 发 { command: "unlock" }', async () => {
   );
 });
 
+test('focus 发 { command: "focus" } 并透传 focused/window', async () => {
+  await withServer(
+    async (ctx) => {
+      assert.equal(ctx.method, "POST");
+      assert.equal(ctx.url, "/guard");
+      assert.deepEqual(ctx.body, { command: "focus" });
+      ctx.send(200, { ok: true, focused: true, window: "DeepSeek Harness" });
+    },
+    async (baseUrl) => {
+      const client = new GuardClient({ baseUrl, token: TOKEN });
+      const result = await client.focus();
+      assert.deepEqual(result, {
+        ok: true,
+        status: 200,
+        data: { ok: true, focused: true, window: "DeepSeek Harness" },
+      });
+    },
+  );
+});
+
 test("notify 携带 title 与 body", async () => {
   await withServer(
     async (ctx) => {

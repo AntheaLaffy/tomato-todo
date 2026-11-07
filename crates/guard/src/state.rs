@@ -48,6 +48,25 @@ impl State {
         }
     }
 
+    /// 把 DeepSeek Harness 的窗口切到前台。锁机期间不抢（会让锁窗失去前台）。
+    /// 没找到 DSH 窗口时返回 Ok(None)，不是错误。
+    pub fn focus(&self) -> Result<Option<String>, String> {
+        {
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if inner.locked {
+                return Ok(None);
+            }
+        }
+        let desktop = guard::Desktop::detect();
+        let window = desktop.focus_dsh().map_err(|error| error.to_string())?;
+        Ok(window.map(|window| {
+            window
+                .title
+                .or(window.app_id)
+                .unwrap_or_else(|| "DeepSeek Harness".into())
+        }))
+    }
+
     /// 上锁或（已锁定时）替换白名单。锁窗创建失败时保持未锁定并报错。
     pub fn lock(&self, whitelist: Vec<String>) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();

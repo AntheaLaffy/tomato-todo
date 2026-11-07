@@ -17,6 +17,8 @@ pub enum Command {
         title: String,
         body: String,
     },
+    /// 把 DeepSeek Harness 的窗口切到前台（桌面窗口托管模式与浏览器都适用）。
+    Focus,
 }
 
 /// `GET /guard/status` 的响应体（形状由 API.md 固定）。
@@ -33,6 +35,14 @@ pub struct Status {
 #[derive(Serialize)]
 pub struct OkReply {
     pub ok: bool,
+}
+
+/// `focus` 的响应：没找到 DSH 窗口时 `focused=false` 且 `window=null`。
+#[derive(Serialize)]
+pub struct FocusReply {
+    pub ok: bool,
+    pub focused: bool,
+    pub window: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -64,6 +74,8 @@ mod tests {
         let notify: Command =
             serde_json::from_str(r#"{"command":"notify","title":"番茄","body":"完成"}"#).unwrap();
         assert!(matches!(notify, Command::Notify { ref title, ref body } if title == "番茄" && body == "完成"));
+        let focus: Command = serde_json::from_str(r#"{"command":"focus"}"#).unwrap();
+        assert!(matches!(focus, Command::Focus));
         assert!(serde_json::from_str::<Command>(r#"{"command":"unknown"}"#).is_err());
         assert!(serde_json::from_str::<Command>(r#"{}"#).is_err());
     }

@@ -139,6 +139,37 @@ impl Desktop {
         }
     }
 
+    /// 把 DeepSeek Harness 的窗口切到前台：优先窗口应用 ID，其次标题
+    /// （浏览器标题是「会话 — DeepSeek Harness」，WebKit 桌面窗口是
+    /// 「DeepSeek Harness」/「… · DeepSeek Harness」）。
+    ///
+    /// 返回被激活的窗口（找不到时 Ok(None)）；调用方据此判断是否真的抢到了目标。
+    pub fn focus_dsh(&self) -> AppResult<Option<Window>> {
+        let windows = self.windows()?;
+        let mut candidates: Vec<Window> = windows
+            .into_iter()
+            .filter(is_dsh_window)
+            .collect();
+        if candidates.is_empty() {
+            return Ok(None);
+        }
+        if let Some(focused) = candidates.iter().find(|w| w.is_focused) {
+            return Ok(Some(focused.clone()));
+        }
+        // 同一个 DSH 可能同时有桌面窗口和浏览器标签：优先桌面窗口。
+        candidates.sort_by_key(|window| {
+            let app = window
+                .app_id
+                .as_deref()
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            u8::from(!(app == "dsh-desktop" || app == "studio.dsh.desktop"))
+        });
+        let target = candidates.remove(0);
+        self.focus(target.id)?;
+        Ok(Some(target))
+    }
+
     pub fn focus(&self, id: u64) -> AppResult<bool> {
         #[cfg(target_os = "linux")]
         {
@@ -316,6 +347,23 @@ pub fn changed(previous: &[Window], current: &[Window]) -> (Vec<Window>, Vec<Win
     (added, removed)
 }
 
+/// DSH 窗口识别：应用 ID 优先，其次浏览器/WebKit 窗口标题里的产品名。
+fn is_dsh_window(window: &Window) -> bool {
+    let app = window
+        .app_id
+        .as_deref()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if app == "dsh-desktop" || app == "studio.dsh.desktop" {
+        return true;
+    }
+    window
+        .title
+        .as_deref()
+        .map(|title| title.to_ascii_lowercase().contains("deepseek harness"))
+        .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,6 +376,20 @@ mod tests {
             pid: Some(pid),
             is_focused: focused,
         }
+    }
+
+    #[test]
+    fn dsh_windows_match_by_app_id_or_title() {
+        let mut browser = window(1, "google-chrome", 200, false);
+        browser.title = Some("重写 todo 插件为 dash 插件 — DeepSeek Harness".into());
+        assert!(is_dsh_window(&browser));
+
+        let mut desktop = window(2, "dsh-desktop", 300, false);
+        desktop.title = Some("DeepSeek Harness · :3081".into());
+        assert!(is_dsh_window(&desktop));
+
+        let other = window(3, "google-chrome", 200, false);
+        assert!(!is_dsh_window(&other));
     }
 
     #[test]
