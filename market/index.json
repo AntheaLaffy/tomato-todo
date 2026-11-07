@@ -50,16 +50,6 @@
           "engines": {
             "dsh": ">=0.2.2-rc.1"
           }
-        },
-        {
-          "version": "0.0.0-stage",
-          "publishTimestamp": 1794054140,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {
-            "dsh": ">=0.2.2-rc.1"
-          }
         }
       ]
     }
