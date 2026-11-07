@@ -51,6 +51,7 @@ DOMAINS = [
             "runtime/test/engine.test.mjs",
             "runtime/test/http.test.mjs",
             "runtime/test/library.test.mjs",
+            "runtime/test/library-index.test.mjs",
             "runtime/test/mcp-stdio.test.mjs",
         ],
         "`cd runtime && node --test`",
@@ -95,6 +96,7 @@ CHAPTER_TESTS = {
         "runtime/test/http.test.mjs",
         "runtime/test/api-state.test.mjs",
         "runtime/test/library.test.mjs",
+        "runtime/test/library-index.test.mjs",
     ],
     "10-锁与专注保护": [
         "crates/guard/src",

@@ -86,6 +86,61 @@ export function revokeLibraryGrant(opts) {
   return request("/api/library/grant", { ...opts, method: "DELETE" });
 }
 
+// 共享库索引：扫描只把文件清单写进 dataDir/library-index.json，不写计划、
+// 不写备份，也不等于 education.resources；浏览/搜索都走这组端点。
+export function scanLibrary(opts) {
+  return request("/api/library/scan", {
+    method: "POST",
+    timeoutMs: 120000,
+    ...opts,
+  });
+}
+
+export function getLibraryStats(opts) {
+  return request("/api/library/stats", { timeoutMs: 8000, ...opts });
+}
+
+export function getLibraryItems(
+  { projectId, q = "", kind = "", offset = 0, limit = 40 } = {},
+  opts,
+) {
+  const params = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit),
+  });
+  if (projectId) params.set("projectId", projectId);
+  if (q) params.set("q", q);
+  if (kind) params.set("kind", kind);
+  return request("/api/library/items?" + params.toString(), {
+    timeoutMs: 15000,
+    ...opts,
+  });
+}
+
+/** 文件读取令牌（进程内生成，只用于本机 ?access= 查询参数）。 */
+export function getFileToken(opts) {
+  return request("/api/file-token", opts);
+}
+
+/** 索引文件的直链；预览与下载共用，令牌随 URL 过期于 runtime 退出。 */
+export function libraryFileUrl(path, access, download = false) {
+  const params = new URLSearchParams({ path, access });
+  if (download) params.set("download", "1");
+  return API_BASE + "/api/library/file?" + params.toString();
+}
+
+/** 把索引条目登记成教学资源（可选动作；目录与路径仍由 runtime 校验）。 */
+export function registerResource(projectId, resource, opts) {
+  return request(
+    "/api/projects/" + encodeURIComponent(projectId) + "/resources",
+    {
+      ...opts,
+      method: "POST",
+      body: { resource },
+    },
+  );
+}
+
 /** 检查一个项目资料是否仍在授权目录里（GET /api/projects/:id/resources/scan）。 */
 export function scanProjectLibrary(id, opts) {
   return request(

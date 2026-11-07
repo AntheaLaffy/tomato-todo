@@ -35,6 +35,12 @@ import {
   authorizeLibrary,
   revokeLibraryGrant,
   scanProjectLibrary,
+  scanLibrary,
+  getLibraryStats,
+  getLibraryItems,
+  getFileToken,
+  libraryFileUrl,
+  registerResource,
 } from "../shared/api.js";
 import {
   addDays,
@@ -150,6 +156,57 @@ registerCopy("education", {
     libraryLoading: "正在读取资料库授权…",
     libraryUnavailable: "无法读取资料库状态，runtime 可能未连接。",
     libraryRetry: "重试",
+    libraryIndexNever: "尚未生成资料库索引",
+    libraryIndexStale: "索引属于旧目录，请重新扫描",
+    libraryIndexScanned: "已扫描 {n} 个文件 · {time}",
+    libraryIndexScanning: "正在扫描资料库…",
+    libraryIndexHint:
+      "索引只记录文件清单，不写入计划或备份；只有真正引用某份资料时才登记。",
+    libraryIndexByKind: "按类型",
+    libraryIndexByTop: "按目录",
+    libraryIndexKindPdf: "PDF",
+    libraryIndexKindImage: "图片",
+    libraryIndexKindAudio: "音频",
+    libraryIndexKindVideo: "视频",
+    libraryIndexKindDoc: "文档",
+    libraryIndexKindOther: "其他",
+    libraryIndexRootDir: "库根目录",
+    libraryIndexScan: "扫描/重新扫描",
+    libraryIndexScanDone: "已扫描 {n} 个文件，用时 {ms} 毫秒",
+    libraryIndexCheck: "检查已登记",
+    libraryIndexCheckDone: "已检查 {n} 份登记：可用 {a}，缺失 {m}，不可用 {u}",
+    libraryIndexNone:
+      "还没有资料库索引。点下面的按钮扫描共享库，之后可按目录浏览全部资料。",
+    libraryIndexGenerate: "扫描生成索引",
+    libraryIndexSearchPlaceholder: "搜索文件名或路径",
+    libraryIndexAll: "全部类型",
+    libraryIndexEmpty: "没有匹配的资料。",
+    libraryIndexTotal: "{n} 个文件",
+    libraryIndexPage: "第 {page} / {pages} 页",
+    libraryIndexPrev: "上一页",
+    libraryIndexNext: "下一页",
+    libraryIndexNoFilter: "未匹配到项目目录，显示全部文件",
+    libraryIndexFiltered: "按目录 {dirs} 过滤",
+    libraryIndexPreview: "预览",
+    libraryIndexRegister: "登记",
+    libraryIndexUnpreviewable: "此类型或大小不支持预览，可下载原件。",
+    libraryIndexDownload: "下载原件",
+    libraryIndexLoading: "正在读取索引…",
+    libraryIndexLoadFailed: "索引读取失败",
+    libraryIndexRegisterTitle: "登记为项目资料",
+    libraryIndexRegisterSubtitle:
+      "登记会写入教学记录；只在课程、作业或学情要引用这份资料时才需要。",
+    libraryIndexTitleLabel: "标题",
+    libraryIndexKindLabel: "类型",
+    libraryIndexSourceLabel: "来源",
+    libraryIndexEditionLabel: "版本",
+    libraryIndexRegisterSubmit: "登记",
+    libraryIndexRegistered: "已登记为项目资料",
+    libraryIndexRegisterRequired: "请填写标题",
+    libraryIndexFileTitle: "资料预览",
+    libraryIndexFileLoading: "正在获取文件…",
+    libraryIndexFileFailed: "无法读取文件",
+    libraryIndexFileMeta: "{kind} · {size}",
     syllabusLabel: "考纲",
     pastPapersCount: "真题 {n} 份",
     mockPapersCount: "模拟题 {n} 份",
@@ -318,6 +375,60 @@ registerCopy("education", {
     libraryUnavailable:
       "Could not read the library state; runtime may be offline.",
     libraryRetry: "Retry",
+    libraryIndexNever: "No library index yet",
+    libraryIndexStale: "The index belongs to a previous folder; scan again.",
+    libraryIndexScanned: "Scanned {n} files · {time}",
+    libraryIndexScanning: "Scanning the resource library…",
+    libraryIndexHint:
+      "The index only stores the file list; it is not part of the plan or backups. A resource is registered only when teaching records actually reference it.",
+    libraryIndexByKind: "By type",
+    libraryIndexByTop: "By folder",
+    libraryIndexKindPdf: "PDF",
+    libraryIndexKindImage: "Images",
+    libraryIndexKindAudio: "Audio",
+    libraryIndexKindVideo: "Video",
+    libraryIndexKindDoc: "Documents",
+    libraryIndexKindOther: "Other",
+    libraryIndexRootDir: "Library root",
+    libraryIndexScan: "Scan / rescan",
+    libraryIndexScanDone: "Scanned {n} files in {ms} ms",
+    libraryIndexCheck: "Check registered",
+    libraryIndexCheckDone:
+      "Checked {n} registrations: {a} available, {m} missing, {u} unavailable",
+    libraryIndexNone:
+      "No library index yet. Scan the shared library to browse every file by folder without registering them one by one.",
+    libraryIndexGenerate: "Scan to build index",
+    libraryIndexSearchPlaceholder: "Search file name or path",
+    libraryIndexAll: "All types",
+    libraryIndexEmpty: "No matching files.",
+    libraryIndexTotal: "{n} files",
+    libraryIndexPage: "Page {page} / {pages}",
+    libraryIndexPrev: "Previous",
+    libraryIndexNext: "Next",
+    libraryIndexNoFilter:
+      "No project folder matched; showing all indexed files.",
+    libraryIndexFiltered: "Filtered by folder {dirs}",
+    libraryIndexPreview: "Preview",
+    libraryIndexRegister: "Register",
+    libraryIndexUnpreviewable:
+      "This type or size cannot be previewed; download the original instead.",
+    libraryIndexDownload: "Download original",
+    libraryIndexLoading: "Reading the index…",
+    libraryIndexLoadFailed: "Could not read the index",
+    libraryIndexRegisterTitle: "Register as project resource",
+    libraryIndexRegisterSubtitle:
+      "Registration writes a teaching record. Use it only when a lesson, assignment, or progress note actually references this file.",
+    libraryIndexTitleLabel: "Title",
+    libraryIndexKindLabel: "Type",
+    libraryIndexSourceLabel: "Source",
+    libraryIndexEditionLabel: "Edition",
+    libraryIndexRegisterSubmit: "Register",
+    libraryIndexRegistered: "Registered as a project resource",
+    libraryIndexRegisterRequired: "Enter a title",
+    libraryIndexFileTitle: "Resource preview",
+    libraryIndexFileLoading: "Loading file…",
+    libraryIndexFileFailed: "Could not read the file",
+    libraryIndexFileMeta: "{kind} · {size}",
     syllabusLabel: "Syllabus",
     pastPapersCount: "{n} past papers",
     mockPapersCount: "{n} mock papers",
@@ -415,6 +526,29 @@ const RESOURCE_KIND_COPY = {
   attachment: "resourceKindAttachment",
   answerSheet: "resourceKindAnswerSheet",
 };
+
+// 索引浏览分组（与 runtime library-index.mjs 的 INDEX_KINDS 对应）。
+const INDEX_KINDS = ["pdf", "image", "audio", "video", "doc", "other"];
+const INDEX_KIND_COPY = {
+  pdf: "libraryIndexKindPdf",
+  image: "libraryIndexKindImage",
+  audio: "libraryIndexKindAudio",
+  video: "libraryIndexKindVideo",
+  doc: "libraryIndexKindDoc",
+  other: "libraryIndexKindOther",
+};
+
+function indexKindLabel(kind) {
+  const key = INDEX_KIND_COPY[kind];
+  return key ? t(`education.${key}`) : strOr(kind);
+}
+
+function formatBytes(n) {
+  const value = numOr(n, 0);
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
+}
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -1126,7 +1260,10 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
   const [directory, setDirectory] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [scan, setScan] = useState("");
+  const [check, setCheck] = useState("");
+  const [stats, setStats] = useState(null);
+  const [statsError, setStatsError] = useState("");
+  const [scanning, setScanning] = useState(false);
 
   const loading = library === null || library === undefined;
   const authorized =
@@ -1134,6 +1271,40 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
   const unavailable =
     library !== null && library !== undefined && library.unavailable === true;
   const path = strOr(library?.directory);
+
+  // 索引状态与授权状态一起刷新；授权成功后自动扫描在后台跑，没有索引时
+  // 每 2.5 秒补一次状态，扫完就停。授权本身不等待扫描。
+  useEffect(() => {
+    if (!authorized) {
+      setStats(null);
+      setStatsError("");
+      return undefined;
+    }
+    let cancelled = false;
+    let timer = null;
+    const load = () => {
+      getLibraryStats({ timeoutMs: 8000 })
+        .then((next) => {
+          if (cancelled) return;
+          setStats(next);
+          setStatsError("");
+          if (next && next.hasIndex === true && timer !== null) {
+            clearInterval(timer);
+            timer = null;
+          }
+        })
+        .catch((e) => {
+          if (!cancelled)
+            setStatsError(e && e.userMessage ? e.userMessage : String(e));
+        });
+    };
+    load();
+    timer = setInterval(load, 2500);
+    return () => {
+      cancelled = true;
+      if (timer !== null) clearInterval(timer);
+    };
+  }, [authorized, path]);
 
   const openAuthorize = () => {
     setDirectory(path || "");
@@ -1162,6 +1333,8 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
       const next = await authorizeLibrary(value);
       onChange(next);
       setDialog(null);
+      setStats(null);
+      setStatsError("");
       notify(t("education.librarySaved"), "brand");
     } catch (e) {
       setError(e && e.userMessage ? e.userMessage : String(e));
@@ -1185,13 +1358,36 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
     }
   };
 
-  const scanAll = async () => {
+  // 「扫描」只建索引：文件清单来自目录本身，不碰 education.resources。
+  const scanIndex = async () => {
+    setBusy(true);
+    setScanning(true);
+    try {
+      const result = await scanLibrary();
+      setStats({ ...result, authorized: true, hasIndex: true });
+      notify(
+        t("education.libraryIndexScanDone", {
+          n: result.count,
+          ms: result.durationMs,
+        }),
+        "brand",
+      );
+    } catch (e) {
+      notify(e && e.userMessage ? e.userMessage : String(e), "danger");
+    } finally {
+      setBusy(false);
+      setScanning(false);
+    }
+  };
+
+  // 「检查已登记」保留原来的逐项目核查：它看的是已登记资源，不是目录索引。
+  const checkRegistered = async () => {
     if (projectIds.length === 0) {
       notify(t("education.libraryScanNone"), "neutral");
       return;
     }
     setBusy(true);
-    setScan(t("education.libraryScanning"));
+    setCheck(t("education.libraryScanning"));
     try {
       const results = await Promise.all(
         projectIds.map((id) => scanProjectLibrary(id)),
@@ -1203,8 +1399,8 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
         items.filter((item) => item.state === state).length;
       const available = count("available");
       const missing = count("missing");
-      setScan(
-        t("education.libraryScanDone", {
+      setCheck(
+        t("education.libraryIndexCheckDone", {
           n: items.length,
           a: available,
           m: missing,
@@ -1212,7 +1408,7 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
         }),
       );
     } catch (e) {
-      setScan("");
+      setCheck("");
       notify(e && e.userMessage ? e.userMessage : String(e), "danger");
     } finally {
       setBusy(false);
@@ -1247,6 +1443,132 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
             : t("education.directoryEmpty")),
   );
 
+  const statsBlock = (() => {
+    if (loading || !authorized) return null;
+    if (statsError)
+      return h(
+        "div",
+        { style: { fontSize: 11.5, color: "#b8503f", marginTop: 9 } },
+        statsError,
+      );
+    if (stats === null)
+      return h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            marginTop: 9,
+          },
+        },
+        t("education.libraryIndexLoading"),
+      );
+    if (stats.hasIndex !== true)
+      return h(
+        "div",
+        { style: { marginTop: 9 } },
+        h(
+          "div",
+          { style: { fontSize: 12, color: "var(--tomato-ink-2)" } },
+          stats.stale
+            ? t("education.libraryIndexStale")
+            : t("education.libraryIndexNever"),
+        ),
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 11.5,
+              color: "var(--tomato-ink-3)",
+              lineHeight: 1.55,
+              marginTop: 4,
+            },
+          },
+          t("education.libraryIndexHint"),
+        ),
+      );
+    const kindChips = INDEX_KINDS.filter(
+      (kind) => numOr(stats.byKind?.[kind], 0) > 0,
+    ).map((kind) =>
+      h(
+        Chip,
+        { key: kind, tone: "neutral" },
+        `${indexKindLabel(kind)} ${stats.byKind[kind]}`,
+      ),
+    );
+    const topChips = Object.entries(stats.byTop ?? {})
+      .slice(0, 8)
+      .map(([top, count]) =>
+        h(
+          Chip,
+          { key: top, tone: "neutral", icon: "folder" },
+          `${top === "." ? t("education.libraryIndexRootDir") : top} ${count}`,
+        ),
+      );
+    return h(
+      "div",
+      { style: { marginTop: 9 } },
+      h(
+        "div",
+        { style: { fontSize: 12, color: "var(--tomato-ink-2)" } },
+        t("education.libraryIndexScanned", {
+          n: stats.count,
+          time: fmtDateTime(stats.scannedAt),
+        }),
+      ),
+      h(
+        "div",
+        {
+          style: {
+            fontSize: 11.5,
+            color: "var(--tomato-ink-3)",
+            lineHeight: 1.55,
+            marginTop: 4,
+          },
+        },
+        t("education.libraryIndexHint"),
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            flexWrap: "wrap",
+            marginTop: 7,
+          },
+        },
+        h(
+          "span",
+          { style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+          t("education.libraryIndexByKind"),
+        ),
+        ...kindChips,
+      ),
+      topChips.length > 0
+        ? h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+                marginTop: 6,
+              },
+            },
+            h(
+              "span",
+              { style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+              t("education.libraryIndexByTop"),
+            ),
+            ...topChips,
+          )
+        : null,
+    );
+  })();
+
   const card = h(
     Card,
     { pad: 20 },
@@ -1273,6 +1595,7 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
         ? t("education.librarySharedHint")
         : t("education.libraryMissingHint"),
     ),
+    statsBlock,
     unavailable
       ? h(
           "div",
@@ -1326,13 +1649,27 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
                 Btn,
                 {
                   key: "scan",
-                  variant: "ghost",
+                  variant: "soft",
                   size: "sm",
                   icon: "refresh",
-                  onClick: scanAll,
+                  onClick: scanIndex,
+                  disabled: busy || scanning,
+                },
+                scanning
+                  ? t("education.libraryIndexScanning")
+                  : t("education.libraryIndexScan"),
+              ),
+              h(
+                Btn,
+                {
+                  key: "check",
+                  variant: "ghost",
+                  size: "sm",
+                  icon: "eye",
+                  onClick: checkRegistered,
                   disabled: busy,
                 },
-                t("education.libraryScan"),
+                t("education.libraryIndexCheck"),
               ),
               h(
                 Btn,
@@ -1357,7 +1694,7 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
               t("education.libraryAuthorize"),
             ),
     ),
-    scan
+    check
       ? h(
           "div",
           {
@@ -1367,7 +1704,7 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
               marginTop: 9,
             },
           },
-          scan,
+          check,
         )
       : null,
   );
@@ -1469,6 +1806,660 @@ function LibraryCard({ library, projectIds, onChange, onReload }) {
     card,
     authorizeDialog,
     revokeDialog,
+  );
+}
+
+// ---------------------------------------------------------------- 索引浏览
+
+// 预览对话框：图片/PDF/文本/音视频直接用 runtime 的流式文件端点。
+// 预览上限 20 MiB 由服务端判定；超过或类型未知时只给下载，不硬塞进内存。
+function FilePreviewDialog({ item, onClose }) {
+  const open = item !== null && item !== undefined;
+  const path = strOr(item?.path);
+  const [access, setAccess] = useState("");
+  const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    setAccess("");
+    setError("");
+    getFileToken({ timeoutMs: 5000 })
+      .then((next) => {
+        if (!cancelled) setAccess(strOr(next?.access));
+      })
+      .catch((e) => {
+        if (!cancelled)
+          setError(e && e.userMessage ? e.userMessage : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, path, reloadKey]);
+
+  if (!open) return null;
+
+  const previewable = item.previewable === true;
+  const viewUrl = access ? libraryFileUrl(path, access, false) : "";
+  const downloadUrl = access ? libraryFileUrl(path, access, true) : "";
+  let body = null;
+  if (!previewable) {
+    body = mutedText(t("education.libraryIndexUnpreviewable"));
+  } else if (error !== "") {
+    body = h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h("div", { style: { fontSize: 12.5, color: "#b8503f" } }, error),
+      h(
+        Btn,
+        {
+          variant: "ghost",
+          size: "sm",
+          icon: "refresh",
+          onClick: () => setReloadKey((value) => value + 1),
+        },
+        t("education.libraryRetry"),
+      ),
+    );
+  } else if (access === "") {
+    body = h(Skeleton, { w: "100%", h: 220 });
+  } else if (item.kind === "image") {
+    body = h("img", {
+      src: viewUrl,
+      alt: strOr(item.name),
+      style: {
+        display: "block",
+        maxWidth: "100%",
+        maxHeight: "66vh",
+        margin: "0 auto",
+        borderRadius: 8,
+      },
+    });
+  } else if (item.kind === "audio") {
+    body = h("audio", {
+      controls: true,
+      src: viewUrl,
+      style: { width: "100%" },
+    });
+  } else if (item.kind === "video") {
+    body = h("video", {
+      controls: true,
+      src: viewUrl,
+      style: { display: "block", maxWidth: "100%", maxHeight: "66vh" },
+    });
+  } else {
+    body = h("iframe", {
+      title: strOr(item.name),
+      src: viewUrl,
+      style: {
+        width: "100%",
+        height: "66vh",
+        border: "none",
+        borderRadius: 8,
+        background: "#fff",
+      },
+    });
+  }
+
+  return h(
+    Modal,
+    {
+      open,
+      onClose,
+      title: strOr(item.name, t("education.libraryIndexFileTitle")),
+      subtitle: t("education.libraryIndexFileMeta", {
+        kind: indexKindLabel(item.kind),
+        size: formatBytes(item.sizeBytes),
+      }),
+      icon: "eye",
+      width: 920,
+      bodyStyle: { paddingTop: 6 },
+      footer: h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 10,
+          },
+        },
+        error !== ""
+          ? h(
+              Btn,
+              {
+                variant: "ghost",
+                size: "sm",
+                icon: "refresh",
+                onClick: () => setReloadKey((value) => value + 1),
+              },
+              t("education.libraryRetry"),
+            )
+          : null,
+        downloadUrl
+          ? h(
+              "a",
+              {
+                href: downloadUrl,
+                style: {
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--tomato-brand-deep)",
+                  textDecoration: "none",
+                  padding: "6px 10px",
+                  borderRadius: 9,
+                  background: "var(--tomato-brand-soft)",
+                },
+              },
+              t("education.libraryIndexDownload"),
+            )
+          : null,
+        h(
+          Btn,
+          { variant: "ghost", size: "sm", onClick: onClose },
+          t("common.close"),
+        ),
+      ),
+    },
+    body,
+  );
+}
+
+// 登记仍是可选动作：索引负责浏览，只有教学记录真的要引用时才写一条
+// education.resources（kind 由用户选，系统不按扩展名猜）。
+function RegisterResourceDialog({ item, projectId, onClose }) {
+  const open = item !== null && item !== undefined;
+  const [title, setTitle] = useState("");
+  const [kind, setKind] = useState("attachment");
+  const [source, setSource] = useState("");
+  const [edition, setEdition] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle(strOr(item?.name));
+    setKind("attachment");
+    setSource("");
+    setEdition("");
+    setError("");
+  }, [open, strOr(item?.path)]);
+
+  if (!open) return null;
+
+  const submit = async () => {
+    if (title.trim() === "") {
+      setError(t("education.libraryIndexRegisterRequired"));
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await registerResource(projectId, {
+        title: title.trim(),
+        kind,
+        path: item.path,
+        source: source.trim(),
+        edition: edition.trim(),
+        topics: [],
+      });
+      await refresh();
+      notify(t("education.libraryIndexRegistered"), "brand");
+      onClose();
+    } catch (e) {
+      setError(e && e.userMessage ? e.userMessage : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return h(
+    Modal,
+    {
+      open,
+      onClose: busy ? undefined : onClose,
+      title: t("education.libraryIndexRegisterTitle"),
+      subtitle: t("education.libraryIndexRegisterSubtitle"),
+      icon: "tag",
+      footer: h(
+        "div",
+        { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
+        h(
+          Btn,
+          { variant: "ghost", onClick: onClose, disabled: busy },
+          t("common.cancel"),
+        ),
+        h(
+          Btn,
+          { variant: "primary", onClick: submit, disabled: busy },
+          t("education.libraryIndexRegisterSubmit"),
+        ),
+      ),
+    },
+    h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 10 } },
+      h(
+        Field,
+        { label: t("education.libraryIndexTitleLabel") },
+        h(Input, {
+          value: title,
+          onChange: (value) => {
+            setTitle(value);
+            setError("");
+          },
+          autoFocus: true,
+        }),
+      ),
+      h(
+        Field,
+        { label: t("education.libraryIndexKindLabel") },
+        h(Select, {
+          value: kind,
+          options: RESOURCE_KINDS.map((value) => ({
+            value,
+            label: resourceKindLabel(value),
+          })),
+          onChange: setKind,
+        }),
+      ),
+      h(
+        Field,
+        { label: t("education.libraryIndexSourceLabel") },
+        h(Input, { value: source, onChange: setSource }),
+      ),
+      h(
+        Field,
+        { label: t("education.libraryIndexEditionLabel") },
+        h(Input, { value: edition, onChange: setEdition }),
+      ),
+      h(
+        "div",
+        {
+          className: "t-mono",
+          style: {
+            fontSize: 11,
+            color: "var(--tomato-ink-3)",
+            background: "var(--tomato-surface-2)",
+            borderRadius: 8,
+            padding: "7px 9px",
+            wordBreak: "break-all",
+          },
+        },
+        strOr(item.path),
+      ),
+      error
+        ? h("div", { style: { fontSize: 12, color: "#b8503f" } }, error)
+        : null,
+    ),
+  );
+}
+
+// 项目详情里的资料目录浏览器：分页 + 关键词 + 类型筛选，点击预览。
+function LibraryBrowser({ projectId }) {
+  const limit = 40;
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [scanning, setScanning] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [registerItem, setRegisterItem] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    getLibraryItems({ projectId, q, kind, offset, limit }, { timeoutMs: 15000 })
+      .then((next) => {
+        if (cancelled) return;
+        setData(next);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e && e.userMessage ? e.userMessage : String(e));
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, q, kind, offset, reloadKey]);
+
+  const scanIndex = async () => {
+    setScanning(true);
+    setError("");
+    try {
+      const result = await scanLibrary();
+      notify(
+        t("education.libraryIndexScanDone", {
+          n: result.count,
+          ms: result.durationMs,
+        }),
+        "brand",
+      );
+      setOffset(0);
+      setReloadKey((value) => value + 1);
+    } catch (e) {
+      setError(e && e.userMessage ? e.userMessage : String(e));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  if (loading && data === null)
+    return h(
+      "div",
+      {
+        style: {
+          marginTop: 14,
+          paddingTop: 12,
+          borderTop: "1px solid var(--tomato-line)",
+          fontSize: 12,
+          color: "var(--tomato-ink-3)",
+        },
+      },
+      t("education.libraryIndexLoading"),
+    );
+
+  if (data !== null && data.hasIndex !== true) {
+    return h(
+      "div",
+      {
+        style: {
+          marginTop: 14,
+          paddingTop: 12,
+          borderTop: "1px solid var(--tomato-line)",
+        },
+      },
+      mutedText(t("education.libraryIndexNone")),
+      h(
+        Btn,
+        {
+          variant: "soft",
+          size: "sm",
+          icon: "refresh",
+          onClick: scanIndex,
+          disabled: scanning,
+          style: { marginTop: 8 },
+        },
+        scanning
+          ? t("education.libraryIndexScanning")
+          : t("education.libraryIndexGenerate"),
+      ),
+      error
+        ? h(
+            "div",
+            { style: { fontSize: 12, color: "#b8503f", marginTop: 8 } },
+            error,
+          )
+        : null,
+    );
+  }
+
+  const items = asArray(data?.items);
+  const total = numOr(data?.total, 0);
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.floor(offset / limit) + 1;
+  const matchedDirs = asArray(data?.matchedDirs);
+  const filterHint = data
+    ? data.filtered === true
+      ? t("education.libraryIndexFiltered", {
+          dirs: matchedDirs.join("、"),
+        })
+      : t("education.libraryIndexNoFilter")
+    : "";
+
+  const searchRow = h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginTop: 10,
+      },
+    },
+    h(Input, {
+      value: qInput,
+      onChange: setQInput,
+      placeholder: t("education.libraryIndexSearchPlaceholder"),
+      style: { flex: 1, minWidth: 180 },
+      onKeyDown: (e) => {
+        if (e.key === "Enter") {
+          setQ(qInput.trim());
+          setOffset(0);
+        }
+      },
+    }),
+    h(
+      Btn,
+      {
+        variant: "soft",
+        size: "sm",
+        icon: "search",
+        onClick: () => {
+          setQ(qInput.trim());
+          setOffset(0);
+        },
+      },
+      t("common.search"),
+    ),
+    h(Select, {
+      value: kind,
+      options: [
+        { value: "", label: t("education.libraryIndexAll") },
+        ...INDEX_KINDS.map((value) => ({
+          value,
+          label: indexKindLabel(value),
+        })),
+      ],
+      onChange: (value) => {
+        setKind(value);
+        setOffset(0);
+      },
+      width: 130,
+    }),
+    h(
+      Btn,
+      {
+        variant: "ghost",
+        size: "sm",
+        icon: "refresh",
+        onClick: scanIndex,
+        disabled: scanning,
+      },
+      scanning
+        ? t("education.libraryIndexScanning")
+        : t("education.libraryIndexScan"),
+    ),
+  );
+
+  return h(
+    "div",
+    {
+      style: {
+        marginTop: 14,
+        paddingTop: 12,
+        borderTop: "1px solid var(--tomato-line)",
+      },
+    },
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+        },
+      },
+      h(
+        "div",
+        { style: { fontSize: 12.5, fontWeight: 600 } },
+        t("education.libraryIndexTotal", { n: total }),
+      ),
+      filterHint
+        ? h(
+            "span",
+            { style: { fontSize: 11, color: "var(--tomato-ink-3)" } },
+            filterHint,
+          )
+        : null,
+    ),
+    searchRow,
+    error
+      ? h(
+          "div",
+          { style: { fontSize: 12, color: "#b8503f", marginTop: 8 } },
+          error,
+        )
+      : null,
+    items.length === 0
+      ? h(
+          "div",
+          { style: { marginTop: 10 } },
+          mutedText(t("education.libraryIndexEmpty")),
+        )
+      : h(
+          "div",
+          {
+            className: "t-scroll",
+            style: {
+              maxHeight: 380,
+              overflowY: "auto",
+              marginTop: 6,
+              paddingRight: 4,
+            },
+          },
+          items.map((item) =>
+            h(
+              "div",
+              { key: strOr(item.path), style: ROW },
+              h(
+                "div",
+                { style: { flex: 1, minWidth: 0 } },
+                h(
+                  "div",
+                  {
+                    style: {
+                      fontSize: 13,
+                      color: "var(--tomato-ink)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    },
+                  },
+                  strOr(item.name),
+                ),
+                h(
+                  "div",
+                  { style: { ...META, overflow: "hidden" } },
+                  h(Chip, { tone: "neutral" }, indexKindLabel(item.kind)),
+                  h("span", null, formatBytes(item.sizeBytes)),
+                  h(
+                    "span",
+                    {
+                      style: {
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      },
+                    },
+                    strOr(item.path),
+                  ),
+                ),
+              ),
+              h(
+                "div",
+                {
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    flex: "none",
+                  },
+                },
+                h(
+                  Btn,
+                  {
+                    variant: "ghost",
+                    size: "sm",
+                    icon: "eye",
+                    onClick: () => setPreview(item),
+                  },
+                  t("education.libraryIndexPreview"),
+                ),
+                h(
+                  Btn,
+                  {
+                    variant: "ghost",
+                    size: "sm",
+                    icon: "tag",
+                    onClick: () => setRegisterItem(item),
+                  },
+                  t("education.libraryIndexRegister"),
+                ),
+              ),
+            ),
+          ),
+        ),
+    total > limit
+      ? h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 8,
+              marginTop: 8,
+            },
+          },
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              icon: "chevronLeft",
+              onClick: () => setOffset(Math.max(0, offset - limit)),
+              disabled: offset === 0,
+            },
+            t("education.libraryIndexPrev"),
+          ),
+          h(
+            "span",
+            { style: { fontSize: 11.5, color: "var(--tomato-ink-3)" } },
+            t("education.libraryIndexPage", { page, pages }),
+          ),
+          h(
+            Btn,
+            {
+              variant: "ghost",
+              size: "sm",
+              iconRight: "chevronRight",
+              onClick: () => setOffset(offset + limit),
+              disabled: offset + limit >= total,
+            },
+            t("education.libraryIndexNext"),
+          ),
+        )
+      : null,
+    h(FilePreviewDialog, {
+      item: preview,
+      onClose: () => setPreview(null),
+    }),
+    h(RegisterResourceDialog, {
+      item: registerItem,
+      projectId,
+      onClose: () => setRegisterItem(null),
+    }),
   );
 }
 
@@ -1788,6 +2779,7 @@ export function ProjectDetail({
         }),
       ),
     ),
+    usesSharedLibrary ? h(LibraryBrowser, { projectId }) : null,
   );
 
   const resourcesCard = h(

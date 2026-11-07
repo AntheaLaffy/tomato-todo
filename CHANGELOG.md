@@ -7,6 +7,7 @@
 ### 变更
 
 - 应试教育新增「共享资料库」：在页面一次授权整个资料目录（如 `/home/fuurin/exam`）后，所有学习项目默认共用，不再要求逐个项目绑定；项目单独授权保留，但只能收窄到共享库内的子目录。新增 `GET /api/library/grant`、`POST /api/library/authorize`、`DELETE /api/library/grant`，授权只给界面用户操作，不新增 MCP/助手入口；取消共享授权只删除 `library-grant.json`，按项目的授权保留。安全校验（绝对路径、无符号链接、非根/主目录/应用数据目录、读取不越界）对共享库同样生效。
+- 共享资料库改为「索引 vs 登记」两层：新增 `runtime/src/library-index.mjs`，扫描授权目录得到独立索引 `dataDir/library-index.json`（0600 原子写，不进计划/备份），新增 `POST /api/library/scan`、`GET /api/library/items`、`GET /api/library/stats`、`GET /api/library/file`；项目详情可直接浏览/搜索/预览共享库文件并按顶层目录映射到项目，只有真正要写进教学记录时才登记单份资料。这样近五千个文件不必逐份 `education.saveResource`（避免每次写盘重写整份计划、每份快照序列化），也不再需要按扩展名猜固定的 `Resource.kind`；授权成功后自动异步扫描，并发扫描等待同一份结果。
 - 应用白名单建议改为只列当前有窗口的运行中应用，自动刷新并最多显示 8 项；DSH 自身不列入建议，手动输入仍可添加其他 app id。桌面入口只用于名称，guard 不可达时不回退为全部已安装应用。
 - niri 保护改为直接全屏并回焦 DSH 实际窗口，保留倒计时与解锁入口；锁机模式、快速/定时锁机忽略所有白名单，白名单专注模式才放行有效白名单。沉浸层接入显式原生全屏/退出，守卫重启后 runtime 根据实际状态重发保护命令；独立 Xvfb+niri 回归覆盖上述行为。
 - 界面改为「整个 DSH 的番茄皮肤」：`skin/` 用 `theme.overrideTokens` 把 `--dsw-alias-*` 换成纸色系（浅/深同源、不改用户明暗偏好），注入 `--tomato-*` 变量、组件样式、`#tomato-ambient` 氛围层（窗光/纸纹/线描书桌/漂移微粒/竖排小字/时段变化）与侧栏、会话首屏品牌位；另有常驻专注 HUD（`shell.overlay`）与全屏沉浸模式（含 Legacy 2b 结束确认）。

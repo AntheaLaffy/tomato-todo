@@ -37,6 +37,7 @@
 - `GET /api/projects/:id/resources/scan` — 只读核查登记文件：`{projectId,checkedAt,resources:[{id,state,sizeBytes,detail,references}]}`
 - `GET /api/state`、`GET /api/export/plan`、`GET /api/export/backup` — 见下节（UI 数据面与导出）
 - `GET /api/library/grant` — 共享资料库授权状态（见「资料目录授权」）
+- `GET /api/library/stats`、`GET /api/library/items`、`GET /api/library/file` — 共享资料库索引的摘要、浏览与文件流（见「资料库索引」）
 
 浏览器写端点（同 Origin 白名单；写路径也必须经 @tomato/core 的校验与保护规则）：
 - `POST /api/tasks`、`PATCH /api/tasks/:id`、`POST /api/tasks/:id/complete`、`POST /api/tasks/move`
@@ -48,6 +49,7 @@
 - `POST /api/projects/:id/resources/:rid/repair` `{path}` → 验证新路径后保留资源 ID
 - `POST /api/projects/:id/resources/cleanup` `{ids?}` → 清理仍缺失且无教学引用的登记；只删索引，不删磁盘文件
 - `POST /api/library/authorize` `{directory}`、`DELETE /api/library/grant` — 共享资料库的一次性授权与取消，只给界面上的用户操作，见「资料目录授权」
+- `POST /api/library/scan` — 重新扫描共享资料库并写索引，返回摘要；同一时刻只跑一次，见「资料库索引」
 - 其余写操作走 MCP（助手代劳），UI 不直接暴露
 
 ### UI 数据面（插件 UI 的唯一数据入口）
@@ -97,6 +99,40 @@ UI 不再按页面堆端点，而是「取一份全量状态 + 提交 Action」�
   Action union**，保持「目录授权只能由用户设置」这条不变量。授权存 `dataDir/library-grant.json`
   （0600、同目录临时文件 + rename 原子写，内容 `{directory, grantedAt}`），不进入计划/备份；
   导入备份也不会扩大本机授权。
+
+**资料库索引（索引 ≠ 登记）**：
+
+索引是共享资料库的**文件清单**，回答「目录里有什么」，用于浏览与搜索；它不是
+`education.resources`，也不进入 `plan.json`/备份。只有课程、作业、学情等教学记录真的要引用某份
+资料时，才通过 `POST /api/projects/:id/resources` 登记一条 Resource（`kind` 由用户/助手按枚举选择，
+不按扩展名猜）。扫描只读元数据，不打开文件内容，也不写 `/home/fuurin/exam`。
+
+- 索引文件：`dataDir/library-index.json`（0600、同目录临时文件 + rename 原子写），形状
+  `{root, scannedAt, count, items}`；`items` 按 `path` 排序，条目为
+  `{path,name,ext,sizeBytes,mtime}`，`path` 是相对库根的 POSIX 路径，`mtime` 为 Unix 秒。
+  索引不属于计划/备份；换目录或重新授权后旧索引会被标记为 stale，不对外提供。
+- 扫描规则：不跟随符号链接；跳过隐藏文件/目录、`node_modules`、`.git`；默认最多 50000 条、
+  单次最多 30 秒，超限返回已收集的前缀并标记 `truncated`。
+- `POST /api/library/scan` — 重新扫描并返回摘要
+  `{hasIndex,count,byExt,byKind,byTop,scannedAt,durationMs,truncated}`。未授权 403。同一时刻只跑一次：
+  并发请求**等待同一次扫描的结果**（`scannedAt`/`durationMs` 相同），不会各自重扫。授权成功后会自动
+  异步触发一次扫描，失败只记日志，不阻塞授权响应。
+- `GET /api/library/stats` — 授权与索引状态：`{authorized,directory,hasIndex,stale?,reason?,root,
+  scannedAt,count,byExt,byKind,byTop}`；没有索引时 `hasIndex:false`、计数为 0。
+- `GET /api/library/items?q=&kind=&offset=&limit=&projectId=` — 索引分页搜索（limit 1–100，默认 40）。
+  `kind` 既接受浏览分组 `pdf`/`image`/`audio`/`video`/`doc`/`other`，也接受单个扩展名（如 `docx`）；
+  `q` 匹配文件名与相对路径。带 `projectId` 时按「顶层目录 → 项目 name」的最佳匹配过滤
+  （如 `math`↔数学一、`eng`↔英语一、`408`↔408、`politics`↔政治、`教学安排`↔教学安排）；
+  匹配不到时**不过滤，返回全部条目**。返回
+  `{authorized,hasIndex,total,offset,limit,filtered,matchedDirs,items}`，条目额外带
+  `kind`（浏览分组）、`mimeType`、`previewable`（已知 MIME 且 ≤20 MiB）。没有索引时返回
+  `hasIndex:false` 与空 `items`。
+- `GET /api/library/file?path=<相对路径>&access=<token>[&download=1]` — 按索引里的相对路径流式读取
+  原件。必须带 `/api/file-token` 令牌；路径先经 `ProjectLibrary.resolveLibraryPath` 的
+  `safeRelative`/`noSymlinks`/`inside` 校验，再要求它确实在当前索引的 `items` 里。`..`、绝对路径、
+  库内指向库外的符号链接都返回 400（与项目资料一致），非索引路径返回 404；未授权 403，
+  无索引或索引 stale 409。
+  支持单段 `Range`（206/416）与 20 MiB 预览上限，超出时 `download=1` 仍可下载。
 
 **导出端点（偏好设置页用）**：
 
